@@ -739,6 +739,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .st-seg button{border:1px solid var(--line-2);background:var(--bg);color:var(--txt-2);border-radius:8px;padding:11px 8px;font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.15s var(--ease)}
 .st-seg button .d{width:7px;height:7px;border-radius:50%}
 .st-seg button.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--accent)}
+.dpick{position:relative;width:100%}
+.dp-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;cursor:pointer;transition:.16s}
+.dp-trigger:hover{border-color:var(--accent-line)}
+.dp-trigger.empty .dp-val{color:var(--txt-3)}
+.dp-trigger>svg{width:16px;height:16px;color:var(--txt-3);flex:none}
+.dp-trigger:hover>svg{color:var(--accent)}
+.dp-pop{position:absolute;top:calc(100% + 8px);left:0;z-index:90;width:272px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:12px;padding:14px;box-shadow:0 20px 56px rgba(0,0,0,.6);animation:ddIn .14s ease}
+.dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.dp-title{font-size:13px;font-weight:600;color:var(--txt)}
+.dp-nav{display:flex;gap:6px}
+.dp-nav button{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--bg-1);border:1px solid var(--line-2);border-radius:7px;color:var(--txt-2);cursor:pointer;transition:.14s;padding:0}
+.dp-nav button:hover{border-color:var(--accent-line);color:var(--accent)}
+.dp-nav svg{width:13px;height:13px}
+.dp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px}
+.dp-dow span{text-align:center;font-size:10px;letter-spacing:.04em;color:var(--txt-3);text-transform:uppercase;padding:4px 0}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-grid button{aspect-ratio:1;border:0;background:transparent;color:var(--txt-2);font-family:var(--font);font-size:12.5px;border-radius:7px;cursor:pointer;transition:.12s;padding:0}
+.dp-grid button:hover:not(:disabled){background:var(--bg-3);color:var(--txt)}
+.dp-grid button.oth{color:var(--txt-3);opacity:.4;cursor:default}
+.dp-grid button.today{box-shadow:inset 0 0 0 1px var(--accent-line)}
+.dp-grid button.sel{background:var(--accent);color:#06231e;font-weight:700}
+.dp-foot{display:flex;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.dp-foot button{background:transparent;border:0;color:var(--txt-2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;padding:5px 8px;border-radius:6px;transition:.12s}
+.dp-foot button:hover{color:var(--accent)}
+.dp-foot .clr:hover{color:var(--neg)}
 .cyc-list{display:flex;flex-direction:column;gap:9px}
 .cyc-it{display:flex;align-items:center;gap:13px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
 .cyc-it .pr{font-weight:600;font-size:13.5px;flex:1}
@@ -1803,7 +1828,7 @@ function pdNewStage(){
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" placeholder="напр. Контент-план"></div>
       <div class="fld"><label>Статус</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
-      <div class="fld"><label>Срок (дедлайн)</label><input type="date" id="pd2-date"></div>
+      <div class="fld"><label>Срок (дедлайн)</label>${dateField('pd2-date','')}</div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddStage()">Создать</button></div></div>`);
 }
@@ -1830,7 +1855,7 @@ async function pdNewTask(){
       <div class="fld"><label>Этап <span style="color:var(--neg)">*</span> · только активные</label><select id="pd2-stg">${stOpts}</select></div>
       <div class="fld2">
         <div class="fld"><label>Исполнитель</label><select id="pd2-asg"><option value="">— не назначен —</option>${opts}</select></div>
-        <div class="fld"><label>Срок</label><input type="date" id="pd2-tdate"></div>
+        <div class="fld"><label>Срок</label>${dateField('pd2-tdate','')}</div>
       </div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddTask()">Создать</button></div></div>`);
@@ -1922,6 +1947,60 @@ function renderPd(){
 /* ——— project secondary modals ——— */
 let pd2St='active', pd2Rep='PERF';
 function pd2Open(html){document.getElementById('ov-pd2').innerHTML=html;document.getElementById('ov-pd2').classList.add('on');}
+
+function pd2SetStatus(k){ pd2St=k; document.querySelectorAll('#pd2-stseg button').forEach(b=>b.classList.toggle('on', b.dataset.st===k)); }
+
+/* ——— custom date picker (brand-styled, RU) ——— */
+const DP_MON=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const DP_DOW=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+let _dpState={};
+function dpFmt(iso){ if(!iso) return ''; const [y,m,d]=iso.split('-'); return d+'.'+m+'.'+y; }
+function dpVal(id){ const e=document.getElementById(id); return e?e.value:''; }
+function dateField(id, iso, ph, onpick){
+  ph = ph||'дд.мм.гггг';
+  const disp = iso?dpFmt(iso):ph;
+  return `<div class="dpick" id="dpw-${id}">`
+    +`<input type="hidden" id="${id}" value="${iso||''}" data-onpick="${(onpick||'').replace(/"/g,'&quot;')}">`
+    +`<button type="button" class="dp-trigger ${iso?'':'empty'}" onclick="dpOpen('${id}')"><span class="dp-val">${disp}</span>`
+    +`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></button></div>`;
+}
+function _dpClose(){ document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); }
+function dpOpen(id){
+  const wrap=document.getElementById('dpw-'+id); if(!wrap) return;
+  const open=wrap.querySelector('.dp-pop'); _dpClose(); if(open) return;
+  const iso=dpVal(id), today=new Date(); let y,m;
+  if(iso){ const a=iso.split('-').map(Number); y=a[0]; m=a[1]-1; } else { y=today.getFullYear(); m=today.getMonth(); }
+  _dpState[id]={y,m};
+  const pop=document.createElement('div'); pop.className='dp-pop'; pop.innerHTML=_dpGrid(id); wrap.appendChild(pop);
+}
+function _dpGrid(id){
+  const st=_dpState[id], y=st.y, m=st.m, iso=dpVal(id), now=new Date();
+  const tISO=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  let start=new Date(y,m,1).getDay(); start=(start===0?6:start-1);
+  const dim=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate();
+  let cells='';
+  for(let i=0;i<start;i++) cells+=`<button class="oth" disabled>${prev-start+1+i}</button>`;
+  for(let d=1;d<=dim;d++){ const ci=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const cls=[ci===iso?'sel':'', ci===tISO?'today':''].filter(Boolean).join(' ');
+    cells+=`<button class="${cls}" onclick="dpPick('${id}','${ci}')">${d}</button>`; }
+  const tot=start+dim, trail=(7-(tot%7))%7;
+  for(let i=1;i<=trail;i++) cells+=`<button class="oth" disabled>${i}</button>`;
+  return `<div class="dp-head"><div class="dp-title">${DP_MON[m]} ${y}</div><div class="dp-nav">`
+    +`<button type="button" onclick="dpNav('${id}',-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>`
+    +`<button type="button" onclick="dpNav('${id}',1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button></div></div>`
+    +`<div class="dp-dow">${DP_DOW.map(d=>'<span>'+d+'</span>').join('')}</div><div class="dp-grid">${cells}</div>`
+    +`<div class="dp-foot"><button type="button" onclick="dpPick('${id}','${tISO}')">Сегодня</button><button type="button" class="clr" onclick="dpPick('${id}','')">Очистить</button></div>`;
+}
+function dpNav(id,delta){ const st=_dpState[id]; let m=st.m+delta,y=st.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} _dpState[id]={y,m};
+  const wrap=document.getElementById('dpw-'+id), pop=wrap&&wrap.querySelector('.dp-pop'); if(pop) pop.innerHTML=_dpGrid(id); }
+function dpPick(id,iso){
+  const e=document.getElementById(id); if(e) e.value=iso;
+  const wrap=document.getElementById('dpw-'+id), trig=wrap&&wrap.querySelector('.dp-trigger'), val=trig&&trig.querySelector('.dp-val');
+  if(val){ val.textContent=iso?dpFmt(iso):'дд.мм.гггг'; trig.classList.toggle('empty',!iso); }
+  _dpClose();
+  const cb=e&&e.getAttribute('data-onpick'); if(cb){ try{ new Function('v',cb)(iso); }catch(err){ console.warn(err); } }
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('.dpick')) _dpClose(); });
 function pd2Close(){document.getElementById('ov-pd2').classList.remove('on');document.getElementById('ov-pd2').innerHTML='';}
 function _v(id){const e=document.getElementById(id);return e?e.value.trim():'';}
 
@@ -1934,7 +2013,7 @@ function pdEditStage(id){
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" value="${(s.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Статус этапа</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
-      <div class="fld"><label>Срок (дедлайн)</label><input type="date" id="pd2-date" value="${s.due_date||''}"></div>
+      <div class="fld"><label>Срок (дедлайн)</label>${dateField('pd2-date', s.due_date||'')}</div>
       <div class="fld"><label>Ссылка на материал</label><input id="pd2-link" value="${(s.link||'').replace(/"/g,'&quot;')}" placeholder="https://… (Drive, Figma, Notion)"></div>
       <div class="fld"><label>Комментарий</label><textarea id="pd2-note" placeholder="Заметка по этапу…">${s.note||''}</textarea></div>
     </div>
