@@ -808,7 +808,7 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible,.cmdk-it:focus-vis
     <div class="login-form">
       <div class="field"><input id="lg-login" type="text" placeholder="Логин" autocomplete="username"></div>
       <div class="field"><input id="lg-pass" type="password" placeholder="Пароль" autocomplete="current-password"></div>
-      <button class="btn btn-primary" onclick="enter('general')">Войти</button>
+      <button class="btn btn-primary" onclick="doLogin()">Войти</button>
     </div>
     <div class="login-demo">
       <div class="lbl">Демо-вход в кабинет</div>
@@ -1118,7 +1118,8 @@ function _initCounters(){
 }
 
 function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
-function logout(){ document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
+function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); enter('general'); }
+function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
 
 /* ——— GENERAL CABINET ——— */
@@ -1350,7 +1351,7 @@ function renderGeneral(){
         <thead><tr><th>Агентство</th><th>Вертикаль</th><th>Тариф</th><th>Статус</th><th>Сотр.</th><th>Проекты</th><th>Клиенты</th><th>MRR</th><th>Активность</th><th></th></tr></thead>
         <tbody>
           ${AGENCIES.map(a=>`
-            <tr onclick="openDrawer(${a.id})">
+            <tr onclick="openDrawer('${a.id}')">
               <td><div class="ag-name"><span class="ag-dot" style="background:${a.accent}"></span><div><div class="nm">${a.name}</div><div class="sl">${a.slug}.triada.app</div></div></div></td>
               <td style="font-family:var(--font);color:var(--txt-2);text-align:right">${a.vertical}</td>
               <td><span class="plan">${a.plan}</span></td>
@@ -1361,9 +1362,9 @@ function renderGeneral(){
               <td>${a.mrr? money(a.mrr):'<span style="color:var(--txt-3)">—</span>'}</td>
               <td style="color:var(--txt-3)">${a.active}</td>
               <td onclick="event.stopPropagation()"><div class="t-actions">
-                <button class="act" title="Открыть" onclick="openDrawer(${a.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
-                <button class="act" title="Редактировать" onclick="openAgency(${a.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
-                <button class="act del" title="Удалить" onclick="askDel(${a.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
+                <button class="act" title="Открыть" onclick="openDrawer('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button class="act" title="Редактировать" onclick="openAgency('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="act del" title="Удалить" onclick="askDel('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
               </div></td>
             </tr>`).join('')}
         </tbody>
@@ -1404,7 +1405,7 @@ function openAgency(id){
   const sw=document.getElementById('f-swatches');
   sw.innerHTML=ACCENTS.map(c=>`<span class="sw" style="background:${c}" onclick="pickAccent('${c}',this)"></span>`).join('');
   if(id){
-    const a=AGENCIES.find(x=>x.id===id);
+    const a=AGENCIES.find(x=>String(x.id)===String(id));
     document.getElementById('m-title').textContent='Редактировать агентство';
     document.getElementById('m-sub').textContent=a.name;
     document.getElementById('m-save').textContent='Сохранить';
@@ -1432,6 +1433,7 @@ function saveAgency(){
   const name=f('name').trim(); if(!name){toast('Введи название агентства');return;}
   const slug=(f('slug').trim()||name.toLowerCase().replace(/\s+/g,'-')).replace(/[^a-z0-9-]/g,'');
   const plan=f('plan');
+  if(window.LIVE){ if(_editId){ window.tUpdateAgency(_editId,{name,slug,plan,owner_name:f('owner').trim(),accent:_accent,logo_url:f('logo').trim()}); } else { window.tProvisionAgency({name,slug,plan,owner:f('owner').trim(),pass:f('pass'),accent:_accent,logo:f('logo').trim()}); } closeAgency(); return; }
   if(_editId){
     const a=AGENCIES.find(x=>x.id===_editId);
     a.name=name;a.slug=slug;a.plan=plan;a.owner=f('owner').trim()||a.owner;a.accent=_accent;a.logoUrl=f('logo').trim();
@@ -1445,13 +1447,13 @@ function saveAgency(){
 function closeAgency(){document.getElementById('ov-agency').classList.remove('on');}
 
 /* ——— delete ——— */
-function askDel(id){_delId=id;const a=AGENCIES.find(x=>x.id===id);document.getElementById('del-name').textContent='«'+a.name+'» — действие необратимо.';document.getElementById('ov-del').classList.add('on');}
+function askDel(id){_delId=id;const a=AGENCIES.find(x=>String(x.id)===String(id));document.getElementById('del-name').textContent='«'+a.name+'» — действие необратимо.';document.getElementById('ov-del').classList.add('on');}
 function closeDel(){document.getElementById('ov-del').classList.remove('on');}
-function confirmDel(){AGENCIES=AGENCIES.filter(x=>x.id!==_delId);closeDel();renderGeneral();document.getElementById('nav-ag-ct').textContent=AGENCIES.length;toast('Агентство удалено');}
+function confirmDel(){if(window.LIVE){window.tDeleteAgency(_delId);closeDel();return;}AGENCIES=AGENCIES.filter(x=>String(x.id)!==String(_delId));closeDel();renderGeneral();document.getElementById('nav-ag-ct').textContent=AGENCIES.length;toast('Агентство удалено');}
 
 /* ——— drawer (read-only monitoring) ——— */
 function openDrawer(id){
-  const a=AGENCIES.find(x=>x.id===id);
+  const a=AGENCIES.find(x=>String(x.id)===String(id));
   const emps=['Оператор','Дизайнер','Менеджер','Таргетолог','Контент'].slice(0,Math.min(a.employees,5));
   const projs=Array.from({length:Math.min(a.projects,5)},(_,i)=>'Проект '+(i+1));
   document.getElementById('drawer').innerHTML=`
@@ -1481,7 +1483,7 @@ function openDrawer(id){
       <div class="dr-list">${projs.length?projs.map(p=>`<div class="dr-li"><span class="ic">#</span>${p}<span class="meta">активен</span></div>`).join(''):'<div style="color:var(--txt-3);font-size:12.5px">Пока нет проектов</div>'}</div>
     </div>
     <div class="dr-sec" style="border:0">
-      <button class="btn-ghost" style="width:100%" onclick="openAgency(${a.id});closeDrawer()">Редактировать кабинет</button>
+      <button class="btn-ghost" style="width:100%" onclick="openAgency('${a.id}');closeDrawer()">Редактировать кабинет</button>
     </div>`;
   document.getElementById('drawer').classList.add('on');
   document.getElementById('ov-bg').classList.add('on');
@@ -1589,6 +1591,7 @@ function openNewProject(){
         <button data-svc="PROD" onclick="pjTogStatus(this)">PROD</button>
         <button data-svc="DESIGN" onclick="pjTogStatus(this)">DESIGN</button>
       </div></div></div>
+      <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
   setTimeout(()=>{const n=document.getElementById('np-name');if(n)n.focus();},30);
@@ -1597,6 +1600,7 @@ function npSaveProject(){
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
   const b=document.querySelector('#np-svcseg button.on'); const svc=b?b.dataset.svc:'SMM';
   const totN=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).length;
+  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc}}); pd2Close(); return; }
   PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,pct:0,stages:'0 / '+totN,health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
@@ -2615,6 +2619,7 @@ function saveEmp(){
   const dept=document.getElementById('e-dept').value;
   const login=document.getElementById('e-login').value.trim();
   const mods=Object.keys(empPerms).filter(k=>empPerms[k].view).length;
+  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMemberPerms(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms))); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
   if(empEditIdx!=null){
     const e=TEAM[empEditIdx];
     Object.assign(e,{name,role,dept,color:empColor,perms:JSON.parse(JSON.stringify(empPerms))});
@@ -2942,8 +2947,129 @@ function renderModule(m){
     </div>`;
 }
 
-document.getElementById('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')enter('general')});
+document.getElementById('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 _initCounters();
+</script>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+/* ===== TRIADA · live Supabase layer (dual-mode: без ключа = демо) ===== */
+const SUPA_URL = 'https://frotqycnpnrsgncdylbq.supabase.co';
+const SUPA_KEY = '__PASTE_PUBLISHABLE_OR_ANON_KEY__';   // публичный ключ — безопасен (защита через RLS)
+
+const configured = SUPA_KEY && SUPA_KEY.indexOf('__') !== 0;
+const SB = configured ? createClient(SUPA_URL, SUPA_KEY) : null;
+window.SB = SB; window.LIVE = !!SB;
+let ME = null; window.tMe = () => ME;
+
+const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.vertical||'—',
+  plan:a.plan, status:a.status, accent:a.accent||'#37E6C8', logoUrl:a.logo_url||'',
+  owner:a.owner_name||'owner', mrr:a.mrr||0,
+  employees:c.emp[a.id]||0, clients:c.cl[a.id]||0, projects:c.pr[a.id]||0, active:'—' });
+const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
+  logoUrl:p.logo_url||'', cat:p.category||'—', svc:p.service||'SMM', pct:p.pct||0,
+  stages:(p.stages_done||0)+' / '+(p.stages_total||6), health:p.health||'В норме',
+  dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'' });
+const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
+  color:m.color||'#37E6C8', cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
+  login:m.login||'', perms:m.permissions||{}, _id:m.id });
+
+async function loadTariffs(){
+  const { data } = await SB.from('tariffs').select('*').order('sort');
+  if (data && window.TARIFFS){ TARIFFS.length = 0;
+    data.forEach(t => TARIFFS.push({ key:t.key, name:t.name, price:t.price, per:t.per,
+      pop:t.popular, feats:(t.features||[]).map(x => [x[0], x[1]]) })); }
+}
+
+window.tLoadAll = async (role) => {
+  if (!SB) return;
+  if (role === 'superadmin'){
+    const [ag, pr, pf] = await Promise.all([
+      SB.from('agencies').select('*').order('created_at'),
+      SB.from('projects').select('id,agency_id'),
+      SB.from('profiles').select('id,agency_id,role') ]);
+    const c = { emp:{}, cl:{}, pr:{} };
+    (pr.data||[]).forEach(p => c.pr[p.agency_id] = (c.pr[p.agency_id]||0)+1);
+    (pf.data||[]).forEach(p => { if (p.role==='member') c.emp[p.agency_id]=(c.emp[p.agency_id]||0)+1;
+      if (p.role==='client') c.cl[p.agency_id]=(c.cl[p.agency_id]||0)+1; });
+    AGENCIES.length = 0; (ag.data||[]).forEach(a => AGENCIES.push(mapAgency(a, c)));
+    const nb = document.getElementById('nav-ag-ct'); if (nb) nb.textContent = AGENCIES.length;
+  } else if (role === 'agency_owner' || role === 'member'){
+    const [pr, tm] = await Promise.all([
+      SB.from('projects').select('*').order('created_at'),
+      SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
+    PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
+    TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
+  }
+  await loadTariffs();
+};
+
+async function routeByProfile(){
+  const { data:{ user } } = await SB.auth.getUser();
+  if (!user) return;
+  const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
+  ME = data || { role:'member' };
+  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent').eq('id', ME.agency_id).single();
+    if (ag) ME.agencySlug = ag.slug; }
+  await window.tLoadAll(ME.role);
+  if (ME.role === 'superadmin') enter('general');
+  else if (ME.role === 'client') enterClient();
+  else enterAgency();
+}
+
+window.tLogin = async () => {
+  const email = document.getElementById('lg-login').value.trim();
+  const pass = document.getElementById('lg-pass').value;
+  if (!email || !pass){ toast('Введи email и пароль'); return; }
+  const { error } = await SB.auth.signInWithPassword({ email, password: pass });
+  if (error){ toast('Вход не удался: ' + error.message); return; }
+  await routeByProfile();
+};
+window.tLogout = async () => { if (SB) await SB.auth.signOut(); };
+
+window.tProvisionAgency = async (a) => {
+  try { await SB.functions.invoke('provision-agency', { body:{
+      email:(a.owner||'owner')+'@'+a.slug+'.triada.app', password:a.pass, login:a.owner,
+      agency:{ name:a.name, slug:a.slug, plan:a.plan, accent:a.accent, logo_url:a.logo, owner_name:a.owner } }});
+    toast('Агентство и владелец созданы'); await window.tLoadAll('superadmin'); renderGeneral();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tUpdateAgency = async (id, patch) => {
+  try { await SB.from('agencies').update(patch).eq('id', id);
+    toast('Агентство обновлено'); await window.tLoadAll('superadmin'); renderGeneral();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tDeleteAgency = async (id) => {
+  try { await SB.from('agencies').delete().eq('id', id);
+    toast('Агентство удалено'); await window.tLoadAll('superadmin'); renderGeneral();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tProvisionClient = async (c) => {
+  try { await SB.functions.invoke('provision-client', { body:{
+      email:(c.login||'client')+'@'+(c.slug||'agency')+'.triada.app', password:c.pass,
+      login:c.login, full_name:c.full_name, project:c.project }});
+    toast('Проект и клиентский доступ созданы'); await window.tLoadAll(ME.role);
+    if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tProvisionMember = async (m) => {
+  try { await SB.functions.invoke('provision-member', { body:{
+      email:(m.login||'user')+'@'+(m.slug||'agency')+'.triada.app', password:m.pass, login:m.login,
+      full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, permissions:m.permissions }});
+    toast('Сотрудник создан'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tUpdateMemberPerms = async (id, perms) => {
+  try { await SB.from('profiles').update({ permissions: perms }).eq('id', id);
+    toast('Доступы обновлены'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+
+if (window.LIVE){
+  const d = document.querySelector('.login-demo'); if (d) d.style.display = 'none';
+  const lg = document.getElementById('lg-login'); if (lg) lg.setAttribute('placeholder','Email');
+  (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(); })();
+}
 </script>
 </body>
 </html>
