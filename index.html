@@ -1755,12 +1755,22 @@ function pdAddStage(){ const name=_v('pd2-name'); if(!name){toast('Введи н
   if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,idx}); }
 function pdStageDel(id){ if(window.tStageDel) window.tStageDel(id); }
 function pdSeedStages(){ const names=PD_STAGE_SETS[PROJECTS[pdIdx].svc]||PD_STAGE_SETS.SMM; if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
-let pdTaskAssignee=null;
-function pdNewTask(){
+async function pdNewTask(){
+  const p=PROJECTS[pdIdx];
+  if(window.tLoadProjectWork) await window.tLoadProjectWork(p.id);   // активные этапы в реальном времени
+  const active=(p._stages||[]).filter(s=>s.status==='active');
+  if(!active.length){
+    pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
+      <div class="modal-b"><div class="modph" style="padding:26px 0"><h3>Нет активных этапов</h3><p>Задачу можно привязать только к активному этапу. Переведи этап в статус «В работе» во вкладке «Этапы».</p></div></div>
+      <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div></div>`);
+    return;
+  }
+  const stOpts=active.map(s=>`<option value="${s.id}">${(s.name||'').replace(/"/g,'&quot;')}</option>`).join('');
   const opts=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>`<option value="${m._id}">${m.name}</option>`).join('');
-  pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${PROJECTS[pdIdx].name} · Операционка</p></div>
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
+      <div class="fld"><label>Этап <span style="color:var(--neg)">*</span> · только активные</label><select id="pd2-stg">${stOpts}</select></div>
       <div class="fld2">
         <div class="fld"><label>Исполнитель</label><select id="pd2-asg"><option value="">— не назначен —</option>${opts}</select></div>
         <div class="fld"><label>Срок</label><input type="date" id="pd2-tdate"></div>
@@ -1769,8 +1779,9 @@ function pdNewTask(){
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddTask()">Создать</button></div></div>`);
 }
 function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи задачу');return;}
+  const stage_id=_v('pd2-stg'); if(!stage_id){toast('Выбери этап');return;}
   const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
-  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,status:'wait',idx}); }
+  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,status:'wait',idx}); }
 function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
 const PD_MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 function _dDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+PD_MON[d.getMonth()]; }
@@ -1823,9 +1834,9 @@ function renderPd(){
       const T=p._tasks, byst=st=>T.filter(t=>t.status===st);
       const col=(st,label,color)=>{ const arr=byst(st);
         return `<div class="pk-col"><div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${arr.length}</span></div>
-          ${arr.length?arr.map(c=>{ const w=_who(c.assignee_id); const dd=c.due_date?` · ${_dDate(c.due_date)}`:'';
+          ${arr.length?arr.map(c=>{ const w=_who(c.assignee_id); const dd=c.due_date?` · ${_dDate(c.due_date)}`:''; const stg=(p._stages||[]).find(x=>x.id===c.stage_id);
             const adv=st!=='done'?`<button class="adv" title="Дальше" onclick="pkAdvance('${c.id}','${c.status}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></button>`:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--pos)" stroke-width="2.6" style="margin-left:auto"><path d="M20 6L9 17l-5-5"/></svg>';
-            return `<div class="pk-card"><div class="t">${c.title}<button title="Удалить" onclick="pdTaskDel('${c.id}')" style="float:right;background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></div><div class="m"><span class="av" style="background:${w.c}">${(w.n[0]||'?')}</span><span class="who">${w.n}${dd}</span>${adv}</div></div>`;
+            return `<div class="pk-card"><div class="t">${c.title}<button title="Удалить" onclick="pdTaskDel('${c.id}')" style="float:right;background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></div>${stg?`<div style="font-size:10px;color:var(--txt-3);margin:2px 0 0">↳ ${stg.name}</div>`:''}<div class="m"><span class="av" style="background:${w.c}">${(w.n[0]||'?')}</span><span class="who">${w.n}${dd}</span>${adv}</div></div>`;
           }).join(''):'<div class="pk-empty">пусто</div>'}
         </div>`; };
       h=`<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn-add" onclick="pdNewTask()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Задача</button></div>
@@ -3142,7 +3153,7 @@ function refreshActive(){
   }catch(e){ console.warn('refresh', e); }
 }
 let _rtT;
-function onRt(){ clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ await window.tLoadAll(ME.role); refreshActive(); } }, 350); }
+function onRt(){ clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ await window.tLoadAll(ME.role); refreshActive(); if (window._pdProj && document.getElementById('ov-proj').classList.contains('on')){ await window.tLoadProjectWork(window._pdProj); if (typeof renderPd==='function') renderPd(); } } }, 350); }
 function subscribeRealtime(){
   try{
     SB.channel('triada-rt')
