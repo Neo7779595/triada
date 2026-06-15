@@ -790,6 +790,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .avup:hover{border-color:var(--accent-line);transform:translateY(-1px)}
 .avup .ovl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,10,9,.58);color:#fff;opacity:0;transition:opacity .16s;pointer-events:none}
 .avup:hover .ovl{opacity:1}
+.dd.cmb{display:block;width:100%}
+.dd.cmb .dd-menu{left:0;right:0;min-width:0}
+.cmb-inp{width:100%;background:var(--bg-1);border:1px solid var(--line-2);border-radius:7px;color:var(--txt);font-family:var(--font);font-size:12.5px;padding:8px 10px;margin-bottom:6px;outline:none}
+.cmb-inp:focus{border-color:var(--accent-line)}
+.cmb-list{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.dd-opt.cmb-new{color:var(--accent);font-weight:600}
 .cyc-list{display:flex;flex-direction:column;gap:9px}
 .cyc-it{display:flex;align-items:center;gap:13px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
 .cyc-it .pr{font-weight:600;font-size:13.5px;flex:1}
@@ -1599,12 +1605,14 @@ function pjSaveNote(i){ const p=PROJECTS[i]; if(window.LIVE&&window.tProjectUpda
 function pjTogStatus(el){[...el.parentNode.children].forEach(b=>b.classList.remove('on'));el.classList.add('on');}
 function projSettings(i){
   const p=PROJECTS[i];
+  const cats=[...new Set(PROJECTS.map(x=>x.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>a.localeCompare(b,'ru'));
+  const svcs=[...new Set(['SMM','PROD','DESIGN',...PROJECTS.map(x=>x.svc).filter(Boolean)])];
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Настройки · ${p.name}</h3><p>Карточка проекта · теги и статус</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pj-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
-      <div class="fld2"><div class="fld"><label>Категория (тег)</label><input id="pj-cat" value="${(p.cat||'').replace(/"/g,'&quot;')}" placeholder="напр. Фаст-фуд"></div><div class="fld"><label>Услуга (тег)</label><input id="pj-svc" value="${(p.svc||'').replace(/"/g,'&quot;')}" placeholder="SMM / PROD / DESIGN"></div></div>
+      <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай')}${tagCombo('pj-svc','Услуга (тег)',svcs,p.svc,'Выбери или создай')}</div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
         <button data-st="active" class="${p.status!=='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--accent)"></span>В работе</button>
         <button data-st="done" class="${p.status==='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--pos)"></span>Завершён</button>
@@ -1657,17 +1665,14 @@ function setAgFilter(f){agFilter=f;renderProjects();}
 
 /* ——— create project (mirrors projSettings shape) ——— */
 function openNewProject(){
+  const cats=[...new Set(PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>a.localeCompare(b,'ru'));
+  const svcs=[...new Set(['SMM','PROD','DESIGN',...PROJECTS.map(p=>p.svc).filter(Boolean)])];
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги и услуга задаются сразу</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. Uzbek Doner"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
-      <div class="fld2"><div class="fld"><label>Категория (тег)</label><input id="np-cat" placeholder="напр. Фаст-фуд"></div>
-      <div class="fld"><label>Услуга</label><div class="st-seg" style="grid-template-columns:repeat(3,1fr)" id="np-svcseg">
-        <button data-svc="SMM" class="on" onclick="pjTogStatus(this)">SMM</button>
-        <button data-svc="PROD" onclick="pjTogStatus(this)">PROD</button>
-        <button data-svc="DESIGN" onclick="pjTogStatus(this)">DESIGN</button>
-      </div></div></div>
+      <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай')}</div>
       <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
@@ -1675,7 +1680,7 @@ function openNewProject(){
 }
 function npSaveProject(){
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
-  const b=document.querySelector('#np-svcseg button.on'); const svc=b?b.dataset.svc:'SMM';
+  const svc=_v('np-svc')||'SMM';
   const totN=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).length;
   if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc}}); pd2Close(); return; }
   PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,pct:0,stages:'0 / '+totN,health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
@@ -1697,6 +1702,42 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
     +`</div></div>`;
 }
 function ddToggle(k){const el=document.getElementById('dd-'+k);if(!el)return;const o=el.classList.contains('open');document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));if(!o)el.classList.add('open');}
+const _attr=v=>_ddH(v).replace(/"/g,'&quot;');
+function tagCombo(id,label,options,cur,ph){
+  cur=cur||''; const opts=[...new Set((options||[]).filter(Boolean))];
+  (window._cmb=window._cmb||{})[id]=opts;
+  const caret='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
+  return `<div class="fld"><label>${label}</label>
+    <div class="dd cmb" id="cmb-${id}">
+      <input type="hidden" id="${id}" value="${_attr(cur)}">
+      <button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();cmbToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${cur?'':'color:var(--txt-3);font-weight:500'}">${cur?_ddH(cur):(ph||'Выбери или создай')}</span>${caret}</button>
+      <div class="dd-menu">
+        <input class="cmb-inp" id="${id}-q" placeholder="Поиск или новый тег…" autocomplete="off" oninput="cmbFilter('${id}')" onkeydown="cmbKey(event,'${id}')" onclick="event.stopPropagation()">
+        <div class="cmb-list" id="${id}-list">${cmbOptsHTML(id,opts,cur,'')}</div>
+      </div>
+    </div></div>`;
+}
+function cmbOptsHTML(id,opts,cur,q){
+  q=(q||'').trim(); const ql=q.toLowerCase();
+  const filt=opts.filter(o=>!ql||o.toLowerCase().includes(ql));
+  const exact=opts.some(o=>o.toLowerCase()===ql);
+  const ck='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  let h='';
+  if(q&&!exact) h+=`<button type="button" class="dd-opt cmb-new" data-v="${_attr(q)}" onclick="cmbPick('${id}',this.dataset.v)"><span>+ Создать «${_ddH(q)}»</span></button>`;
+  h+=filt.map(o=>`<button type="button" class="dd-opt ${o===cur?'on':''}" data-v="${_attr(o)}" onclick="cmbPick('${id}',this.dataset.v)">${_ddH(o)}${ck}</button>`).join('');
+  if(!filt.length&&!q) h+='<div style="padding:8px 10px;color:var(--txt-3);font-size:12px">Тегов пока нет — введи новый</div>';
+  return h;
+}
+function cmbToggle(id){ const el=document.getElementById('cmb-'+id); if(!el)return; const o=el.classList.contains('open');
+  document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));
+  if(!o){ el.classList.add('open'); const q=document.getElementById(id+'-q'); if(q){ q.value=''; cmbFilter(id); setTimeout(()=>q.focus(),20); } } }
+function cmbFilter(id){ const q=(document.getElementById(id+'-q')||{}).value||''; const cur=(document.getElementById(id)||{}).value||'';
+  const list=document.getElementById(id+'-list'); if(list) list.innerHTML=cmbOptsHTML(id,(window._cmb||{})[id]||[],cur,q); }
+function cmbPick(id,val){ const h=document.getElementById(id); if(h)h.value=val;
+  const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=val; lbl.style.color=''; lbl.style.fontWeight=''; }
+  const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open'); }
+function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const first=document.getElementById(id+'-list').querySelector('.dd-opt'); if(first)cmbPick(id,first.dataset.v); }
+  else if(e.key==='Escape'){ const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open'); } }
 document.addEventListener('click',e=>{if(!e.target.closest('.dd'))document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));});
 function setAgCat(v){agCat=v;renderProjects();}
 function setAgSvc(v){agSvc=v;renderProjects();}
