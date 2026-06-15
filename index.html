@@ -869,6 +869,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* keyboard focus visibility + a11y */
 button:focus-visible,a:focus-visible,[tabindex]:focus-visible,.cmdk-it:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 .ov,.drawer{scroll-behavior:smooth}
+
+/* overview project avatar */
+.ov-avw{position:relative;flex:0 0 auto}
+.ov-av{position:relative;width:36px;height:36px;border-radius:9px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--txt-2);overflow:hidden;border:1px solid var(--line-2)}
+.ov-st{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;border:2.5px solid var(--bg-1)}
 </style>
 </head>
 <body>
@@ -2507,21 +2512,29 @@ function renderOverview(){
         <div class="segm">${seg('all','Все')}${seg('active','Активные')}${seg('overdue','Просрочены','<span class="d" style="background:var(--neg)"></span>')}${seg('done','Завершены','<span class="d" style="background:var(--pos)"></span>')}</div>
       </div>
       <table>
-        <thead><tr><th>Проект</th><th>Категория</th><th>Прогресс</th><th>Этапы</th><th>Ближайший дедлайн</th><th>Активность</th></tr></thead>
+        <thead><tr><th>Проект</th><th>Категория</th><th>Прогресс</th><th>Этапы</th><th>Здоровье</th><th>Ближайший дедлайн</th><th>Активность</th></tr></thead>
         <tbody>${rows.length?rows.map(p=>{
           const dot = p.status==='done'?'var(--pos)':p._overdue?'var(--neg)':'var(--accent)';
           const prog = p.pct||0;
           const la = p._lastActDays;
           const laC = la==null?'var(--txt-3)':la>=14?'var(--neg)':la>=7?'var(--warn)':'var(--pos)';
           const laT = la==null?'—':la===0?'сегодня':la+'д назад';
+          const hl = p.status==='done'?['Завершён','var(--pos)']:p._overdue?['Риск','var(--neg)']:['В норме','var(--txt-2)'];
+          let dueTxt='—', dueRel='';
+          if(p._nextDue){ const _t=new Date(); _t.setHours(0,0,0,0); const _d=new Date(p._nextDue+'T00:00:00'); const _diff=Math.round((_d-_t)/86400000);
+            dueTxt=_ovDue(p._nextDue); dueRel=_diff<0?('просрочен '+(-_diff)+' дн'):_diff===0?'сегодня':_diff===1?'завтра':('через '+_diff+' дн'); }
           return `<tr onclick="ovOpen('${p.id}')">
-            <td><div class="ag-name"><span class="ag-dot" style="background:${dot}"></span><div class="nm">${p.name}</div></div></td>
+            <td><div class="ag-name" style="gap:12px">
+              <div class="ov-avw"><div class="ov-av">${logoFill(p.logoUrl,p.logo)}</div><span class="ov-st" style="background:${dot}"></span></div>
+              <div style="min-width:0"><div class="nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${p.name}</div>${p.svc?`<div class="sl" style="color:var(--accent)">${p.svc}</div>`:''}</div>
+            </div></td>
             <td style="text-align:right">${p.cat&&p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:'<span style="color:var(--txt-3)">—</span>'}</td>
-            <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span class="num">${prog}%</span><div style="width:66px;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><i style="display:block;width:${prog}%;height:100%;background:${prog>=100?'var(--pos)':'var(--accent)'};border-radius:3px"></i></div></div></td>
+            <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span class="num">${prog}%</span><div style="width:72px;height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden"><i style="display:block;width:${prog}%;height:100%;background:${prog>=100?'var(--pos)':'var(--accent)'};border-radius:3px"></i></div></div></td>
             <td class="num">${(p._sdone||0)} / ${(p._stot||0)}</td>
-            <td style="color:${p._overdue?'var(--neg)':'var(--txt-3)'}">${_ovDue(p._nextDue)}</td>
+            <td><span style="color:${hl[1]};font-weight:600;font-size:11.5px">${hl[0]}</span></td>
+            <td>${p._nextDue?`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="color:${p._overdue?'var(--neg)':'var(--txt-2)'};font-family:var(--mono);font-size:12.5px">${dueTxt}</span><span style="font-family:var(--mono);font-size:10px;color:${p._overdue?'var(--neg)':'var(--txt-3)'}">${dueRel}</span></div>`:'<span style="color:var(--txt-3)">—</span>'}</td>
             <td><span class="mrg" style="color:${laC}">● ${laT}</span></td>
-          </tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--txt-3);padding:26px">Нет проектов в этой категории</td></tr>'}</tbody>
+          </tr>`;}).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--txt-3);padding:26px">Нет проектов в этой категории</td></tr>'}</tbody>
       </table>
     </div>
 
