@@ -215,6 +215,23 @@ tbody tr:hover td{background:var(--bg-2)}
 .segm button .d{width:6px;height:6px;border-radius:50%}
 .segm button.on{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
 .sel{background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt-2);font-family:var(--font);font-size:12.5px;padding:9px 12px;cursor:pointer}
+.dd{position:relative;display:inline-block}
+.dd-btn{display:inline-flex;align-items:center;gap:8px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt-2);font-family:var(--font);font-size:12.5px;font-weight:600;padding:9px 12px;cursor:pointer;transition:.15s;white-space:nowrap}
+.dd-btn:hover{border-color:var(--accent-line);color:var(--txt)}
+.dd.open .dd-btn{border-color:var(--accent-line);color:var(--txt);box-shadow:0 0 0 3px var(--accent-dim)}
+.dd-btn .dd-k{color:var(--txt-3);font-weight:500}
+.dd-btn .dd-v{color:var(--accent)}
+.dd-btn>svg{width:11px;height:11px;color:var(--txt-3);transition:.18s;margin-left:2px}
+.dd.open .dd-btn>svg{transform:rotate(180deg);color:var(--accent)}
+.dd-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:190px;max-height:300px;overflow:auto;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:60;display:none;animation:ddIn .14s ease}
+.dd.right .dd-menu{left:auto;right:0}
+.dd.open .dd-menu{display:block}
+@keyframes ddIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.dd-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;background:transparent;border:0;color:var(--txt-2);font-family:var(--font);font-size:12.5px;font-weight:500;padding:9px 10px;border-radius:7px;cursor:pointer;transition:.12s}
+.dd-opt:hover{background:var(--bg-3);color:var(--txt)}
+.dd-opt.on{background:var(--accent-dim);color:var(--accent);font-weight:600}
+.dd-opt .ck{flex:none;opacity:0;width:13px;height:13px;color:var(--accent)}
+.dd-opt.on .ck{opacity:1}
 
 /* project card */
 .pcard{display:flex;align-items:center;gap:18px;background:var(--bg-1);border:1px solid var(--line);border-left:2.5px solid var(--accent);border-radius:var(--r);padding:16px 18px;margin-bottom:11px;transition:.16s;cursor:pointer}
@@ -1495,7 +1512,7 @@ let PROJECTS = [
   {name:'Тестовый проект',logo:'Т',cat:'Кофейня',svc:'DESIGN',pct:0,stages:'0 / 4',health:'В норме',dyn:'— 0 / 7д',status:'active'},
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
-let agFilter='active';
+let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='';
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты'};
 
 function enterAgency(){
@@ -1607,8 +1624,67 @@ function npSaveProject(){
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
 
+/* ——— project filters (custom dropdowns + live data) ——— */
+const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
+const SORT_LABEL=Object.fromEntries(SORT_OPTS);
+const _ddEsc=v=>String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+const _ddH=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function _dd(key,label,valLabel,opts,curVal,setter,right){
+  const caret='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
+  const ck='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  return `<div class="dd${right?' right':''}" id="dd-${key}">`
+    +`<button class="dd-btn" onclick="event.stopPropagation();ddToggle('${key}')"><span class="dd-k">${label}</span><span class="dd-v">${_ddH(valLabel)}</span>${caret}</button>`
+    +`<div class="dd-menu">`
+    +opts.map(o=>`<button class="dd-opt ${curVal===o[0]?'on':''}" onclick="${setter}('${_ddEsc(o[0])}')">${_ddH(o[1])}${ck}</button>`).join('')
+    +`</div></div>`;
+}
+function ddToggle(k){const el=document.getElementById('dd-'+k);if(!el)return;const o=el.classList.contains('open');document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));if(!o)el.classList.add('open');}
+document.addEventListener('click',e=>{if(!e.target.closest('.dd'))document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));});
+function setAgCat(v){agCat=v;renderProjects();}
+function setAgSvc(v){agSvc=v;renderProjects();}
+function setAgSort(v){agSort=v;renderProjects();}
+function projFiltered(){
+  const q=(agQ||'').trim().toLowerCase();
+  let l=PROJECTS.filter(p=>{
+    if(agFilter==='active'&&p.status!=='active')return false;
+    if(agFilter==='done'&&p.status!=='done')return false;
+    if(agFilter==='overdue')return false;
+    if(agCat!=='all'&&p.cat!==agCat)return false;
+    if(agSvc!=='all'&&p.svc!==agSvc)return false;
+    if(q&&!((p.name||'').toLowerCase().includes(q)||(p.cat||'').toLowerCase().includes(q)||(p.svc||'').toLowerCase().includes(q)))return false;
+    return true;
+  });
+  if(agSort==='progress')l=l.slice().sort((a,b)=>b.pct-a.pct);
+  else if(agSort==='progress_asc')l=l.slice().sort((a,b)=>a.pct-b.pct);
+  else if(agSort==='name')l=l.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru'));
+  return l;
+}
+const _projCard=(p)=>`
+      <div class="pcard" onclick="openProject(${PROJECTS.indexOf(p)})">
+        <div class="pc-logo">${logoFill(p.logoUrl,p.logo)}</div>
+        <div class="pc-main">
+          <div class="pc-name">${p.name}</div>
+          <div class="pc-tags">${p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:''}<span class="tagx svc">${p.svc}</span></div>
+        </div>
+        <div class="pc-prog">
+          <div class="pbar"><i style="width:${p.pct}%"></i></div>
+          <div class="pbar thin"><i style="width:${Math.max(p.pct-14,3)}%"></i></div>
+        </div>
+        <div class="pc-pct"><div class="p num">${p.pct}%</div><div class="s">${p.stages}</div></div>
+        <div class="pc-stats">
+          <div class="pstat"><div class="l">Дедлайн</div><div class="v mut">—</div></div>
+          <div class="pstat"><div class="l">Здоровье</div><div class="v ok">${p.health}</div></div>
+          <div class="pstat"><div class="l">Динамика</div><div class="v mut">${p.dyn}</div></div>
+          <div class="pstat" onclick="event.stopPropagation();projNote(${PROJECTS.indexOf(p)})"><div class="l">Заметка</div><div class="v mut"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:1px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div></div>
+          <div class="pstat" onclick="event.stopPropagation();projSettings(${PROJECTS.indexOf(p)})"><div class="l">Настройки</div><div class="v mut"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:1px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H1a2 2 0 110-4h.09A1.65 1.65 0 003 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H8a1.65 1.65 0 001-1.51V1a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V8a1.65 1.65 0 001.51 1H23a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div></div>
+        </div>
+      </div>`;
+function _projListHTML(l){ return l.length ? l.map(_projCard).join('') : `<div class="modph"><h3>Нет проектов в этом фильтре</h3><p>Под выбранные фильтры ничего не нашлось — измени категорию, услугу или сбрось фильтры.</p></div>`; }
+function paintProjList(){ const el=document.getElementById('pj-list'); if(el) el.innerHTML=_projListHTML(projFiltered()); }
 function renderProjects(){
-  const list = PROJECTS.filter(p=> agFilter==='all'?true : agFilter==='overdue'?false : p.status===agFilter);
+  const list = projFiltered();
+  const cats=[...new Set(PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>(a||'').localeCompare(b||'','ru'));
+  const svcs=[...new Set(PROJECTS.map(p=>p.svc).filter(Boolean))];
   const on=f=>agFilter===f?'on':'';
   const _act=PROJECTS.filter(p=>p.status==='active'), _done=PROJECTS.filter(p=>p.status==='done');
   const _avg=_act.length?Math.round(_act.reduce((s,p)=>s+p.pct,0)/_act.length):0;
@@ -1631,39 +1707,20 @@ function renderProjects(){
     </div>
 
     <div class="toolbar">
-      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск проекта…"></div>
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск проекта…" value="${agQ.replace(/"/g,'&quot;')}" oninput="agQ=this.value;paintProjList()"></div>
       <div class="segm">
         <button class="${on('all')}" onclick="setAgFilter('all')">Все</button>
         <button class="${on('active')}" onclick="setAgFilter('active')">Активные</button>
         <button class="${on('overdue')}" onclick="setAgFilter('overdue')"><span class="d" style="background:var(--neg)"></span>Просрочены</button>
         <button class="${on('done')}" onclick="setAgFilter('done')"><span class="d" style="background:var(--pos)"></span>Завершены</button>
       </div>
-      <select class="sel"><option>Категория ▾</option></select>
-      <select class="sel"><option>Услуга ▾</option></select>
+      ${_dd('cat','Категория', agCat==='all'?'Все':agCat, [['all','Все категории']].concat(cats.map(c=>[c,c])), agCat, 'setAgCat')}
+      ${_dd('svc','Услуга', agSvc==='all'?'Все':agSvc, [['all','Все услуги']].concat(svcs.map(x=>[x,x])), agSvc, 'setAgSvc')}
       <div class="flex1"></div>
-      <select class="sel"><option>По активности ▾</option></select>
+      ${_dd('sort','Сортировка', SORT_LABEL[agSort]||'По активности', SORT_OPTS, agSort, 'setAgSort', true)}
     </div>
 
-    <div>${list.length?list.map(p=>`
-      <div class="pcard" onclick="openProject(${PROJECTS.indexOf(p)})">
-        <div class="pc-logo">${logoFill(p.logoUrl,p.logo)}</div>
-        <div class="pc-main">
-          <div class="pc-name">${p.name}</div>
-          <div class="pc-tags">${p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:''}<span class="tagx svc">${p.svc}</span></div>
-        </div>
-        <div class="pc-prog">
-          <div class="pbar"><i style="width:${p.pct}%"></i></div>
-          <div class="pbar thin"><i style="width:${Math.max(p.pct-14,3)}%"></i></div>
-        </div>
-        <div class="pc-pct"><div class="p num">${p.pct}%</div><div class="s">${p.stages}</div></div>
-        <div class="pc-stats">
-          <div class="pstat"><div class="l">Дедлайн</div><div class="v mut">—</div></div>
-          <div class="pstat"><div class="l">Здоровье</div><div class="v ok">${p.health}</div></div>
-          <div class="pstat"><div class="l">Динамика</div><div class="v mut">${p.dyn}</div></div>
-          <div class="pstat" onclick="event.stopPropagation();projNote(${PROJECTS.indexOf(p)})"><div class="l">Заметка</div><div class="v mut"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:1px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div></div>
-          <div class="pstat" onclick="event.stopPropagation();projSettings(${PROJECTS.indexOf(p)})"><div class="l">Настройки</div><div class="v mut"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:1px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H1a2 2 0 110-4h.09A1.65 1.65 0 003 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H8a1.65 1.65 0 001-1.51V1a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V8a1.65 1.65 0 001.51 1H23a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div></div>
-        </div>
-      </div>`).join(''):'<div class="modph"><h3>Нет проектов в этом фильтре</h3><p>Просроченных проектов нет — всё в срок.</p></div>'}</div>`;
+    <div id="pj-list">${_projListHTML(list)}</div>`;
 }
 
 /* ——— PROJECT DETAIL window ——— */
