@@ -2435,74 +2435,112 @@ function renderDeadlines(){
     ${body}`;
 }
 
-/* ——— OVERVIEW module ——— */
-const PORTFOLIO=[
-  {name:'88888888',logo:'8',cat:'—',mrr:0,margin:null,profit:null,deadline:'—',churn:'6д',churnC:'pos'},
-  {name:'Тестовый проект',logo:'Т',cat:'Кофейня',mrr:7000000,margin:60,profit:4200000,deadline:'—',churn:'12д',churnC:'warn'},
-  {name:'RESTO',logo:'R',cat:'Продакшн',mrr:12000000,margin:44,profit:5280002,deadline:'—',churn:'12д',churnC:'warn'},
-  {name:'Uzbek Doner',logo:'U',cat:'Фаст-фуд',mrr:12000000,margin:1,profit:70003,deadline:'—',churn:'0д',churnC:'pos'},
-];
-const STAGE_LOAD=[
-  {name:'Анализ клиентских данных',done:0,total:1},
-  {name:'Анализ конкурентов',done:1,total:2},
-  {name:'Контент-стратегия',done:1,total:1},
-  {name:'Таргет-стратегия',done:0,total:1},
-  {name:'Съёмки',done:2,total:3},
-  {name:'Финальный отчёт',done:0,total:1},
-];
+/* ——— OVERVIEW module · live data only (no mock) ——— */
+let OVERVIEW = { onTime:0, deadlineDone:0, v7:0, v30:0, vMonth:0, monthName:'', rework:0, trans:0, overdueItems:0, stageLoad:[] };
+let ovFilter = 'all';
+function setOvFilter(f){ ovFilter = f; renderOverview(); }
+function ovOpen(id){ const i=(typeof PROJECTS!=='undefined'?PROJECTS:[]).findIndex(x=>x.id===id); if(i>=0) openProject(i); }
+const OV_MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+function _ovDue(due){ if(!due) return '—'; const d=new Date(due+'T00:00:00'); return d.getDate()+' '+OV_MON[d.getMonth()]; }
 function renderOverview(){
-  const radar=DEADLINES.filter(d=>d.bucket==='today'||d.bucket==='week');
-  document.getElementById('content-ag').innerHTML=`
+  const O = OVERVIEW;
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+
+  /* —— scalars derived from the projects themselves (always match the table) —— */
+  const active = P.filter(p => p.status !== 'done');
+  const doneN  = P.filter(p => p.status === 'done').length;
+  const onTrack = active.filter(p => !p._overdue).length;
+  const health  = active.length ? Math.round(100 * onTrack / active.length) : 100;
+  const avgProg = active.length ? Math.round(active.reduce((s,p)=>s+(p.pct||0),0)/active.length) : 0;
+  const overdueProjects = active.filter(p => p._overdue).length;
+  const STALE = 14;
+  const stale = active.filter(p => p._lastActDays == null || p._lastActDays >= STALE).length;
+  const openOf = p => Math.max((p._stot||0)-(p._sdone||0), 0);
+  const opens = active.map(openOf), openSum = opens.reduce((a,b)=>a+b,0);
+  let concentration = 0, concTop = '—';
+  if (openSum > 0){ let mx=0, idx=-1; active.forEach((p,i)=>{ if(opens[i]>mx){ mx=opens[i]; idx=i; } });
+    concentration = Math.round(100*mx/openSum); if(idx>=0) concTop = active[idx].name; }
+  const totDone = P.reduce((s,p)=>s+(p._sdone||0),0);
+  const totStg  = P.reduce((s,p)=>s+(p._stot||0),0);
+
+  /* —— scalars derived from stage history (loaded into OVERVIEW) —— */
+  const otPct = O.deadlineDone ? Math.round(100*O.onTime/O.deadlineDone) : null;
+  const reworkPct = O.trans ? Math.round(100*O.rework/O.trans) : 0;
+
+  /* —— thresholds → colour + badge —— */
+  const hMeta  = health>=80 ? ['var(--pos)','отличное состояние'] : health>=50 ? ['var(--warn)','требует внимания'] : ['var(--neg)','критическое состояние'];
+  const concB  = concentration>=50 ? ['b-susp','Высокий'] : concentration>=30 ? ['b-trial','Умеренный'] : ['b-active','Низкий'];
+  const progB  = avgProg>=66 ? ['b-active','Высокий'] : avgProg>=33 ? ['b-trial','Средний'] : ['b-susp','Низкий'];
+  const churnB = stale===0 ? ['b-active','Норма'] : stale<=1 ? ['b-trial','Внимание'] : ['b-susp','Риск'];
+  const reworkB= reworkPct>=20 ? ['b-susp','Высокий'] : reworkPct>=8 ? ['b-trial','Средний'] : ['b-active','Низкий'];
+
+  /* —— portfolio rows (respect the active filter tab) —— */
+  const rows = P.filter(p => ovFilter==='all' ? true : ovFilter==='active' ? p.status!=='done' : ovFilter==='overdue' ? !!p._overdue : p.status==='done');
+  const seg = (k,lbl,dot) => `<button class="${ovFilter===k?'on':''}" onclick="setOvFilter('${k}')">${dot||''}${lbl}</button>`;
+
+  /* —— deadline radar: overdue → today → week —— */
+  const ord = { overdue:0, today:1, week:2 };
+  const radar = DEADLINES.filter(d => d.bucket==='overdue'||d.bucket==='today'||d.bucket==='week')
+    .sort((a,b)=> (ord[a.bucket]-ord[b.bucket]) || String(a.due||'').localeCompare(String(b.due||'')));
+  const rBadge = b => b==='overdue' ? ['b-susp','Просрочен'] : b==='today' ? ['b-cyan','Сегодня'] : ['b-trial','Неделя'];
+
+  document.getElementById('content-ag').innerHTML = `
     <div class="ph"><div><div class="eyebrow">Агентство · обзор</div><h1>Сводка</h1>
-    <div class="s">Состояние портфеля одним экраном: здоровье, скорость, риски, нагрузка. Пороги задаются агентством.</div></div></div>
+    <div class="s">Состояние портфеля одним экраном: здоровье, скорость, риски, нагрузка. Все цифры считаются из ваших проектов.</div></div></div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Индекс здоровья</div><div class="v num" style="color:var(--warn)">64<span class="u">%</span></div><div class="sub">требует внимания состояние</div><div class="kfoot">4 активных · 1 завершено</div></div>
-      <div class="kpi"><div class="l">On-time delivery</div><div class="v num">71<span class="u">%</span></div><div class="sub">задач сдано в срок</div><div class="kfoot">7 задач с дедлайном · 5 в срок</div></div>
-      <div class="kpi"><div class="l">Просрочено сейчас</div><div class="v num">0</div><div class="sub pos">всё в норме</div><div class="kfoot">0 проектов · 0 задач просрочено</div></div>
-      <div class="kpi"><div class="l">Velocity · 30 дней</div><div class="v num">16</div><div class="sub">задач закрыто</div><div class="kfoot">за 7 дней: 2 · июнь: 6 · 30 дн: 16</div></div>
+      <div class="kpi"><div class="l">Индекс здоровья</div><div class="v num" style="color:${hMeta[0]}">${health}<span class="u">%</span></div><div class="sub">${hMeta[1]}</div><div class="kfoot">${active.length} активных · ${doneN} завершено</div></div>
+      <div class="kpi"><div class="l">On-time delivery</div><div class="v num">${otPct==null?'—':otPct+'<span class="u">%</span>'}</div><div class="sub">${otPct==null?'нет завершённых с дедлайном':'этапов сдано в срок'}</div><div class="kfoot">${O.deadlineDone} с дедлайном · ${O.onTime} в срок</div></div>
+      <div class="kpi"><div class="l">Просрочено сейчас</div><div class="v num" style="color:${O.overdueItems?'var(--neg)':'inherit'}">${O.overdueItems}</div><div class="sub ${O.overdueItems?'':'pos'}">${O.overdueItems?'требуют действия':'всё в норме'}</div><div class="kfoot">${overdueProjects} проектов · ${O.overdueItems} этапов/задач</div></div>
+      <div class="kpi"><div class="l">Velocity · 30 дней</div><div class="v num">${O.v30}</div><div class="sub">этапов закрыто</div><div class="kfoot">за 7 дней: ${O.v7} · ${O.monthName}: ${O.vMonth} · 30 дн: ${O.v30}</div></div>
     </div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10"/><path d="M12 2v10h10A10 10 0 0012 2z"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Концентрация выручки</div><span class="badge b-trial" style="font-size:9px;padding:2px 7px">Умеренный</span></div><div class="v num" style="color:var(--warn)">39<span class="u">%</span></div><div class="sub">RESTO · топ-клиент</div></div></div>
-      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Выручка на час</div><span class="badge b-active" style="font-size:9px;padding:2px 7px">Высокая</span></div><div class="v num">577 640</div><div class="sub">64 ч · за 30 дн · MRR 31 000 000</div></div></div>
-      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.9 17.9A10 10 0 0112 20C5 20 1 12 1 12a18 18 0 015-5.9M9.9 4.2A9 9 0 0112 4c7 0 11 8 11 8a18 18 0 01-2.2 3.2m-6.7-1.1a3 3 0 11-4.2-4.2"/><path d="M1 1l22 22"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Churn risk</div><span class="badge b-active" style="font-size:9px;padding:2px 7px">Норма</span></div><div class="v num">0</div><div class="sub">активность в норме</div></div></div>
-      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Rework rate</div><span class="badge b-susp" style="font-size:9px;padding:2px 7px">Высокий</span></div><div class="v num" style="color:var(--neg)">18</div><div class="sub">этапов откатилось назад</div></div></div>
+      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10"/><path d="M12 2v10h10A10 10 0 0012 2z"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Концентрация портфеля</div><span class="badge ${concB[0]}" style="font-size:9px;padding:2px 7px">${concB[1]}</span></div><div class="v num" style="color:${concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${concentration}<span class="u">%</span></div><div class="sub">${concTop} · крупнейший</div></div></div>
+      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Средний прогресс</div><span class="badge ${progB[0]}" style="font-size:9px;padding:2px 7px">${progB[1]}</span></div><div class="v num">${avgProg}<span class="u">%</span></div><div class="sub">в среднем по активным</div></div></div>
+      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.9 17.9A10 10 0 0112 20C5 20 1 12 1 12a18 18 0 015-5.9M9.9 4.2A9 9 0 0112 4c7 0 11 8 11 8a18 18 0 01-2.2 3.2m-6.7-1.1a3 3 0 11-4.2-4.2"/><path d="M1 1l22 22"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Риск оттока</div><span class="badge ${churnB[0]}" style="font-size:9px;padding:2px 7px">${churnB[1]}</span></div><div class="v num" style="color:${stale?'var(--warn)':'inherit'}">${stale}</div><div class="sub">${stale?('без активности ≥ '+STALE+' дн'):'активность в норме'}</div></div></div>
+      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Откаты (rework)</div><span class="badge ${reworkB[0]}" style="font-size:9px;padding:2px 7px">${reworkB[1]}</span></div><div class="v num" style="color:${reworkPct>=20?'var(--neg)':'inherit'}">${O.rework}</div><div class="sub">${reworkPct}% переходов назад</div></div></div>
     </div>
 
     <div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Портфель проектов <span class="c">${PORTFOLIO.length} активных · 4/23 этапов</span></div>
-        <div class="segm"><button class="on">Все</button><button>Активные</button><button><span class="d" style="background:var(--neg)"></span>Просрочены</button><button><span class="d" style="background:var(--pos)"></span>Завершены</button></div>
+      <div class="card-h"><div class="t">Портфель проектов <span class="c">${active.length} активных · ${totDone}/${totStg} этапов</span></div>
+        <div class="segm">${seg('all','Все')}${seg('active','Активные')}${seg('overdue','Просрочены','<span class="d" style="background:var(--neg)"></span>')}${seg('done','Завершены','<span class="d" style="background:var(--pos)"></span>')}</div>
       </div>
       <table>
-        <thead><tr><th>Проект</th><th>Категория</th><th>MRR</th><th>Маржа / прибыль</th><th>Дедлайн</th><th>Churn</th></tr></thead>
-        <tbody>${PORTFOLIO.map(p=>`<tr>
-          <td><div class="ag-name"><span class="ag-dot" style="background:var(--accent)"></span><div class="nm">${p.name}</div></div></td>
-          <td style="text-align:right">${p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:'<span style="color:var(--txt-3)">—</span>'}</td>
-          <td>${p.mrr?money(p.mrr):'<span style="color:var(--txt-3)">—</span>'}</td>
-          <td>${p.margin!=null?`<span class="mrg" style="color:var(--accent)">${p.margin}%</span> <span class="mrg" style="color:var(--pos);font-size:11px">+${fmt(p.profit)}</span>`:'<span style="color:var(--txt-3)">—</span>'}</td>
-          <td style="color:var(--txt-3)">${p.deadline}</td>
-          <td><span class="mrg" style="color:var(--${p.churnC})">● ${p.churn}</span></td>
-        </tr>`).join('')}</tbody>
+        <thead><tr><th>Проект</th><th>Категория</th><th>Прогресс</th><th>Этапы</th><th>Ближайший дедлайн</th><th>Активность</th></tr></thead>
+        <tbody>${rows.length?rows.map(p=>{
+          const dot = p.status==='done'?'var(--pos)':p._overdue?'var(--neg)':'var(--accent)';
+          const prog = p.pct||0;
+          const la = p._lastActDays;
+          const laC = la==null?'var(--txt-3)':la>=14?'var(--neg)':la>=7?'var(--warn)':'var(--pos)';
+          const laT = la==null?'—':la===0?'сегодня':la+'д назад';
+          return `<tr onclick="ovOpen('${p.id}')">
+            <td><div class="ag-name"><span class="ag-dot" style="background:${dot}"></span><div class="nm">${p.name}</div></div></td>
+            <td style="text-align:right">${p.cat&&p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:'<span style="color:var(--txt-3)">—</span>'}</td>
+            <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span class="num">${prog}%</span><div style="width:66px;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><i style="display:block;width:${prog}%;height:100%;background:${prog>=100?'var(--pos)':'var(--accent)'};border-radius:3px"></i></div></div></td>
+            <td class="num">${(p._sdone||0)} / ${(p._stot||0)}</td>
+            <td style="color:${p._overdue?'var(--neg)':'var(--txt-3)'}">${_ovDue(p._nextDue)}</td>
+            <td><span class="mrg" style="color:${laC}">● ${laT}</span></td>
+          </tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--txt-3);padding:26px">Нет проектов в этой категории</td></tr>'}</tbody>
       </table>
     </div>
 
     <div class="row2" style="margin-top:16px">
       <div class="card">
-        <div class="card-h"><div class="t">Радар дедлайнов <span class="c">активные по этапам</span></div></div>
-        <div class="card-body">${radar.length?radar.map(d=>`<div class="rd-row">
+        <div class="card-h"><div class="t">Радар дедлайнов <span class="c">просрочено · сегодня · неделя</span></div></div>
+        <div class="card-body">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);return `<div class="rd-row">
           <div class="rd-date">${d.day} ${d.mon}</div>
           <div class="rd-main"><div class="rd-stage">${d.stage}</div><div class="rd-proj">${d.project}</div></div>
-          <span class="badge ${d.bucket==='today'?'b-cyan':'b-trial'}" style="font-size:9px;padding:2px 7px">${d.bucket==='today'?'Сегодня':'Неделя'}</span>
-        </div>`).join(''):'<div class="empty-mini">Нет активных дедлайнов</div>'}</div>
+          <span class="badge ${rb[0]}" style="font-size:9px;padding:2px 7px">${rb[1]}</span>
+        </div>`;}).join(''):'<div class="empty-mini">Нет ближайших дедлайнов</div>'}</div>
       </div>
       <div class="card">
-        <div class="card-h"><div class="t">Загрузка по этапам</div></div>
-        <div class="card-body">${STAGE_LOAD.map(s=>`<div class="ld-row">
+        <div class="card-h"><div class="t">Загрузка по этапам <span class="c">по всем проектам</span></div></div>
+        <div class="card-body">${O.stageLoad.length?O.stageLoad.map(s=>`<div class="ld-row">
           <div class="ld-name">${s.name}</div>
           <div class="ld-bar"><i style="width:${s.total?Math.round(s.done/s.total*100):0}%"></i></div>
           <div class="ld-ct">${s.done}/${s.total}</div>
-        </div>`).join('')}</div>
+        </div>`).join(''):'<div class="empty-mini">Нет этапов</div>'}</div>
       </div>
     </div>`;
 }
@@ -3440,6 +3478,75 @@ window.tLoadProjectAggregates = async () => {
   });
 };
 
+/* ===== OVERVIEW · live aggregation (real metrics, no mock) ===== */
+window.tLoadOverview = async () => {
+  if (!SB) return;
+  const now = Date.now();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const iso7   = new Date(now - 7*86400000).toISOString();
+  const iso30  = new Date(now - 30*86400000).toISOString();
+  const isoMon = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+  const MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+  const [sr, tr, hr] = await Promise.all([
+    SB.from('project_stages').select('id,project_id,name,status,due_date'),
+    SB.from('project_tasks').select('project_id,status,due_date'),
+    SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at')
+  ]);
+  const stages = sr.data||[], tasks = tr.data||[], hist = hr.data||[];
+  const rank = { wait:0, active:1, done:2 };
+  const dueOf = {}; stages.forEach(s => { dueOf[s.id] = s.due_date; });
+
+  let v7=0, v30=0, vMonth=0, rework=0, trans=0, onTime=0, deadlineDone=0;
+  const lastAct = {};
+  hist.forEach(h => {
+    const t = new Date(h.created_at).getTime();
+    if (!(h.project_id in lastAct) || t > lastAct[h.project_id]) lastAct[h.project_id] = t;
+    trans++;
+    const f = rank[h.old_status], to = rank[h.new_status];
+    if (f != null && to != null && to < f) rework++;            // переход назад = откат
+    if (h.new_status === 'done') {
+      if (h.created_at >= iso30)  v30++;
+      if (h.created_at >= iso7)   v7++;
+      if (h.created_at >= isoMon)  vMonth++;
+      const due = dueOf[h.stage_id];
+      if (due) { deadlineDone++; if (t <= new Date(due+'T23:59:59').getTime()) onTime++; }
+    }
+  });
+
+  /* per-project rollup: done / total / nearest deadline / overdue flag */
+  const roll = {};
+  const R = pid => (roll[pid] || (roll[pid] = { done:0, total:0, next:null, over:false }));
+  stages.forEach(s => { const a = R(s.project_id); a.total++; if (s.status==='done') a.done++;
+    if (s.status!=='done' && s.due_date){ if (new Date(s.due_date+'T00:00:00') < today) a.over = true;
+      if (!a.next || s.due_date < a.next) a.next = s.due_date; } });
+  tasks.forEach(t => { if (t.status!=='done' && t.due_date){ const a = R(t.project_id);
+    if (new Date(t.due_date+'T00:00:00') < today) a.over = true;
+    if (!a.next || t.due_date < a.next) a.next = t.due_date; } });
+
+  let overdueItems = 0;
+  const over = (status, due) => { if (status==='done' || !due) return;
+    if (new Date(due+'T00:00:00') < today) overdueItems++; };
+  stages.forEach(s => over(s.status, s.due_date));
+  tasks.forEach(t => over(t.status, t.due_date));
+
+  /* enrich PROJECTS in place (read by renderOverview / portfolio table) */
+  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => {
+    const a = roll[p.id] || { done:0, total:0, next:null, over:false };
+    p._sdone = a.done; p._stot = a.total; p._nextDue = a.next; p._overdue = a.over;
+    const la = lastAct[p.id]; p._lastActDays = (la != null) ? Math.floor((now - la)/86400000) : null;
+  });
+
+  /* stage load grouped by stage name across the whole portfolio */
+  const lm = {}, lo = [];
+  stages.forEach(s => { const nm = s.name || '—'; if (!lm[nm]){ lm[nm] = { name:nm, done:0, total:0 }; lo.push(nm); }
+    lm[nm].total++; if (s.status==='done') lm[nm].done++; });
+  const stageLoad = lo.map(n => lm[n]).sort((a,b)=> (b.total-a.total) || a.name.localeCompare(b.name,'ru'));
+
+  OVERVIEW = { onTime, deadlineDone, v7, v30, vMonth, monthName: MON[today.getMonth()],
+    rework, trans, overdueItems, stageLoad };
+};
+
 window.tLoadAll = async (role) => {
   if (!SB) return;
   if (role === 'superadmin'){
@@ -3459,7 +3566,7 @@ window.tLoadAll = async (role) => {
       SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
     PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
-    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates();
+    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates(); await window.tLoadOverview();
   }
   await loadTariffs();
 };
