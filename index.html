@@ -1722,7 +1722,7 @@ function pdTabbar(d){
 }
 function openProject(i){
   pdIdx=i;pdTabCur='stages';
-  const p=PROJECTS[i]; p._d=p._d||buildDetail(p);
+  const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id;
   document.getElementById('pd-logo').innerHTML=logoFill(p.logoUrl,p.logo);
   document.getElementById('pd-name').textContent=p.name;
   document.getElementById('pd-desc').textContent=p.cat&&p.cat!=='—'?p.cat:'Нет описания';
@@ -1732,75 +1732,106 @@ function openProject(i){
   document.getElementById('ov-proj').classList.add('on');
   renderPd();
   requestAnimationFrame(()=>{document.getElementById('pd-minibar').style.width=p.pct+'%';});
+  if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).then(()=>{ if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id) renderPd(); });
 }
 function closeProject(){document.getElementById('ov-proj').classList.remove('on');}
 function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));renderPd();}
-function pkAdvance(col,idx){
-  const k=PROJECTS[pdIdx]._d.kanban, order=['wait','work','done'], ni=order.indexOf(col)+1;
-  if(ni>=order.length){toast('Этап уже завершён');return;}
-  const item=k[col].splice(idx,1)[0]; k[order[ni]].push(item);
-  renderPd(); toast(`«${item.t}» → ${ni===1?'В работе':'Готово'}`);
+const PD_STNEXT={wait:'active',active:'done'};
+function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
+function pdNewStage(){
+  pd2St='wait';
+  const seg=[['wait','Ожидает','var(--warn)'],['active','В работе','var(--accent)'],['done','Завершён','var(--pos)']]
+    .map(([k,l,c])=>`<button class="${k==='wait'?'on':''}" data-st="${k}" onclick="pd2SetStatus('${k}')"><span class="d" style="background:${c}"></span>${l}</button>`).join('');
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Новый этап</h3><p>${PROJECTS[pdIdx].name}</p></div>
+    <div class="modal-b">
+      <div class="fld"><label>Название</label><input id="pd2-name" placeholder="напр. Контент-план"></div>
+      <div class="fld"><label>Статус</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
+      <div class="fld"><label>Срок (дедлайн)</label><input type="date" id="pd2-date"></div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddStage()">Создать</button></div></div>`);
 }
-function pdTaskToggle(si,ti){const t=PROJECTS[pdIdx]._d.stages[si].tasks[ti];t.done=!t.done;renderPd();}
+function pdAddStage(){ const name=_v('pd2-name'); if(!name){toast('Введи название этапа');return;}
+  const S=PROJECTS[pdIdx]._stages||[]; const idx=S.length?Math.max(...S.map(s=>s.idx||0))+1:0;
+  if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,idx}); }
+function pdStageDel(id){ if(window.tStageDel) window.tStageDel(id); }
+function pdSeedStages(){ const names=PD_STAGE_SETS[PROJECTS[pdIdx].svc]||PD_STAGE_SETS.SMM; if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
+let pdTaskAssignee=null;
+function pdNewTask(){
+  const opts=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>`<option value="${m._id}">${m.name}</option>`).join('');
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${PROJECTS[pdIdx].name} · Операционка</p></div>
+    <div class="modal-b">
+      <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
+      <div class="fld2">
+        <div class="fld"><label>Исполнитель</label><select id="pd2-asg"><option value="">— не назначен —</option>${opts}</select></div>
+        <div class="fld"><label>Срок</label><input type="date" id="pd2-tdate"></div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddTask()">Создать</button></div></div>`);
+}
+function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи задачу');return;}
+  const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
+  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,status:'wait',idx}); }
+function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
+const PD_MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+function _dDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+PD_MON[d.getMonth()]; }
+function _who(id){ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{n:m.name||'—',c:m.color||'var(--txt-3)'}:{n:'—',c:'var(--txt-3)'}; }
 function renderPd(){
   const p=PROJECTS[pdIdx], d=p._d; let h='';
   if(pdTabCur==='stages'){
-    const segs=d.stages.map(s=>`<div class="pd-seg ${s.st==='done'?'done':s.st==='active'?'active':''}"></div>`).join('');
-    const hero=`<div class="pd-hero">
-      <div class="pd-hero-top">
-        <div><div class="pd-bignum">${p.pct}%</div><div class="pd-bigsub">${d.done} из ${d.stages.length} этапов завершено</div></div>
-        <div class="pd-segs"><div class="pd-seglbl"><span>Прогресс этапов</span><span style="font-family:var(--mono);color:var(--txt-2)">${d.done} / ${d.stages.length}</span></div><div class="pd-segrow">${segs}</div><div class="pd-seg2"><i style="width:${p.pct}%"></i></div></div>
-      </div>
-      <div class="pd-statrow">
-        <div class="pd-stat"><div class="v" style="color:var(--pos)">${d.done}</div><div class="l">Завершено</div></div>
-        <div class="pd-stat"><div class="v" style="color:var(--accent)">${d.work}</div><div class="l">В работе</div></div>
-        <div class="pd-stat"><div class="v" style="color:var(--warn)">${d.wait}</div><div class="l">Ожидают</div></div>
-        <div class="pd-stat"><div class="v" style="color:var(--txt-3)">—</div><div class="l">Бл. дедлайн</div></div>
-      </div></div>`;
-    const stages=d.stages.map((s,i)=>{
-      const mark=s.st==='done'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>'
-                :s.st==='active'?'<span class="pulse"></span>':'';
-      const status=s.st==='done'?'Завершён':s.st==='active'?'В работе':'Ожидает';
-      const right=s.st==='wait'?`<div class="pd-st-status">${status}</div>`
-        :`${s.date?`<div class="pd-st-date">${s.date}</div>`:''}<div class="pd-st-status">${s.st==='active'?'● '+status:status}</div>`;
-      let body;
-      if(s.st==='active'){
-        const doneCt=s.tasks.filter(t=>t.done).length;
-        body=`<div class="pd-st-body">
-          <button class="pd-openmat" onclick="event.stopPropagation();pdMaterial(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg>Открыть материал</button>
-          <div class="pd-tasks-h">☑ Задачи <span class="ct">${doneCt}/${s.tasks.length}</span></div>
-          ${s.tasks.map((t,ti)=>`<div class="pd-task ${t.done?'checked':''}">
-            <div class="cb ${t.done?'on':''}" onclick="event.stopPropagation();pdTaskToggle(${i},${ti})">${t.done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''}</div>
-            <div class="tk">${t.t}</div>
-            <div class="who"><span class="av" style="background:${t.who.c}">${t.who.n[0]}</span>${t.date}</div>
-            <div class="tmr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${t.tmr}</div>
-          </div>`).join('')}
-        </div>`;
+    if(p._stages===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка этапов…</div>'; }
+    else {
+      const S=p._stages;
+      const total=S.length, done=S.filter(s=>s.status==='done').length, work=S.filter(s=>s.status==='active').length, wait=total-done-work;
+      const pct=total?Math.round(done/total*100):0;
+      const pe=document.getElementById('pd-pct'); if(pe) pe.textContent=pct+'%';
+      const mb=document.getElementById('pd-minibar'); if(mb) mb.style.width=pct+'%';
+      const next=S.filter(s=>s.status!=='done'&&s.due_date).sort((a,b)=>a.due_date<b.due_date?-1:1)[0];
+      const segs=S.map(s=>`<div class="pd-seg ${s.status==='done'?'done':s.status==='active'?'active':''}"></div>`).join('');
+      const hero=`<div class="pd-hero"><div class="pd-hero-top">
+        <div><div class="pd-bignum">${pct}%</div><div class="pd-bigsub">${done} из ${total} этапов завершено</div></div>
+        <div class="pd-segs"><div class="pd-seglbl"><span>Прогресс этапов</span><span style="font-family:var(--mono);color:var(--txt-2)">${done} / ${total}</span></div><div class="pd-segrow">${segs}</div><div class="pd-seg2"><i style="width:${pct}%"></i></div></div>
+        </div><div class="pd-statrow">
+        <div class="pd-stat"><div class="v" style="color:var(--pos)">${done}</div><div class="l">Завершено</div></div>
+        <div class="pd-stat"><div class="v" style="color:var(--accent)">${work}</div><div class="l">В работе</div></div>
+        <div class="pd-stat"><div class="v" style="color:var(--warn)">${wait}</div><div class="l">Ожидают</div></div>
+        <div class="pd-stat"><div class="v" style="color:var(--txt-3)">${next?_dDate(next.due_date):'—'}</div><div class="l">Бл. дедлайн</div></div>
+        </div></div>`;
+      let list;
+      if(!total){
+        list=`<div class="modph"><h3>Этапов пока нет</h3><p>Создай пайплайн — этапы появятся в дедлайнах и у клиента.</p>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:14px">
+            <button class="btn-add" onclick="pdNewStage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Этап</button>
+            <button class="btn-ghost" onclick="pdSeedStages()">Шаблон SMM · 6 этапов</button>
+          </div></div>`;
       } else {
-        body=`<div class="pd-st-mini">☑ Задачи <span class="ct">${s.taskN}</span></div>`;
+        list=S.map((s,i)=>{
+          const ic=PD_ST_IC[i%PD_ST_IC.length];
+          const mark=s.status==='done'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':s.status==='active'?'<span class="pulse"></span>':'';
+          const status=s.status==='done'?'Завершён':s.status==='active'?'В работе':'Ожидает';
+          const dd=s.due_date?`<div class="pd-st-date">${_dDate(s.due_date)}</div>`:'';
+          return `<div class="pd-st ${s.status}"><div class="pd-st-mark">${mark}</div>
+            <div class="pd-st-row"><span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></span>
+            <div class="pd-st-nm">${s.name}</div>${dd}<div class="pd-st-status">${s.status==='active'?'● '+status:status}</div>
+            <button class="pd-edit" onclick="event.stopPropagation();pdEditStage('${s.id}')">Изменить</button></div></div>`;
+        }).join('');
       }
-      return `<div class="pd-st ${s.st}">
-        <div class="pd-st-mark">${mark}</div>
-        <div class="pd-st-row">
-          <span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${s.icon}</svg></span>
-          <div class="pd-st-nm">${s.n}</div>
-          ${right}
-          <button class="pd-edit" onclick="event.stopPropagation();pdEditStage(${i})">Изменить</button>
-        </div>
-        ${body}
-      </div>`;
-    }).join('');
-    h=hero+`<div class="pd-sec-h"><div class="t">Этапы проекта · ${d.stages.length} шагов</div><button class="pd-cyc-btn" onclick="pdCycles()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/></svg>Прошлые циклы</button></div>
-      <div class="pd-stages">${stages}</div>`;
+      h=hero+`<div class="pd-sec-h"><div class="t">Этапы проекта · ${total} шагов</div>${total?`<button class="pd-cyc-btn" onclick="pdNewStage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Этап</button>`:''}</div><div class="pd-stages">${list}</div>`;
+    }
   } else if(pdTabCur==='kanban'){
-    const col=(key,label,color)=>{
-      const arr=d.kanban[key];
-      return `<div class="pk-col"><div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${arr.length}</span></div>
-        ${arr.length?arr.map((c,i)=>`<div class="pk-card"><div class="t">${c.t}</div><div class="m"><span class="av" style="background:${c.who.c}">${c.who.n[0]}</span><span class="who">${c.who.n}</span>${key!=='done'?`<button class="adv" title="Дальше" onclick="pkAdvance('${key}',${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></button>`:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--pos)" stroke-width="2.6" style="margin-left:auto"><path d="M20 6L9 17l-5-5"/></svg>'}</div></div>`).join(''):'<div class="pk-empty">пусто</div>'}
-      </div>`;
-    };
-    h=`<div class="pk-board">${col('wait','Ожидание','var(--warn)')}${col('work','В работе','var(--accent)')}${col('done','Готово','var(--pos)')}</div>
-       <div style="font-size:11.5px;color:var(--txt-3);margin-top:14px;text-align:center">Нажми «›» на карточке, чтобы продвинуть задачу по статусу</div>`;
+    if(p._tasks===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка задач…</div>'; }
+    else {
+      const T=p._tasks, byst=st=>T.filter(t=>t.status===st);
+      const col=(st,label,color)=>{ const arr=byst(st);
+        return `<div class="pk-col"><div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${arr.length}</span></div>
+          ${arr.length?arr.map(c=>{ const w=_who(c.assignee_id); const dd=c.due_date?` · ${_dDate(c.due_date)}`:'';
+            const adv=st!=='done'?`<button class="adv" title="Дальше" onclick="pkAdvance('${c.id}','${c.status}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg></button>`:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--pos)" stroke-width="2.6" style="margin-left:auto"><path d="M20 6L9 17l-5-5"/></svg>';
+            return `<div class="pk-card"><div class="t">${c.title}<button title="Удалить" onclick="pdTaskDel('${c.id}')" style="float:right;background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></div><div class="m"><span class="av" style="background:${w.c}">${(w.n[0]||'?')}</span><span class="who">${w.n}${dd}</span>${adv}</div></div>`;
+          }).join(''):'<div class="pk-empty">пусто</div>'}
+        </div>`; };
+      h=`<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn-add" onclick="pdNewTask()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Задача</button></div>
+        <div class="pk-board">${col('wait','Ожидание','var(--warn)')}${col('active','В работе','var(--accent)')}${col('done','Готово','var(--pos)')}</div>
+        <div style="font-size:11.5px;color:var(--txt-3);margin-top:14px;text-align:center">Нажми «›», чтобы продвинуть задачу по статусу</div>`;
+    }
   } else if(pdTabCur==='reports'){
     h=d.reports.length?d.reports.map((r,ri)=>`<div class="act-row" style="cursor:pointer" onclick="openReportProj(${ri})"><div class="act-ic start" style="background:${r.color}22;color:${r.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div><div style="flex:1"><div class="act-txt">${r.t}</div><div class="act-tag">Опубликован · ${r.date}</div></div><span class="badge" style="background:${r.color}22;color:${r.color}">${r.ty}</span></div>`).join('')
       :'<div class="pk-empty" style="padding:40px 0">Отчётов пока нет — появятся после первых завершённых этапов</div>';
@@ -1826,32 +1857,25 @@ function pd2Open(html){document.getElementById('ov-pd2').innerHTML=html;document
 function pd2Close(){document.getElementById('ov-pd2').classList.remove('on');document.getElementById('ov-pd2').innerHTML='';}
 function _v(id){const e=document.getElementById(id);return e?e.value.trim():'';}
 
-function pdEditStage(i){
-  const s=PROJECTS[pdIdx]._d.stages[i]; pd2St=s.st;
+function pdEditStage(id){
+  const s=(PROJECTS[pdIdx]._stages||[]).find(x=>x.id===id); if(!s) return; pd2St=s.status;
   const seg=[['done','Завершён','var(--pos)'],['active','В работе','var(--accent)'],['wait','Ожидает','var(--warn)']]
-    .map(([k,l,c])=>`<button class="${k===s.st?'on':''}" data-st="${k}" onclick="pd2SetStatus('${k}')"><span class="d" style="background:${c}"></span>${l}</button>`).join('');
+    .map(([k,l,c])=>`<button class="${k===s.status?'on':''}" data-st="${k}" onclick="pd2SetStatus('${k}')"><span class="d" style="background:${c}"></span>${l}</button>`).join('');
   pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Этап ${i+1} · ${s.n}</h3><p>Статус, сроки и материалы этапа</p></div>
+    <div class="modal-h"><h3>Этап · ${s.name}</h3><p>Статус, срок и материалы этапа</p></div>
     <div class="modal-b">
+      <div class="fld"><label>Название</label><input id="pd2-name" value="${(s.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Статус этапа</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
-      <div class="fld"><label>Дата</label><input id="pd2-date" value="${s.date||''}" placeholder="12 июня 2026"></div>
-      <div class="fld"><label>Ссылка на материал</label><input id="pd2-link" value="${s.link||''}" placeholder="https://… (Google Drive, Figma, Notion)"></div>
+      <div class="fld"><label>Срок (дедлайн)</label><input type="date" id="pd2-date" value="${s.due_date||''}"></div>
+      <div class="fld"><label>Ссылка на материал</label><input id="pd2-link" value="${(s.link||'').replace(/"/g,'&quot;')}" placeholder="https://… (Drive, Figma, Notion)"></div>
       <div class="fld"><label>Комментарий</label><textarea id="pd2-note" placeholder="Заметка по этапу…">${s.note||''}</textarea></div>
     </div>
-    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveStage(${i})">Сохранить</button></div>
+    <div class="modal-f"><button class="btn-ghost" style="margin-right:auto;color:var(--neg)" onclick="pdStageDel('${s.id}')">Удалить</button><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveStage('${s.id}')">Сохранить</button></div>
   </div>`);
 }
-function pd2SetStatus(v){pd2St=v;document.querySelectorAll('#pd2-stseg button').forEach(b=>b.classList.toggle('on',b.dataset.st===v));}
-function pdSaveStage(i){
-  const p=PROJECTS[pdIdx], d=p._d, s=d.stages[i];
-  s.st=pd2St; s.date=_v('pd2-date'); s.link=_v('pd2-link'); s.note=_v('pd2-note');
-  if(s.st==='active'&&(!s.tasks||!s.tasks.length)){s.tasks=[{t:s.n+' — черновик',who:PD_PEOPLE[0],date:s.date||'12 июня',tmr:'1м',done:false}];s.taskN=1;}
-  const tot=d.stages.length, done=d.stages.filter(x=>x.st==='done').length, work=d.stages.filter(x=>x.st==='active').length;
-  d.done=done; d.work=work; d.wait=tot-done-work;
-  p.pct=Math.round(done/tot*100); p.stages=`${done} / ${tot}`; p.status=done===tot?'done':'active';
-  document.getElementById('pd-pct').textContent=p.pct+'%';
-  document.getElementById('pd-minibar').style.width=p.pct+'%';
-  pd2Close(); renderPd(); toast(`Этап «${s.n}» обновлён`);
+function pdSaveStage(id){
+  const patch={ name:_v('pd2-name')||'Этап', status:pd2St, due_date:_v('pd2-date')||null, link:_v('pd2-link')||null, note:_v('pd2-note')||null };
+  if(window.tStageSave) window.tStageSave(id,patch);
 }
 
 function pdMaterial(i){
@@ -2048,7 +2072,7 @@ _MODALS.forEach(id=>{
 })();
 
 /* ——— DEADLINES module ——— */
-let agDlFilter='all', agDlView='deadlines', agDlProj='all', agDlSearch='', agDlFrom='', agDlTo='';
+let agDlFilter='all', agDlView='deadlines', agDlProj='all', agDlSearch='', agDlFrom='', agDlTo='', agDlType='all';
 const DL_BUCKETS=[
   {k:'overdue',l:'Просрочено',c:'red',st:'Просрочен',sc:'b-susp'},
   {k:'today',l:'Сегодня',c:'cyan',st:'Сегодня',sc:'b-cyan'},
@@ -2064,12 +2088,14 @@ function setDlProj(p){agDlProj=p;renderDeadlines();}
 function setDlSearch(q){agDlSearch=q;renderDeadlines();}
 function setDlFrom(d){agDlFrom=d;renderDeadlines();}
 function setDlTo(d){agDlTo=d;renderDeadlines();}
+function setDlType(t){agDlType=t;renderDeadlines();}
 function _dlFiltered(){
   const q=agDlSearch.trim().toLowerCase();
   const inRange=d=>{ if(!d.due) return !(agDlFrom||agDlTo);
     if(agDlFrom && d.due<agDlFrom) return false; if(agDlTo && d.due>agDlTo) return false; return true; };
   return DEADLINES.filter(d=>
     (agDlProj==='all'||d.project===agDlProj) &&
+    (agDlType==='all'||d.type===agDlType) &&
     (!q || (d.stage||'').toLowerCase().includes(q) || (d.project||'').toLowerCase().includes(q)) &&
     inRange(d));
 }
@@ -2095,7 +2121,7 @@ function renderDeadlines(){
       return `<div class="dl-group"><div class="dl-group-h">${b.l}<span class="ct">${items.length}</span><span class="ln"></span></div>
         ${items.map(d=>`<div class="dl-item ${b.c}">
           <div class="dl-date"><div class="d">${d.day}</div><div class="m">${d.mon}</div></div>
-          <div class="dl-main"><div class="dl-stage">${d.stage}</div><div class="dl-proj"><span class="pd"></span>${d.project}</div></div>
+          <div class="dl-main"><div class="dl-stage">${d.stage}</div><div class="dl-proj"><span class="pd"></span>${d.project}<span class="badge ${d.type==='task'?'b-mut':'b-cyan'}" style="margin-left:8px;font-size:9px;padding:1px 6px">${d.type==='task'?'задача':'этап'}</span></div></div>
           <div class="dl-st"><span class="badge ${b.sc}"><span class="bd"></span>${b.st}</span></div>
         </div>`).join('')}</div>`;
     }).join('') || (DEADLINES.length
@@ -2122,6 +2148,11 @@ function renderDeadlines(){
         <button class="${onF('today')}" onclick="setDlFilter('today')"><span class="d" style="background:var(--accent)"></span>Сегодня</button>
         <button class="${onF('week')}" onclick="setDlFilter('week')"><span class="d" style="background:var(--warn)"></span>Неделя</button>
         <button class="${onF('future')}" onclick="setDlFilter('future')">Будущие</button>
+      </div>
+      <div class="segm">
+        <button class="${agDlType==='all'?'on':''}" onclick="setDlType('all')">Все типы</button>
+        <button class="${agDlType==='stage'?'on':''}" onclick="setDlType('stage')">Этапы</button>
+        <button class="${agDlType==='task'?'on':''}" onclick="setDlType('task')">Задачи</button>
       </div>
       <div class="segm">
         <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
@@ -3026,18 +3057,20 @@ function dlBucket(due, status){
 }
 window.tLoadDeadlines = async () => {
   if (!SB) return;
-  const [st, hist] = await Promise.all([
+  const [st, tk, hist] = await Promise.all([
     SB.from('project_stages').select('id,name,status,due_date, projects(name)').not('due_date','is',null),
+    SB.from('project_tasks').select('id,title,status,due_date, projects(name)').not('due_date','is',null),
     SB.from('stage_history').select('stage_name,new_status,created_at, projects(name)').order('created_at',{ascending:false}).limit(30)
   ]);
+  const _push = (label, status, due, proj, id, type) => {
+    const d = due ? new Date(due+'T00:00:00') : null;
+    DEADLINES.push({ stage:label, project:proj||'—', day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'',
+      due: due, bucket: dlBucket(due, status), type, _id:id });
+  };
   if (typeof DEADLINES !== 'undefined'){
     DEADLINES.length = 0;
-    (st.data||[]).forEach(r => {
-      const d = r.due_date ? new Date(r.due_date+'T00:00:00') : null;
-      DEADLINES.push({ stage:r.name, project:(r.projects&&r.projects.name)||'—',
-        day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'',
-        due: r.due_date, bucket: dlBucket(r.due_date, r.status), _id:r.id });
-    });
+    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects&&r.projects.name, r.id, 'stage'));
+    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects&&r.projects.name, r.id, 'task'));
   }
   if (typeof DL_ACT !== 'undefined'){
     DL_ACT.length = 0;
@@ -3048,6 +3081,34 @@ window.tLoadDeadlines = async () => {
     });
   }
 };
+
+const curProjId = () => window._pdProj || null;
+async function _pwReload(projectId){
+  if (window.tLoadProjectWork){ await window.tLoadProjectWork(projectId);
+    if (typeof renderPd==='function' && document.getElementById('ov-proj').classList.contains('on')) renderPd(); }
+}
+window.tLoadProjectWork = async (projectId) => {
+  if (!SB || !projectId) return;
+  const p = (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x => x.id===projectId); if (!p) return;
+  const [st, tk] = await Promise.all([
+    SB.from('project_stages').select('*').eq('project_id',projectId).order('idx'),
+    SB.from('project_tasks').select('*').eq('project_id',projectId).order('idx') ]);
+  p._stages = st.data||[]; p._tasks = tk.data||[];
+};
+window.tStageSave = async (id,patch) => { try { const {error}=await SB.from('project_stages').update(patch).eq('id',id); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); toast('Этап обновлён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tStageAdd = async (projectId,row) => { try { const {error}=await SB.from('project_stages').insert({project_id:projectId,...row}); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); toast('Этап создан'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tStageDel = async (id) => { try { const {error}=await SB.from('project_stages').delete().eq('id',id); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); toast('Этап удалён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
+  const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tTaskMove = async (id,status) => { try { const {error}=await SB.from('project_tasks').update({status}).eq('id',id); if(error)throw error;
+  await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
+  toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 
 window.tLoadAll = async (role) => {
   if (!SB) return;
@@ -3092,6 +3153,7 @@ function subscribeRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'tools'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_stages'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'stage_history'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'project_tasks'},onRt)
       .subscribe();
   }catch(e){ console.warn('realtime', e); }
 }
