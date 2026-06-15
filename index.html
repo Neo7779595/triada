@@ -2048,7 +2048,7 @@ _MODALS.forEach(id=>{
 })();
 
 /* ——— DEADLINES module ——— */
-let agDlFilter='all', agDlView='deadlines';
+let agDlFilter='all', agDlView='deadlines', agDlProj='all', agDlSearch='', agDlFrom='', agDlTo='';
 const DL_BUCKETS=[
   {k:'overdue',l:'Просрочено',c:'red',st:'Просрочен',sc:'b-susp'},
   {k:'today',l:'Сегодня',c:'cyan',st:'Сегодня',sc:'b-cyan'},
@@ -2056,41 +2056,41 @@ const DL_BUCKETS=[
   {k:'future',l:'Будущие',c:'mut',st:'Будущие',sc:'b-mut'},
   {k:'done',l:'Выполнено',c:'green',st:'Выполнен',sc:'b-active'},
 ];
-let DEADLINES=[
-  {stage:'Сдача таргет-стратегии',project:'Uzbek Doner',day:9,mon:'июн',bucket:'overdue'},
-  {stage:'Финальные правки меню',project:'RESTO',day:10,mon:'июн',bucket:'overdue'},
-  {stage:'Публикация контент-плана',project:'Uzbek Doner',day:12,mon:'июн',bucket:'today'},
-  {stage:'Согласование сценариев',project:'88888888',day:12,mon:'июн',bucket:'today'},
-  {stage:'Съёмка ролика',project:'Тестовый проект',day:15,mon:'июн',bucket:'week'},
-  {stage:'Аудит профиля',project:'Stella Coffee',day:17,mon:'июн',bucket:'week'},
-  {stage:'Запуск рекламной кампании',project:'88888888',day:24,mon:'июн',bucket:'future'},
-  {stage:'Квартальный отчёт',project:'RESTO',day:30,mon:'июн',bucket:'future'},
-  {stage:'Добавление филиала на карты',project:'Uzbek Doner',day:5,mon:'июн',bucket:'done'},
-  {stage:'Продвижение филиала Беруни',project:'Uzbek Doner',day:6,mon:'июн',bucket:'done'},
-];
-let DL_ACT=[
-  {txt:'Команда начала работу над этапом',tag:'Публикация контент-плана · Uzbek Doner',t:'14 мин назад',k:'start'},
-  {txt:'Команда завершила этап',tag:'Продвижение филиала Беруни · Uzbek Doner',t:'13 ч назад',k:'done'},
-  {txt:'Команда вернула в ожидание',tag:'Анализ конкурентов · 88888888',t:'2 дн назад',k:'back'},
-  {txt:'Команда завершила этап',tag:'Добавление филиала · Uzbek Doner',t:'3 дн назад',k:'done'},
-  {txt:'Команда начала работу над этапом',tag:'Финальные правки меню · RESTO',t:'3 дн назад',k:'start'},
-];
+let DEADLINES=[];   // ← этапы с due_date, из project_stages (tLoadDeadlines)
+let DL_ACT=[];      // ← лента смен статусов этапов, из stage_history (tLoadDeadlines)
 function setDlFilter(f){agDlFilter=f;renderDeadlines();}
 function setDlView(v){agDlView=v;renderDeadlines();}
+function setDlProj(p){agDlProj=p;renderDeadlines();}
+function setDlSearch(q){agDlSearch=q;renderDeadlines();}
+function setDlFrom(d){agDlFrom=d;renderDeadlines();}
+function setDlTo(d){agDlTo=d;renderDeadlines();}
+function _dlFiltered(){
+  const q=agDlSearch.trim().toLowerCase();
+  const inRange=d=>{ if(!d.due) return !(agDlFrom||agDlTo);
+    if(agDlFrom && d.due<agDlFrom) return false; if(agDlTo && d.due>agDlTo) return false; return true; };
+  return DEADLINES.filter(d=>
+    (agDlProj==='all'||d.project===agDlProj) &&
+    (!q || (d.stage||'').toLowerCase().includes(q) || (d.project||'').toLowerCase().includes(q)) &&
+    inRange(d));
+}
 function renderDeadlines(){
-  const cnt=b=>DEADLINES.filter(d=>d.bucket===b).length;
-  const over=cnt('overdue'),today=cnt('today'),weekN=cnt('week'),future=cnt('week')+cnt('future'),done=cnt('done');
+  const FILT=_dlFiltered();
+  const cnt=b=>FILT.filter(d=>d.bucket===b).length;
+  const over=cnt('overdue'),today=cnt('today'),weekN=cnt('week'),futureN=cnt('future'),done=cnt('done');
+  const upcoming=weekN+futureN;
   const onF=f=>agDlFilter===f?'on':'', onV=v=>agDlView===v?'on':'';
+  const projOpts=(typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>`<option value="${(p.name||'').replace(/"/g,'&quot;')}" ${agDlProj===p.name?'selected':''}>${p.name}</option>`).join('');
   let body;
   if(agDlView==='activity'){
-    body=`<div class="act-feed">${DL_ACT.map(a=>{
+    body = DL_ACT.length ? `<div class="act-feed">${DL_ACT.map(a=>{
       const ic=a.k==='start'?'<path d="M5 3l14 9-14 9z"/>':a.k==='done'?'<path d="M20 6L9 17l-5-5"/>':'<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>';
       return `<div class="act-row"><div class="act-ic ${a.k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></div><div><div class="act-txt">${a.txt}</div><div class="act-tag">${a.tag}</div></div><div class="act-t">${a.t}</div></div>`;
-    }).join('')}</div>`;
+    }).join('')}</div>`
+    : '<div class="modph"><h3>Пока нет активности</h3><p>Как только команда начнёт или завершит этап — события появятся здесь.</p></div>';
   }else{
     const order=agDlFilter==='all'?['overdue','today','week','future','done']:[agDlFilter];
     body=order.map(k=>{
-      const b=DL_BUCKETS.find(x=>x.k===k), items=DEADLINES.filter(d=>d.bucket===k);
+      const b=DL_BUCKETS.find(x=>x.k===k), items=FILT.filter(d=>d.bucket===k);
       if(!items.length) return '';
       return `<div class="dl-group"><div class="dl-group-h">${b.l}<span class="ct">${items.length}</span><span class="ln"></span></div>
         ${items.map(d=>`<div class="dl-item ${b.c}">
@@ -2098,21 +2098,23 @@ function renderDeadlines(){
           <div class="dl-main"><div class="dl-stage">${d.stage}</div><div class="dl-proj"><span class="pd"></span>${d.project}</div></div>
           <div class="dl-st"><span class="badge ${b.sc}"><span class="bd"></span>${b.st}</span></div>
         </div>`).join('')}</div>`;
-    }).join('') || '<div class="modph"><h3>Нет дедлайнов в этом фильтре</h3><p>Всё в срок.</p></div>';
+    }).join('') || (DEADLINES.length
+        ? '<div class="modph"><h3>Ничего не найдено</h3><p>Под текущие фильтры дедлайнов нет.</p></div>'
+        : '<div class="modph"><h3>Дедлайнов пока нет</h3><p>Проставь срок этапу в карточке проекта — он появится здесь.</p></div>');
   }
   document.getElementById('content-ag').innerHTML=`
     <div class="ph"><div><div class="eyebrow">Агентство · сроки</div><h1>Дедлайны</h1>
     <div class="s">Сроки по этапам всех проектов: просрочено / сегодня / неделя / будущие. Работает для любого типа проекта.</div></div></div>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Просрочено</div><div class="v num" style="color:${over?'var(--neg)':'var(--txt)'}">${over}</div><div class="sub">${over} эт · 0 зад.</div><div class="kfoot ${over?'':'pos'}">${over?'требует внимания':'всё в срок ✓'}</div></div>
-      <div class="kpi"><div class="l">Сегодня</div><div class="v num">${today}</div><div class="sub">${today} эт · 0 зад.</div><div class="kfoot">${weekN} на этой неделе</div></div>
-      <div class="kpi"><div class="l">Будущие</div><div class="v num">${future}</div><div class="sub">${future} эт · 0 зад.</div><div class="kfoot">${weekN} на неделе · ${future-weekN} позже</div></div>
-      <div class="kpi"><div class="l">Выполнено</div><div class="v num">${done}</div><div class="sub">${done} эт · 0 зад.</div><div class="kfoot">за всё время</div></div>
+      <div class="kpi"><div class="l">Просрочено</div><div class="v num" style="color:${over?'var(--neg)':'var(--txt)'}">${over}</div><div class="sub">${over} эт.</div><div class="kfoot ${over?'':'pos'}">${over?'требует внимания':'всё в срок ✓'}</div></div>
+      <div class="kpi"><div class="l">Сегодня</div><div class="v num">${today}</div><div class="sub">${today} эт.</div><div class="kfoot">${weekN} на этой неделе</div></div>
+      <div class="kpi"><div class="l">Будущие</div><div class="v num">${upcoming}</div><div class="sub">${upcoming} эт.</div><div class="kfoot">${weekN} на неделе · ${futureN} позже</div></div>
+      <div class="kpi"><div class="l">Выполнено</div><div class="v num">${done}</div><div class="sub">${done} эт.</div><div class="kfoot">за всё время</div></div>
     </div>
     <div class="toolbar">
-      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по этапу или проекту…"></div>
-      <select class="sel"><option>Все проекты ▾</option></select>
-      <input type="date" class="dinp"><span style="color:var(--txt-3);font-size:12px">—</span><input type="date" class="dinp">
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по этапу или проекту…" value="${(agDlSearch||'').replace(/"/g,'&quot;')}" oninput="setDlSearch(this.value)"></div>
+      <select class="sel" onchange="setDlProj(this.value)"><option value="all" ${agDlProj==='all'?'selected':''}>Все проекты</option>${projOpts}</select>
+      <input type="date" class="dinp" value="${agDlFrom}" onchange="setDlFrom(this.value)"><span style="color:var(--txt-3);font-size:12px">—</span><input type="date" class="dinp" value="${agDlTo}" onchange="setDlTo(this.value)">
       <div class="flex1"></div>
       <div class="segm">
         <button class="${onF('all')}" onclick="setDlFilter('all')">Все</button>
@@ -2120,10 +2122,6 @@ function renderDeadlines(){
         <button class="${onF('today')}" onclick="setDlFilter('today')"><span class="d" style="background:var(--accent)"></span>Сегодня</button>
         <button class="${onF('week')}" onclick="setDlFilter('week')"><span class="d" style="background:var(--warn)"></span>Неделя</button>
         <button class="${onF('future')}" onclick="setDlFilter('future')">Будущие</button>
-      </div>
-      <div class="segm icseg">
-        <button class="on" title="Список"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2"/><circle cx="3.5" cy="12" r="1.2"/><circle cx="3.5" cy="18" r="1.2"/></svg></button>
-        <button title="Сетка"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
       </div>
       <div class="segm">
         <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
@@ -3007,6 +3005,50 @@ window.tLoadTools = async () => {
   if (typeof TOOLS_DATA !== 'undefined'){ TOOLS_DATA.length = 0; order.forEach(c => TOOLS_DATA.push(groups[c])); }
 };
 
+function tAgo(iso){
+  const s = Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
+  if (s<60) return 'только что';
+  if (s<3600) return Math.floor(s/60)+' мин назад';
+  if (s<86400) return Math.floor(s/3600)+' ч назад';
+  return Math.floor(s/86400)+' дн назад';
+}
+const DL_MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+function dlBucket(due, status){
+  if (status === 'done') return 'done';
+  if (!due) return 'future';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(due+'T00:00:00');
+  const diff = Math.round((d - today)/86400000);
+  if (diff < 0)  return 'overdue';
+  if (diff === 0) return 'today';
+  if (diff <= 7) return 'week';
+  return 'future';
+}
+window.tLoadDeadlines = async () => {
+  if (!SB) return;
+  const [st, hist] = await Promise.all([
+    SB.from('project_stages').select('id,name,status,due_date, projects(name)').not('due_date','is',null),
+    SB.from('stage_history').select('stage_name,new_status,created_at, projects(name)').order('created_at',{ascending:false}).limit(30)
+  ]);
+  if (typeof DEADLINES !== 'undefined'){
+    DEADLINES.length = 0;
+    (st.data||[]).forEach(r => {
+      const d = r.due_date ? new Date(r.due_date+'T00:00:00') : null;
+      DEADLINES.push({ stage:r.name, project:(r.projects&&r.projects.name)||'—',
+        day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'',
+        due: r.due_date, bucket: dlBucket(r.due_date, r.status), _id:r.id });
+    });
+  }
+  if (typeof DL_ACT !== 'undefined'){
+    DL_ACT.length = 0;
+    (hist.data||[]).forEach(h => {
+      const k = h.new_status==='done' ? 'done' : h.new_status==='active' ? 'start' : 'back';
+      const verb = k==='done' ? 'Команда завершила этап' : k==='start' ? 'Команда начала работу над этапом' : 'Команда вернула в ожидание';
+      DL_ACT.push({ txt:verb, tag:(h.stage_name||'—')+' · '+((h.projects&&h.projects.name)||'—'), t:tAgo(h.created_at), k });
+    });
+  }
+};
+
 window.tLoadAll = async (role) => {
   if (!SB) return;
   if (role === 'superadmin'){
@@ -3026,7 +3068,7 @@ window.tLoadAll = async (role) => {
       SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
     PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
-    await window.tLoadKB(); await window.tLoadTools();
+    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines();
   }
   await loadTariffs();
 };
@@ -3048,6 +3090,8 @@ function subscribeRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'kb_materials'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'tools'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'project_stages'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'stage_history'},onRt)
       .subscribe();
   }catch(e){ console.warn('realtime', e); }
 }
