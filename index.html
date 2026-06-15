@@ -1501,8 +1501,18 @@ const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overvie
 function enterAgency(){
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('app-ag').classList.add('on');
-  agNav('projects');   // фирменные цвета TRIADA — циан/обсидиан, без оверрайда
+  const _first=applyAgencyPerms(); agNav(_first||'projects');   // меню по правам сотрудника
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-ag .side')));
+}
+function applyAgencyPerms(){
+  const me=(window.tMe&&window.tMe())||null;
+  const nav=document.querySelectorAll('#app-ag .nav-i');
+  const np=document.querySelector('[onclick="openNewProject()"]');
+  if(!me || me.role!=='member'){ nav.forEach(n=>n.style.display=''); if(np)np.style.display=''; return null; }
+  const perms=me.permissions||{}; let first=null;
+  nav.forEach(n=>{ const m=n.dataset.m; const ok=!!(perms[m]&&perms[m].view); n.style.display=ok?'':'none'; if(ok&&!first)first=m; });
+  if(np)np.style.display=(perms.projects&&perms.projects.edit)?'':'none';
+  return first;
 }
 function agNav(m){
   document.querySelectorAll('#app-ag .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.m===m));
@@ -2576,8 +2586,8 @@ function renderPermGrid(){
 function togglePerm(k,t,v){ if(!empPerms[k])empPerms[k]={view:false,edit:false}; empPerms[k][t]=v; if(t==='view'&&!v)empPerms[k].edit=false; renderPermGrid(); }
 function openEmp(){
   empEditIdx=null;
-  empPerms={projects:{view:true,edit:false}};
-  ['deadlines','overview','cycles','finance','team','kb','tools'].forEach(k=>empPerms[k]={view:false,edit:false});
+  empPerms={};
+  ['projects','deadlines','overview','cycles','finance','team','kb','tools'].forEach(k=>empPerms[k]={view:false,edit:false});
   empColor=ACCENTS[0];
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass'].forEach(id=>document.getElementById('e-'+id).value='');
