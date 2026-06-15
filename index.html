@@ -1591,7 +1591,7 @@ function projNote(i){
     <div class="modal-b"><div class="fld"><label>Текст</label><textarea id="pj-note" placeholder="Контекст, договорённости, риски…">${p.note||''}</textarea></div></div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjSaveNote(${i})">Сохранить</button></div></div>`);
 }
-function pjSaveNote(i){PROJECTS[i].note=_v('pj-note');pd2Close();toast('Заметка сохранена');}
+function pjSaveNote(i){ const p=PROJECTS[i]; if(window.LIVE&&window.tProjectUpdate) return window.tProjectUpdate(p.id,{note:_v('pj-note')}); p.note=_v('pj-note');pd2Close();toast('Заметка сохранена'); }
 function pjTogStatus(el){[...el.parentNode.children].forEach(b=>b.classList.remove('on'));el.classList.add('on');}
 function projSettings(i){
   const p=PROJECTS[i];
@@ -1606,13 +1606,20 @@ function projSettings(i){
         <button data-st="done" class="${p.status==='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--pos)"></span>Завершён</button>
       </div></div>
     </div>
-    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjSaveSettings(${i})">Сохранить</button></div></div>`);
+    <div class="modal-f"><button class="btn-ghost" style="margin-right:auto;color:var(--neg)" onclick="pjDeleteProject(${i})">Удалить</button><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjSaveSettings(${i})">Сохранить</button></div></div>`);
 }
 function pjSaveSettings(i){
   const p=PROJECTS[i];
-  p.name=_v('pj-name')||p.name; p.cat=_v('pj-cat')||'—'; p.svc=_v('pj-svc')||p.svc; p.logoUrl=_v('pj-logo');
-  const b=document.querySelector('#pj-stseg button.on'); if(b)p.status=b.dataset.st;
+  const b=document.querySelector('#pj-stseg button.on'); const status=b?b.dataset.st:p.status;
+  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:_v('pj-svc')||p.svc, status };
+  if(window.LIVE&&window.tProjectUpdate) return window.tProjectUpdate(p.id,patch);
+  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.status=status;
   pd2Close(); renderProjects(); toast('Проект обновлён');
+}
+function pjDeleteProject(i){ const p=PROJECTS[i];
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Удалить проект?</h3><p>${p.name} · вместе с этапами, задачами, отчётами</p></div>
+    <div class="modal-b"><div style="font-size:13px;color:var(--txt-2);line-height:1.55">Действие необратимо: удалятся все этапы, задачи, отчёты и история проекта. Клиентский аккаунт сохранится.</div></div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" style="background:var(--neg);color:#fff" onclick="${window.LIVE?`window.tProjectDelete('${p.id}')`:`pd2Close()`}">Удалить</button></div></div>`);
 }
 let KEYS=[
   {name:'Production',key:'trd_live_••••8f2a',created:'12 апр 2026'},
@@ -1695,7 +1702,7 @@ function projFiltered(){
   let l=PROJECTS.filter(p=>{
     if(agFilter==='active'&&p.status!=='active')return false;
     if(agFilter==='done'&&p.status!=='done')return false;
-    if(agFilter==='overdue')return false;
+    if(agFilter==='overdue'&&!p._overdue)return false;
     if(agCat!=='all'&&p.cat!==agCat)return false;
     if(agSvc!=='all'&&p.svc!==agSvc)return false;
     if(q&&!((p.name||'').toLowerCase().includes(q)||(p.cat||'').toLowerCase().includes(q)||(p.svc||'').toLowerCase().includes(q)))return false;
@@ -1719,9 +1726,9 @@ const _projCard=(p)=>`
         </div>
         <div class="pc-pct"><div class="p num">${p.pct}%</div><div class="s">${p.stages}</div></div>
         <div class="pc-stats">
-          <div class="pstat"><div class="l">Дедлайн</div><div class="v mut">—</div></div>
-          <div class="pstat"><div class="l">Здоровье</div><div class="v ok">${p.health}</div></div>
-          <div class="pstat"><div class="l">Динамика</div><div class="v mut">${p.dyn}</div></div>
+          <div class="pstat"><div class="l">Дедлайн</div><div class="v mut" style="${p._overdue?'color:var(--neg)':''}">${p._nextDue?_dDate(p._nextDue):'—'}</div></div>
+          <div class="pstat"><div class="l">Здоровье</div><div class="v ok" style="${p._healthCls==='risk'?'color:var(--neg)':''}">${p._health||p.health}</div></div>
+          <div class="pstat"><div class="l">Динамика</div><div class="v mut" style="${(p._dyn||'').indexOf('↑')===0?'color:var(--pos)':''}">${p._dyn||p.dyn}</div></div>
           <div class="pstat" onclick="event.stopPropagation();projNote(${PROJECTS.indexOf(p)})"><div class="l">Заметка</div><div class="v mut"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:1px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div></div>
           <div class="pstat" onclick="event.stopPropagation();projSettings(${PROJECTS.indexOf(p)})"><div class="l">Настройки</div><div class="v mut"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:1px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H1a2 2 0 110-4h.09A1.65 1.65 0 003 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H8a1.65 1.65 0 001-1.51V1a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V8a1.65 1.65 0 001.51 1H23a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div></div>
         </div>
@@ -1813,13 +1820,15 @@ function buildDetail(p){
   return {stages,kanban:{wait,work,done},reports,smm,history,total:p.pct>0?'4м':'—',done:doneN,work:p.status==='done'?0:1,wait:Math.max(totN-doneN-(p.status==='done'?0:1),0)};
 }
 let pdIdx=0,pdTabCur='stages';
-function pdTabbar(d){
+function pdTabbar(p){
+  const reps=(p&&p._reports)?p._reports.length:0;
+  const smmN=(p&&p._reports)?p._reports.filter(r=>r.kind==='SMM').length:0;
   const tabs=PD_TABS.map(([k,l,ic])=>{
-    const cnt=k==='reports'?d.reports.length:k==='smm'?1:0;
+    const cnt=k==='reports'?reps:k==='smm'?smmN:0;
     return `<div class="pd-tab ${k===pdTabCur?'on':''}" onclick="pdTab('${k}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg>${l}${cnt?`<span class="cnt">${cnt}</span>`:''}</div>`;
   }).join('');
   return tabs+`<div class="pd-tabact">
-    <div class="pd-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b>${d.total}</b> всего</div>
+    <div class="pd-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b>—</b> всего</div>
     <div class="pd-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>Telegram <span style="color:var(--pos)">✓</span></div>
     <button class="pd-newbtn" onclick="pdNewReport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый отчёт</button>
   </div>`;
@@ -1832,7 +1841,7 @@ function openProject(i){
   document.getElementById('pd-desc').textContent=p.cat&&p.cat!=='—'?p.cat:'Нет описания';
   document.getElementById('pd-pct').textContent=p.pct+'%';
   document.getElementById('pd-agency').textContent=(document.getElementById('ag-name')?.textContent||'detroyd').toLowerCase();
-  document.getElementById('pd-tabbar').innerHTML=pdTabbar(p._d);
+  document.getElementById('pd-tabbar').innerHTML=pdTabbar(p);
   document.getElementById('ov-proj').classList.add('on');
   renderPd();
   requestAnimationFrame(()=>{document.getElementById('pd-minibar').style.width=p.pct+'%';});
@@ -1895,6 +1904,7 @@ function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи з
 function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
 const PD_MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 function _dDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+PD_MON[d.getMonth()]; }
+function _dDateFull(iso){ if(!iso) return '—'; const d=new Date(iso); return d.getDate()+' '+PD_MON[d.getMonth()]+' '+d.getFullYear(); }
 function _who(id){ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{n:m.name||'—',c:m.color||'var(--txt-3)'}:{n:'—',c:'var(--txt-3)'}; }
 function renderPd(){
   const p=PROJECTS[pdIdx], d=p._d; let h='';
@@ -1963,18 +1973,25 @@ function renderPd(){
         <div class="pk-hint"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l4-4M5 9l4 4M5 9h11a4 4 0 010 8h-1"/></svg>Перетащите карточку между колонками или нажмите «›», чтобы продвинуть по статусу</div>`;
     }
   } else if(pdTabCur==='reports'){
-    h=d.reports.length?d.reports.map((r,ri)=>`<div class="act-row" style="cursor:pointer" onclick="openReportProj(${ri})"><div class="act-ic start" style="background:${r.color}22;color:${r.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div><div style="flex:1"><div class="act-txt">${r.t}</div><div class="act-tag">Опубликован · ${r.date}</div></div><span class="badge" style="background:${r.color}22;color:${r.color}">${r.ty}</span></div>`).join('')
-      :'<div class="pk-empty" style="padding:40px 0">Отчётов пока нет — появятся после первых завершённых этапов</div>';
+    const R=p._reports||[];
+    h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:13px;font-weight:600;color:var(--txt)">Отчёты · ${R.length}</div><button class="btn-add" onclick="pdNewReport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Отчёт</button></div>`
+      + (R.length?R.map((r,ri)=>{ const col=r.kind==='SMM'?'#8A8FFF':'#37E6C8';
+        return `<div class="act-row" style="cursor:pointer" onclick="openReportProj(${ri})"><div class="act-ic start" style="background:${col}22;color:${col}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div><div style="flex:1"><div class="act-txt">${_ddH(r.title)}</div><div class="act-tag">Опубликован · ${_dDateFull(r.published_at)}</div></div><span class="badge" style="background:${col}22;color:${col}">${r.kind}</span><button title="Удалить" onclick="event.stopPropagation();pdReportDel('${r.id}')" style="background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:16px;line-height:1;padding:0 4px">×</button></div>`;
+      }).join('')
+      :'<div class="pk-empty" style="padding:40px 0">Отчётов пока нет — создай первый кнопкой «Отчёт»</div>');
   } else if(pdTabCur==='smm'){
-    const m=d.smm;
-    h=`<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Охват</div><div class="v num">${m.ohvat}</div><div class="sub">за месяц</div></div>
-      <div class="kpi"><div class="l">Вовлечённость</div><div class="v num" style="color:var(--accent)">${m.er}</div><div class="sub">ER</div></div>
-      <div class="kpi"><div class="l">Подписчики Δ</div><div class="v num" style="color:var(--pos)">${m.pod}</div><div class="sub">прирост</div></div>
-      <div class="kpi"><div class="l">Публикаций</div><div class="v num">${m.pub}</div><div class="sub">за период</div></div>
-    </div>${p.pct>0?'<div style="margin-top:14px"><span class="badge b-cyan">ER 2,00% · ↑ Потенциал роста</span></div>':''}`;
+    const sm=(p._reports||[]).filter(r=>r.kind==='SMM')[0];
+    if(!sm){ h='<div class="pk-empty" style="padding:44px 0">Нет SMM-отчётов. Создай отчёт типа SMM — метрики появятся здесь.</div>'; }
+    else { const m=sm.payload||{};
+      h=`<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi"><div class="l">Охват</div><div class="v num">${m.ohvat||'—'}</div><div class="sub">${_dDateFull(sm.published_at)}</div></div>
+        <div class="kpi"><div class="l">Вовлечённость</div><div class="v num" style="color:var(--accent)">${m.er||'—'}</div><div class="sub">ER</div></div>
+        <div class="kpi"><div class="l">Подписчики Δ</div><div class="v num" style="color:var(--pos)">${m.pod||'—'}</div><div class="sub">прирост</div></div>
+        <div class="kpi"><div class="l">Публикаций</div><div class="v num">${m.pub||'—'}</div><div class="sub">за период</div></div>
+      </div>${m.note?`<div class="rv-insight" style="margin-top:14px"><div class="h">◆ Вывод</div><p>${_ddH(m.note)}</p></div>`:''}`;
+    }
   } else {
-    h=actFeed(d.history);
+    h=(p._history&&p._history.length)?actFeed(p._history):'<div class="pk-empty" style="padding:44px 0">История пуста — события появятся при смене статусов этапов.</div>';
   }
   const body=document.getElementById('pd-body');
   body.innerHTML=`<div class="pd-inner">${h}</div>`;
@@ -2086,27 +2103,36 @@ function pdNewReport(){
   pd2Rep='PERF';
   const seg=[['PERF','Performance','var(--accent)'],['SMM','SMM','#8A8FFF']]
     .map(([k,l,c])=>`<button class="${k==='PERF'?'on':''}" data-rt="${k}" onclick="pd2RepType('${k}')"><span class="d" style="background:${c}"></span>${l}</button>`).join('');
-  pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Новый отчёт</h3><p>${PROJECTS[pdIdx].name} · сформировать и опубликовать</p></div>
+  pd2Open(`<div class="modal" style="max-width:560px">
+    <div class="modal-h"><h3>Новый отчёт</h3><p>${PROJECTS[pdIdx].name} · опубликовать клиенту</p></div>
     <div class="modal-b">
       <div class="fld"><label>Тип отчёта</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pd2-rtseg">${seg}</div></div>
-      <div class="fld2">
-        <div class="fld"><label>Период</label><select id="pd2-period"><option>Июнь</option><option>Май</option><option>Апрель</option><option>Март</option></select></div>
-        <div class="fld"><label>Заголовок</label><input id="pd2-title" placeholder="авто, если пусто"></div>
+      <div class="fld2"><div class="fld"><label>Период</label><input id="pd2-period" placeholder="напр. Июнь 2026"></div><div class="fld"><label>Заголовок</label><input id="pd2-title" placeholder="авто, если пусто"></div></div>
+      <div id="pd2-perf">
+        <div class="fld2"><div class="fld"><label>Рост выручки</label><input id="rp-rost" placeholder="↑ 6%"></div><div class="fld"><label>Трафик Δ</label><input id="rp-traf" placeholder="↑ 1 280 чек."></div></div>
+        <div class="fld2"><div class="fld"><label>Ср. чек Δ</label><input id="rp-chek" placeholder="↑ 900 сум"></div><div class="fld"><label>Выручка факт</label><input id="rp-fakt" placeholder="5 715 550 500 сум"></div></div>
+        <div class="fld"><label>База сравнения</label><input id="rp-baza" placeholder="5 305 585 500 сум"></div>
       </div>
+      <div id="pd2-smm" style="display:none">
+        <div class="fld2"><div class="fld"><label>Охват</label><input id="rp-ohvat" placeholder="833 222"></div><div class="fld"><label>ER</label><input id="rp-er" placeholder="2,00%"></div></div>
+        <div class="fld2"><div class="fld"><label>Подписчики Δ</label><input id="rp-pod" placeholder="↑ 205"></div><div class="fld"><label>Публикаций</label><input id="rp-pub" placeholder="11"></div></div>
+      </div>
+      <div class="fld"><label>Вывод (необязательно)</label><textarea id="rp-note" placeholder="Ключевой вывод и рекомендация…"></textarea></div>
     </div>
-    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveReport()">Создать отчёт</button></div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveReport()">Опубликовать</button></div>
   </div>`);
 }
-function pd2RepType(v){pd2Rep=v;document.querySelectorAll('#pd2-rtseg button').forEach(b=>b.classList.toggle('on',b.dataset.rt===v));}
+function pd2RepType(v){pd2Rep=v;document.querySelectorAll('#pd2-rtseg button').forEach(b=>b.classList.toggle('on',b.dataset.rt===v)); const pf=document.getElementById('pd2-perf'), sm=document.getElementById('pd2-smm'); if(pf)pf.style.display=v==='PERF'?'':'none'; if(sm)sm.style.display=v==='SMM'?'':'none'; }
 function pdSaveReport(){
-  const d=PROJECTS[pdIdx]._d, period=_v('pd2-period')||'Июнь';
-  const title=_v('pd2-title')||`${pd2Rep==='PERF'?'ОТЧЁТ':'SMM'} · ${period}`;
-  d.reports.unshift({t:title,ty:pd2Rep,date:`${period} 2026`,color:pd2Rep==='PERF'?'#37E6C8':'#8A8FFF'});
-  pdTabCur='reports';
-  document.getElementById('pd-tabbar').innerHTML=pdTabbar(d);
-  pd2Close(); renderPd(); toast('Отчёт создан и опубликован');
+  const period=_v('pd2-period')||'';
+  const title=_v('pd2-title')||`${pd2Rep==='PERF'?'Performance':'SMM'}${period?' · '+period:''}`;
+  const payload=pd2Rep==='PERF'
+    ? {period, rost:_v('rp-rost'),traf:_v('rp-traf'),chek:_v('rp-chek'),fakt:_v('rp-fakt'),baza:_v('rp-baza'),note:_v('rp-note')}
+    : {period, ohvat:_v('rp-ohvat'),er:_v('rp-er'),pod:_v('rp-pod'),pub:_v('rp-pub'),note:_v('rp-note')};
+  if(window.tReportAdd) window.tReportAdd(PROJECTS[pdIdx].id,{title,kind:pd2Rep,payload});
+  else { pd2Close(); toast('Нужен бэкенд'); }
 }
+function pdReportDel(id){ if(window.tReportDel) window.tReportDel(id); }
 
 function pdCycles(){
   const cycles=[
@@ -2124,28 +2150,32 @@ function pdCycles(){
 }
 
 /* ——— report viewer (PERF / SMM) ——— */
-function openReportProj(i){const r=PROJECTS[pdIdx]._d.reports[i];openReport(r.ty,{t:r.t,date:r.date});}
+function openReportProj(i){ const r=(PROJECTS[pdIdx]._reports||[])[i]; if(!r) return; openReport(r.kind, Object.assign({t:r.title,date:_dDateFull(r.published_at),_real:true}, r.payload||{})); }
 function openReport(ty,d){
   d=d||{}; const isP=ty==='PERF'; const col=isP?'#37E6C8':'#8A8FFF';
   const icon=isP?'<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/>':'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>';
   const grid=isP?[
-      ['Рост выручки',d.rost||'↑ 6%','var(--pos)'],
-      ['Трафик Δ',d.traf||'↑ 1 280 чек.','var(--pos)'],
-      ['Ср. чек Δ',d.chek||'↑ 900 сум',(d.chek&&d.chek.includes('↓'))?'var(--neg)':'var(--pos)'],
-      ['Выручка факт',d.fakt||'5 715 550 500 сум','var(--txt)'],
-      ['База сравнения',d.baza||'5 305 585 500 сум','var(--txt-3)'],
+      ['Рост выручки',d.rost||'—','var(--pos)'],
+      ['Трафик Δ',d.traf||'—','var(--pos)'],
+      ['Ср. чек Δ',d.chek||'—',(d.chek&&d.chek.includes('↓'))?'var(--neg)':'var(--pos)'],
+      ['Выручка факт',d.fakt||'—','var(--txt)'],
+      ['База сравнения',d.baza||'—','var(--txt-3)'],
     ]:[
-      ['Охват',d.ohvat||'833 222','var(--txt)'],
-      ['Вовлечённость (ER)',d.vov||d.er||'2,00%','var(--accent)'],
-      ['Подписчики Δ',d.pod||'↑ 205','var(--pos)'],
-      ['Публикаций',d.pub||'11','var(--txt)'],
+      ['Охват',d.ohvat||'—','var(--txt)'],
+      ['Вовлечённость (ER)',d.er||'—','var(--accent)'],
+      ['Подписчики Δ',d.pod||'—','var(--pos)'],
+      ['Публикаций',d.pub||'—','var(--txt)'],
     ];
-  const vals=isP?[4.86,4.95,5.05,5.31,5.72]:[410,520,610,705,833];
-  const labels=['Фев','Мар','Апр','Май','Июн'];
-  const chTitle=isP?'Выручка по месяцам · млрд сум':'Охват по месяцам · тыс.';
-  const insight=isP
-    ?`<p><b style="color:var(--txt)">Наблюдение.</b> Выручка факт превысила базу сравнения на ${d.rost||'↑ 6%'} при росте трафика ${d.traf||'↑ 1 280 чек.'} — рост идёт за счёт потока, а не цены.</p><p><b style="color:var(--txt)">Рекомендация.</b> Зафиксировать драйверы трафика и протестировать аккуратное повышение среднего чека на топ-позициях, чтобы усилить маржу без потери потока.</p>`
-    :`<p><b style="color:var(--txt)">Наблюдение.</b> Охват ${d.ohvat||'833 222'} при ER ${d.vov||d.er||'2,00%'} и приросте подписчиков ${d.pod||'↑ 205'} — вовлечённость стабильна на здоровом уровне.</p><p><b style="color:var(--txt)">Рекомендация.</b> Увеличить долю Reels в контент-плане: формат даёт наибольший прирост охвата при текущем ER.</p>`;
+  let chartBlock='', insightBlock='';
+  if(!d._real){
+    const vals=isP?[4.86,4.95,5.05,5.31,5.72]:[410,520,610,705,833];
+    const labels=['Фев','Мар','Апр','Май','Июн'];
+    const chTitle=isP?'Выручка по месяцам · млрд сум':'Охват по месяцам · тыс.';
+    chartBlock=`<div class="rv-chart"><div class="ch">${chTitle}</div>${svgLine(vals,labels)}</div>`;
+    insightBlock=`<div class="rv-insight"><div class="h">◆ Вывод аналитика</div><p>Демо-вывод. Реальные отчёты формируются из введённых метрик.</p></div>`;
+  } else if(d.note){
+    insightBlock=`<div class="rv-insight"><div class="h">◆ Вывод</div><p>${_ddH(d.note)}</p></div>`;
+  }
   pd2Open(`<div class="modal" style="max-width:780px">
     <div class="modal-h" style="display:flex;align-items:flex-start;gap:13px">
       <div class="rv-ic" style="background:${col}22;color:${col}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg></div>
@@ -2154,8 +2184,8 @@ function openReport(ty,d){
     </div>
     <div class="modal-b" style="max-height:70vh;overflow:auto">
       <div class="rv-grid">${grid.map(([l,v,c])=>`<div class="rv-kpi"><div class="l">${l}</div><div class="v" style="color:${c}">${v}</div></div>`).join('')}</div>
-      <div class="rv-chart"><div class="ch">${chTitle}</div>${svgLine(vals,labels)}</div>
-      <div class="rv-insight"><div class="h">◆ Вывод аналитика</div>${insight}</div>
+      ${chartBlock}
+      ${insightBlock}
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="toast('Готовим PDF…')">Скачать PDF</button><button class="btn-add" onclick="pd2Close()">Закрыть</button></div>
   </div>`);
@@ -3274,10 +3304,15 @@ async function _pwReload(projectId){
 window.tLoadProjectWork = async (projectId) => {
   if (!SB || !projectId) return;
   const p = (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x => x.id===projectId); if (!p) return;
-  const [st, tk] = await Promise.all([
+  const [st, tk, rp, hs] = await Promise.all([
     SB.from('project_stages').select('*').eq('project_id',projectId).order('idx'),
-    SB.from('project_tasks').select('*').eq('project_id',projectId).order('idx') ]);
-  p._stages = st.data||[]; p._tasks = tk.data||[];
+    SB.from('project_tasks').select('*').eq('project_id',projectId).order('idx'),
+    SB.from('reports').select('*').eq('project_id',projectId).order('published_at',{ascending:false}),
+    SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40) ]);
+  p._stages = st.data||[]; p._tasks = tk.data||[]; p._reports = rp.data||[];
+  p._history = (hs.data||[]).map(h => { const k = h.new_status==='done'?'done':h.new_status==='active'?'start':'back';
+    const txt = k==='done'?'Этап завершён':k==='start'?'Команда начала этап':'Этап возвращён в ожидание';
+    return { txt, tag:h.stage_name||'—', t:tAgo(h.created_at), k }; });
 };
 window.tStageSave = async (id,patch) => { try { const {error}=await SB.from('project_stages').update(patch).eq('id',id); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Этап обновлён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
@@ -3293,6 +3328,41 @@ window.tTaskMove = async (id,status) => { try { const {error}=await SB.from('pro
   await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
   toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+
+window.tProjectUpdate = async (id,patch) => { try { const {error}=await SB.from('projects').update(patch).eq('id',id); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); toast('Проект обновлён'); await window.tLoadAll(ME.role); if(typeof renderProjects==='function')renderProjects(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tProjectDelete = async (id) => { try { const {error}=await SB.from('projects').delete().eq('id',id); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); if(typeof closeProject==='function')closeProject(); toast('Проект удалён'); await window.tLoadAll(ME.role); if(typeof renderProjects==='function')renderProjects(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tReportAdd = async (projectId,row) => { try { const {error}=await SB.from('reports').insert({project_id:projectId,...row}); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); toast('Отчёт опубликован'); await _pwReload(projectId);
+  if(typeof pdTabCur!=='undefined') pdTabCur='reports';
+  const pp=(typeof PROJECTS!=='undefined'?PROJECTS:[])[typeof pdIdx!=='undefined'?pdIdx:-1];
+  if(pp && document.getElementById('pd-tabbar')) document.getElementById('pd-tabbar').innerHTML=pdTabbar(pp);
+  if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tReportDel = async (id) => { try { const {error}=await SB.from('reports').delete().eq('id',id); if(error)throw error;
+  toast('Отчёт удалён'); await _pwReload(curProjId()); if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tLoadProjectAggregates = async () => {
+  if (!SB) return;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const wk=new Date(Date.now()-7*86400000).toISOString();
+  const [st,tk,hs]=await Promise.all([
+    SB.from('project_stages').select('project_id,status,due_date'),
+    SB.from('project_tasks').select('project_id,status,due_date'),
+    SB.from('stage_history').select('project_id,new_status,created_at').eq('new_status','done').gte('created_at',wk) ]);
+  const agg={};
+  const add=(pid,status,due)=>{ if(!pid)return; const a=agg[pid]||(agg[pid]={over:false,next:null});
+    if(status!=='done'&&due){ const d=new Date(due+'T00:00:00'); if(d<today) a.over=true; if(!a.next||due<a.next) a.next=due; } };
+  (st.data||[]).forEach(r=>add(r.project_id,r.status,r.due_date));
+  (tk.data||[]).forEach(r=>add(r.project_id,r.status,r.due_date));
+  const done7={}; (hs.data||[]).forEach(r=>{ done7[r.project_id]=(done7[r.project_id]||0)+1; });
+  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{
+    const a=agg[p.id]||{over:false,next:null}, d7=done7[p.id]||0;
+    p._nextDue=a.next; p._overdue=a.over;
+    p._dyn = d7>0?('↑ '+d7+' / 7д'):'— 0 / 7д';
+    p._health = a.over?'Риск':(p.pct>=100?'Завершён':'В норме');
+    p._healthCls = a.over?'risk':'ok';
+  });
+};
 
 window.tLoadAll = async (role) => {
   if (!SB) return;
@@ -3313,7 +3383,7 @@ window.tLoadAll = async (role) => {
       SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
     PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
-    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines();
+    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates();
   }
   await loadTariffs();
 };
@@ -3338,6 +3408,7 @@ function subscribeRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'project_stages'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'stage_history'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_tasks'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'reports'},onRt)
       .subscribe();
   }catch(e){ console.warn('realtime', e); }
 }
