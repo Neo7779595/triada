@@ -810,14 +810,6 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible,.cmdk-it:focus-vis
       <div class="field"><input id="lg-pass" type="password" placeholder="Пароль" autocomplete="current-password"></div>
       <button class="btn btn-primary" onclick="doLogin()">Войти</button>
     </div>
-    <div class="login-demo">
-      <div class="lbl">Демо-вход в кабинет</div>
-      <div class="demo-row">
-        <button class="demo-btn" onclick="enter('general')">Генеральный<small>платформа</small></button>
-        <button class="demo-btn" onclick="enterAgency()">Агентский<small>DETROYD</small></button>
-        <button class="demo-btn" onclick="enterClient()">Клиентский<small>Uzbek Doner</small></button>
-      </div>
-    </div>
     <div class="login-foot">© 2026 TRIADA SYSTEM GROUP · циан-токены провизорны</div>
   </div>
 </section>
@@ -1118,7 +1110,7 @@ function _initCounters(){
 }
 
 function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
-function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); enter('general'); }
+function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast('Supabase не настроен: вставь публичный ключ в SUPA_KEY (внизу файла)'); }
 function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
 
@@ -2725,7 +2717,7 @@ function kbOpenMat(cat,i){
       <button class="btn-add" onclick="pd2Close()">Закрыть</button>
     </div></div>`);
 }
-function kbDelMat(cat,i){KB_DATA[kbProj][cat].splice(i,1);pd2Close();renderKB();toast('Материал удалён');}
+function kbDelMat(cat,i){ if(window.LIVE){ const it=KB_DATA[kbProj][cat][i]; window.tKbDel(it&&it._id); pd2Close(); return; } KB_DATA[kbProj][cat].splice(i,1);pd2Close();renderKB();toast('Материал удалён');}
 function kbAddMat(){
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Добавить материал</h3><p>${kbProj} · ссылка на доску или документ</p></div>
@@ -2742,6 +2734,7 @@ function kbAddMat(){
 function kbSaveMat(){
   const cat=_v('kb-cat'),ty=_v('kb-ty'),t=_v('kb-title'),url=_v('kb-url');
   if(!t){toast('Введи название материала');return;}
+  if(window.LIVE){ window.tKbAdd(cat,t,ty,url); pd2Close(); return; }
   if(!KB_DATA[kbProj])KB_DATA[kbProj]={};
   if(!KB_DATA[kbProj][cat])KB_DATA[kbProj][cat]=[];
   KB_DATA[kbProj][cat].push({t,ty,url});
@@ -2776,6 +2769,7 @@ function toolAdd(si){
 function toolSaveAdd(){
   const cat=_v('tl-cat'),ty=_v('tl-ty'),name=_v('tl-name'),url=_v('tl-url');
   if(!name){toast('Введи название');return;}
+  if(window.LIVE){ window.tToolAdd(cat,name,ty,url); pd2Close(); return; }
   const s=TOOLS_DATA.find(x=>x.cat===cat); if(s)s.items.push({name,url:url||'—',ty});
   pd2Close(); renderTools(); toast(`«${name}» добавлен`);
 }
@@ -2953,9 +2947,9 @@ _initCounters();
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-/* ===== TRIADA · live Supabase layer (dual-mode: без ключа = демо) ===== */
+/* ===== TRIADA · live Supabase layer (live-only, real-time) ===== */
 const SUPA_URL = 'https://frotqycnpnrsgncdylbq.supabase.co';
-const SUPA_KEY = '__PASTE_PUBLISHABLE_OR_ANON_KEY__';   // публичный ключ — безопасен (защита через RLS)
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyb3RxeWNucG5yc2duY2R5bGJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1OTAsImV4cCI6MjA5NzAyNTU5MH0.CALL01cDTr7yv8d0a1TwqXKBwIkrPHE06CzfuIM_nkU';   // публичный ключ — безопасен (защита через RLS)
 
 const configured = SUPA_KEY && SUPA_KEY.indexOf('__') !== 0;
 const SB = configured ? createClient(SUPA_URL, SUPA_KEY) : null;
@@ -2976,10 +2970,32 @@ const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудни
 
 async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
-  if (data && window.TARIFFS){ TARIFFS.length = 0;
+  if (data && typeof TARIFFS !== 'undefined'){ TARIFFS.length = 0;
     data.forEach(t => TARIFFS.push({ key:t.key, name:t.name, price:t.price, per:t.per,
       pop:t.popular, feats:(t.features||[]).map(x => [x[0], x[1]]) })); }
 }
+
+window.tLoadKB = async () => {
+  if (!SB) return;
+  const { data } = await SB.from('kb_materials').select('*');
+  const byId = {}; (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => byId[p.id]=p.name);
+  const map = {};
+  (data||[]).forEach(r => { const pn = byId[r.project_id] || '—';
+    (map[pn] = map[pn]||{}); (map[pn][r.category] = map[pn][r.category]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', _id:r.id }); });
+  if (typeof KB_DATA !== 'undefined'){ Object.keys(KB_DATA).forEach(k => delete KB_DATA[k]); Object.assign(KB_DATA, map); }
+  if (typeof KB_PROJECTS !== 'undefined'){ KB_PROJECTS.length = 0;
+    (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => KB_PROJECTS.push({ name:p.name, logo:p.logo||(p.name[0]||'?').toUpperCase() })); }
+  try { if (typeof kbProj !== 'undefined' && KB_PROJECTS[0] && !KB_PROJECTS.some(p => p.name===kbProj)) kbProj = KB_PROJECTS[0].name; } catch(e){}
+};
+window.tLoadTools = async () => {
+  if (!SB) return;
+  const { data } = await SB.from('tools').select('*');
+  const pal = ['#37E6C8','#8A8FFF','#F0785C','#43D88C','#E3B567','#6AA9FF'];
+  const groups = {}, order = [];
+  (data||[]).forEach(r => { if (!groups[r.category]){ groups[r.category] = { cat:r.category, color:pal[order.length%pal.length], items:[] }; order.push(r.category); }
+    groups[r.category].items.push({ name:r.name, url:r.url||'—', ty:r.kind||'Ссылка', _id:r.id }); });
+  if (typeof TOOLS_DATA !== 'undefined'){ TOOLS_DATA.length = 0; order.forEach(c => TOOLS_DATA.push(groups[c])); }
+};
 
 window.tLoadAll = async (role) => {
   if (!SB) return;
@@ -3000,9 +3016,31 @@ window.tLoadAll = async (role) => {
       SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
     PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
+    await window.tLoadKB(); await window.tLoadTools();
   }
   await loadTariffs();
 };
+
+function refreshActive(){
+  try{
+    if (document.getElementById('app').classList.contains('on')){ const n=document.querySelector('#nav-general .nav-i.on'); genNav(n?n.dataset.gm:'agencies'); }
+    else if (document.getElementById('app-ag').classList.contains('on')){ const n=document.querySelector('#app-ag .nav-i.on'); agNav(n?n.dataset.m:'projects'); }
+    else if (document.getElementById('app-cl').classList.contains('on')){ const n=document.querySelector('#app-cl .nav-i.on'); clNav(n?n.dataset.cm:'overview'); }
+  }catch(e){ console.warn('refresh', e); }
+}
+let _rtT;
+function onRt(){ clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ await window.tLoadAll(ME.role); refreshActive(); } }, 350); }
+function subscribeRealtime(){
+  try{
+    SB.channel('triada-rt')
+      .on('postgres_changes',{event:'*',schema:'public',table:'agencies'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'projects'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'kb_materials'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'tools'},onRt)
+      .subscribe();
+  }catch(e){ console.warn('realtime', e); }
+}
 
 async function routeByProfile(){
   const { data:{ user } } = await SB.auth.getUser();
@@ -3012,6 +3050,7 @@ async function routeByProfile(){
   if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent').eq('id', ME.agency_id).single();
     if (ag) ME.agencySlug = ag.slug; }
   await window.tLoadAll(ME.role);
+  if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
   if (ME.role === 'superadmin') enter('general');
   else if (ME.role === 'client') enterClient();
   else enterAgency();
@@ -3064,9 +3103,24 @@ window.tUpdateMemberPerms = async (id, perms) => {
     toast('Доступы обновлены'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
+window.tKbAdd = async (cat, title, ty, url) => {
+  try { const proj=(PROJECTS||[]).find(p => p.name===kbProj); if (!proj){ toast('Сначала выбери проект'); return; }
+    await SB.from('kb_materials').insert({ agency_id: ME&&ME.agency_id, project_id: proj.id, category:cat, title, kind:ty, url:url||null });
+    toast('Материал добавлен'); await window.tLoadKB(); renderKB();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tKbDel = async (id) => {
+  try { if (!id) return; await SB.from('kb_materials').delete().eq('id', id);
+    toast('Материал удалён'); await window.tLoadKB(); renderKB();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tToolAdd = async (cat, name, ty, url) => {
+  try { await SB.from('tools').insert({ agency_id: ME&&ME.agency_id, category:cat, name, kind:ty, url:url||null });
+    toast('Инструмент добавлен'); await window.tLoadTools(); renderTools();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
 
 if (window.LIVE){
-  const d = document.querySelector('.login-demo'); if (d) d.style.display = 'none';
   const lg = document.getElementById('lg-login'); if (lg) lg.setAttribute('placeholder','Email');
   (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(); })();
 }
