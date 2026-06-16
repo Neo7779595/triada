@@ -2633,7 +2633,7 @@ _MODALS.forEach(id=>{
 })();
 
 /* ——— DEADLINES module ——— */
-let agDlFilter='all', agDlView='deadlines', agDlProj='all', agDlSearch='', agDlFrom='', agDlTo='', agDlType='all', agDlGroup='urgency';
+let agDlFilter='all', agDlView='deadlines', agDlProj='all', agDlSearch='', agDlFrom='', agDlTo='', agDlType='all', agDlGroup='urgency', agDlResp='all';
 const DL_BUCKETS=[
   {k:'overdue',l:'Просрочено',c:'red',st:'Просрочен',sc:'b-susp'},
   {k:'today',l:'Сегодня',c:'cyan',st:'Сегодня',sc:'b-cyan'},
@@ -2657,10 +2657,12 @@ function _dlFiltered(){
   return DEADLINES.filter(d=>
     (agDlProj==='all'||d.project===agDlProj) &&
     (agDlType==='all'||d.type===agDlType) &&
+    (agDlResp==='all'||_dlOwner(d).key===agDlResp) &&
     (!q || (d.stage||'').toLowerCase().includes(q) || (d.project||'').toLowerCase().includes(q)) &&
     inRange(d));
 }
 function setDlGroup(g){agDlGroup=g;renderDeadlines();}
+function setDlResp(v){agDlResp=v;renderDeadlines();}
 function _plural(n,one,few,many){ n=Math.abs(n); const m=n%10,h=n%100; if(m===1&&h!==11)return one; if(m>=2&&m<=4&&(h<10||h>=20))return few; return many; }
 function _dlMeta(b){ return DL_BUCKETS.find(x=>x.k===b)||DL_BUCKETS[3]; }
 function _avInit(name,bg,url,sz,light){ sz=sz||24; const L=((name||'?')[0]||'?').toUpperCase();
@@ -2767,6 +2769,9 @@ function renderDeadlines(){
   const unassigned=FILT.filter(d=>d.type==='task'&&d.bucket!=='done'&&_dlOwner(d).key==='__none').length;
   const onF=f=>agDlFilter===f?'on':'', onV=v=>agDlView===v?'on':'', onG=g=>agDlGroup===g?'on':'';
   const projOptsArr=[['all','Все проекты']].concat((typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>[p.name,p.name]));
+  const _team=(typeof TEAM!=='undefined'?TEAM:[]);
+  const respOpts=[['all','Все исполнители'],['__none','Не назначен']].concat(_team.map(m=>[m._id,m.name]));
+  const respLabel = agDlResp==='all'?'Все':(agDlResp==='__none'?'Не назначен':((_team.find(m=>m._id===agDlResp)||{}).name||'—'));
 
   let body;
   if(agDlView==='activity'){
@@ -2776,8 +2781,10 @@ function renderDeadlines(){
     }).join('')}</div>`
     : '<div class="modph"><h3>Пока нет активности</h3><p>Как только команда начнёт или завершит этап — события появятся здесь.</p></div>';
   }else{
-    const grouped = agDlGroup==='project' ? _dlByProject(FILT) : agDlGroup==='owner' ? _dlByOwner(FILT) : _dlByUrgency(FILT);
-    body = grouped || (DEADLINES.length
+    const grouped = agDlGroup==='project' ? _dlByProject(FILT) : _dlByUrgency(FILT);
+    body = grouped || (agDlResp!=='all'
+        ? `<div class="modph"><h3>Задач нет</h3><p>У сотрудника «${respLabel}» нет дедлайнов под текущие фильтры.</p></div>`
+        : DEADLINES.length
         ? '<div class="modph"><h3>Ничего не найдено</h3><p>Под текущие фильтры дедлайнов нет — измените период, проект или тип.</p></div>'
         : '<div class="modph"><h3>Дедлайнов пока нет</h3><p>Проставьте срок этапу или задаче в карточке проекта — он появится здесь.</p></div>');
   }
@@ -2801,35 +2808,30 @@ function renderDeadlines(){
       <div class="dl-range">${dlRangeField()}</div>
     </div>
 
-    <div class="toolbar" style="margin-top:-4px">
-      <div class="segm">
+    <div class="toolbar dl-controls" style="margin-top:-4px">
+      ${agDlView==='deadlines'?`<div class="segm">
         <button class="${onF('all')}" onclick="setDlFilter('all')">Все</button>
         <button class="${onF('overdue')}" onclick="setDlFilter('overdue')"><span class="d" style="background:var(--neg)"></span>Просрочены</button>
         <button class="${onF('today')}" onclick="setDlFilter('today')"><span class="d" style="background:var(--accent)"></span>Сегодня</button>
         <button class="${onF('week')}" onclick="setDlFilter('week')"><span class="d" style="background:var(--warn)"></span>Неделя</button>
         <button class="${onF('future')}" onclick="setDlFilter('future')">Будущие</button>
       </div>
-      <div class="flex1"></div>
-      <div class="segm">
-        <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
-        <button class="${onV('activity')}" onclick="setDlView('activity')">Активность</button>
-      </div>
-    </div>
-
-    ${agDlView==='deadlines'?`<div class="toolbar" style="margin-top:-4px">
       <div class="segm">
         <button class="${agDlType==='all'?'on':''}" onclick="setDlType('all')">Все типы</button>
         <button class="${agDlType==='stage'?'on':''}" onclick="setDlType('stage')">Этапы</button>
         <button class="${agDlType==='task'?'on':''}" onclick="setDlType('task')">Задачи</button>
       </div>
+      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}`:''}
       <div class="flex1"></div>
-      <span class="dl-grouplbl">Группировать:</span>
-      <div class="segm">
+      ${agDlView==='deadlines'?`<div class="segm">
         <button class="${onG('urgency')}" onclick="setDlGroup('urgency')">⚡ Срочность</button>
         <button class="${onG('project')}" onclick="setDlGroup('project')">▦ Проект</button>
-        <button class="${onG('owner')}" onclick="setDlGroup('owner')">◑ Ответственный</button>
+      </div>`:''}
+      <div class="segm">
+        <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
+        <button class="${onV('activity')}" onclick="setDlView('activity')">Активность</button>
       </div>
-    </div>`:''}
+    </div>
 
     <div style="margin-top:6px">${body}</div>`;
 }
