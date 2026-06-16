@@ -809,6 +809,24 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .dp-foot button{background:transparent;border:0;color:var(--txt-2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;padding:5px 8px;border-radius:6px;transition:.12s}
 .dp-foot button:hover{color:var(--accent)}
 .dp-foot .clr:hover{color:var(--neg)}
+.dr-wrap .dp-trigger{min-width:210px}
+.dr-clear{width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:5px;color:var(--txt-3);font-size:12px;flex:none;transition:.12s}
+.dr-clear:hover{background:var(--neg-dim);color:var(--neg)}
+.dr-pop{left:auto;right:0;width:300px}
+.dr-hint{font-size:11px;color:var(--txt-3);margin:-4px 0 10px;font-family:var(--mono)}
+.dr-grid button.in-range{background:var(--accent-dim);color:var(--txt);border-radius:0}
+.dr-grid button.r-start{background:var(--accent);color:#06231e;font-weight:700;border-radius:7px 0 0 7px}
+.dr-grid button.r-end{background:var(--accent);color:#06231e;font-weight:700;border-radius:0 7px 7px 0}
+.dr-grid button.r-start.r-end{border-radius:7px}
+.dr-grid button.in-range:hover{background:var(--accent-line)!important;color:var(--txt)}
+.dr-grid button.r-start:hover,.dr-grid button.r-end:hover{background:var(--accent)!important;color:#06231e}
+.dr-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line);flex-wrap:wrap}
+.dr-presets{display:flex;gap:6px;flex-wrap:wrap}
+.dr-presets button{background:var(--bg-1);border:1px solid var(--line-2);color:var(--txt-2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer;padding:5px 9px;border-radius:6px;transition:.12s}
+.dr-presets button:hover{border-color:var(--accent-line);color:var(--accent)}
+.dr-foot .clr{background:transparent;border:0;color:var(--txt-3);font-size:11.5px;font-weight:600;cursor:pointer;padding:5px 6px;border-radius:6px}
+.dr-foot .clr:hover{color:var(--neg)}
+@media(max-width:560px){.dr-pop{width:286px}}
 .avup{position:relative;cursor:pointer;border:1px solid var(--line-2);transition:border-color .16s,transform .16s}
 .avup:hover{border-color:var(--accent-line);transform:translateY(-1px)}
 .avup .ovl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,10,9,.58);color:#fff;opacity:0;transition:opacity .16s;pointer-events:none}
@@ -2262,7 +2280,80 @@ function dpPick(id,iso){
   _dpClose();
   const cb=e&&e.getAttribute('data-onpick'); if(cb){ try{ new Function('v',cb)(iso); }catch(err){ console.warn(err); } }
 }
-document.addEventListener('click',e=>{ if(!e.target.closest('.dpick')) _dpClose(); });
+document.addEventListener('click',e=>{ if(!e.target.closest('.dpick')){ _dpClose(); _dr.anchor=null; _dr.hover=null; } });
+
+/* ——— single range date picker (deadlines) — выбор периода в одном календаре ——— */
+let _dr={y:0,m:0,anchor:null,hover:null};
+function _iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _isoAdd(iso,n){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return _iso(d); }
+function _drBounds(){
+  if(_dr.anchor){ const a=_dr.anchor,h=_dr.hover||_dr.anchor; return a<=h?[a,h]:[h,a]; }
+  if(agDlFrom&&agDlTo) return agDlFrom<=agDlTo?[agDlFrom,agDlTo]:[agDlTo,agDlFrom];
+  if(agDlFrom) return [agDlFrom,agDlFrom];
+  if(agDlTo) return [agDlTo,agDlTo];
+  return [null,null];
+}
+function _drLabel(){
+  if(agDlFrom&&agDlTo) return dpFmt(agDlFrom)+' — '+dpFmt(agDlTo);
+  if(agDlFrom) return 'с '+dpFmt(agDlFrom);
+  if(agDlTo) return 'до '+dpFmt(agDlTo);
+  return 'Период';
+}
+function dlRangeField(){
+  const has=!!(agDlFrom||agDlTo);
+  return `<div class="dpick dr-wrap" id="dr-wrap">`
+    +`<button type="button" class="dp-trigger ${has?'':'empty'}" onclick="event.stopPropagation();drToggle()"><span class="dp-val">${_drLabel()}</span>`
+    +(has?`<span class="dr-clear" onclick="event.stopPropagation();drClear()" title="Сбросить период">✕</span>`
+        :`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`)
+    +`</button></div>`;
+}
+function drToggle(){
+  const w=document.getElementById('dr-wrap'); if(!w) return;
+  if(w.querySelector('.dr-pop')){ drClose(); return; }
+  _dpClose();
+  const base=agDlFrom||agDlTo||_iso(new Date()), a=base.split('-').map(Number);
+  _dr.y=a[0]; _dr.m=a[1]-1; _dr.anchor=null; _dr.hover=null;
+  const pop=document.createElement('div'); pop.className='dp-pop dr-pop';
+  pop.addEventListener('click',ev=>ev.stopPropagation());
+  pop.innerHTML=_drGrid(); w.appendChild(pop);
+}
+function drClose(){ const w=document.getElementById('dr-wrap'), p=w&&w.querySelector('.dr-pop'); if(p)p.remove(); _dr.anchor=null; _dr.hover=null; }
+function _drRefresh(){ const w=document.getElementById('dr-wrap'), p=w&&w.querySelector('.dr-pop'); if(p)p.innerHTML=_drGrid(); }
+function drNav(delta){ let m=_dr.m+delta,y=_dr.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} _dr.y=y;_dr.m=m; _drRefresh(); }
+function drDay(iso){
+  if(_dr.anchor===null){ _dr.anchor=iso; _dr.hover=iso; _drRefresh(); }
+  else { let a=_dr.anchor,b=iso; if(b<a){const t=a;a=b;b=t;} agDlFrom=a; agDlTo=b; _dr.anchor=null; _dr.hover=null; renderDeadlines(); }
+}
+function drHover(iso){ if(_dr.anchor!==null && _dr.hover!==iso){ _dr.hover=iso; _drRefresh(); } }
+function drPreset(kind){
+  const t=new Date(), ti=_iso(t);
+  if(kind==='today'){ agDlFrom=ti; agDlTo=ti; }
+  else if(kind==='week'){ agDlFrom=ti; agDlTo=_isoAdd(ti,6); }
+  else if(kind==='month'){ const y=t.getFullYear(),m=t.getMonth(); agDlFrom=_iso(new Date(y,m,1)); agDlTo=_iso(new Date(y,m+1,0)); }
+  _dr.anchor=null; _dr.hover=null; renderDeadlines();
+}
+function drClear(){ agDlFrom=''; agDlTo=''; _dr.anchor=null; _dr.hover=null; renderDeadlines(); }
+function _drGrid(){
+  const y=_dr.y, m=_dr.m, now=new Date(), tISO=_iso(now);
+  const [lo,hi]=_drBounds();
+  let start=new Date(y,m,1).getDay(); start=(start===0?6:start-1);
+  const dim=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate();
+  let cells='';
+  for(let i=0;i<start;i++) cells+=`<button class="oth" disabled>${prev-start+1+i}</button>`;
+  for(let d=1;d<=dim;d++){ const ci=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const inR=lo&&hi&&ci>=lo&&ci<=hi, isS=ci===lo, isE=ci===hi;
+    const cls=[inR?'in-range':'', isS?'r-start':'', isE?'r-end':'', ci===tISO?'today':''].filter(Boolean).join(' ');
+    cells+=`<button class="${cls}" onclick="drDay('${ci}')" onmouseenter="drHover('${ci}')">${d}</button>`; }
+  const tot=start+dim, trail=(7-(tot%7))%7;
+  for(let i=1;i<=trail;i++) cells+=`<button class="oth" disabled>${i}</button>`;
+  const hint=_dr.anchor?'Выберите конец периода':(agDlFrom&&agDlTo?(dpFmt(agDlFrom)+' — '+dpFmt(agDlTo)):agDlFrom?('с '+dpFmt(agDlFrom)):'Выберите начало периода');
+  return `<div class="dp-head"><div class="dp-title">${DP_MON[m]} ${y}</div><div class="dp-nav">`
+    +`<button type="button" onclick="drNav(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>`
+    +`<button type="button" onclick="drNav(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button></div></div>`
+    +`<div class="dr-hint">${hint}</div>`
+    +`<div class="dp-dow">${DP_DOW.map(d=>'<span>'+d+'</span>').join('')}</div><div class="dp-grid dr-grid">${cells}</div>`
+    +`<div class="dr-foot"><div class="dr-presets"><button type="button" onclick="drPreset('today')">Сегодня</button><button type="button" onclick="drPreset('week')">7 дней</button><button type="button" onclick="drPreset('month')">Месяц</button></div><button type="button" class="clr" onclick="drClear()">Очистить</button></div>`;
+}
 function pd2Close(){document.getElementById('ov-pd2').classList.remove('on');document.getElementById('ov-pd2').innerHTML='';}
 function _v(id){const e=document.getElementById(id);return e?e.value.trim():'';}
 
@@ -2562,7 +2653,7 @@ function renderDeadlines(){
     <div class="toolbar">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по этапу или проекту…" value="${(agDlSearch||'').replace(/"/g,'&quot;')}" oninput="setDlSearch(this.value)"></div>
       ${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}
-      <div class="dl-range">${dateField('dlfrom', agDlFrom, 'От', 'setDlFrom(v)')}<span class="dl-sep">—</span>${dateField('dlto', agDlTo, 'До', 'setDlTo(v)')}</div>
+      <div class="dl-range">${dlRangeField()}</div>
     </div>
     <div class="toolbar" style="margin-top:-4px">
       <div class="segm">
