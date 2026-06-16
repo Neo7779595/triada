@@ -2958,8 +2958,8 @@ function renderFinance(){
     </div>
 
     <div class="kpis" style="grid-template-columns:repeat(6,1fr);margin-top:14px">
-      <div class="kpi"><div class="l">Выручка / час</div><div class="v num">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="sub">сум за час работы</div></div>
-      <div class="kpi"><div class="l">Прибыль / час</div><div class="v num" style="color:${F.profitPerHour>0?'var(--pos)':F.profitPerHour<0?'var(--neg)':'var(--txt)'}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="sub">чистыми за час</div></div>
+      <div class="kpi"><div class="l">Выручка / час</div><div class="v num">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="sub">${F.revPerHour?'сум за час работы':'нужно ≥ 1ч трекинга'}</div></div>
+      <div class="kpi"><div class="l">Прибыль / час</div><div class="v num" style="color:${F.profitPerHour>0?'var(--pos)':F.profitPerHour<0?'var(--neg)':'var(--txt)'}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="sub">${F.profitPerHour?'чистыми за час':'логируйте часы в канбане'}</div></div>
       <div class="kpi"><div class="l">Runway</div><div class="v" style="font-size:19px;font-weight:700;color:${F.profit>=0?'var(--pos)':'var(--neg)'};margin-top:6px">${F.profit>=0?'Стабильно':'Дефицит'}</div><div class="sub">${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div></div>
       <div class="kpi"><div class="l">Concentration risk</div><div class="v num" style="color:${F.concentrationPct>=50?'var(--neg)':F.concentrationPct>=30?'var(--warn)':'var(--txt)'}">${F.concentrationPct}<span class="u">%</span></div><div class="sub">${F.concentrationTop}</div></div>
       <div class="kpi"><div class="l">Break-even</div><div class="v num">${money(F.totalCost)}</div><div class="sub">минимум для нулевой прибыли</div></div>
@@ -3961,7 +3961,7 @@ window.tLoadFinance = async () => {
   let projects = rows.map(p => ({ id:p.id, name:p.name, cat:p.cat, logo:p.logo, logoUrl:p.logoUrl, status:p.status,
     mrr:p.mrr, cost:p.cost, hours:p.hours, trackedSec:p.trackedSec, finance:p.finance, profit:p.mrr-p.cost,
     margin: p.mrr>0 ? Math.round(100*(p.mrr-p.cost)/p.mrr) : null,
-    profitPerHour: p.hours>0 ? Math.round((p.mrr-p.cost)/p.hours) : null }));
+    profitPerHour: p.hours>=1 ? Math.round((p.mrr-p.cost)/p.hours) : null }));
   projects.sort((a,b)=> b.mrr-a.mrr);
 
   // —— разбивка «куда уходит выручка»: все статьи расходов из всех проектов ——
@@ -3986,8 +3986,9 @@ window.tLoadFinance = async () => {
 
   const totalHours = rows.reduce((s,p)=>s+(Number(p.hours)||0),0);
   const avgHours = paying ? Math.round(totalHours/paying) : 0;
-  const revPerHour = totalHours>0 ? Math.round(totalMrr/totalHours) : 0;
-  const profitPerHour = totalHours>0 ? Math.round(profit/totalHours) : 0;
+  const MIN_H = 1;   // меньше часа трекинга — почасовая ставка не показательна (делитель → 0)
+  const revPerHour = totalHours>=MIN_H ? Math.round(totalMrr/totalHours) : 0;
+  const profitPerHour = totalHours>=MIN_H ? Math.round(profit/totalHours) : 0;
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
     paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop,
     totalHours, avgHours, revPerHour, profitPerHour, services, projects, breakdown };
