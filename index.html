@@ -2813,109 +2813,83 @@ let TEAM=[
   {name:'Шербек',role:'Таргетолог',dept:'Продакшн',color:'#E3B567',cycle:'< 1 ч',inwork:'1 мин',d7:'—',d30:'1',rework:0,eff:77},
   {name:'Нур-Ислам Алиев',role:'Руководитель',dept:'Администрация',color:'#F0785C',cycle:'—',inwork:'—',d7:'—',d30:'—',rework:39,eff:null},
 ];
-const TEAM_DEPTS=[
-  {name:'Продакшн',cycle:'1',unit:'ч',rework:25,eff:88,count:2,warn:null},
-  {name:'Администрация',cycle:'1,8',unit:'д',rework:25,eff:79,count:1,warn:'100% потока на одном исполнителе'},
-];
-const TEAM_WL=[
-  {name:'Абдурауф',color:'#37E6C8',waiting:5,inwork:0,done:3},
-  {name:'Нур-Ислам Алиев',color:'#F0785C',waiting:0,inwork:0,done:1},
-];
+let TEAMAGG={assigned:0,open:0,overdue:0,v30:0};
 function setTeamTab(t){teamTab=t;renderTeam();}
 function effColor(e){return e>=75?'var(--pos)':e>=50?'var(--warn)':'var(--neg)';}
 
 function renderTeam(){
+  const A = (typeof TEAMAGG!=='undefined'?TEAMAGG:{assigned:0,open:0,overdue:0,v30:0});
+  const fmtDays = d => d==null?'—':d===0?'сегодня':d+'д назад';
+  const actColor = d => d==null?'var(--txt-3)':d>=14?'var(--neg)':d>=7?'var(--warn)':'var(--pos)';
   let body='';
   if(teamTab==='employees'){
     body=`<div class="card">
-      <div class="card-h">
-        <div style="display:flex;align-items:center;gap:12px"><div style="width:36px;height:36px;border-radius:9px;background:var(--bg-3);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></div><div><div class="t">Эффективность сотрудников</div><div style="font-size:11px;color:var(--txt-3);margin-top:2px">Скорость · Нагрузка · Возвраты · Velocity</div></div></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <div class="segm"><button class="on">Всё время</button><button>Этот месяц</button><button>Прошлый месяц</button><button>30 дней</button></div>
-          <div class="segm"><button class="on">Только активные</button><button>Все проекты</button></div>
-        </div>
-      </div>
-      <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <div class="search" style="flex:1;min-width:220px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по имени, роли, отделу…"></div>
-        <select class="sel"><option>Все отделы ▾</option></select>
-        <select class="sel"><option>Все роли ▾</option></select>
-        <select class="sel"><option>По эффективности ▾</option></select>
-      </div>
-      <div style="padding:12px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line)">
-        <button class="fchip"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent)"></span>Только с данными</button>
-        <button class="fchip on">Все</button>
-        <button class="fchip"><span style="width:7px;height:7px;border-radius:50%;background:var(--pos)"></span>≥ 75%</button>
-        <button class="fchip"><span style="width:7px;height:7px;border-radius:50%;background:var(--warn)"></span>50-74%</button>
-        <button class="fchip"><span style="width:7px;height:7px;border-radius:50%;background:var(--neg)"></span>&lt; 50%</button>
-        <div class="flex1"></div>
-        <span style="font-size:11px;color:var(--txt-3);font-family:var(--mono)">${TEAM.length} из ${TEAM.length} сотр</span>
-        <span style="font-size:11px;color:var(--accent);cursor:pointer">Сбросить</span>
-      </div>
-      <table><thead><tr><th>Сотрудник</th><th>Цикл задачи</th><th>Ср. в работе</th><th>За 7 дн</th><th>За 30 дн</th><th>Возвраты</th><th>Эффект.</th><th></th></tr></thead>
-      <tbody>${TEAM.map((e,i)=>`<tr>
+      <div class="card-h"><div class="t">Сотрудники <span class="c">${TEAM.length} в команде · задачи и активность</span></div></div>
+      <table><thead><tr><th>Сотрудник</th><th>Задач</th><th>Выполнено</th><th>В работе</th><th>Просрочено</th><th>Этапов·30д</th><th>Активность</th><th>Выполнение</th><th></th></tr></thead>
+      <tbody>${TEAM.length?TEAM.map((e,i)=>`<tr>
         <td><div class="ag-name"><span class="ag-dot" style="background:${e.color};border-radius:50%"></span><div><div class="nm">${e.name}</div><div class="sl" style="font-family:var(--font)">${e.role} · ${e.dept}</div></div></div></td>
-        <td>${e.cycle}</td><td style="color:var(--txt-3)">${e.inwork}</td><td>${e.d7}</td><td>${e.d30}</td>
-        <td style="color:${e.rework>=30?'var(--neg)':e.rework>0?'var(--warn)':'var(--txt-3)'}">${e.rework}%</td>
-        <td>${e.eff!=null?`<div class="eff"><span style="color:${effColor(e.eff)}">${e.eff}%</span><div class="bar"><i style="width:${e.eff}%;background:${effColor(e.eff)}"></i></div></div>`:'<span style="color:var(--txt-3)">—</span>'}</td>
-        <td style="text-align:right;white-space:nowrap"><button class="btn-ghost" style="padding:5px 11px;font-size:11px" onclick="event.stopPropagation();openEmpEdit(${i})">Изм.</button> <button class="btn-ghost" style="padding:5px 9px;font-size:11px;color:var(--neg)" onclick="event.stopPropagation();TEAM.splice(${i},1);renderTeam()">✕</button></td>
-      </tr>`).join('')}</tbody></table></div>`;
+        <td class="num">${e._assigned||0}</td>
+        <td class="num" style="color:${(e._done||0)?'var(--pos)':'var(--txt-3)'}">${e._done||0}</td>
+        <td class="num">${e._open||0}</td>
+        <td class="num" style="color:${e._overdue?'var(--neg)':'var(--txt-3)'}">${e._overdue||0}</td>
+        <td class="num">${e._v30||0}</td>
+        <td style="color:${actColor(e._lastDays)};font-size:11.5px">${fmtDays(e._lastDays)}</td>
+        <td>${e._compPct!=null?`<div class="eff"><span style="color:${effColor(e._compPct)}">${e._compPct}%</span><div class="bar"><i style="width:${e._compPct}%;background:${effColor(e._compPct)}"></i></div></div>`:'<span style="color:var(--txt-3)">—</span>'}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn-ghost" style="padding:5px 11px;font-size:11px" onclick="event.stopPropagation();openEmpEdit(${i})">Изм.</button></td>
+      </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--txt-3);padding:24px">Нет сотрудников</td></tr>'}</tbody></table></div>`;
   } else if(teamTab==='workload'){
-    const W=TEAM_WL.reduce((s,e)=>s+e.waiting,0),I=TEAM_WL.reduce((s,e)=>s+e.inwork,0),D=TEAM_WL.reduce((s,e)=>s+e.done,0);
-    body=`<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-        <div class="search" style="flex:1;min-width:220px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по сотруднику или отделу…"></div>
-        <select class="sel"><option>По загрузке ▾</option></select>
-        <span style="font-size:11px;color:var(--txt-3);font-family:var(--mono)">${TEAM_WL.length} из ${TEAM_WL.length} сотр</span>
-      </div>
-      <div class="wl-summary">
+    const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
+    const sorted=[...TEAM].sort((a,b)=>((b._open||0)+(b._done||0))-((a._open||0)+(a._done||0)));
+    body=`<div class="wl-summary">
         <div class="s"><div class="v" style="color:var(--warn)">${W}</div><div class="l">В ожидании</div></div>
         <div class="s"><div class="v" style="color:var(--accent)">${I}</div><div class="l">В работе</div></div>
         <div class="s"><div class="v" style="color:var(--pos)">${D}</div><div class="l">Завершено</div></div>
       </div>
       <div style="display:flex;gap:18px;margin:0 0 14px;font-size:11px;color:var(--txt-3)"><span><i style="display:inline-block;width:9px;height:9px;background:var(--warn);border-radius:2px;vertical-align:-1px"></i> Ожидание</span><span><i style="display:inline-block;width:9px;height:9px;background:var(--accent);border-radius:2px;vertical-align:-1px"></i> В работе</span><span><i style="display:inline-block;width:9px;height:9px;background:var(--pos);border-radius:2px;vertical-align:-1px"></i> Готово</span></div>
       <div class="card"><table>
-        <thead><tr><th>Сотрудник</th><th style="width:42%">Распределение</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th></tr></thead>
-        <tbody>${TEAM_WL.map(e=>{const t=e.waiting+e.inwork+e.done||1;return `<tr>
-          <td><div class="ag-name"><span class="wl-av" style="width:30px;height:30px;background:${e.color};font-size:12px">${e.name[0]}</span><div><div class="nm">${e.name}</div><div class="sl" style="font-family:var(--font)">${e.waiting+e.inwork+e.done} эт.</div></div></div></td>
-          <td><div style="height:9px;background:var(--bg-3);border-radius:5px;overflow:hidden;display:flex"><i style="width:${e.waiting/t*100}%;background:var(--warn)"></i><i style="width:${e.inwork/t*100}%;background:var(--accent)"></i><i style="width:${e.done/t*100}%;background:var(--pos)"></i></div></td>
-          <td style="color:var(--warn)">${e.waiting?e.waiting+' эт.':'—'}</td>
-          <td style="color:${e.inwork?'var(--accent)':'var(--txt-3)'}">${e.inwork?e.inwork+' эт.':'—'}</td>
-          <td style="color:var(--pos)">${e.done?e.done+' эт.':'—'}</td>
-          <td class="num">${e.waiting+e.inwork+e.done}</td>
-        </tr>`;}).join('')}</tbody>
+        <thead><tr><th>Сотрудник</th><th style="width:42%">Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th></tr></thead>
+        <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d||1;return `<tr>
+          <td><div class="ag-name"><span class="wl-av" style="width:30px;height:30px;background:${e.color};font-size:12px">${(e.name||'?')[0]}</span><div><div class="nm">${e.name}</div><div class="sl" style="font-family:var(--font)">${w+a+d} задач</div></div></div></td>
+          <td><div style="height:9px;background:var(--bg-3);border-radius:5px;overflow:hidden;display:flex"><i style="width:${w/t*100}%;background:var(--warn)"></i><i style="width:${a/t*100}%;background:var(--accent)"></i><i style="width:${d/t*100}%;background:var(--pos)"></i></div></td>
+          <td style="color:var(--warn)">${w||'—'}</td>
+          <td style="color:${a?'var(--accent)':'var(--txt-3)'}">${a||'—'}</td>
+          <td style="color:var(--pos)">${d||'—'}</td>
+          <td class="num">${w+a+d}</td>
+        </tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--txt-3);padding:24px">Нет данных</td></tr>'}</tbody>
       </table></div>`;
   } else {
-    body=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-        <div style="font-size:11px;color:var(--txt-3)">Эффективность отделов · атрибуция через ответственного за этап</div>
-        <div class="flex1"></div>
-        <div class="search" style="width:260px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по отделу…"></div>
-        <select class="sel"><option>По эффективности ▾</option></select>
-        <div class="segm"><button class="on">Карточки</button><button onclick="toast('Орг-структура')">Орг-структура</button></div>
-      </div>
-      <div class="dept-grid">${TEAM_DEPTS.map(d=>{
-        const emps=TEAM.filter(e=>e.dept===d.name);
-        return `<div class="dept-card">
-        <div class="dept-h"><div><div class="dept-cy">${d.cycle}<span class="u"> ${d.unit}</span></div><div style="font-size:11px;color:var(--txt-3);margin-top:5px">медианный цикл · ${d.count} сотр.</div></div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px"><div class="dept-name">${d.name}</div>${d.rework>=20?'<span class="badge b-susp" style="font-size:9.5px"><span class="bd"></span>Брак высокий</span>':''}</div></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><span style="font-size:11px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em">Эффективность отдела</span><span class="num" style="font-size:18px;color:var(--pos)">${d.eff}%</span></div>
-        <div class="dept-bar"><i style="width:${d.eff}%"></i></div>
-        <div class="dept-stats"><div class="st"><div class="v">${d.count}</div><div class="l">Поток / 30д</div></div><div class="st"><div class="v" style="color:var(--neg)">${d.rework}%</div><div class="l">Брак</div></div><div class="st"><div class="v">0</div><div class="l">В работе</div></div></div>
-        ${d.warn?`<div class="dept-warn">⚠ ${d.warn}</div>`:''}
-        <div style="display:flex;gap:-6px;margin-top:13px">${emps.slice(0,5).map((e,i)=>`<span style="width:28px;height:28px;border-radius:50%;background:${e.color};color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid var(--bg-1);margin-left:${i?'-6px':'0'}">${e.name[0]}</span>`).join('')}</div>
-      </div>`;}).join('')}</div>`;
+    const deptMap={};
+    TEAM.forEach(e=>{ const d=e.dept||'—'; const x=deptMap[d]||(deptMap[d]={name:d,emps:[],assigned:0,done:0,open:0,v30:0,rework:0,maxOpen:0});
+      x.emps.push(e); x.assigned+=e._assigned||0; x.done+=e._done||0; x.open+=e._open||0; x.v30+=e._v30||0; x.rework+=e._rework||0; if((e._open||0)>x.maxOpen)x.maxOpen=e._open||0; });
+    const depts=Object.values(deptMap).sort((a,b)=>b.v30-a.v30);
+    body=`<div class="dept-grid">${depts.length?depts.map(d=>{
+      const comp=d.assigned?Math.round(100*d.done/d.assigned):null;
+      const conc=d.open?Math.round(100*d.maxOpen/d.open):0;
+      const reworkHigh=d.done && Math.round(100*d.rework/Math.max(d.done,1))>=20;
+      return `<div class="dept-card">
+        <div class="dept-h"><div><div class="dept-cy">${d.v30}<span class="u"> этап.</span></div><div style="font-size:11px;color:var(--txt-3);margin-top:5px">закрыто за 30 дн · ${d.emps.length} сотр.</div></div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px"><div class="dept-name">${d.name}</div>${reworkHigh?'<span class="badge b-susp" style="font-size:9.5px"><span class="bd"></span>Возвраты высокие</span>':''}</div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><span style="font-size:11px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em">Выполнение задач</span><span class="num" style="font-size:18px;color:${comp!=null?effColor(comp):'var(--txt-3)'}">${comp!=null?comp+'%':'—'}</span></div>
+        <div class="dept-bar"><i style="width:${comp||0}%"></i></div>
+        <div class="dept-stats"><div class="st"><div class="v">${d.open}</div><div class="l">В работе</div></div><div class="st"><div class="v" style="color:${d.rework?'var(--neg)':'var(--txt)'}">${d.rework}</div><div class="l">Возвратов</div></div><div class="st"><div class="v">${d.done}</div><div class="l">Выполнено</div></div></div>
+        ${conc>=70&&d.emps.length>1?`<div class="dept-warn">⚠ ${conc}% открытых задач на одном исполнителе</div>`:''}
+        <div style="display:flex;margin-top:13px">${d.emps.slice(0,5).map((e,i)=>`<span style="width:28px;height:28px;border-radius:50%;background:${e.color};color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid var(--bg-1);margin-left:${i?'-6px':'0'}">${(e.name||'?')[0]}</span>`).join('')}</div>
+      </div>`;}).join(''):'<div class="empty-mini">Нет отделов</div>'}</div>`;
   }
   document.getElementById('content-ag').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Агентство · команда</div><h1>Команда</h1></div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · команда</div><h1>Команда</h1>
+    <div class="s">Реальная загрузка и активность: задачи по исполнителям, закрытые этапы, возвраты.</div></div></div>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Сотрудников</div><div class="v num">${TEAM.length}</div><div class="sub">в команде</div><div class="kfoot">${TEAM.length} сотр. · 23 этапов</div></div>
-      <div class="kpi"><div class="l">Ср. цикл задачи</div><div class="v num" style="color:var(--pos)">22<span class="u">ч</span></div><div class="sub">высокий темп</div><div class="kfoot">1 сотр. с данными</div></div>
-      <div class="kpi"><div class="l">Ср. эффект. сотрудников</div><div class="v num" style="color:var(--pos)">91<span class="u">%</span></div><div class="sub">отлично</div><div class="kfoot">1 из ${TEAM.length} сотр.</div></div>
-      <div class="kpi"><div class="l">Ср. эффект. отделов</div><div class="v num" style="color:var(--pos)">91<span class="u">%</span></div><div class="sub">2 отдела с данными</div><div class="kfoot">лучший: 91% · хуже: 79%</div></div>
+      <div class="kpi"><div class="l">Сотрудников</div><div class="v num">${TEAM.length}</div><div class="sub">в команде</div><div class="kfoot">${A.assigned} задач всего</div></div>
+      <div class="kpi"><div class="l">Задач в работе</div><div class="v num">${A.open}</div><div class="sub">открытых задач</div><div class="kfoot">по всем сотрудникам</div></div>
+      <div class="kpi"><div class="l">Просрочено у команды</div><div class="v num" style="${A.overdue?'color:var(--neg)':''}">${A.overdue}</div><div class="sub ${A.overdue?'':'pos'}">${A.overdue?'требуют внимания':'всё в срок'}</div><div class="kfoot">открытых задач с дедлайном в прошлом</div></div>
+      <div class="kpi"><div class="l">Этапов закрыто · 30д</div><div class="v num">${A.v30}</div><div class="sub">темп команды</div><div class="kfoot">по истории статусов</div></div>
     </div>
     <div class="tabs-row">
       <div class="segm">
         <button class="${teamTab==='employees'?'on':''}" onclick="setTeamTab('employees')">Сотрудники</button>
         <button class="${teamTab==='workload'?'on':''}" onclick="setTeamTab('workload')">Нагрузка</button>
-        <button class="${teamTab==='depts'?'on':''}" onclick="setTeamTab('depts')">Эффективность отделов</button>
+        <button class="${teamTab==='depts'?'on':''}" onclick="setTeamTab('depts')">Отделы</button>
       </div>
       <button class="btn-add" onclick="openEmp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить сотрудника</button>
     </div>
@@ -3652,6 +3626,43 @@ window.tLoadCycles = async () => {
     stages:stageRows, trend, clients };
 };
 
+/* ===== TEAM · live aggregation (workload & activity per member) ===== */
+window.tLoadTeam = async () => {
+  if (!SB) return;
+  const now = Date.now();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const iso30 = new Date(now - 30*86400000).toISOString();
+  const [tr, hr] = await Promise.all([
+    SB.from('project_tasks').select('assignee_id,status,due_date'),
+    SB.from('stage_history').select('changed_by,old_status,new_status,created_at')
+  ]);
+  const tasks = tr.data||[], hist = hr.data||[];
+  const rank = { wait:0, active:1, done:2 };
+  const stat = {};
+  const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,overdue:0,v30:0,rework:0,last:null });
+
+  tasks.forEach(t => { if (!t.assignee_id) return; const a = S(t.assignee_id); a.assigned++;
+    if (t.status==='done') a.done++;
+    else { a.open++; if (t.status==='wait') a.wait++; if (t.status==='active') a.active++;
+      if (t.due_date && new Date(t.due_date+'T00:00:00') < today) a.overdue++; } });
+
+  hist.forEach(h => { if (!h.changed_by) return; const a = S(h.changed_by);
+    const tt = new Date(h.created_at).getTime(); if (a.last==null || tt>a.last) a.last = tt;
+    const f = rank[h.old_status], to = rank[h.new_status]; if (f!=null && to!=null && to<f) a.rework++;
+    if (h.new_status==='done' && h.created_at>=iso30) a.v30++; });
+
+  let tA=0, tO=0, tOv=0, tV=0;
+  (typeof TEAM!=='undefined'?TEAM:[]).forEach(m => {
+    const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,overdue:0,v30:0,rework:0,last:null };
+    m._assigned=a.assigned; m._done=a.done; m._open=a.open; m._wait=a.wait; m._active=a.active;
+    m._overdue=a.overdue; m._v30=a.v30; m._rework=a.rework;
+    m._lastDays = a.last!=null ? Math.floor((now - a.last)/86400000) : null;
+    m._compPct = a.assigned ? Math.round(100*a.done/a.assigned) : null;
+    tA+=a.assigned; tO+=a.open; tOv+=a.overdue; tV+=a.v30;
+  });
+  TEAMAGG = { assigned:tA, open:tO, overdue:tOv, v30:tV };
+};
+
 window.tLoadAll = async (role) => {
   if (!SB) return;
   if (role === 'superadmin'){
@@ -3671,7 +3682,7 @@ window.tLoadAll = async (role) => {
       SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
     PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
-    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates(); await window.tLoadOverview(); await window.tLoadCycles();
+    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates(); await window.tLoadOverview(); await window.tLoadCycles(); await window.tLoadTeam();
   }
   await loadTariffs();
 };
