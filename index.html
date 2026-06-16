@@ -933,11 +933,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .fin-tabs{flex-wrap:wrap}
 .fin-tabs button b{color:var(--accent);font-weight:700;margin-left:2px}
 .fin-tabs button.on b{color:inherit}
-.fin-2col{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-top:16px;align-items:start}
-.pdist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.fin-2col{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-top:16px;align-items:stretch}
+.pdist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .fin-rcol{display:flex;flex-direction:column;gap:16px;min-width:0}
 .pdist-card{background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:16px}
-.pdist-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#06140f;font-size:14px;flex:0 0 auto}
+.pdist-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#06140f;font-size:14px;flex:0 0 auto;position:relative;overflow:hidden}
 .pdist-nm{font-size:13.5px;font-weight:600}
 .pdist-pct{font-family:var(--mono);font-size:12px;font-weight:700;padding:3px 9px;border-radius:7px}
 .pdist-amt{font-family:var(--mono);font-size:21px;font-weight:700;margin:16px 0 12px;letter-spacing:-.3px}
@@ -2884,7 +2884,7 @@ function peRender(){
     <div class="modal-h"><h3>Распределение чистой прибыли</h3><p>Кому и сколько % от прибыли · сумма долей должна быть 100%</p></div>
     <div class="modal-b">
       ${PSEDIT.map((r,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-        <span style="width:11px;height:11px;border-radius:50%;background:${r.color};flex:0 0 auto"></span>
+        <label style="position:relative;width:36px;height:36px;border-radius:50%;background:${r.color};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;overflow:hidden;color:#06140f;font-weight:700;font-size:13px" title="Загрузить фото">${r.avatar?`<img src="${r.avatar}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`:((r.name||'?')[0]||'?').toUpperCase()}<input type="file" accept="image/*" style="display:none" onchange="if(this.files&&this.files[0])tUploadPartnerAvatar(this.files[0],${i})"><span style="position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:50%;background:var(--bg-1);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="var(--txt-2)" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></span></label>
         <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Имя / статья (напр. Партнёр, Благотворительность)" oninput="peName(${i},this.value)" style="flex:1">
         <input type="number" min="0" max="100" value="${r.pct}" oninput="pePct(${i},this.value)" style="width:78px;text-align:right;font-family:var(--mono)"><span style="color:var(--txt-3);font-size:12px">%</span>
         <button class="btn-ghost" style="padding:0 11px;color:var(--neg);flex:0 0 auto" onclick="peDel(${i})">✕</button>
@@ -2898,7 +2898,7 @@ function peRender(){
 function savePSplit(){
   if(!PSEDIT)return;
   if(peSumVal()!==100){ toast('Сумма долей должна быть ровно 100%'); return; }
-  const clean=PSEDIT.filter(r=>r.name&&r.name.trim()).map(r=>({name:r.name.trim(),pct:r.pct||0,color:r.color}));
+  const clean=PSEDIT.filter(r=>r.name&&r.name.trim()).map(r=>({name:r.name.trim(),pct:r.pct||0,color:r.color,avatar:r.avatar||null}));
   if(!clean.length){ toast('Добавьте хотя бы одного участника'); return; }
   psSave(clean); PSEDIT=null; pd2Close(); renderFinance(); toast('Распределение прибыли сохранено');
 }
@@ -2952,7 +2952,7 @@ function renderFinance(){
     pdistHtml = split.length
       ? '<div class="pdist-grid">'+split.map(s=>{ const amt=Math.round(distBase*s.pct/100);
           return `<div class="pdist-card" style="border-top:2px solid ${s.color}">`
-            +`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="display:flex;align-items:center;gap:11px"><span class="pdist-av" style="background:${s.color}">${((s.name||'?')[0]||'?').toUpperCase()}</span><div class="pdist-nm">${s.name}</div></div><span class="pdist-pct" style="background:${s.color}26;color:${s.color}">${s.pct}%</span></div>`
+            +`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="display:flex;align-items:center;gap:11px"><span class="pdist-av" style="background:${s.color}">${logoFill(s.avatar,((s.name||'?')[0]||'?').toUpperCase())}</span><div class="pdist-nm">${s.name}</div></div><span class="pdist-pct" style="background:${s.color}26;color:${s.color}">${s.pct}%</span></div>`
             +`<div class="pdist-amt" style="color:${s.color}">+${money(amt)}</div>`
             +`<div class="pdist-bar"><i style="width:${s.pct}%;background:${s.color}"></i></div></div>`;
         }).join('')+'</div>'
@@ -3058,18 +3058,17 @@ function renderFinance(){
           <div class="wf-row" style="margin-top:17px;padding-top:14px;border-top:1px solid var(--line)"><div class="wf-top"><span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Остаток (прибыль)</span><span style="white-space:nowrap"><span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:11.5px">${F.marginPct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:13px;font-weight:700">${money(F.profit)}</span></span></div><div class="wf-bar"><i style="width:${Math.max(0,Math.min(100,F.marginPct)).toFixed(2)}%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></i></div></div>
         </div>
       </div>
-      <div class="fin-rcol">
-      <div class="card">
+      <div class="card" style="display:flex;flex-direction:column">
         <div class="card-h"><div class="t">Unit Economics <span class="c">на клиента</span></div></div>
-        <div class="card-body">
+        <div class="card-body" style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
           ${[['Выручка на клиента', money(F.avgMrr),'var(--txt)'],['Расходы на клиента', money(F.avgCost),'var(--neg)'],['Прибыль на клиента', (F.avgProfit>=0?'+':'')+money(F.avgProfit), F.avgProfit>=0?'var(--pos)':'var(--neg)'],['Часы на клиента', fmtHours(F.avgHours),'var(--txt-2)']].map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2)">${u[0]}</span><span class="num" style="color:${u[2]};font-size:13px">${u[1]}</span></div>`).join('')}
         </div>
       </div>
-      <div class="card">
-        <div class="card-h"><div class="t">Распределение прибыли <span class="c">чистыми</span></div><button class="btn-ghost" style="margin-left:auto;font-size:11px;padding:6px 13px" onclick="openProfitSplit()">⚙ Настроить %</button></div>
-        <div class="card-body">${F.profit>0?pdistHtml:'<div style="text-align:center;color:var(--txt-3);font-size:12.5px;padding:16px 8px">Распределение появится при положительной прибыли</div>'}</div>
-      </div>
-      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Распределение прибыли <span class="c">чистыми</span></div><button class="btn-ghost" style="margin-left:auto;font-size:11px;padding:6px 13px" onclick="openProfitSplit()">⚙ Настроить %</button></div>
+      <div class="card-body">${F.profit>0?pdistHtml:'<div style="text-align:center;color:var(--txt-3);font-size:12.5px;padding:18px 8px">Распределение появится при положительной прибыли</div>'}</div>
     </div>`;
 }
 
@@ -3703,6 +3702,22 @@ window.tUploadLogo = async (file, inputId, letter) => {
     const pv = document.getElementById(inputId+'-pv'); if (pv) pv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
     toast('Фото загружено');
   } catch(e){ toast('Ошибка загрузки: ' + (e.message||e)); }
+};
+window.tUploadPartnerAvatar = async (file, idx) => {
+  try {
+    if (!SB || !file) { toast('Хранилище недоступно'); return; }
+    if (file.size > 4*1024*1024) { toast('Файл больше 4 МБ — сожми изображение'); return; }
+    const ag=(ME&&ME.agency_id)||'shared';
+    const ext=((file.name||'').split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
+    const path=ag+'/partner-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'.'+ext;
+    toast('Загрузка фото…');
+    const {error}=await SB.storage.from('project-logos').upload(path,file,{upsert:true,contentType:file.type||undefined});
+    if(error) throw error;
+    const {data}=SB.storage.from('project-logos').getPublicUrl(path);
+    if(typeof PSEDIT!=='undefined' && PSEDIT && PSEDIT[idx]) PSEDIT[idx].avatar=data.publicUrl;
+    if(typeof peRender==='function') peRender();
+    toast('Фото загружено');
+  } catch(e){ toast('Ошибка загрузки: '+(e.message||e)); }
 };
 window.tProjectUpdate = async (id,patch) => { try { const {error}=await SB.from('projects').update(patch).eq('id',id); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Проект обновлён'); await window.tLoadAll(ME.role); if(typeof renderProjects==='function')renderProjects(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
