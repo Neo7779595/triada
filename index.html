@@ -821,6 +821,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cmb-del{flex:none;background:none;border:0;color:var(--txt-3);cursor:pointer;width:26px;height:30px;border-radius:6px;font-size:16px;line-height:1;opacity:0;transition:.12s}
 .cmb-row:hover .cmb-del{opacity:1}
 .cmb-del:hover{background:var(--neg-dim);color:var(--neg)}
+.dd.seldd{display:block;width:100%}
+.dd.seldd .dd-menu{left:0;right:0;min-width:0}
 .cyc-list{display:flex;flex-direction:column;gap:9px}
 .cyc-it{display:flex;align-items:center;gap:13px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
 .cyc-it .pr{font-weight:600;font-size:13.5px;flex:1}
@@ -1130,7 +1132,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div class="fld"><label>Название агентства</label><input id="f-name" placeholder="Apex Legal"></div>
       <div class="fld2">
         <div class="fld"><label>Slug</label><input id="f-slug" placeholder="apex-legal"></div>
-        <div class="fld"><label>Тариф</label><select id="f-plan"><option value="trial">Trial</option><option value="basic">Basic</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
+        <div class="fld"><label>Тариф</label>${selField('f-plan',[['trial','Trial'],['basic','Basic'],['pro','Pro'],['enterprise','Enterprise']],'trial')}</div>
       </div>
       <div class="fld"><label>Логотип — URL (необязательно)</label><input id="f-logo" placeholder="https://…/logo.png — иначе буква"></div>
       <div class="fld"><label>Владелец — логин</label><input id="f-owner" placeholder="owner"><div class="hint" id="f-email">логин владельца: owner@apex-legal.triada.app</div></div>
@@ -1168,7 +1170,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="fld"><label>Роль</label><input id="e-role" placeholder="SMM-менеджер, дизайнер…"></div>
       </div>
       <div class="fld2">
-        <div class="fld"><label>Отдел</label><select id="e-dept"><option>Продакшн</option><option>Администрация</option><option>Руководство</option></select></div>
+        <div class="fld"><label>Отдел</label>${selField('e-dept',['Продакшн','Администрация','Руководство'],'Продакшн')}</div>
         <div class="fld"><label>Цвет</label><div class="swatches" id="e-sw"></div></div>
       </div>
       <div class="fld"><label>Доступ к модулям — видит / редактирует</label><div class="perm-grid" id="e-perms"></div></div>
@@ -1808,6 +1810,20 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
 }
 function ddToggle(k){const el=document.getElementById('dd-'+k);if(!el)return;const o=el.classList.contains('open');document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));if(!o)el.classList.add('open');}
 const _attr=v=>_ddH(v).replace(/"/g,'&quot;');
+function selField(id, options, cur){
+  const opts=(options||[]).map(o=>Array.isArray(o)?o:[o,o]);
+  cur=(cur==null?'':cur);
+  const co=opts.find(o=>String(o[0])===String(cur));
+  const lbl=co?co[1]:'Выбрать';
+  const caret='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
+  const ck='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  return `<div class="dd seldd" id="seldd-${id}">`
+    +`<input type="hidden" id="${id}" value="${_attr(cur)}">`
+    +`<button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${co?'':'color:var(--txt-3);font-weight:500'}">${_ddH(lbl)}</span>${caret}</button>`
+    +`<div class="dd-menu">`+opts.map(o=>`<button type="button" class="dd-opt ${String(o[0])===String(cur)?'on':''}" data-v="${_attr(o[0])}" data-l="${_attr(o[1])}" onclick="selPick('${id}',this.dataset.v,this.dataset.l)">${_ddH(o[1])}${ck}</button>`).join('')+`</div></div>`;
+}
+function selToggle(id){ const el=document.getElementById('seldd-'+id); if(!el)return; const o=el.classList.contains('open'); document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); if(!o)el.classList.add('open'); }
+function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } const el=document.getElementById('seldd-'+id); if(el)el.classList.remove('open'); }
 function tagCombo(id,label,options,cur,ph,kind){
   cur=cur||''; kind=kind||''; const opts=[...new Set((options||[]).filter(Boolean))];
   (window._cmb=window._cmb||{})[id]={opts,kind};
@@ -2043,14 +2059,14 @@ async function pdNewTask(){
       <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div></div>`);
     return;
   }
-  const stOpts=active.map(s=>`<option value="${s.id}">${(s.name||'').replace(/"/g,'&quot;')}</option>`).join('');
-  const opts=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>`<option value="${m._id}">${m.name}</option>`).join('');
+  const stArr=active.map(s=>[s.id, s.name]);
+  const teamArr=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]);
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
-      <div class="fld"><label>Этап <span style="color:var(--neg)">*</span> · только активные</label><select id="pd2-stg">${stOpts}</select></div>
+      <div class="fld"><label>Этап <span style="color:var(--neg)">*</span> · только активные</label>${selField('pd2-stg', stArr, stArr.length?stArr[0][0]:'')}</div>
       <div class="fld2">
-        <div class="fld"><label>Исполнитель</label><select id="pd2-asg"><option value="">— не назначен —</option>${opts}</select></div>
+        <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
         <div class="fld"><label>Срок</label>${dateField('pd2-tdate','')}</div>
       </div>
     </div>
@@ -2507,7 +2523,7 @@ function renderDeadlines(){
   const over=cnt('overdue'),today=cnt('today'),weekN=cnt('week'),futureN=cnt('future'),done=cnt('done');
   const upcoming=weekN+futureN;
   const onF=f=>agDlFilter===f?'on':'', onV=v=>agDlView===v?'on':'';
-  const projOpts=(typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>`<option value="${(p.name||'').replace(/"/g,'&quot;')}" ${agDlProj===p.name?'selected':''}>${p.name}</option>`).join('');
+  const projOptsArr=[['all','Все проекты']].concat((typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>[p.name,p.name]));
   let body;
   if(agDlView==='activity'){
     body = DL_ACT.length ? `<div class="act-feed">${DL_ACT.map(a=>{
@@ -2541,8 +2557,8 @@ function renderDeadlines(){
     </div>
     <div class="toolbar">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по этапу или проекту…" value="${(agDlSearch||'').replace(/"/g,'&quot;')}" oninput="setDlSearch(this.value)"></div>
-      <select class="sel" onchange="setDlProj(this.value)"><option value="all" ${agDlProj==='all'?'selected':''}>Все проекты</option>${projOpts}</select>
-      <input type="date" class="dinp" value="${agDlFrom}" onchange="setDlFrom(this.value)"><span style="color:var(--txt-3);font-size:12px">—</span><input type="date" class="dinp" value="${agDlTo}" onchange="setDlTo(this.value)">
+      ${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}
+      ${dateField('dlfrom', agDlFrom, 'От', 'setDlFrom(v)')}<span style="color:var(--txt-3);font-size:12px">—</span>${dateField('dlto', agDlTo, 'До', 'setDlTo(v)')}
       <div class="flex1"></div>
       <div class="segm">
         <button class="${onF('all')}" onclick="setDlFilter('all')">Все</button>
@@ -2901,6 +2917,8 @@ function saveProjFinance(){
 /* ——— finance helpers: hours format, filters, profit split ——— */
 function fmtHours(h){ h=Number(h)||0; if(h<=0)return '—'; const hh=Math.floor(h); const mm=Math.round((h-hh)*60); if(hh===0)return mm+'м'; if(mm===0)return hh+'ч'; return hh+'ч '+mm+'м'; }
 let finFilter='all', finSort='margin_desc';
+const FINSORT_OPTS=[['margin_desc','Маржа ↓'],['margin_asc','Маржа ↑'],['budget_desc','Бюджет ↓'],['profit_desc','Прибыль ↓'],['hours_desc','Часы ↓']];
+const FINSORT_LABEL=Object.fromEntries(FINSORT_OPTS);
 function setFinFilter(f){ finFilter=f; renderFinance(); }
 function setFinSort(s){ finSort=s; renderFinance(); }
 
@@ -3040,13 +3058,7 @@ function renderFinance(){
 
     <div class="tabs-row" style="margin-top:16px">
       <div class="segm fin-tabs">${tabsDef.map(t=>tab(t[0],t[1],t[2])).join('')}</div>
-      <select class="sel" style="min-width:130px" onchange="setFinSort(this.value)">
-        <option value="margin_desc" ${finSort==='margin_desc'?'selected':''}>Маржа ↓</option>
-        <option value="margin_asc" ${finSort==='margin_asc'?'selected':''}>Маржа ↑</option>
-        <option value="budget_desc" ${finSort==='budget_desc'?'selected':''}>Бюджет ↓</option>
-        <option value="profit_desc" ${finSort==='profit_desc'?'selected':''}>Прибыль ↓</option>
-        <option value="hours_desc" ${finSort==='hours_desc'?'selected':''}>Часы ↓</option>
-      </select>
+      ${_dd('finsort','Сортировка', FINSORT_LABEL[finSort]||'Маржа ↓', FINSORT_OPTS, finSort, 'setFinSort', true)}
     </div>
 
     ${chartProjects.length?`<div class="card" style="margin-top:14px">
@@ -3368,8 +3380,8 @@ function kbAddMat(){
     <div class="modal-h"><h3>Добавить материал</h3><p>${kbProj} · ссылка на доску или документ</p></div>
     <div class="modal-b">
       <div class="fld2">
-        <div class="fld"><label>Категория</label><select id="kb-cat">${KB_CATS.map(c=>`<option>${c}</option>`).join('')}</select></div>
-        <div class="fld"><label>Тип</label><select id="kb-ty">${Object.keys(KB_TYPES).map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="fld"><label>Категория</label>${selField('kb-cat', KB_CATS, KB_CATS[0])}</div>
+        <div class="fld"><label>Тип</label>${selField('kb-ty', Object.keys(KB_TYPES), Object.keys(KB_TYPES)[0])}</div>
       </div>
       <div class="fld"><label>Название</label><input id="kb-title" placeholder="Контент-план · июль"></div>
       <div class="fld"><label>Ссылка</label><input id="kb-url" placeholder="https://… (необязательно)"></div>
@@ -3398,13 +3410,13 @@ function kbSaveCat(){
 }
 function toolOpen(si,ii){const it=TOOLS_DATA[si].items[ii];const u=(/^https?:/i.test(it.url)?it.url:'https://'+it.url).replace(/['"<>]/g,'');window.open(u,'_blank');}
 function toolAdd(si){
-  const opts=TOOLS_DATA.map((s,i)=>`<option ${i===si?'selected':''}>${s.cat}</option>`).join('');
+  const tcats=TOOLS_DATA.map(s=>s.cat);
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Добавить инструмент</h3><p>Закладка на доску, документ или продукт</p></div>
     <div class="modal-b">
       <div class="fld2">
-        <div class="fld"><label>Категория</label><select id="tl-cat">${opts}</select></div>
-        <div class="fld"><label>Тип</label><select id="tl-ty">${Object.keys(TOOL_TYPES).map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div class="fld"><label>Категория</label>${selField('tl-cat', tcats, tcats[si]||tcats[0])}</div>
+        <div class="fld"><label>Тип</label>${selField('tl-ty', Object.keys(TOOL_TYPES), Object.keys(TOOL_TYPES)[0])}</div>
       </div>
       <div class="fld"><label>Название</label><input id="tl-name" placeholder="Miro · аналитика"></div>
       <div class="fld"><label>Ссылка</label><input id="tl-url" placeholder="miro.com/board/…"></div>
