@@ -815,6 +815,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cmb-inp:focus{border-color:var(--accent-line)}
 .cmb-list{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:2px}
 .dd-opt.cmb-new{color:var(--accent);font-weight:600}
+.cmb-row{display:flex;align-items:center;gap:2px;border-radius:7px}
+.cmb-row:hover{background:var(--bg-3)}
+.cmb-row .dd-opt{background:transparent!important}
+.cmb-del{flex:none;background:none;border:0;color:var(--txt-3);cursor:pointer;width:26px;height:30px;border-radius:6px;font-size:16px;line-height:1;opacity:0;transition:.12s}
+.cmb-row:hover .cmb-del{opacity:1}
+.cmb-del:hover{background:var(--neg-dim);color:var(--neg)}
 .cyc-list{display:flex;flex-direction:column;gap:9px}
 .cyc-it{display:flex;align-items:center;gap:13px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
 .cyc-it .pr{font-weight:600;font-size:13.5px;flex:1}
@@ -1668,6 +1674,7 @@ let PROJECTS = [
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
 let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='';
+let PROJECT_TAGS={category:[],service:[]};
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты'};
 
 function enterAgency(){
@@ -1703,14 +1710,14 @@ function pjSaveNote(i){ const p=PROJECTS[i]; if(window.LIVE&&window.tProjectUpda
 function pjTogStatus(el){[...el.parentNode.children].forEach(b=>b.classList.remove('on'));el.classList.add('on');}
 function projSettings(i){
   const p=PROJECTS[i];
-  const cats=[...new Set(PROJECTS.map(x=>x.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>a.localeCompare(b,'ru'));
-  const svcs=[...new Set(['SMM','PROD','DESIGN',...PROJECTS.map(x=>x.svc).filter(Boolean)])];
+  const cats=[...new Set([...(PROJECT_TAGS.category||[]),...PROJECTS.map(x=>x.cat).filter(c=>c&&c!=='—')])].sort((a,b)=>a.localeCompare(b,'ru'));
+  const svcs=[...new Set(['SMM','PROD','DESIGN',...(PROJECT_TAGS.service||[]),...PROJECTS.map(x=>x.svc).filter(Boolean)])];
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Настройки · ${p.name}</h3><p>Карточка проекта · теги и статус</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pj-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
-      <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай')}${tagCombo('pj-svc','Услуга (тег)',svcs,p.svc,'Выбери или создай')}</div>
+      <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}${tagCombo('pj-svc','Услуга (тег)',svcs,p.svc,'Выбери или создай','service')}</div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
         <button data-st="active" class="${p.status!=='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--accent)"></span>В работе</button>
         <button data-st="done" class="${p.status==='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--pos)"></span>Завершён</button>
@@ -1763,14 +1770,14 @@ function setAgFilter(f){agFilter=f;renderProjects();}
 
 /* ——— create project (mirrors projSettings shape) ——— */
 function openNewProject(){
-  const cats=[...new Set(PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>a.localeCompare(b,'ru'));
-  const svcs=[...new Set(['SMM','PROD','DESIGN',...PROJECTS.map(p=>p.svc).filter(Boolean)])];
+  const cats=[...new Set([...(PROJECT_TAGS.category||[]),...PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—')])].sort((a,b)=>a.localeCompare(b,'ru'));
+  const svcs=[...new Set(['SMM','PROD','DESIGN',...(PROJECT_TAGS.service||[]),...PROJECTS.map(p=>p.svc).filter(Boolean)])];
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги и услуга задаются сразу</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. Uzbek Doner"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
-      <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай')}</div>
+      <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай','service')}</div>
       <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
@@ -1801,9 +1808,9 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
 }
 function ddToggle(k){const el=document.getElementById('dd-'+k);if(!el)return;const o=el.classList.contains('open');document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));if(!o)el.classList.add('open');}
 const _attr=v=>_ddH(v).replace(/"/g,'&quot;');
-function tagCombo(id,label,options,cur,ph){
-  cur=cur||''; const opts=[...new Set((options||[]).filter(Boolean))];
-  (window._cmb=window._cmb||{})[id]=opts;
+function tagCombo(id,label,options,cur,ph,kind){
+  cur=cur||''; kind=kind||''; const opts=[...new Set((options||[]).filter(Boolean))];
+  (window._cmb=window._cmb||{})[id]={opts,kind};
   const caret='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
   return `<div class="fld"><label>${label}</label>
     <div class="dd cmb" id="cmb-${id}">
@@ -1811,30 +1818,39 @@ function tagCombo(id,label,options,cur,ph){
       <button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();cmbToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${cur?'':'color:var(--txt-3);font-weight:500'}">${cur?_ddH(cur):(ph||'Выбери или создай')}</span>${caret}</button>
       <div class="dd-menu">
         <input class="cmb-inp" id="${id}-q" placeholder="Поиск или новый тег…" autocomplete="off" oninput="cmbFilter('${id}')" onkeydown="cmbKey(event,'${id}')" onclick="event.stopPropagation()">
-        <div class="cmb-list" id="${id}-list">${cmbOptsHTML(id,opts,cur,'')}</div>
+        <div class="cmb-list" id="${id}-list">${cmbOptsHTML(id,opts,cur,'',kind)}</div>
       </div>
     </div></div>`;
 }
-function cmbOptsHTML(id,opts,cur,q){
+function cmbOptsHTML(id,opts,cur,q,kind){
   q=(q||'').trim(); const ql=q.toLowerCase();
   const filt=opts.filter(o=>!ql||o.toLowerCase().includes(ql));
   const exact=opts.some(o=>o.toLowerCase()===ql);
   const ck='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
   let h='';
-  if(q&&!exact) h+=`<button type="button" class="dd-opt cmb-new" data-v="${_attr(q)}" onclick="cmbPick('${id}',this.dataset.v)"><span>+ Создать «${_ddH(q)}»</span></button>`;
-  h+=filt.map(o=>`<button type="button" class="dd-opt ${o===cur?'on':''}" data-v="${_attr(o)}" onclick="cmbPick('${id}',this.dataset.v)">${_ddH(o)}${ck}</button>`).join('');
+  if(q&&!exact) h+=`<button type="button" class="dd-opt cmb-new" data-v="${_attr(q)}" onclick="cmbPick('${id}',this.dataset.v,true)"><span>+ Создать «${_ddH(q)}»</span></button>`;
+  h+=filt.map(o=>`<div class="cmb-row ${o===cur?'on':''}"><button type="button" class="dd-opt ${o===cur?'on':''}" style="flex:1" data-v="${_attr(o)}" onclick="cmbPick('${id}',this.dataset.v)">${_ddH(o)}${ck}</button>${kind?`<button type="button" class="cmb-del" title="Удалить тег" data-v="${_attr(o)}" onclick="event.stopPropagation();cmbDel('${id}',this.dataset.v)">×</button>`:''}</div>`).join('');
   if(!filt.length&&!q) h+='<div style="padding:8px 10px;color:var(--txt-3);font-size:12px">Тегов пока нет — введи новый</div>';
   return h;
 }
 function cmbToggle(id){ const el=document.getElementById('cmb-'+id); if(!el)return; const o=el.classList.contains('open');
   document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));
   if(!o){ el.classList.add('open'); const q=document.getElementById(id+'-q'); if(q){ q.value=''; cmbFilter(id); setTimeout(()=>q.focus(),20); } } }
-function cmbFilter(id){ const q=(document.getElementById(id+'-q')||{}).value||''; const cur=(document.getElementById(id)||{}).value||'';
-  const list=document.getElementById(id+'-list'); if(list) list.innerHTML=cmbOptsHTML(id,(window._cmb||{})[id]||[],cur,q); }
-function cmbPick(id,val){ const h=document.getElementById(id); if(h)h.value=val;
+function cmbFilter(id){ const rec=(window._cmb||{})[id]||{opts:[],kind:''};
+  const q=(document.getElementById(id+'-q')||{}).value||''; const cur=(document.getElementById(id)||{}).value||'';
+  const list=document.getElementById(id+'-list'); if(list) list.innerHTML=cmbOptsHTML(id,rec.opts,cur,q,rec.kind); }
+function cmbPick(id,val,isNew){ const rec=(window._cmb||{})[id]||{opts:[],kind:''};
+  if(isNew && rec.kind){ if(rec.opts.indexOf(val)<0) rec.opts.push(val); if(window.LIVE&&window.tTagAdd) window.tTagAdd(rec.kind,val); }
+  const hh=document.getElementById(id); if(hh)hh.value=val;
   const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=val; lbl.style.color=''; lbl.style.fontWeight=''; }
   const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open'); }
-function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const first=document.getElementById(id+'-list').querySelector('.dd-opt'); if(first)cmbPick(id,first.dataset.v); }
+function cmbDel(id,val){ const rec=(window._cmb||{})[id]||{opts:[],kind:''};
+  rec.opts=rec.opts.filter(o=>o!==val);
+  if(rec.kind && window.LIVE && window.tTagDel) window.tTagDel(rec.kind,val);
+  cmbFilter(id); }
+function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const list=document.getElementById(id+'-list');
+    const nb=list.querySelector('.cmb-new'); if(nb){ cmbPick(id,nb.dataset.v,true); return; }
+    const first=list.querySelector('.dd-opt'); if(first)cmbPick(id,first.dataset.v); }
   else if(e.key==='Escape'){ const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open'); } }
 document.addEventListener('click',e=>{if(!e.target.closest('.dd'))document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));});
 function setAgCat(v){agCat=v;renderProjects();}
@@ -3713,6 +3729,21 @@ window.tTimerPause = async (id) => { try { const t=_findTask(id); let spent=(t&&
   const {error}=await SB.from('project_tasks').update({time_spent:spent,timer_started:null}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tTimerResume = async (id) => { try { const {error}=await SB.from('project_tasks').update({timer_started:new Date().toISOString()}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 
+window.tLoadTags = async () => {
+  if (!SB) return;
+  const { data, error } = await SB.from('project_tags').select('kind,name').order('name');
+  if (error) return;   // таблицы ещё нет — молча выходим
+  const t={category:[],service:[]};
+  (data||[]).forEach(r=>{ if(t[r.kind]) t[r.kind].push(r.name); });
+  if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; }
+};
+window.tTagAdd = async (kind,name) => { try { name=(name||'').trim(); if(!name)return;
+  const { error } = await SB.from('project_tags').insert({ agency_id: ME&&ME.agency_id, kind, name });
+  if (error && !String(error.message||'').toLowerCase().includes('duplicate')) throw error;
+  await window.tLoadTags(); } catch(e){ toast('Ошибка тега: '+(e.message||e)); } };
+window.tTagDel = async (kind,name) => { try {
+  const { error } = await SB.from('project_tags').delete().eq('agency_id', ME&&ME.agency_id).eq('kind',kind).eq('name',name);
+  if (error) throw error; await window.tLoadTags(); toast('Тег удалён'); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tUploadLogo = async (file, inputId, letter) => {
   try {
     if (!SB || !file) return;
@@ -4073,7 +4104,7 @@ window.tLoadAll = async (role) => {
       SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
     PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
-    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates(); await window.tLoadOverview(); await window.tLoadCycles(); await window.tLoadTeam(); await window.tLoadFinance();
+    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates(); await window.tLoadOverview(); await window.tLoadCycles(); await window.tLoadTeam(); await window.tLoadFinance(); await window.tLoadTags();
   }
   await loadTariffs();
 };
@@ -4099,6 +4130,7 @@ function subscribeRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'stage_history'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_tasks'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'reports'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'project_tags'},onRt)
       .subscribe();
   }catch(e){ console.warn('realtime', e); }
 }
