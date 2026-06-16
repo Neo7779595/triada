@@ -876,6 +876,20 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible,.cmdk-it:focus-vis
 .ov-st{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;border:2.5px solid var(--bg-1)}
 .ov-grid thead th + th,.ov-grid tbody td + td{border-left:1px solid var(--line)}
 .ov-grid tbody td{padding-top:16px;padding-bottom:16px}
+
+/* finance cards */
+.fin-card{display:flex;align-items:center;gap:16px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:13px 16px}
+.fin-id{display:flex;align-items:center;gap:13px;flex:1;min-width:0}
+.fin-nm{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fin-stats{display:flex;gap:9px;flex:0 0 auto}
+.fin-stat{background:var(--bg-3);border:1px solid var(--line);border-radius:9px;padding:8px 13px;min-width:96px;text-align:center}
+.fin-stat .fl{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);margin-bottom:5px}
+.fin-stat .fv{font-family:var(--mono);font-size:12.5px;font-weight:600;white-space:nowrap}
+.fin-margin{background:transparent}
+.fin-gear{flex:0 0 auto;width:38px;height:38px;border-radius:9px;background:var(--bg-3);border:1px solid var(--line);color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.fin-gear:hover{color:var(--accent);border-color:var(--accent)}
+.fin-gear svg{width:17px;height:17px}
+@media(max-width:980px){.fin-card{flex-wrap:wrap}.fin-stats{flex-wrap:wrap;width:100%}}
 </style>
 </head>
 <body>
@@ -1624,10 +1638,6 @@ function projSettings(i){
         <button data-st="active" class="${p.status!=='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--accent)"></span>В работе</button>
         <button data-st="done" class="${p.status==='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--pos)"></span>Завершён</button>
       </div></div>
-      ${(typeof FINANCE!=='undefined'&&FINANCE.ready)?`<div class="fld2">
-        <div class="fld"><label>Выручка / мес · MRR (сум)</label><input id="pj-mrr" type="number" min="0" step="100000" value="${p.mrr||0}"></div>
-        <div class="fld"><label>Себестоимость / мес (сум)</label><input id="pj-cost" type="number" min="0" step="100000" value="${p.cost||0}"></div>
-      </div>`:''}
     </div>
     <div class="modal-f"><button class="btn-ghost" style="margin-right:auto;color:var(--neg)" onclick="pjDeleteProject(${i})">Удалить</button><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjSaveSettings(${i})">Сохранить</button></div></div>`);
 }
@@ -1635,9 +1645,8 @@ function pjSaveSettings(i){
   const p=PROJECTS[i];
   const b=document.querySelector('#pj-stseg button.on'); const status=b?b.dataset.st:p.status;
   const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:_v('pj-svc')||p.svc, status };
-  if(typeof FINANCE!=='undefined'&&FINANCE.ready){ patch.mrr=Math.max(0,parseInt(_v('pj-mrr'),10)||0); patch.cost=Math.max(0,parseInt(_v('pj-cost'),10)||0); }
   if(window.LIVE&&window.tProjectUpdate) return window.tProjectUpdate(p.id,patch);
-  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.status=status; if(patch.mrr!=null){p.mrr=patch.mrr;p.cost=patch.cost;}
+  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.status=status;
   pd2Close(); renderProjects(); toast('Проект обновлён');
 }
 function pjDeleteProject(i){ const p=PROJECTS[i];
@@ -2680,6 +2689,96 @@ function svgMarginBars(projs){
   });
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bars}${xl}</svg>`;
 }
+/* ——— project finance editor (in Finance window) ——— */
+let PFIN=null;
+function openProjFinance(id){
+  const list=(typeof FINANCE!=='undefined'&&FINANCE.projects)?FINANCE.projects:[];
+  const p=list.find(x=>x.id===id);
+  if(!p){ toast('Проект не найден'); return; }
+  const f=p.finance||{};
+  const arr=k=>Array.isArray(f[k])?JSON.parse(JSON.stringify(f[k])):[];
+  PFIN={ id, name:p.name, logoUrl:p.logoUrl, logo:p.logo, mrr:p.mrr||0,
+    salaries:arr('salaries'), opex:arr('opex'), projex:arr('projex'), hours:f.hours||0 };
+  pfRender();
+}
+function pfTotals(){
+  const sum=a=>a.reduce((s,r)=>s+(r.amount||0),0);
+  const s=sum(PFIN.salaries), o=sum(PFIN.opex), pr=sum(PFIN.projex);
+  const cost=s+o+pr, profit=PFIN.mrr-cost;
+  const margin=PFIN.mrr>0?Math.round(100*profit/PFIN.mrr):null;
+  return {s,o,pr,cost,profit,margin};
+}
+function pfAdd(list){ PFIN[list].push({name:'',amount:0}); pfRender(); }
+function pfDel(list,i){ PFIN[list].splice(i,1); pfRender(); }
+function pfSetName(list,i,v){ PFIN[list][i].name=v; }
+function pfSetAmt(list,i,v){ PFIN[list][i].amount=Math.max(0,parseInt(v,10)||0); pfRecalc(); }
+function pfSetMrr(v){ PFIN.mrr=Math.max(0,parseInt(v,10)||0); pfRecalc(); }
+function pfSetHours(v){ PFIN.hours=Math.max(0,parseInt(v,10)||0); }
+function pfRecalc(){ const el=document.getElementById('pf-pl'); if(el) el.innerHTML=pfPLHtml(); }
+function pfLine(lbl,val,col,indent,bold){
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:${indent?'3px 0':'7px 0'};${indent?'':'border-top:1px solid var(--line)'}">
+    <span style="font-size:${indent?'11.5px':'13px'};color:${indent?'var(--txt-3)':'var(--txt-2)'};${bold?'font-weight:700':''};padding-left:${indent?'15px':'0'}">${lbl}</span>
+    <span class="num" style="font-size:${indent?'11px':'12.5px'};color:${col};${bold?'font-weight:700':''}">${val}</span></div>`;
+}
+function pfPLHtml(){
+  const t=pfTotals(); let h='';
+  h+=pfLine('Доход (бюджет)', money(PFIN.mrr), 'var(--pos)');
+  h+=pfLine('↳ Зарплаты', t.s?'−'+money(t.s):'—', 'var(--txt-3)');
+  PFIN.salaries.forEach(r=>{ if((r.name&&r.name.trim())||r.amount) h+=pfLine(r.name||'—', money(r.amount||0), 'var(--txt-3)', true); });
+  h+=pfLine('↳ Операционные', t.o?'−'+money(t.o):'—', 'var(--txt-3)');
+  PFIN.opex.forEach(r=>{ if((r.name&&r.name.trim())||r.amount) h+=pfLine(r.name||'—', money(r.amount||0), 'var(--txt-3)', true); });
+  h+=pfLine('↳ На проект', t.pr?'−'+money(t.pr):'—', 'var(--txt-3)');
+  PFIN.projex.forEach(r=>{ if((r.name&&r.name.trim())||r.amount) h+=pfLine(r.name||'—', money(r.amount||0), 'var(--txt-3)', true); });
+  h+=pfLine('Итого расходы', money(t.cost), 'var(--neg)');
+  h+=pfLine('Маржа', (t.profit>=0?'+':'')+money(t.profit), t.profit>=0?'var(--pos)':'var(--neg)', false, true);
+  const mc=t.margin==null?'var(--txt-3)':t.margin>=50?'var(--pos)':t.margin>=25?'var(--accent)':'var(--neg)';
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2);font-weight:700">Маржинальность</span><span class="num" style="font-size:13px;color:${mc};font-weight:700">${t.margin!=null?t.margin+'%':'—'}</span></div>`;
+  return h;
+}
+function pfSection(list,title,sub,ph){
+  const rows=PFIN[list];
+  return `<div class="fld" style="margin-top:6px">
+    <label style="display:flex;justify-content:space-between;align-items:center">${title}<button class="btn-ghost" style="padding:4px 10px;font-size:11px" onclick="pfAdd('${list}')">+ Добавить</button></label>
+    ${rows.length?`<div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3);margin:0 2px 7px"><span>${sub}</span><span>сумма / мес</span></div>`:''}
+    ${rows.length?rows.map((r,i)=>`<div style="display:flex;gap:8px;margin-bottom:7px">
+      <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="${ph}" oninput="pfSetName('${list}',${i},this.value)" style="flex:1">
+      <input type="number" min="0" step="50000" value="${r.amount||0}" oninput="pfSetAmt('${list}',${i},this.value)" style="width:150px;text-align:right;font-family:var(--mono)">
+      <button class="btn-ghost" style="padding:0 12px;color:var(--neg);flex:0 0 auto" onclick="pfDel('${list}',${i})">✕</button>
+    </div>`).join(''):`<div style="font-size:12px;color:var(--txt-3);padding:2px 2px 4px">${ph}</div>`}
+  </div>`;
+}
+function pfRender(){
+  const suff=t=>`<span style="display:flex;align-items:center;padding:0 14px;background:var(--bg-3);border:1px solid var(--line);border-left:none;border-radius:0 9px 9px 0;font-size:11.5px;color:var(--txt-3);flex:0 0 auto">${t}</span>`;
+  pd2Open(`<div class="modal" style="max-width:560px">
+    <div class="modal-h" style="display:flex;align-items:center;gap:12px">
+      <div class="ov-av" style="width:40px;height:40px;border-radius:10px">${logoFill(PFIN.logoUrl,PFIN.logo)}</div>
+      <div><h3 style="margin:0">Финансы проекта</h3><p style="margin:2px 0 0;text-transform:uppercase;letter-spacing:.04em">${PFIN.name}</p></div>
+    </div>
+    <div class="modal-b" style="max-height:64vh;overflow:auto">
+      <div class="fld"><label style="display:flex;justify-content:space-between">Доход от клиента <span style="color:var(--txt-3);font-weight:400;text-transform:uppercase;font-size:9.5px;letter-spacing:.07em;align-self:center">бюджет / мес</span></label>
+        <div style="display:flex"><input id="pf-mrr" type="number" min="0" step="100000" value="${PFIN.mrr}" oninput="pfSetMrr(this.value)" style="flex:1;border-radius:9px 0 0 9px;font-family:var(--mono)">${suff('сум')}</div></div>
+      ${pfSection('salaries','Зарплаты','имя / роль','Имя сотрудника')}
+      ${pfSection('opex','Операционные расходы','статья (аренда, инструменты…)','Аренда, инструменты, реклама…')}
+      ${pfSection('projex','Расходы на проект','статья (съёмка, реквизит…)','Съёмка, реквизит, студия…')}
+      <div class="fld" style="margin-top:6px"><label>Отработанные часы</label>
+        <div style="display:flex"><input id="pf-hours" type="number" min="0" value="${PFIN.hours}" oninput="pfSetHours(this.value)" style="flex:1;border-radius:9px 0 0 9px;font-family:var(--mono)">${suff('часов')}</div></div>
+      <div class="eyebrow" style="margin:20px 0 9px">P&L — расчёт в реальном времени</div>
+      <div id="pf-pl" style="background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:6px 16px 12px">${pfPLHtml()}</div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close();PFIN=null">Отмена</button><button class="btn-add" onclick="saveProjFinance()">✓ Сохранить P&L</button></div>
+  </div>`);
+}
+function saveProjFinance(){
+  if(!PFIN) return;
+  const t=pfTotals();
+  const clean=arr=>arr.filter(r=>(r.name&&r.name.trim())||r.amount>0).map(r=>({name:(r.name||'').trim(),amount:r.amount||0}));
+  const finance={ salaries:clean(PFIN.salaries), opex:clean(PFIN.opex), projex:clean(PFIN.projex), hours:PFIN.hours||0 };
+  if(window.LIVE&&window.tProjectUpdate){ window.tProjectUpdate(PFIN.id,{mrr:PFIN.mrr,cost:t.cost,finance}); pd2Close(); PFIN=null; toast('P&L сохранён'); return; }
+  if(typeof FINANCE!=='undefined'&&FINANCE.projects){ const p=FINANCE.projects.find(x=>x.id===PFIN.id);
+    if(p){ p.mrr=PFIN.mrr; p.cost=t.cost; p.hours=PFIN.hours; p.finance=finance; p.profit=PFIN.mrr-t.cost; p.margin=PFIN.mrr>0?Math.round(100*(PFIN.mrr-t.cost)/PFIN.mrr):null; } }
+  pd2Close(); PFIN=null; renderFinance(); toast('P&L сохранён');
+}
+
 function renderFinance(){
   const F = (typeof FINANCE!=='undefined'?FINANCE:{ready:false});
 
@@ -2693,11 +2792,12 @@ function renderFinance(){
           <p style="color:var(--txt-2);font-size:13.5px;line-height:1.6;margin:0 0 16px">Чтобы здесь были настоящие цифры, а не заглушки, в таблице <code style="color:var(--accent);font-family:var(--mono)">projects</code> нужны два поля — выручка и себестоимость по каждому проекту. Никаких выдуманных сумм мы не показываем.</p>
           <div class="eyebrow" style="margin-bottom:8px">Шаг 1 · выполните SQL (Supabase → SQL Editor)</div>
           <pre style="background:var(--bg-3);border:1px solid var(--line);border-radius:9px;padding:13px 15px;font-family:var(--mono);font-size:12px;color:var(--txt);overflow:auto;line-height:1.55;margin:0 0 18px">alter table public.projects
-  add column if not exists mrr  bigint not null default 0,
-  add column if not exists cost bigint not null default 0;</pre>
-          <div class="eyebrow" style="margin-bottom:8px">Шаг 2 · впишите суммы в проекты</div>
-          <p style="color:var(--txt-2);font-size:13px;line-height:1.6;margin:0 0 6px">В Table Editor у каждого проекта заполните <b style="color:var(--txt)">mrr</b> (ежемесячная выручка, сум) и <b style="color:var(--txt)">cost</b> (себестоимость: зарплаты + расходы, сум).</p>
-          <p style="color:var(--txt-3);font-size:12.5px;line-height:1.6;margin:0">После этого MRR, прибыль, маржа, доход по услугам, P&L по проектам, концентрация и unit-экономика посчитаются автоматически и будут обновляться вживую.</p>
+  add column if not exists mrr     bigint not null default 0,
+  add column if not exists cost    bigint not null default 0,
+  add column if not exists finance jsonb  not null default '{}'::jsonb;</pre>
+          <div class="eyebrow" style="margin-bottom:8px">Шаг 2 · задайте суммы прямо в приложении</div>
+          <p style="color:var(--txt-2);font-size:13px;line-height:1.6;margin:0 0 6px">После SQL вернитесь сюда — у каждого проекта появится карточка с шестерёнкой <b style="color:var(--txt)">⚙</b>. В ней задаются доход клиента, зарплаты, операционные и проектные расходы, часы — с живым расчётом P&L.</p>
+          <p style="color:var(--txt-3);font-size:12.5px;line-height:1.6;margin:0">MRR, прибыль, маржа, доход по услугам, концентрация и unit-экономика посчитаются автоматически и обновятся вживую.</p>
         </div>
       </div>`;
     return;
@@ -2742,17 +2842,35 @@ function renderFinance(){
     </div>`:''}
 
     <div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">P&L по проектам</div></div>
-      <table>
-        <thead><tr><th>Проект</th><th>Выручка (MRR)</th><th>Себестоимость</th><th>Прибыль</th><th>Маржа</th></tr></thead>
-        <tbody>${F.projects.length?F.projects.map(p=>`<tr>
-          <td><div class="ag-name"><span class="ag-dot" style="background:${p.margin==null?'var(--txt-3)':mColor(p.margin)}"></span><div class="nm">${p.name}</div></div></td>
-          <td class="num">${p.mrr?money(p.mrr):'<span style="color:var(--txt-3)">—</span>'}</td>
-          <td class="num" style="color:${p.cost?'var(--neg)':'var(--txt-3)'}">${p.cost?money(p.cost):'—'}</td>
-          <td class="num" style="color:${p.mrr?(p.profit>=0?'var(--pos)':'var(--neg)'):'var(--txt-3)'}">${p.mrr?(p.profit>=0?'+':'')+money(p.profit):'—'}</td>
-          <td>${p.margin!=null?`<div class="eff"><span style="color:${mColor(p.margin)}">${p.margin}%</span><div class="bar"><i style="width:${Math.max(Math.min(p.margin,100),0)}%;background:${mColor(p.margin)}"></i></div></div>`:'<span style="color:var(--txt-3)">—</span>'}</td>
-        </tr>`).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--txt-3);padding:24px">Нет проектов</td></tr>'}</tbody>
-      </table>
+      <div class="card-h"><div class="t">P&L по проектам <span class="c">⚙ задать доход и расходы</span></div></div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+        ${F.projects.length?F.projects.map(p=>{
+          const has=p.mrr>0;
+          const mc = p.margin==null?'var(--txt-3)':p.margin>=50?'var(--pos)':p.margin>=25?'var(--accent)':'var(--neg)';
+          const badge = !has?'<span class="tagx" style="color:var(--txt-3)">нет бюджета</span>'
+            : p.margin<0?'<span class="badge b-susp" style="font-size:9px"><span class="bd"></span>Убыток</span>'
+            : p.margin>=50?'<span class="badge b-active" style="font-size:9px">Маржа высокая</span>'
+            : p.margin<25?'<span class="badge b-trial" style="font-size:9px">Маржа низкая</span>':'';
+          const st=(lbl,val,col)=>`<div class="fin-stat"><div class="fl">${lbl}</div><div class="fv" style="color:${col||'var(--txt)'}">${val}</div></div>`;
+          return `<div class="fin-card">
+            <div class="fin-id">
+              <div class="ov-av" style="width:42px;height:42px;border-radius:10px">${logoFill(p.logoUrl,p.logo)}</div>
+              <div style="min-width:0"><div class="fin-nm">${p.name}</div>
+                <div style="display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap">${p.cat&&p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:''}${badge}</div></div>
+            </div>
+            <div class="fin-stats">
+              ${st('Бюджет', has?money(p.mrr):'—', has?'var(--txt)':'var(--txt-3)')}
+              ${st('Расходы', p.cost?money(p.cost):'—', p.cost?'var(--neg)':'var(--txt-3)')}
+              ${st('Прибыль', has?((p.profit>=0?'+':'')+money(p.profit)):'—', has?(p.profit>=0?'var(--pos)':'var(--neg)'):'var(--txt-3)')}
+              <div class="fin-stat fin-margin" style="border-color:${p.margin==null?'var(--line)':mc}"><div class="fl">Маржа</div><div class="fv" style="color:${mc}">${p.margin!=null?p.margin+'%':'—'}</div></div>
+              ${st('Часы', p.hours?p.hours+'ч':'—', 'var(--txt-2)')}
+            </div>
+            <button class="fin-gear" onclick="openProjFinance('${p.id}')" title="Редактировать финансы проекта">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            </button>
+          </div>`;
+        }).join(''):'<div class="empty-mini">Нет проектов</div>'}
+      </div>
     </div>
 
     <div class="card" style="margin-top:16px;max-width:520px">
@@ -3628,10 +3746,12 @@ window.tLoadTeam = async () => {
 /* ===== FINANCE · live P&L from projects.mrr / projects.cost ===== */
 window.tLoadFinance = async () => {
   if (!SB) return;
-  const res = await SB.from('projects').select('id,name,service,status,mrr,cost');
-  if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost ещё не добавлены
-  const rows = (res.data||[]).map(p => ({ name:p.name, service:p.service||'Прочее', status:p.status,
-    mrr: Number(p.mrr)||0, cost: Number(p.cost)||0 }));
+  const res = await SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance');
+  if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost/finance ещё не добавлены
+  const rows = (res.data||[]).map(p => { const f=p.finance||{};
+    return { id:p.id, name:p.name, service:p.service||'Прочее', status:p.status, cat:p.category||'—',
+      logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(), logoUrl:p.logo_url||'',
+      mrr: Number(p.mrr)||0, cost: Number(p.cost)||0, hours: Number(f.hours)||0, finance:f }; });
 
   const totalMrr  = rows.reduce((s,p)=>s+p.mrr,0);
   const totalCost = rows.reduce((s,p)=>s+p.cost,0);
@@ -3655,7 +3775,8 @@ window.tLoadFinance = async () => {
   let services = so.map((n,i)=>({ name:n, amount:sm[n].amount, pct: totalMrr?Math.round(100*sm[n].amount/totalMrr):0, color:COLORS[i%COLORS.length] }));
   services.sort((a,b)=> b.amount-a.amount);
 
-  let projects = rows.map(p => ({ name:p.name, mrr:p.mrr, cost:p.cost, profit:p.mrr-p.cost,
+  let projects = rows.map(p => ({ id:p.id, name:p.name, cat:p.cat, logo:p.logo, logoUrl:p.logoUrl, status:p.status,
+    mrr:p.mrr, cost:p.cost, hours:p.hours, finance:p.finance, profit:p.mrr-p.cost,
     margin: p.mrr>0 ? Math.round(100*(p.mrr-p.cost)/p.mrr) : null }));
   projects.sort((a,b)=> b.mrr-a.mrr);
 
