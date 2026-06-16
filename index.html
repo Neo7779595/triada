@@ -890,6 +890,14 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible,.cmdk-it:focus-vis
 .fin-gear:hover{color:var(--accent);border-color:var(--accent)}
 .fin-gear svg{width:17px;height:17px}
 @media(max-width:980px){.fin-card{flex-wrap:wrap}.fin-stats{flex-wrap:wrap;width:100%}}
+
+/* where-revenue-goes report */
+.wf-row{margin-bottom:11px}
+.wf-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px}
+.wf-name{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--txt);min-width:0}
+.wf-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.wf-bar{height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden}
+.wf-bar i{display:block;height:100%;border-radius:4px}
 </style>
 </head>
 <body>
@@ -2836,6 +2844,31 @@ function renderFinance(){
       </div>`).join('')}</div>
     </div>`:''}
 
+    ${F.totalMrr>0?`<div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Куда уходит выручка <span class="c">разбивка по статьям · % от выручки</span></div></div>
+      <div class="card-body">
+        <div class="wf-row">
+          <div class="wf-top"><span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Выручка (MRR)</span><span class="num" style="color:var(--pos);font-size:13px">${money(F.totalMrr)}</span></div>
+          <div class="wf-bar"><i style="width:100%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></i></div>
+        </div>
+        <div class="eyebrow" style="margin:17px 0 9px">Расходы по статьям</div>
+        ${F.breakdown.length?F.breakdown.map(x=>`<div class="wf-row">
+          <div class="wf-top">
+            <span class="wf-name"><span class="wf-dot" style="background:${x.color}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span></span>
+            <span style="white-space:nowrap"><span class="num" style="color:var(--neg);font-size:11.5px">${x.pct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="font-size:12.5px">${money(x.amount)}</span></span>
+          </div>
+          <div class="wf-bar"><i style="width:${F.totalMrr>0?Math.min(100,x.amount/F.totalMrr*100).toFixed(2):0}%;background:${x.color}"></i></div>
+        </div>`).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 0 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте и добавьте зарплаты, операционные и проектные расходы.</div>'}
+        <div class="wf-row" style="margin-top:17px;padding-top:14px;border-top:1px solid var(--line)">
+          <div class="wf-top">
+            <span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Остаток (прибыль)</span>
+            <span style="white-space:nowrap"><span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:11.5px">${F.marginPct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:13px;font-weight:700">${money(F.profit)}</span></span>
+          </div>
+          <div class="wf-bar"><i style="width:${Math.max(0,Math.min(100,F.marginPct)).toFixed(2)}%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></i></div>
+        </div>
+      </div>
+    </div>`:''}
+
     ${withMargin.length?`<div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">Маржа по проектам <span class="c">%</span></div></div>
       <div class="card-body">${svgMarginBars(withMargin)}</div>
@@ -3780,8 +3813,28 @@ window.tLoadFinance = async () => {
     margin: p.mrr>0 ? Math.round(100*(p.mrr-p.cost)/p.mrr) : null }));
   projects.sort((a,b)=> b.mrr-a.mrr);
 
+  // —— разбивка «куда уходит выручка»: все статьи расходов из всех проектов ——
+  const CAT_LABEL = { salaries:'Зарплаты', opex:'Операционные', projex:'На проект' };
+  const CAT_COLOR = { salaries:'#8A8FFF', opex:'#E3B567', projex:'#F0785C' };
+  const bd = {};
+  rows.forEach(p => { const f=p.finance||{};
+    ['salaries','opex','projex'].forEach(cat => { (Array.isArray(f[cat])?f[cat]:[]).forEach(it => {
+      const amt = Number(it.amount)||0; if (amt<=0) return;
+      const nm = ((it.name||'—').trim())||'—';
+      const key = cat+'|'+nm.toLowerCase();
+      if (!bd[key]) bd[key] = { name:nm, cat, label:CAT_LABEL[cat], color:CAT_COLOR[cat], amount:0 };
+      bd[key].amount += amt;
+    }); });
+  });
+  let breakdown = Object.values(bd).sort((a,b)=> b.amount-a.amount)
+    .map(x => ({ ...x, pct: totalMrr>0 ? Math.round(100*x.amount/totalMrr) : 0 }));
+  // если у проекта задан cost без детализации — добиваем «Прочее», чтобы отчёт сходился
+  const shownCost = breakdown.reduce((s,x)=>s+x.amount,0);
+  const other = totalCost - shownCost;
+  if (other > 0) breakdown.push({ name:'Прочие расходы', cat:'other', label:'Прочее', color:'#5B616B', amount:other, pct: totalMrr>0?Math.round(100*other/totalMrr):0 });
+
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
-    paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop, services, projects };
+    paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop, services, projects, breakdown };
 };
 
 window.tLoadAll = async (role) => {
