@@ -2737,20 +2737,31 @@ function renderCycles(){
 /* ——— FINANCE module ——— */
 let FINANCE={ready:false};
 function svgMarginBars(projs){
-  const W=1100,H=300,padL=40,padR=16,padT=20,padB=46;
+  const W=1100,H=240,padL=46,padR=22,padT=28,padB=42;
   const iW=W-padL-padR,iH=H-padT-padB,max=80;
-  const n=projs.length,gW=iW/n,bW=Math.min(gW*0.5,180);
+  const n=Math.max(1,projs.length),gW=iW/n,bW=Math.min(gW*0.42,94);
+  const defs=`<defs>
+    <linearGradient id="mbHi" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5BEBD2"/><stop offset="1" stop-color="#37E6C8"/></linearGradient>
+    <linearGradient id="mbMid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#37E6C8"/><stop offset="1" stop-color="#2CBBA6"/></linearGradient>
+    <linearGradient id="mbLow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0785C"/><stop offset="1" stop-color="#E0566A"/></linearGradient>
+  </defs>`;
   let grid='',yl='';
-  [0,20,40,60,80].forEach(v=>{const y=padT+iH-(v/max)*iH;grid+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--line)"/>`;yl+=`<text x="${padL-7}" y="${y+3}" text-anchor="end" fill="#5B616B" font-size="9.5" font-family="ui-monospace,monospace">${v}%</text>`;});
-  let bars='',xl='';
+  [0,20,40,60,80].forEach(v=>{const y=padT+iH-(v/max)*iH;
+    grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--line)" ${v?'stroke-dasharray="3 6"':''}/>`;
+    yl+=`<text x="${padL-10}" y="${(y+3.5).toFixed(1)}" text-anchor="end" fill="#5B616B" font-size="10" font-family="ui-monospace,monospace">${v}%</text>`;});
+  let bars='';
   projs.forEach((p,i)=>{
-    const cx=padL+gW*i+gW/2,h=(Math.min(p.margin,max)/max)*iH;
-    const col=p.margin>=50?'#43D88C':p.margin>=25?'var(--accent)':'#E0566A';
-    bars+=`<rect class="c-bar" style="animation-delay:${(i*70)}ms" x="${(cx-bW/2).toFixed(1)}" y="${(padT+iH-h).toFixed(1)}" width="${bW.toFixed(1)}" height="${Math.max(h,2).toFixed(1)}" rx="4" fill="${col}"/>`;
-    bars+=`<text class="c-vlab" style="animation-delay:${(280+i*70)}ms" x="${cx.toFixed(1)}" y="${(padT+iH-h-9).toFixed(1)}" text-anchor="middle" fill="#C9CDD3" font-size="13" font-family="ui-monospace,monospace">${p.margin}%</text>`;
-    xl+=`<text x="${cx.toFixed(1)}" y="${H-padB+22}" text-anchor="middle" fill="#7A828C" font-size="11">${p.name.length>16?p.name.slice(0,15)+'…':p.name}</text>`;
+    const cx=padL+gW*i+gW/2, m=Math.min(Math.max(p.margin||0,0),max), h=(m/max)*iH;
+    const x=cx-bW/2, yTop=padT+iH-h, base=padT+iH, r=Math.min(9,bW/2,Math.max(h,0));
+    const grd=p.margin>=50?'mbHi':p.margin>=25?'mbMid':'mbLow';
+    const col=p.margin>=50?'#5BEBD2':p.margin>=25?'#37E6C8':'#E0566A';
+    bars+=`<rect x="${x.toFixed(1)}" y="${padT}" width="${bW.toFixed(1)}" height="${iH}" rx="10" fill="var(--bg-3)" opacity=".45"/>`;
+    bars+=`<path class="c-bar" style="animation-delay:${i*70}ms" d="M${x.toFixed(1)} ${base} L${x.toFixed(1)} ${(yTop+r).toFixed(1)} Q${x.toFixed(1)} ${yTop.toFixed(1)} ${(x+r).toFixed(1)} ${yTop.toFixed(1)} L${(x+bW-r).toFixed(1)} ${yTop.toFixed(1)} Q${(x+bW).toFixed(1)} ${yTop.toFixed(1)} ${(x+bW).toFixed(1)} ${(yTop+r).toFixed(1)} L${(x+bW).toFixed(1)} ${base} Z" fill="url(#${grd})"/>`;
+    bars+=`<text class="c-vlab" style="animation-delay:${280+i*70}ms" x="${cx.toFixed(1)}" y="${(yTop-11).toFixed(1)}" text-anchor="middle" fill="${col}" font-size="15" font-weight="700" font-family="ui-monospace,monospace">${p.margin}%</text>`;
+    bars+=`<text x="${cx.toFixed(1)}" y="${H-padB+24}" text-anchor="middle" fill="#9AA1AC" font-size="11.5">${p.name.length>16?p.name.slice(0,15)+'…':p.name}</text>`;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bars}${xl}</svg>`;
+  const baseLine=`<line x1="${padL}" y1="${padT+iH}" x2="${W-padR}" y2="${padT+iH}" stroke="var(--line-2)"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-height:250px;display:block" preserveAspectRatio="xMidYMid meet">${defs}${grid}${yl}${baseLine}${bars}</svg>`;
 }
 /* ——— project finance editor (in Finance window) ——— */
 let PFIN=null;
