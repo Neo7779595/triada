@@ -938,6 +938,29 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .fin-rcol{display:flex;flex-direction:column;gap:16px;min-width:0}
 .pdist-card{background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:16px}
 .pdist-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#06140f;font-size:14px;flex:0 0 auto;position:relative;overflow:hidden}
+.pe-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.pe-av{position:relative;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;overflow:hidden;color:#06140f;font-weight:700;font-size:13.5px;transition:.15s}
+.pe-av:hover{filter:brightness(1.08)}
+.pe-av .badge{position:absolute;right:-2px;bottom:-2px;width:17px;height:17px;border-radius:50%;background:var(--bg-1);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center}
+.pe-av .badge svg{width:9px;height:9px;color:var(--txt-2)}
+.pe-name{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;transition:.15s}
+.pe-name::placeholder{color:var(--txt-3)}
+.pe-name:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
+.pe-pct{display:flex;align-items:center;flex:0 0 auto;width:86px;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding-right:10px;transition:.15s}
+.pe-pct:focus-within{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
+.pe-pct input{width:100%;background:none;border:0;outline:none;color:var(--txt);font-family:var(--mono);font-size:13.5px;text-align:right;padding:10px 4px 10px 11px}
+.pe-pct span{color:var(--txt-3);font-size:12px;font-family:var(--mono)}
+.pe-del{flex:0 0 auto;width:36px;height:36px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.14s}
+.pe-del:hover{border-color:var(--neg);background:var(--neg-dim,rgba(224,86,106,.14));color:var(--neg)}
+.pe-del svg{width:14px;height:14px}
+.pe-add{width:100%;margin-top:5px;display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;border:1.5px dashed var(--line-2);border-radius:10px;padding:11px;color:var(--txt-2);font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}
+.pe-add:hover{border-color:var(--accent-line);color:var(--accent);background:var(--accent-dim)}
+.pe-add svg{width:14px;height:14px}
+.pe-sum{display:flex;flex-direction:column;gap:10px;margin-top:18px;padding-top:15px;border-top:1px solid var(--line)}
+.pe-sum-top{display:flex;justify-content:space-between;align-items:center}
+.pe-sum-top .l{font-size:12.5px;color:var(--txt-2)}
+.pe-sum-bar{height:6px;border-radius:4px;background:var(--bg-3);overflow:hidden}
+.pe-sum-bar i{display:block;height:100%;border-radius:4px;transition:width .3s var(--ease-out)}
 .pdist-nm{font-size:13.5px;font-weight:600}
 .pdist-pct{font-family:var(--mono);font-size:12px;font-weight:700;padding:3px 9px;border-radius:7px}
 .pdist-amt{font-family:var(--mono);font-size:21px;font-weight:700;margin:16px 0 12px;letter-spacing:-.3px}
@@ -2877,20 +2900,24 @@ function peDel(i){ PSEDIT.splice(i,1); peRender(); }
 function peName(i,v){ PSEDIT[i].name=v; }
 function pePct(i,v){ PSEDIT[i].pct=Math.max(0,Math.min(100,parseInt(v,10)||0)); peSum(); }
 function peSumVal(){ return PSEDIT.reduce((s,r)=>s+(r.pct||0),0); }
-function peSum(){ const el=document.getElementById('pe-sum'); if(el){ const s=peSumVal(); el.textContent=s+'%'; el.style.color=s===100?'var(--pos)':'var(--neg)'; } }
+function peSum(){ const s=peSumVal(); const el=document.getElementById('pe-sum'); if(el){ el.textContent=s+'%'; el.style.color=s===100?'var(--pos)':s>100?'var(--neg)':'var(--warn)'; } const bar=document.getElementById('pe-sum-bar'); if(bar){ bar.style.width=Math.min(100,s)+'%'; bar.style.background=s>100?'var(--neg)':'linear-gradient(90deg,#43D88C,#37E6C8)'; } }
 function peRender(){
   const sum=peSumVal();
-  pd2Open(`<div class="modal" style="max-width:520px">
+  const sumCol = sum===100?'var(--pos)':sum>100?'var(--neg)':'var(--warn)';
+  pd2Open(`<div class="modal" style="max-width:540px">
     <div class="modal-h"><h3>Распределение чистой прибыли</h3><p>Кому и сколько % от прибыли · сумма долей должна быть 100%</p></div>
     <div class="modal-b">
-      ${PSEDIT.map((r,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-        <label style="position:relative;width:36px;height:36px;border-radius:50%;background:${r.color};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;overflow:hidden;color:#06140f;font-weight:700;font-size:13px" title="Загрузить фото">${r.avatar?`<img src="${r.avatar}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`:((r.name||'?')[0]||'?').toUpperCase()}<input type="file" accept="image/*" style="display:none" onchange="if(this.files&&this.files[0])tUploadPartnerAvatar(this.files[0],${i})"><span style="position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:50%;background:var(--bg-1);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="var(--txt-2)" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg></span></label>
-        <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Имя / статья (напр. Партнёр, Благотворительность)" oninput="peName(${i},this.value)" style="flex:1">
-        <input type="number" min="0" max="100" value="${r.pct}" oninput="pePct(${i},this.value)" style="width:78px;text-align:right;font-family:var(--mono)"><span style="color:var(--txt-3);font-size:12px">%</span>
-        <button class="btn-ghost" style="padding:0 11px;color:var(--neg);flex:0 0 auto" onclick="peDel(${i})">✕</button>
+      ${PSEDIT.map((r,i)=>`<div class="pe-row">
+        <label class="pe-av" style="background:${r.color}" title="Загрузить фото">${r.avatar?`<img src="${r.avatar}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`:((r.name||'?')[0]||'?').toUpperCase()}<input type="file" accept="image/*" style="display:none" onchange="if(this.files&&this.files[0])tUploadPartnerAvatar(this.files[0],${i})"><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></label>
+        <input class="pe-name" value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Имя или статья (Партнёр, Резерв…)" oninput="peName(${i},this.value)">
+        <div class="pe-pct"><input type="number" min="0" max="100" value="${r.pct}" oninput="pePct(${i},this.value)"><span>%</span></div>
+        <button class="pe-del" title="Удалить" onclick="peDel(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       </div>`).join('')}
-      <button class="btn-ghost" style="font-size:12px;margin-top:4px" onclick="peAdd()">+ Добавить участника</button>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:13px;border-top:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2)">Сумма долей</span><span id="pe-sum" class="num" style="font-weight:700;color:${sum===100?'var(--pos)':'var(--neg)'}">${sum}%</span></div>
+      <button class="pe-add" onclick="peAdd()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить участника</button>
+      <div class="pe-sum">
+        <div class="pe-sum-top"><span class="l">Сумма долей</span><span id="pe-sum" class="num" style="font-weight:700;color:${sumCol}">${sum}%</span></div>
+        <div class="pe-sum-bar"><i id="pe-sum-bar" style="width:${Math.min(100,sum)}%;background:${sum>100?'var(--neg)':'linear-gradient(90deg,#43D88C,#37E6C8)'}"></i></div>
+      </div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close();PSEDIT=null">Отмена</button><button class="btn-add" onclick="savePSplit()">Сохранить</button></div>
   </div>`);
