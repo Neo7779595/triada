@@ -902,6 +902,28 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible,.cmdk-it:focus-vis
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
+
+/* finance reference layout */
+.fin-top{display:grid;grid-template-columns:repeat(4,1fr);background:linear-gradient(135deg,rgba(227,181,103,.08),rgba(55,230,200,.04) 60%,transparent);border:1px solid var(--line);border-radius:16px;margin-top:16px;overflow:hidden}
+.fin-tcard{padding:21px 24px;border-right:1px solid var(--line)}
+.fin-tcard:last-child{border-right:none}
+.fin-tcard .tl{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--txt-3);margin-bottom:12px}
+.fin-tcard .tv{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.5px;line-height:1.05}
+.fin-tcard .ts{font-size:12px;color:var(--txt-3);margin-top:8px}
+.fin-tcard .tf{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:16px;padding-top:13px;border-top:1px solid var(--line)}
+.fin-tabs{flex-wrap:wrap}
+.fin-tabs button b{color:var(--accent);font-weight:700;margin-left:2px}
+.fin-tabs button.on b{color:inherit}
+.fin-2col{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-top:16px;align-items:start}
+.pdist-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.pdist-card{background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:16px}
+.pdist-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#06140f;font-size:14px;flex:0 0 auto}
+.pdist-nm{font-size:13.5px;font-weight:600}
+.pdist-pct{font-family:var(--mono);font-size:12px;font-weight:700;padding:3px 9px;border-radius:7px}
+.pdist-amt{font-family:var(--mono);font-size:21px;font-weight:700;margin:16px 0 12px;letter-spacing:-.3px}
+.pdist-bar{height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden}
+.pdist-bar i{display:block;height:100%;border-radius:3px}
+@media(max-width:1180px){.fin-top{grid-template-columns:repeat(2,1fr)}.fin-tcard:nth-child(2){border-right:none}.fin-tcard:nth-child(1),.fin-tcard:nth-child(2){border-bottom:1px solid var(--line)}.fin-2col{grid-template-columns:1fr}.pdist-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -2791,6 +2813,50 @@ function saveProjFinance(){
   pd2Close(); PFIN=null; renderFinance(); toast('P&L сохранён');
 }
 
+/* ——— finance helpers: hours format, filters, profit split ——— */
+function fmtHours(h){ h=Number(h)||0; if(h<=0)return '—'; const hh=Math.floor(h); const mm=Math.round((h-hh)*60); if(hh===0)return mm+'м'; if(mm===0)return hh+'ч'; return hh+'ч '+mm+'м'; }
+let finFilter='all', finSort='margin_desc';
+function setFinFilter(f){ finFilter=f; renderFinance(); }
+function setFinSort(s){ finSort=s; renderFinance(); }
+
+/* profit distribution (agency-level, stored locally per agency) */
+const PS_COLORS=['#37E6C8','#E3B567','#8A8FFF','#F0785C','#43D88C','#5BC8F5'];
+let PSPLIT_CACHE=null, PSEDIT=null;
+function psKey(){ const me=(window.tMe&&window.tMe())||{}; return 'triada_psplit_'+(me.agencySlug||'default'); }
+function psLoad(){ if(PSPLIT_CACHE)return PSPLIT_CACHE; let a=[]; try{ const r=localStorage.getItem(psKey()); if(r)a=JSON.parse(r); }catch(e){} if(!Array.isArray(a))a=[]; PSPLIT_CACHE=a; return a; }
+function psSave(a){ PSPLIT_CACHE=a; try{ localStorage.setItem(psKey(),JSON.stringify(a)); }catch(e){} }
+function openProfitSplit(){ PSEDIT=JSON.parse(JSON.stringify(psLoad())); if(!PSEDIT.length)PSEDIT=[{name:'',pct:100,color:PS_COLORS[0]}]; peRender(); }
+function peAdd(){ PSEDIT.push({name:'',pct:0,color:PS_COLORS[PSEDIT.length%PS_COLORS.length]}); peRender(); }
+function peDel(i){ PSEDIT.splice(i,1); peRender(); }
+function peName(i,v){ PSEDIT[i].name=v; }
+function pePct(i,v){ PSEDIT[i].pct=Math.max(0,Math.min(100,parseInt(v,10)||0)); peSum(); }
+function peSumVal(){ return PSEDIT.reduce((s,r)=>s+(r.pct||0),0); }
+function peSum(){ const el=document.getElementById('pe-sum'); if(el){ const s=peSumVal(); el.textContent=s+'%'; el.style.color=s===100?'var(--pos)':'var(--neg)'; } }
+function peRender(){
+  const sum=peSumVal();
+  pd2Open(`<div class="modal" style="max-width:520px">
+    <div class="modal-h"><h3>Распределение чистой прибыли</h3><p>Кому и сколько % от прибыли · сумма долей должна быть 100%</p></div>
+    <div class="modal-b">
+      ${PSEDIT.map((r,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+        <span style="width:11px;height:11px;border-radius:50%;background:${r.color};flex:0 0 auto"></span>
+        <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Имя / статья (напр. Партнёр, Благотворительность)" oninput="peName(${i},this.value)" style="flex:1">
+        <input type="number" min="0" max="100" value="${r.pct}" oninput="pePct(${i},this.value)" style="width:78px;text-align:right;font-family:var(--mono)"><span style="color:var(--txt-3);font-size:12px">%</span>
+        <button class="btn-ghost" style="padding:0 11px;color:var(--neg);flex:0 0 auto" onclick="peDel(${i})">✕</button>
+      </div>`).join('')}
+      <button class="btn-ghost" style="font-size:12px;margin-top:4px" onclick="peAdd()">+ Добавить участника</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:13px;border-top:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2)">Сумма долей</span><span id="pe-sum" class="num" style="font-weight:700;color:${sum===100?'var(--pos)':'var(--neg)'}">${sum}%</span></div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close();PSEDIT=null">Отмена</button><button class="btn-add" onclick="savePSplit()">Сохранить</button></div>
+  </div>`);
+}
+function savePSplit(){
+  if(!PSEDIT)return;
+  if(peSumVal()!==100){ toast('Сумма долей должна быть ровно 100%'); return; }
+  const clean=PSEDIT.filter(r=>r.name&&r.name.trim()).map(r=>({name:r.name.trim(),pct:r.pct||0,color:r.color}));
+  if(!clean.length){ toast('Добавьте хотя бы одного участника'); return; }
+  psSave(clean); PSEDIT=null; pd2Close(); renderFinance(); toast('Распределение прибыли сохранено');
+}
+
 function renderFinance(){
   const F = (typeof FINANCE!=='undefined'?FINANCE:{ready:false});
 
@@ -2817,77 +2883,97 @@ function renderFinance(){
 
   const noData = F.totalMrr===0;
   const mColor = m => m==null?'var(--txt-3)':m>=50?'var(--pos)':m>=25?'var(--accent)':'var(--neg)';
-  const withMargin = F.projects.filter(p=>p.margin!=null);
+
+  const med = (()=>{ const hs=F.projects.filter(p=>p.hours>0).map(p=>p.hours).sort((a,b)=>a-b); if(!hs.length)return 0; const m=Math.floor(hs.length/2); return hs.length%2?hs[m]:(hs[m-1]+hs[m])/2; })();
+  const cpct = p => p.mrr>0 ? (p.cost/p.mrr)*100 : 0;
+  const PASS = { all:()=>true,
+    profitable:p=>p.margin!=null&&p.margin>=40,
+    lowhours:p=>p.hours>0&&p.hours<=med,
+    atrisk:p=>p.mrr>0&&p.margin!=null&&p.margin<25,
+    costly:p=>p.mrr>0&&cpct(p)>=75,
+    nobudget:p=>!(p.mrr>0) };
+  const cnt = k => F.projects.filter(PASS[k]).length;
+  const SORT = { margin_desc:(a,b)=>((b.margin==null?-1:b.margin)-(a.margin==null?-1:a.margin)),
+    margin_asc:(a,b)=>((a.margin==null?999:a.margin)-(b.margin==null?999:b.margin)),
+    budget_desc:(a,b)=>b.mrr-a.mrr, profit_desc:(a,b)=>b.profit-a.profit, hours_desc:(a,b)=>(b.hours||0)-(a.hours||0) };
+  let cards = F.projects.filter(PASS[finFilter]||PASS.all).slice().sort(SORT[finSort]||SORT.margin_desc);
+  const chartProjects = cards.filter(p=>p.margin!=null);
+
+  const split = psLoad();
+  const distBase = F.profit>0?F.profit:0;
+  let pdistHtml='';
+  if(F.profit>0){
+    pdistHtml = split.length
+      ? '<div class="pdist-grid">'+split.map(s=>{ const amt=Math.round(distBase*s.pct/100);
+          return `<div class="pdist-card" style="border-top:2px solid ${s.color}">`
+            +`<div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="display:flex;align-items:center;gap:11px"><span class="pdist-av" style="background:${s.color}">${((s.name||'?')[0]||'?').toUpperCase()}</span><div class="pdist-nm">${s.name}</div></div><span class="pdist-pct" style="background:${s.color}26;color:${s.color}">${s.pct}%</span></div>`
+            +`<div class="pdist-amt" style="color:${s.color}">+${money(amt)}</div>`
+            +`<div class="pdist-bar"><i style="width:${s.pct}%;background:${s.color}"></i></div></div>`;
+        }).join('')+'</div>'
+      : '<div class="card"><div class="card-body" style="text-align:center;color:var(--txt-3);font-size:13px;padding:22px">Распределение не настроено. Нажмите «⚙ Настроить %», чтобы задать доли между партнёрами.</div></div>';
+  }
+  const tabsDef=[['all','Все',''],['profitable','Выгодные','🏆'],['lowhours','Мин. часов','⚡'],['atrisk','At-Risk','⚠'],['costly','Затратные','💸'],['nobudget','Без бюджета','']];
+  const tab=(k,lbl,ic)=>`<button class="${finFilter===k?'on':''}" onclick="setFinFilter('${k}')">${ic?ic+' ':''}${lbl} <b>${cnt(k)}</b></button>`;
 
   document.getElementById('content-ag').innerHTML=`
     <div class="ph"><div><div class="eyebrow">Агентство · P&L</div><h1>Финансы</h1>
-    <div class="s">Выручка, себестоимость и прибыль по портфелю. Считается из сумм, заданных в проектах.</div></div></div>
+    <div class="s">Полная экономика портфеля: выручка, расходы, прибыль, маржа и распределение.</div></div></div>
 
-    ${noData?`<div class="card" style="margin-top:16px;border-color:var(--warn)"><div class="card-body" style="display:flex;align-items:center;gap:11px"><span style="color:var(--warn);font-size:18px">⚠</span><div style="font-size:13px;color:var(--txt-2)">Поля <b>mrr</b>/<b>cost</b> добавлены, но суммы ещё не заполнены. Впишите выручку и себестоимость в проекты (Table Editor) — и цифры оживут.</div></div></div>`:''}
+    ${noData?`<div class="card" style="margin-top:16px;border-color:var(--warn)"><div class="card-body" style="display:flex;align-items:center;gap:11px"><span style="color:var(--warn);font-size:18px">⚠</span><div style="font-size:13px;color:var(--txt-2)">Поля добавлены, но суммы ещё не заданы. Откройте ⚙ на проекте и впишите доход и расходы — цифры оживут.</div></div></div>`:''}
 
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-top:16px">
-      <div class="kpi"><div class="l">MRR портфеля</div><div class="v num">${money(F.totalMrr)}</div><div class="sub">выручка в месяц</div><div class="kfoot">${F.paying} платящих из ${F.total}</div></div>
-      <div class="kpi"><div class="l">Себестоимость</div><div class="v num" style="color:var(--neg)">${money(F.totalCost)}</div><div class="sub">зарплаты · расходы</div><div class="kfoot">${F.costPct}% от выручки</div></div>
-      <div class="kpi"><div class="l">Чистая прибыль</div><div class="v num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'}">${F.profit>=0?'+':''}${money(F.profit)}</div><div class="sub">маржа ${F.marginPct}%</div><div class="kfoot" style="padding-top:13px"><div style="height:4px;background:var(--bg-3);border-radius:2px;overflow:hidden"><div style="width:${Math.max(Math.min(F.marginPct,100),0)}%;height:100%;background:${F.profit>=0?'var(--pos)':'var(--neg)'}"></div></div></div></div>
-      <div class="kpi"><div class="l">Платящих клиентов</div><div class="v num">${F.paying}</div><div class="sub">с выручкой > 0</div><div class="kfoot">всего проектов: ${F.total}</div></div>
+    <div class="fin-top">
+      <div class="fin-tcard"><div class="tl">MRR агентства</div><div class="tv">${money(F.totalMrr)}</div><div class="ts">выручка в месяц</div><div class="tf">${F.paying} ${F.paying===1?'клиент':'клиентов'}</div></div>
+      <div class="fin-tcard"><div class="tl">Расходы</div><div class="tv" style="color:var(--neg)">${money(F.totalCost)}</div><div class="ts">зарплаты · opex · проект</div><div class="tf">${F.costPct}% от выручки</div></div>
+      <div class="fin-tcard"><div class="tl">Чистая прибыль</div><div class="tv" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'}">${F.profit>=0?'+':''}${money(F.profit)}</div><div class="ts">маржинальность ${F.marginPct}%</div><div class="tf" style="border:none;padding-top:14px"><div style="height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div style="width:${Math.max(0,Math.min(100,F.marginPct))}%;height:100%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></div></div></div></div>
+      <div class="fin-tcard"><div class="tl">Время</div><div class="tv" style="color:var(--accent)">${fmtHours(F.totalHours)}</div><div class="ts">часов отработано</div><div class="tf">по проектам</div></div>
     </div>
 
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Средний чек</div><div class="v num">${money(F.avgMrr)}</div><div class="sub">выручка на клиента</div></div>
-      <div class="kpi"><div class="l">Маржа портфеля</div><div class="v num" style="color:${mColor(F.marginPct)}">${F.marginPct}<span class="u">%</span></div><div class="sub">прибыль ÷ выручка</div></div>
-      <div class="kpi"><div class="l">Концентрация</div><div class="v num" style="color:${F.concentrationPct>=50?'var(--neg)':F.concentrationPct>=30?'var(--warn)':'var(--txt)'}">${F.concentrationPct}<span class="u">%</span></div><div class="sub">${F.concentrationTop} · топ-клиент</div></div>
-      <div class="kpi"><div class="l">Доля себестоимости</div><div class="v num">${F.costPct}<span class="u">%</span></div><div class="sub">cost ÷ выручка</div></div>
+    <div class="kpis" style="grid-template-columns:repeat(5,1fr);margin-top:14px">
+      <div class="kpi"><div class="l">Выручка / час</div><div class="v num">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="sub">сум за час работы</div></div>
+      <div class="kpi"><div class="l">Runway</div><div class="v" style="font-size:19px;font-weight:700;color:${F.profit>=0?'var(--pos)':'var(--neg)'};margin-top:6px">${F.profit>=0?'Стабильно':'Дефицит'}</div><div class="sub">${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div></div>
+      <div class="kpi"><div class="l">Concentration risk</div><div class="v num" style="color:${F.concentrationPct>=50?'var(--neg)':F.concentrationPct>=30?'var(--warn)':'var(--txt)'}">${F.concentrationPct}<span class="u">%</span></div><div class="sub">${F.concentrationTop}</div></div>
+      <div class="kpi"><div class="l">Break-even</div><div class="v num">${money(F.totalCost)}</div><div class="sub">минимум для нулевой прибыли</div></div>
+      <div class="kpi"><div class="l">EBITDA margin</div><div class="v num" style="color:${mColor(F.marginPct)}">${F.marginPct}<span class="u">%</span></div><div class="sub">операционная эффективность</div></div>
     </div>
 
     ${F.services.length?`<div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">Доход по услугам</div><div class="m">${money(F.totalMrr)} / мес</div></div>
-      <div class="card-body">${F.services.map(s=>`<div class="ld-row">
-        <div class="ld-name" style="width:190px">${s.name}</div>
-        <div class="ld-bar"><i style="width:${s.pct}%;background:${s.color}"></i></div>
-        <div style="flex:0 0 auto;text-align:right;min-width:170px"><span class="num" style="font-size:12.5px">${money(s.amount)}</span> <span class="num" style="color:var(--txt-3);font-size:11px">${s.pct}%</span></div>
-      </div>`).join('')}</div>
-    </div>`:''}
-
-    ${F.totalMrr>0?`<div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Куда уходит выручка <span class="c">разбивка по статьям · % от выручки</span></div></div>
       <div class="card-body">
-        <div class="wf-row">
-          <div class="wf-top"><span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Выручка (MRR)</span><span class="num" style="color:var(--pos);font-size:13px">${money(F.totalMrr)}</span></div>
-          <div class="wf-bar"><i style="width:100%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></i></div>
-        </div>
-        <div class="eyebrow" style="margin:17px 0 9px">Расходы по статьям</div>
-        ${F.breakdown.length?F.breakdown.map(x=>`<div class="wf-row">
-          <div class="wf-top">
-            <span class="wf-name"><span class="wf-dot" style="background:${x.color}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span></span>
-            <span style="white-space:nowrap"><span class="num" style="color:var(--neg);font-size:11.5px">${x.pct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="font-size:12.5px">${money(x.amount)}</span></span>
-          </div>
-          <div class="wf-bar"><i style="width:${F.totalMrr>0?Math.min(100,x.amount/F.totalMrr*100).toFixed(2):0}%;background:${x.color}"></i></div>
-        </div>`).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 0 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте и добавьте зарплаты, операционные и проектные расходы.</div>'}
-        <div class="wf-row" style="margin-top:17px;padding-top:14px;border-top:1px solid var(--line)">
-          <div class="wf-top">
-            <span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Остаток (прибыль)</span>
-            <span style="white-space:nowrap"><span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:11.5px">${F.marginPct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:13px;font-weight:700">${money(F.profit)}</span></span>
-          </div>
-          <div class="wf-bar"><i style="width:${Math.max(0,Math.min(100,F.marginPct)).toFixed(2)}%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></i></div>
-        </div>
+        ${F.services.map(s=>`<div class="ld-row">
+          <div class="ld-name" style="width:200px">${s.name}</div>
+          <div class="ld-bar"><i style="width:${s.pct}%;background:${s.color}"></i></div>
+          <div style="flex:0 0 auto;text-align:right;min-width:175px"><span class="num" style="font-size:12.5px">${money(s.amount)}</span> <span class="num" style="color:var(--txt-3);font-size:11px">${s.pct}%</span></div>
+        </div>`).join('')}
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)">${F.services.map(s=>`<span style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt-3)"><span style="width:9px;height:9px;border-radius:2px;background:${s.color}"></span>${s.name} · ${s.count} пр.</span>`).join('')}</div>
       </div>
     </div>`:''}
 
-    ${withMargin.length?`<div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Маржа по проектам <span class="c">%</span></div></div>
-      <div class="card-body">${svgMarginBars(withMargin)}</div>
+    <div class="tabs-row" style="margin-top:16px">
+      <div class="segm fin-tabs">${tabsDef.map(t=>tab(t[0],t[1],t[2])).join('')}</div>
+      <select class="sel" style="min-width:130px" onchange="setFinSort(this.value)">
+        <option value="margin_desc" ${finSort==='margin_desc'?'selected':''}>Маржа ↓</option>
+        <option value="margin_asc" ${finSort==='margin_asc'?'selected':''}>Маржа ↑</option>
+        <option value="budget_desc" ${finSort==='budget_desc'?'selected':''}>Бюджет ↓</option>
+        <option value="profit_desc" ${finSort==='profit_desc'?'selected':''}>Прибыль ↓</option>
+        <option value="hours_desc" ${finSort==='hours_desc'?'selected':''}>Часы ↓</option>
+      </select>
+    </div>
+
+    ${chartProjects.length?`<div class="card" style="margin-top:14px">
+      <div class="card-h"><div class="t">Маржинальность по проектам <span class="c">%</span></div></div>
+      <div class="card-body">${svgMarginBars(chartProjects)}</div>
     </div>`:''}
 
     <div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">P&L по проектам <span class="c">⚙ задать доход и расходы</span></div></div>
       <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
-        ${F.projects.length?F.projects.map(p=>{
+        ${cards.length?cards.map(p=>{
           const has=p.mrr>0;
-          const mc = p.margin==null?'var(--txt-3)':p.margin>=50?'var(--pos)':p.margin>=25?'var(--accent)':'var(--neg)';
+          const mc = mColor(p.margin);
           const badge = !has?'<span class="tagx" style="color:var(--txt-3)">нет бюджета</span>'
             : p.margin<0?'<span class="badge b-susp" style="font-size:9px"><span class="bd"></span>Убыток</span>'
-            : p.margin>=50?'<span class="badge b-active" style="font-size:9px">Маржа высокая</span>'
-            : p.margin<25?'<span class="badge b-trial" style="font-size:9px">Маржа низкая</span>':'';
+            : p.margin>=50?'<span class="badge b-active" style="font-size:9px">Апсел ↑</span>'
+            : p.margin<25?'<span class="badge b-susp" style="font-size:9px"><span class="bd"></span>At-Risk</span>':'';
           const st=(lbl,val,col)=>`<div class="fin-stat"><div class="fl">${lbl}</div><div class="fv" style="color:${col||'var(--txt)'}">${val}</div></div>`;
           return `<div class="fin-card">
             <div class="fin-id">
@@ -2900,26 +2986,42 @@ function renderFinance(){
               ${st('Расходы', p.cost?money(p.cost):'—', p.cost?'var(--neg)':'var(--txt-3)')}
               ${st('Прибыль', has?((p.profit>=0?'+':'')+money(p.profit)):'—', has?(p.profit>=0?'var(--pos)':'var(--neg)'):'var(--txt-3)')}
               <div class="fin-stat fin-margin" style="border-color:${p.margin==null?'var(--line)':mc}"><div class="fl">Маржа</div><div class="fv" style="color:${mc}">${p.margin!=null?p.margin+'%':'—'}</div></div>
-              ${st('Часы', p.hours?p.hours+'ч':'—', 'var(--txt-2)')}
+              ${st('Часы', p.hours?fmtHours(p.hours):'—', 'var(--txt-2)')}
             </div>
             <button class="fin-gear" onclick="openProjFinance('${p.id}')" title="Редактировать финансы проекта">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
             </button>
           </div>`;
-        }).join(''):'<div class="empty-mini">Нет проектов</div>'}
+        }).join(''):'<div class="empty-mini">Нет проектов в этой категории</div>'}
       </div>
     </div>
 
-    <div class="card" style="margin-top:16px;max-width:520px">
-      <div class="card-h"><div class="t">Unit-экономика <span class="c">на клиента</span></div></div>
-      <div class="card-body">
-        ${[
-          ['Выручка на клиента', money(F.avgMrr), 'var(--txt)'],
-          ['Себестоимость на клиента', money(F.avgCost), 'var(--neg)'],
-          ['Прибыль на клиента', (F.avgProfit>=0?'+':'')+money(F.avgProfit), F.avgProfit>=0?'var(--pos)':'var(--neg)'],
-        ].map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2)">${u[0]}</span><span class="num" style="color:${u[2]};font-size:13px">${u[1]}</span></div>`).join('')}
+    <div class="fin-2col">
+      <div class="card">
+        <div class="card-h"><div class="t">Куда уходит выручка <span class="c">% от выручки</span></div></div>
+        <div class="card-body">
+          <div class="wf-row"><div class="wf-top"><span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Выручка (MRR)</span><span class="num" style="color:var(--pos);font-size:13px">${money(F.totalMrr)}</span></div><div class="wf-bar"><i style="width:100%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></i></div></div>
+          <div class="eyebrow" style="margin:17px 0 9px">Расходы по статьям</div>
+          ${F.breakdown.length?F.breakdown.map(x=>`<div class="wf-row">
+            <div class="wf-top"><span class="wf-name"><span class="wf-dot" style="background:${x.color}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span></span>
+              <span style="white-space:nowrap"><span class="num" style="color:var(--neg);font-size:11.5px">${x.pct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="font-size:12.5px">${money(x.amount)}</span></span></div>
+            <div class="wf-bar"><i style="width:${F.totalMrr>0?Math.min(100,x.amount/F.totalMrr*100).toFixed(2):0}%;background:${x.color}"></i></div>
+          </div>`).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 0 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте.</div>'}
+          <div class="wf-row" style="margin-top:17px;padding-top:14px;border-top:1px solid var(--line)"><div class="wf-top"><span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Остаток (прибыль)</span><span style="white-space:nowrap"><span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:11.5px">${F.marginPct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:13px;font-weight:700">${money(F.profit)}</span></span></div><div class="wf-bar"><i style="width:${Math.max(0,Math.min(100,F.marginPct)).toFixed(2)}%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></i></div></div>
+        </div>
       </div>
-    </div>`;
+      <div class="card">
+        <div class="card-h"><div class="t">Unit Economics <span class="c">на клиента</span></div></div>
+        <div class="card-body">
+          ${[['Выручка на клиента', money(F.avgMrr),'var(--txt)'],['Расходы на клиента', money(F.avgCost),'var(--neg)'],['Прибыль на клиента', (F.avgProfit>=0?'+':'')+money(F.avgProfit), F.avgProfit>=0?'var(--pos)':'var(--neg)'],['Часы на клиента', fmtHours(F.avgHours),'var(--txt-2)']].map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2)">${u[0]}</span><span class="num" style="color:${u[2]};font-size:13px">${u[1]}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${F.profit>0?`<div style="margin-top:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="eyebrow">Распределение чистой прибыли</div><button class="btn-ghost" style="font-size:11px;padding:6px 13px" onclick="openProfitSplit()">⚙ Настроить %</button></div>
+      ${pdistHtml}
+    </div>`:''}`;
 }
 
 /* ——— TEAM module ——— */
@@ -3808,8 +3910,8 @@ window.tLoadFinance = async () => {
 
   const COLORS = ['#37E6C8','#8A8FFF','#F0785C','#E3B567','#43D88C','#5BC8F5'];
   const sm = {}, so = [];
-  rows.forEach(p => { if (p.mrr<=0) return; if (!sm[p.service]){ sm[p.service]={amount:0}; so.push(p.service); } sm[p.service].amount += p.mrr; });
-  let services = so.map((n,i)=>({ name:n, amount:sm[n].amount, pct: totalMrr?Math.round(100*sm[n].amount/totalMrr):0, color:COLORS[i%COLORS.length] }));
+  rows.forEach(p => { if (p.mrr<=0) return; if (!sm[p.service]){ sm[p.service]={amount:0,count:0}; so.push(p.service); } sm[p.service].amount += p.mrr; sm[p.service].count++; });
+  let services = so.map((n,i)=>({ name:n, amount:sm[n].amount, count:sm[n].count, pct: totalMrr?Math.round(100*sm[n].amount/totalMrr):0, color:COLORS[i%COLORS.length] }));
   services.sort((a,b)=> b.amount-a.amount);
 
   let projects = rows.map(p => ({ id:p.id, name:p.name, cat:p.cat, logo:p.logo, logoUrl:p.logoUrl, status:p.status,
@@ -3837,8 +3939,12 @@ window.tLoadFinance = async () => {
   const other = totalCost - shownCost;
   if (other > 0) breakdown.push({ name:'Прочие расходы', cat:'other', label:'Прочее', color:'#5B616B', amount:other, pct: totalMrr>0?Math.round(100*other/totalMrr):0 });
 
+  const totalHours = rows.reduce((s,p)=>s+(Number(p.hours)||0),0);
+  const avgHours = paying ? Math.round(totalHours/paying) : 0;
+  const revPerHour = totalHours>0 ? Math.round(totalMrr/totalHours) : 0;
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
-    paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop, services, projects, breakdown };
+    paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop,
+    totalHours, avgHours, revPerHour, services, projects, breakdown };
 };
 
 window.tLoadAll = async (role) => {
