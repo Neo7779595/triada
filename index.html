@@ -2954,11 +2954,12 @@ function renderFinance(){
       <div class="fin-tcard"><div class="tl">MRR агентства</div><div class="tv">${money(F.totalMrr)}</div><div class="ts">выручка в месяц</div><div class="tf">${F.paying} ${F.paying===1?'клиент':'клиентов'}</div></div>
       <div class="fin-tcard"><div class="tl">Расходы</div><div class="tv" style="color:var(--neg)">${money(F.totalCost)}</div><div class="ts">зарплаты · opex · проект</div><div class="tf">${F.costPct}% от выручки</div></div>
       <div class="fin-tcard"><div class="tl">Чистая прибыль</div><div class="tv" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'}">${F.profit>=0?'+':''}${money(F.profit)}</div><div class="ts">маржинальность ${F.marginPct}%</div><div class="tf" style="border:none;padding-top:14px"><div style="height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div style="width:${Math.max(0,Math.min(100,F.marginPct))}%;height:100%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></div></div></div></div>
-      <div class="fin-tcard"><div class="tl">Время</div><div class="tv" style="color:var(--accent)">${fmtHours(F.totalHours)}</div><div class="ts">часов отработано</div><div class="tf">по проектам</div></div>
+      <div class="fin-tcard"><div class="tl">Время</div><div class="tv" style="color:var(--accent)">${fmtHours(F.totalHours)}</div><div class="ts">часов по таймеру</div><div class="tf">${F.profitPerHour?money(F.profitPerHour)+' / час прибыли':'из канбана'}</div></div>
     </div>
 
-    <div class="kpis" style="grid-template-columns:repeat(5,1fr);margin-top:14px">
+    <div class="kpis" style="grid-template-columns:repeat(6,1fr);margin-top:14px">
       <div class="kpi"><div class="l">Выручка / час</div><div class="v num">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="sub">сум за час работы</div></div>
+      <div class="kpi"><div class="l">Прибыль / час</div><div class="v num" style="color:${F.profitPerHour>0?'var(--pos)':F.profitPerHour<0?'var(--neg)':'var(--txt)'}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="sub">чистыми за час</div></div>
       <div class="kpi"><div class="l">Runway</div><div class="v" style="font-size:19px;font-weight:700;color:${F.profit>=0?'var(--pos)':'var(--neg)'};margin-top:6px">${F.profit>=0?'Стабильно':'Дефицит'}</div><div class="sub">${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div></div>
       <div class="kpi"><div class="l">Concentration risk</div><div class="v num" style="color:${F.concentrationPct>=50?'var(--neg)':F.concentrationPct>=30?'var(--warn)':'var(--txt)'}">${F.concentrationPct}<span class="u">%</span></div><div class="sub">${F.concentrationTop}</div></div>
       <div class="kpi"><div class="l">Break-even</div><div class="v num">${money(F.totalCost)}</div><div class="sub">минимум для нулевой прибыли</div></div>
@@ -3015,7 +3016,8 @@ function renderFinance(){
               ${st('Расходы', p.cost?money(p.cost):'—', p.cost?'var(--neg)':'var(--txt-3)')}
               ${st('Прибыль', has?((p.profit>=0?'+':'')+money(p.profit)):'—', has?(p.profit>=0?'var(--pos)':'var(--neg)'):'var(--txt-3)')}
               <div class="fin-stat fin-margin" style="border-color:${p.margin==null?'var(--line)':mc}"><div class="fl">Маржа</div><div class="fv" style="color:${mc}">${p.margin!=null?p.margin+'%':'—'}</div></div>
-              ${st('Часы', p.hours?fmtHours(p.hours):'—', 'var(--txt-2)')}
+              ${st('Часы', p.hours?fmtHours(p.hours):'—', 'var(--accent)')}
+              ${st('Приб./час', p.profitPerHour!=null?((p.profitPerHour>=0?'+':'')+money(p.profitPerHour)):'—', p.profitPerHour==null?'var(--txt-3)':p.profitPerHour>=0?'var(--pos)':'var(--neg)')}
             </div>
             <button class="fin-gear" onclick="openProjFinance('${p.id}')" title="Редактировать финансы проекта">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -3922,12 +3924,17 @@ window.tLoadTeam = async () => {
 /* ===== FINANCE · live P&L from projects.mrr / projects.cost ===== */
 window.tLoadFinance = async () => {
   if (!SB) return;
-  const res = await SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance');
+  const [res, tt] = await Promise.all([
+    SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance'),
+    SB.from('project_tasks').select('project_id,time_spent,timer_started') ]);
   if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost/finance ещё не добавлены
-  const rows = (res.data||[]).map(p => { const f=p.finance||{};
+  const trk = {};   // отслеженное время по проекту (сек), включая идущие таймеры
+  (tt && !tt.error && tt.data ? tt.data : []).forEach(t => { let s=t.time_spent||0;
+    if(t.timer_started) s+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000)); trk[t.project_id]=(trk[t.project_id]||0)+s; });
+  const rows = (res.data||[]).map(p => { const f=p.finance||{}; const tsec=trk[p.id]||0;
     return { id:p.id, name:p.name, service:p.service||'Прочее', status:p.status, cat:p.category||'—',
       logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(), logoUrl:p.logo_url||'',
-      mrr: Number(p.mrr)||0, cost: Number(p.cost)||0, hours: Number(f.hours)||0, finance:f }; });
+      mrr: Number(p.mrr)||0, cost: Number(p.cost)||0, trackedSec:tsec, hours: tsec>0 ? tsec/3600 : (Number(f.hours)||0), finance:f }; });
 
   const totalMrr  = rows.reduce((s,p)=>s+p.mrr,0);
   const totalCost = rows.reduce((s,p)=>s+p.cost,0);
@@ -3952,8 +3959,9 @@ window.tLoadFinance = async () => {
   services.sort((a,b)=> b.amount-a.amount);
 
   let projects = rows.map(p => ({ id:p.id, name:p.name, cat:p.cat, logo:p.logo, logoUrl:p.logoUrl, status:p.status,
-    mrr:p.mrr, cost:p.cost, hours:p.hours, finance:p.finance, profit:p.mrr-p.cost,
-    margin: p.mrr>0 ? Math.round(100*(p.mrr-p.cost)/p.mrr) : null }));
+    mrr:p.mrr, cost:p.cost, hours:p.hours, trackedSec:p.trackedSec, finance:p.finance, profit:p.mrr-p.cost,
+    margin: p.mrr>0 ? Math.round(100*(p.mrr-p.cost)/p.mrr) : null,
+    profitPerHour: p.hours>0 ? Math.round((p.mrr-p.cost)/p.hours) : null }));
   projects.sort((a,b)=> b.mrr-a.mrr);
 
   // —— разбивка «куда уходит выручка»: все статьи расходов из всех проектов ——
@@ -3979,9 +3987,10 @@ window.tLoadFinance = async () => {
   const totalHours = rows.reduce((s,p)=>s+(Number(p.hours)||0),0);
   const avgHours = paying ? Math.round(totalHours/paying) : 0;
   const revPerHour = totalHours>0 ? Math.round(totalMrr/totalHours) : 0;
+  const profitPerHour = totalHours>0 ? Math.round(profit/totalHours) : 0;
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
     paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop,
-    totalHours, avgHours, revPerHour, services, projects, breakdown };
+    totalHours, avgHours, revPerHour, profitPerHour, services, projects, breakdown };
 };
 
 window.tLoadAll = async (role) => {
