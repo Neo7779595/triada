@@ -2902,7 +2902,9 @@ function renderDeadlines(){
 /* ——— OVERVIEW module · live data only (no mock) ——— */
 let OVERVIEW = { monthName:'', taskHistoryExists:false,
   onTime:0, deadlineDone:0, v7:0, v30:0, vMonth:0, rework:0, trans:0,
+  uniq7:0, uniq30:0, uniqMonth:0, redo7:0, redo30:0, redoMonth:0,
   tOnTime:0, tDeadlineDone:0, tV7:0, tV30:0, tVMonth:0, tRework:0, tTrans:0,
+  tUniq7:0, tUniq30:0, tUniqMonth:0, tRedo7:0, tRedo30:0, tRedoMonth:0,
   overdueItems:0, overdueStages:0, overdueTasks:0,
   stOpen:0, stActive:0, stWait:0, stDone:0, tkOpen:0, tkActive:0, tkWait:0, tkDone:0,
   stageLoad:[] };
@@ -2959,6 +2961,10 @@ function renderOverview(){
     const tk = (needJ && !TH) ? `<span class="ov-tok tk dim">${_svg(IC_TK)}нет журнала</span>`
                               : `<span class="ov-tok tk">${_svg(IC_TK)}${tv}${suf}</span>`;
     return `<div class="ov-split">${st}${tk}</div>`; };
+  /* уникально завершённые vs повторно завершённые (вернули и закрыли заново) */
+  const uniq30C = O.uniq30 + O.tUniq30, uniq7C = O.uniq7 + O.tUniq7, uniqMonC = O.uniqMonth + O.tUniqMonth;
+  const redo30C = O.redo30 + O.tRedo30;
+  const IC_REDO = '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>';
 
   /* —— portfolio rows (respect the active filter tab) —— */
   const rows = P.filter(p => ovFilter==='all' ? true : ovFilter==='active' ? p.status!=='done' : ovFilter==='overdue' ? !!p._overdue : p.status==='done');
@@ -2982,14 +2988,16 @@ function renderOverview(){
       #content-ag .ov-leg{display:flex;gap:13px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--txt-3);margin:-2px 0 14px}
       #content-ag .ov-rtok{display:inline-flex;width:19px;height:19px;border-radius:5px;align-items:center;justify-content:center;flex:none}
       #content-ag .ov-rtok svg{width:11px;height:11px} #content-ag .ov-rtok.st{background:var(--accent-dim);color:var(--accent)} #content-ag .ov-rtok.tk{background:rgba(138,143,255,.14);color:var(--violet)}
+      #content-ag .ov-redo{display:flex;align-items:center;gap:6px;font-size:11px;margin-top:7px}
+      #content-ag .ov-redo svg{width:12px;height:12px;flex:none} #content-ag .ov-redo b{font-family:var(--mono);font-weight:600}
     </style>
     <div class="ov-leg"><span style="color:var(--txt-2);font-weight:600">Обозначения</span><span class="ov-tok st">${_svg(IC_ST)}Этапы</span><span class="ov-tok tk">${_svg(IC_TK)}Задачи</span><span>— скорость, откаты, on-time и просрочка считаются по обоим${TH?'':' · <b style="color:var(--warn)">журнал задач не создан — выполните SQL, см. сообщение</b>'}</span></div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi"><div class="l">Индекс здоровья</div><div class="v num" style="color:${hMeta[0]}">${health}<span class="u">%</span></div><div class="sub">${hMeta[1]}</div><div class="kfoot">${active.length} активных · ${doneN} завершено</div></div>
-      <div class="kpi"><div class="l">On-time delivery</div><div class="v num">${otPctC==null?'—':otPctC+'<span class="u">%</span>'}</div><div class="sub">${otPctC==null?'нет завершённых с дедлайном':'сдано в срок · в срок / всего'}</div>${split(O.onTime+'/'+O.deadlineDone,O.tOnTime+'/'+O.tDeadlineDone,true)}</div>
+      <div class="kpi"><div class="l">On-time delivery</div><div class="v num">${otPctC==null?'—':otPctC+'<span class="u">%</span>'}</div><div class="sub">${otPctC==null?'нет завершённых с дедлайном':'в срок / уникальных доставок'}</div>${split(O.onTime+'/'+O.deadlineDone,O.tOnTime+'/'+O.tDeadlineDone,true)}</div>
       <div class="kpi"><div class="l">Просрочено сейчас</div><div class="v num" style="color:${O.overdueItems?'var(--neg)':'inherit'}">${O.overdueItems}</div><div class="sub ${O.overdueItems?'':'pos'}">${O.overdueItems?'требуют действия':'всё в норме'}</div>${split(O.overdueStages,O.overdueTasks,false)}<div class="kfoot">${overdueProjects} ${overdueProjects===1?'проект':'проектов'} затронуто</div></div>
-      <div class="kpi"><div class="l">Velocity · 30 дней</div><div class="v num">${v30C}</div><div class="sub">этапов и задач закрыто</div>${split(O.v30,O.tV30,true)}<div class="kfoot">7 дн: ${v7C} · ${O.monthName}: ${vMonC}</div></div>
+      <div class="kpi"><div class="l">Velocity · 30 дней</div><div class="v num">${uniq30C}</div><div class="sub">уникальных закрыто</div>${split(O.uniq30,O.tUniq30,true)}<div class="ov-redo" style="color:${redo30C>0?'var(--warn)':'var(--txt-3)'}" title="Вернули и завершили заново — переделки">${_svg(IC_REDO)}<b>${redo30C}</b> повторно завершено${redo30C?` <span style="opacity:.78">(◧ ${O.redo30} · ▥ ${O.tRedo30})</span>`:''}</div><div class="kfoot">7 дн: ${uniq7C} уник · ${O.monthName}: ${uniqMonC}</div></div>
     </div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
@@ -4301,19 +4309,25 @@ window.tLoadOverview = async () => {
 
   /* —— общий разбор журнала переходов: velocity / откаты / on-time / последняя активность —— */
   const tally = (rows, dueMap, idKey) => {
-    const o = { v7:0, v30:0, vMonth:0, rework:0, trans:0, onTime:0, deadlineDone:0, lastAct:{} };
-    rows.forEach(h => {
+    const o = { v7:0, v30:0, vMonth:0, uniq7:0, uniq30:0, uniqMonth:0, redo7:0, redo30:0, redoMonth:0,
+                rework:0, trans:0, onTime:0, deadlineDone:0, lastAct:{} };
+    const doneCount = {};   // id → сколько раз уже доходила до done за всю историю
+    const sorted = rows.slice().sort((a,b)=> (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+    sorted.forEach(h => {
       const t = new Date(h.created_at).getTime();
       if (!(h.project_id in o.lastAct) || t > o.lastAct[h.project_id]) o.lastAct[h.project_id] = t;
       o.trans++;
       const f = rank[h.old_status], to = rank[h.new_status];
       if (f != null && to != null && to < f) o.rework++;          // переход назад = откат
       if (h.new_status === 'done') {
-        if (h.created_at >= iso30) o.v30++;
-        if (h.created_at >= iso7)  o.v7++;
-        if (h.created_at >= isoMon) o.vMonth++;
-        const due = dueMap[h[idKey]];
-        if (due) { o.deadlineDone++; if (t <= new Date(due+'T23:59:59').getTime()) o.onTime++; }
+        const idv = h[idKey];
+        const isFirst = !(doneCount[idv] > 0);                     // первое done за всю историю → уникальное; иначе повторное (redo)
+        doneCount[idv] = (doneCount[idv] || 0) + 1;
+        if (h.created_at >= iso30){ o.v30++;    if(isFirst)o.uniq30++;    else o.redo30++; }
+        if (h.created_at >= iso7) { o.v7++;     if(isFirst)o.uniq7++;     else o.redo7++; }
+        if (h.created_at >= isoMon){ o.vMonth++; if(isFirst)o.uniqMonth++; else o.redoMonth++; }
+        const due = dueMap[idv];
+        if (due && isFirst) { o.deadlineDone++; if (t <= new Date(due+'T23:59:59').getTime()) o.onTime++; }  // on-time только по первой (уникальной) доставке — повторные не задваиваются
       }
     });
     return o;
@@ -4364,8 +4378,10 @@ window.tLoadOverview = async () => {
     monthName: MON[today.getMonth()], taskHistoryExists,
     /* этапы */
     onTime:S.onTime, deadlineDone:S.deadlineDone, v7:S.v7, v30:S.v30, vMonth:S.vMonth, rework:S.rework, trans:S.trans,
+    uniq7:S.uniq7, uniq30:S.uniq30, uniqMonth:S.uniqMonth, redo7:S.redo7, redo30:S.redo30, redoMonth:S.redoMonth,
     /* задачи */
     tOnTime:T.onTime, tDeadlineDone:T.deadlineDone, tV7:T.v7, tV30:T.v30, tVMonth:T.vMonth, tRework:T.rework, tTrans:T.trans,
+    tUniq7:T.uniq7, tUniq30:T.uniq30, tUniqMonth:T.uniqMonth, tRedo7:T.redo7, tRedo30:T.redo30, tRedoMonth:T.redoMonth,
     /* просрочка */
     overdueItems, overdueStages, overdueTasks,
     /* точечные счётчики статусов */
