@@ -3006,8 +3006,8 @@ function renderOverview(){
 }
 
 /* ——— CYCLES module ——— */
-let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, stuckThresholdMs:0, stages:[], trend:{vals:[],labels:[]}, clients:[] };
-function _cycDur(ms){ if(ms==null) return '—'; const m=ms/60000; if(m<1) return '<1 мин'; if(m<60) return Math.round(m)+' мин'; const h=m/60; if(h<24) return (h<10?h.toFixed(1):''+Math.round(h))+' ч'; const d=h/24; return (d<10?d.toFixed(1):''+Math.round(d))+' дн'; }
+let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], trend:{vals:[],labels:[]}, clients:[] };
+function _cycDur(ms){ if(ms==null) return '—'; if(ms<=0) return '0'; if(ms<60000) return Math.round(ms/1000)+' с'; const m=ms/60000; if(m<60) return Math.round(m)+' мин'; const h=m/60; if(h<24) return (h<10?h.toFixed(1).replace('.0',''):''+Math.round(h))+' ч'; const d=h/24; return (d<10?d.toFixed(1).replace('.0',''):''+Math.round(d))+' дн'; }
 function svgLine(vals,labels){
   const W=1100,H=230,padL=46,padR=26,padT=30,padB=38;
   const iW=W-padL-padR,iH=H-padT-padB;
@@ -3024,43 +3024,91 @@ function svgLine(vals,labels){
   const xlabs=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" fill="#7A828C" font-size="11">${l}</text>`).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;height:auto"><polygon class="c-area" points="${area}" fill="var(--accent-dim)"/>${grid}${yl}<polyline class="c-line" pathLength="1" points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>${dots}${vlabs}${xlabs}</svg>`;
 }
+function _cycAxis(maxMs){ if(maxMs>=86400000) return {div:86400000,unit:'д'}; if(maxMs>=3600000) return {div:3600000,unit:'ч'}; if(maxMs>=60000) return {div:60000,unit:'мин'}; return {div:1000,unit:'с'}; }
+function _niceMax(v){ if(v<=0||!isFinite(v)) return 1; const exp=Math.floor(Math.log10(v)); const base=Math.pow(10,exp); const f=v/base; const steps=[1,1.5,2,2.5,3,4,5,6,8,10]; let nf=10; for(let j=0;j<steps.length;j++){ if(f<=steps[j]+1e-9){ nf=steps[j]; break; } } return nf*base; }
+function _axLbl(v){ if(v===0) return '0'; if(v<1) return (+v.toFixed(2))+''; if(v<10) return (+v.toFixed(1))+''; return ''+Math.round(v); }
 function svgCycleBars(stages){
-  const W=1100,H=330,padL=42,padR=16,padT=16,padB=86;
+  const W=1100,H=340,padL=48,padR=20,padT=18,padB=92;
   const iW=W-padL-padR,iH=H-padT-padB;
-  const max=Math.max(...stages.map(s=>s.p50))*1.14||1;
-  const n=stages.length,gW=iW/n,bW=Math.min(gW*0.46,52);
+  const maxMs=Math.max(...stages.map(s=>s.p50Ms||0), ...stages.map(s=>s.p90Ms||0), 1);
+  const ax=_cycAxis(maxMs), maxV=_niceMax(maxMs/ax.div*1.05), nDiv=4;
+  const n=Math.max(stages.length,1),gW=iW/n,bW=Math.min(gW*0.46,52);
+  const yOf=v=>padT+iH-(v/maxV)*iH;
   let grid='',yl='';
-  for(let v=0;v<=max;v+=0.5){const y=padT+iH-(v/max)*iH;grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--line)"/>`;yl+=`<text x="${padL-7}" y="${(y+3).toFixed(1)}" text-anchor="end" fill="#5B616B" font-size="9.5" font-family="ui-monospace,monospace">${v}д</text>`;}
+  for(let k=0;k<=nDiv;k++){ const v=maxV*k/nDiv, y=yOf(v);
+    grid+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="var(--line)"/>`;
+    yl+=`<text x="${padL-7}" y="${(y+3).toFixed(1)}" text-anchor="end" fill="#5B616B" font-size="9.5" font-family="ui-monospace,monospace">${_axLbl(v)}${ax.unit}</text>`; }
   let bars='',xl='';
   stages.forEach((s,i)=>{
-    const cx=padL+gW*i+gW/2,h=(s.p50/max)*iH;
-    bars+=`<rect class="c-bar" style="animation-delay:${(i*55)}ms" x="${(cx-bW/2).toFixed(1)}" y="${(padT+iH-h).toFixed(1)}" width="${bW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${s.bn?'#E0566A':'var(--accent)'}"/>`;
+    const cx=padL+gW*i+gW/2, v=(s.p50Ms||0)/ax.div, h=Math.max((v/maxV)*iH,0);
+    bars+=`<rect class="c-bar" style="animation-delay:${i*55}ms" x="${(cx-bW/2).toFixed(1)}" y="${(padT+iH-h).toFixed(1)}" width="${bW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${s.bn?'var(--neg)':'var(--accent)'}"/>`;
     const lbl=s.name.length>18?s.name.slice(0,17)+'…':s.name;
     xl+=`<text x="${cx.toFixed(1)}" y="${H-padB+18}" text-anchor="end" fill="#7A828C" font-size="9.5" transform="rotate(-30 ${cx.toFixed(1)} ${H-padB+18})">${lbl}</text>`;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bars}${xl}</svg>`;
+  let p90l='',p90d='',prev=null;
+  stages.forEach((s,i)=>{
+    if(s.p90Ms==null){ prev=null; return; }
+    const cx=padL+gW*i+gW/2, y=yOf(s.p90Ms/ax.div);
+    p90d+=`<circle cx="${cx.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="var(--violet)"/>`;
+    if(prev) p90l+=`<line x1="${prev.x.toFixed(1)}" y1="${prev.y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--violet)" stroke-width="2"/>`;
+    prev={x:cx,y};
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bars}${p90l}${p90d}${xl}</svg>`;
+}
+function svgCycleTrend(msVals,labels){
+  const W=1100,H=240,padL=54,padR=26,padT=30,padB=40;
+  const iW=W-padL-padR,iH=H-padT-padB;
+  const maxMs=Math.max(...msVals,1);
+  const ax=_cycAxis(maxMs), maxV=_niceMax(maxMs/ax.div*1.18);
+  const vals=msVals.map(v=>v/ax.div);
+  const x=i=>padL+iW*(vals.length>1?i/(vals.length-1):0.5);
+  const y=v=>padT+iH-(v/maxV)*iH;
+  let grid='',yl='';const steps=4;
+  for(let k=0;k<=steps;k++){ const v=maxV*k/steps, yy=y(v);
+    grid+=`<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W-padR}" y2="${yy.toFixed(1)}" stroke="var(--line)"/>`;
+    yl+=`<text x="${padL-9}" y="${(yy+3).toFixed(1)}" text-anchor="end" fill="#5B616B" font-size="10" font-family="ui-monospace,monospace">${_axLbl(v)}${ax.unit}</text>`; }
+  const pts=vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const area=`${x(0).toFixed(1)},${(padT+iH).toFixed(1)} ${pts} ${x(vals.length-1).toFixed(1)},${(padT+iH).toFixed(1)}`;
+  const dn=Math.max(vals.length-1,1);
+  const dots=vals.map((v,i)=>`<circle class="c-dot" style="animation-delay:${(260+i*640/dn).toFixed(0)}ms" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="var(--accent)"/>`).join('');
+  const vlabs=vals.map((v,i)=>`<text class="c-vlab" style="animation-delay:${(340+i*640/dn).toFixed(0)}ms" x="${x(i).toFixed(1)}" y="${(y(v)-13).toFixed(1)}" text-anchor="middle" fill="#C9CDD3" font-size="13" font-family="ui-monospace,monospace">${_axLbl(v)}${ax.unit}</text>`).join('');
+  const xlabs=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" fill="#7A828C" font-size="11">${l}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;height:auto"><polygon class="c-area" points="${area}" fill="var(--accent-dim)"/>${grid}${yl}<polyline class="c-line" pathLength="1" points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>${dots}${vlabs}${xlabs}</svg>`;
 }
 function renderCycles(){
   const C = CYCLES;
   const has = C.stages.length>0;
   const bn = C.bottleneck;
+  const aging = C.agingRows||[];
+  const rwCol = p => p==null?'var(--txt-3)':(p>=40?'var(--neg)':(p>=20?'var(--warn)':'var(--txt-3)'));
   document.getElementById('content-ag').innerHTML = `
     <div class="ph"><div><div class="eyebrow">Агентство · cycle time</div><h1>Циклы</h1>
-    <div class="s">Сколько реально длятся этапы — от старта до завершения. Всё считается из истории статусов проектов.</div></div></div>
+    <div class="s">Сколько реально длятся этапы — от старта до завершения. Считается из истории статусов: каждая пара «в работе → завершён» — отдельный цикл.</div></div></div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Цикл проекта · медиана</div><div class="v num">${C.projMedianMs!=null?_cycDur(C.projMedianMs):'—'}</div><div class="sub">старт 1-го → финиш последнего</div><div class="kfoot">${C.projCount?('по '+C.projCount+' проект.'):'нет завершённых'}</div></div>
-      <div class="kpi"><div class="l">Узкое место</div>${bn?`<div class="v" style="font-size:17px;font-weight:700;color:var(--neg);line-height:1.15;margin-top:10px">${bn.name}</div><div class="sub">самый долгий этап</div><div class="kfoot">медиана ${_cycDur(bn.p50Ms)} · n=${bn.n}${bn.n<=2?' ⚠ мало данных':''}</div>`:`<div class="v num" style="margin-top:10px">—</div><div class="sub">нет данных</div><div class="kfoot">нужны завершённые этапы</div>`}</div>
+      <div class="kpi"><div class="l">Цикл проекта · медиана</div><div class="v num">${C.projMedianMs!=null?_cycDur(C.projMedianMs):'—'}</div><div class="sub">старт 1-го → финиш последнего</div><div class="kfoot">${C.projCount?('по '+C.projCount+' проект. · старт→финиш'):'нужно ≥2 этапа с замером'}</div></div>
+      <div class="kpi"><div class="l">Узкое место</div>${bn?`<div class="v" style="font-size:17px;font-weight:700;color:var(--neg);line-height:1.15;margin-top:10px">${bn.name}</div><div class="sub">самый долгий этап</div><div class="kfoot">медиана ${_cycDur(bn.p50Ms)} · n=${bn.n}${bn.n<3?' ⚠ мало данных':''}</div>`:`<div class="v num" style="margin-top:10px">—</div><div class="sub">нет данных</div><div class="kfoot">нужны завершённые этапы</div>`}</div>
       <div class="kpi"><div class="l">Покрытие данными</div><div class="v num">${C.coveragePct}<span class="u">%</span></div><div class="sub">этапов с измеримым циклом</div><div class="kfoot">${C.coverageDone} из ${C.coverageTotal} завершённых</div></div>
-      <div class="kpi"><div class="l">Застряло сейчас</div><div class="v num" style="${C.stuckNow?'color:var(--neg)':''}">${C.stuckNow}</div><div class="sub">дольше обычного (p85)</div><div class="kfoot ${C.stuckNow?'':'pos'}">${C.stuckNow?('порог '+_cycDur(C.stuckThresholdMs)):'всё в норме'}</div></div>
+      <div class="kpi"><div class="l">Застряло сейчас</div><div class="v num" style="${C.stuckNow?'color:var(--neg)':''}">${C.stuckNow}</div><div class="sub">дольше нормы (p85)</div><div class="kfoot ${C.stuckNow?'':'pos'}">${C.stuckNow?'требуют внимания':'всё в норме'}</div></div>
     </div>
+
+    ${aging.length?`<div class="card" style="margin-top:16px;border-color:var(--accent-line)">
+      <div class="card-h"><div class="t" style="color:var(--neg)">Застрявшие этапы <span class="c">дольше своего p85</span></div></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+        ${aging.map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--neg-dim);border:1px solid var(--neg-dim);border-radius:10px">
+          <div style="min-width:0"><div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.client}</div><div style="font-size:11px;color:var(--txt-2);font-family:var(--mono);margin-top:2px">${a.stage}</div></div>
+          <div style="text-align:right;flex-shrink:0"><div class="num" style="font-weight:800;font-size:15px;color:var(--neg)">${_cycDur(a.sinceMs)}</div><div style="font-size:10px;color:var(--warn);font-family:var(--mono);margin-top:2px">+${a.overPct}% к норме${a.frozen!=null?' · ~'+money(a.frozen)+' заморож.':''}</div></div>
+        </div>`).join('')}
+      </div>
+    </div>`:''}
 
     ${has?`
     <div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Медиана цикла по этапам <span class="c">дни</span></div>
-        <div class="m" style="display:flex;gap:16px;font-size:11px">
+      <div class="card-h"><div class="t">Медиана (p50) и худший случай (p90) по этапам</div>
+        <div class="m" style="display:flex;gap:14px;font-size:11px;flex-wrap:wrap">
           <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:var(--neg)"></span>Узкое место</span>
           <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>Медиана (p50)</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--violet)"></span>p90 (n≥5)</span>
         </div>
       </div>
       <div class="card-body">${svgCycleBars(C.stages)}</div>
@@ -3069,36 +3117,41 @@ function renderCycles(){
     <div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">Детализация по этапам</div></div>
       <table>
-        <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th>Доля</th><th>% возвратов</th></tr></thead>
+        <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th>Доля</th><th>% возвратов</th><th>Простой</th></tr></thead>
         <tbody>${C.stages.map(s=>`<tr>
-          <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${s.name}${s.n<=2?' <span style="color:var(--warn);font-size:10px;font-family:var(--mono)">мало данных</span>':''}</td>
-          <td class="num">${s.n}</td><td class="num">${_cycDur(s.p50Ms)}</td><td class="num" style="color:var(--txt-3)">${_cycDur(s.p90Ms)}</td>
+          <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${s.name}${s.lowSample?' <span style="color:var(--warn);font-size:10px;font-family:var(--mono)">мало данных</span>':''}</td>
+          <td class="num">${s.n}</td>
+          <td class="num" style="color:var(--accent)">${_cycDur(s.p50Ms)}</td>
+          <td class="num" style="color:var(--violet)">${s.p90Ms!=null?_cycDur(s.p90Ms):'—'}</td>
           <td class="num">${s.sharePct}%</td>
-          <td class="num" style="color:${s.reworkPct?'var(--neg)':'var(--txt-3)'}">${s.reworkPct}%</td>
+          <td class="num" style="color:${rwCol(s.reworkPct)}">${s.reworkPct!=null?s.reworkPct+'%':'—'}</td>
+          <td class="num" style="color:var(--txt-3)">${s.lossMs!=null?_cycDur(s.lossMs):'—'}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>
 
-    ${C.trend.vals.length?`<div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Тренд медианы цикла <span class="c">по месяцам · дни</span></div></div>
-      <div class="card-body">${svgLine(C.trend.vals,C.trend.labels)}</div>
+    ${C.trend.vals.length>=2?`<div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Тренд медианы цикла <span class="c">по месяцам</span></div></div>
+      <div class="card-body">${svgCycleTrend(C.trend.vals,C.trend.labels)}</div>
     </div>`:''}
 
     ${C.clients.length?`<div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Бенчмарк по клиентам <span class="c">средний цикл этапа</span></div></div>
+      <div class="card-h"><div class="t">Бенчмарк по клиентам <span class="c">средний цикл завершённого этапа</span></div></div>
       <table>
         <thead><tr><th>Клиент</th><th>Этапов</th><th>Медиана</th><th>Среднее</th><th>% возвратов</th></tr></thead>
         <tbody>${C.clients.map(c=>`<tr>
           <td><div class="ag-name"><span class="ag-dot" style="background:var(--accent)"></span><div class="nm">${c.client}</div></div></td>
-          <td class="num">${c.n}</td><td class="num">${_cycDur(c.medianMs)}</td><td class="num" style="color:var(--txt-3)">${_cycDur(c.avgMs)}</td>
-          <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span style="color:${c.reworkPct?'var(--neg)':'var(--txt-3)'}">${c.reworkPct}%</span><div style="width:60px;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div style="width:${Math.min(c.reworkPct,100)}%;height:100%;background:${c.reworkPct?'var(--neg)':'var(--accent)'}"></div></div></div></td>
+          <td class="num">${c.n}</td>
+          <td class="num" style="color:var(--accent)">${_cycDur(c.medianMs)}</td>
+          <td class="num" style="color:var(--txt-3)">${_cycDur(c.avgMs)}</td>
+          <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span style="color:${rwCol(c.reworkPct)}">${c.reworkPct!=null?c.reworkPct+'%':'—'}</span><div style="width:60px;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div style="width:${Math.min(c.reworkPct||0,100)}%;height:100%;background:${(c.reworkPct||0)?'var(--neg)':'var(--accent)'}"></div></div></div></td>
         </tr>`).join('')}</tbody>
       </table>
     </div>`:''}
     `:`
     <div class="modph" style="margin-top:16px"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-      <h3>Пока нет завершённых этапов</h3>
-      <p>Цикл считается от старта этапа (переход в «В работе») до его завершения (переход в «Завершён»). Как только команда закроет первые этапы, здесь появятся медианы, p90, узкое место, тренд по месяцам и бенчмарк по клиентам.</p>
+      <h3>Пока нет измеримых циклов</h3>
+      <p>Цикл считается от старта этапа (переход в «В работе») до его завершения (переход в «Завершён»). Чтобы этап стал измеримым, в истории должна быть записана пара «старт → финиш». Как только команда закроет первые этапы — здесь появятся медианы, p90, простой, узкое место, тренд по месяцам и бенчмарк по клиентам.</p>
     </div>`}`;
 }
 
@@ -4230,94 +4283,95 @@ window.tLoadOverview = async () => {
 window.tLoadCycles = async () => {
   if (!SB) return;
   const now = Date.now();
-  const [hr, sr] = await Promise.all([
-    SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at'),
-    SB.from('project_stages').select('id,project_id,name,status')
-  ]);
-  const hist = hr.data||[], stages = sr.data||[];
-  const rank = { wait:0, active:1, done:2 };
-  const nameById = {}; (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => nameById[p.id]=p.name);
+  const hr = await SB.from('stage_history')
+    .select('stage_id,project_id,stage_name,old_status,new_status,created_at')
+    .order('created_at',{ascending:true});
+  const hist = hr.data||[];
+  const nameById={}, mrrById={};
+  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; });
 
-  // group history rows by stage
-  const byStage = {};
-  hist.forEach(h => { (byStage[h.stage_id] || (byStage[h.stage_id]=[])).push(h); });
+  // TRIADA-статусы → семантика цикла: done=закрытие инстанса, active=работа, wait=возврат (откат).
+  // done→active НЕ возврат, а НОВЫЙ цикл (его открывает следующий active). Возврат = active→wait внутри открытого инстанса.
+  const SEM={active:'active',done:'completed',wait:'pending'};
+  const semOf=x=>SEM[x]||null;
 
-  // project-level first active / last done
-  const projFirstActive = {}, projLastDone = {};
-  hist.forEach(r => { const t = new Date(r.created_at).getTime(), pid = r.project_id;
-    if (r.new_status==='active'){ if (projFirstActive[pid]==null || t<projFirstActive[pid]) projFirstActive[pid]=t; }
-    if (r.new_status==='done'){   if (projLastDone[pid]==null   || t>projLastDone[pid])   projLastDone[pid]=t; } });
+  const byStage={};
+  hist.forEach(h=>{ if(!h.stage_id) return; (byStage[h.stage_id]||(byStage[h.stage_id]=[])).push(h); });
 
-  // per-stage measurable cycle: first active → last done
-  const cycles = [];                 // {name, pid, ms, doneTime, hadRework}
-  const doneStageIds = new Set();
-  Object.keys(byStage).forEach(sid => {
-    const rows = byStage[sid].slice().sort((a,b)=> a.created_at<b.created_at?-1:1);
-    let firstActive=null, lastDone=null, hadRework=false, name='—', pid=null;
-    rows.forEach(r => { name = r.stage_name||name; pid = r.project_id||pid;
-      const t = new Date(r.created_at).getTime();
-      if (r.new_status==='active' && firstActive==null) firstActive=t;
-      if (r.new_status==='done'){ lastDone=t; doneStageIds.add(sid); }
-      const f=rank[r.old_status], to=rank[r.new_status];
-      if (f!=null && to!=null && to<f) hadRework=true; });
-    if (firstActive!=null && lastDone!=null && lastDone>firstActive)
-      cycles.push({ name, pid, ms:lastDone-firstActive, doneTime:lastDone, hadRework });
+  // Разбор истории одного этапа на завершённые инстансы (циклы) + открытый WIP.
+  // active-время копится только в статусе active; wait после старта = rework, инстанс не закрывает.
+  function walk(events){
+    const inst=[]; let start=null,activeMs=0,returns=0,activeSince=null,nm=null,pid=null;
+    events.forEach(e=>{
+      nm=e.stage_name||nm; pid=e.project_id||pid;
+      const st=semOf(e.new_status), t=new Date(e.created_at).getTime();
+      if(isNaN(t)) return;
+      if(st==='active'){ if(start===null) start=t; if(activeSince===null) activeSince=t; }
+      else if(st==='completed'){ if(activeSince!==null){ activeMs+=t-activeSince; activeSince=null; } if(start!==null&&t>=start) inst.push({start,complete:t,activeMs,returns}); start=null; activeMs=0; returns=0; }
+      else if(st==='pending'){ if(activeSince!==null){ activeMs+=t-activeSince; activeSince=null; } if(start!==null) returns++; }
+    });
+    const wip=(start!==null)?{start,stillActive:activeSince!==null}:null;
+    return {inst,wip,nm,pid,everCompleted:inst.length>0};
+  }
+
+  const pctl=(arr,p)=>{ if(!arr.length) return null; const a=arr.slice().sort((x,y)=>x-y); if(a.length===1) return a[0]; const idx=(a.length-1)*p, lo=Math.floor(idx), hi=Math.ceil(idx); return lo===hi?a[lo]:a[lo]+(a[hi]-a[lo])*(idx-lo); };
+  const median=a=>pctl(a,0.5);
+  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+
+  const instances=[], wips=[];
+  Object.keys(byStage).forEach(sid=>{
+    const w=walk(byStage[sid]);
+    w.inst.forEach(it=>instances.push({pid:w.pid,name:w.nm||'Этап',startMs:it.start,leadMs:it.complete-it.start,activeMs:it.activeMs,returns:it.returns,completeAt:it.complete}));
+    if(w.wip&&w.wip.stillActive) wips.push({pid:w.pid,name:w.nm||'Этап',sinceMs:now-w.wip.start});
   });
 
-  const srt = a => a.slice().sort((x,y)=>x-y);
-  const pctl = (arr,p) => { if(!arr.length) return 0; const s=srt(arr); const idx=(p/100)*(s.length-1); const lo=Math.floor(idx),hi=Math.ceil(idx); return lo===hi?s[lo]:s[lo]+(s[hi]-s[lo])*(idx-lo); };
-  const median = arr => pctl(arr,50);
-  const mean = arr => arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+  // Покрытие: уникальные этапы с измеримым инстансом / уникальные этапы с любым завершением в истории (≤100%).
+  const measurableUnique=Object.keys(byStage).filter(sid=>walk(byStage[sid]).everCompleted).length;
+  const completedUnique=Object.keys(byStage).filter(sid=>byStage[sid].some(h=>semOf(h.new_status)==='completed')).length;
+  const coveragePct=completedUnique?Math.min(100,Math.round(100*measurableUnique/completedUnique)):0;
 
-  // coverage
-  const coverageTotal = doneStageIds.size;
-  const coverageDone = cycles.length;
-  const coveragePct = coverageTotal ? Math.round(100*coverageDone/coverageTotal) : 0;
+  // Агрегация по ИМЕНИ этапа: p50/p90 от lead, медиана active, простой = p50(lead) − median(active).
+  const g={};
+  instances.forEach(it=>{ const b=g[it.name]||(g[it.name]={leads:[],acts:[],rework:0,n:0}); b.leads.push(it.leadMs); b.acts.push(it.activeMs); if(it.returns>0) b.rework++; b.n++; });
+  let stageRows=Object.keys(g).map(name=>{ const b=g[name];
+    const p50=median(b.leads), p90=b.n>=5?pctl(b.leads,0.9):null, p85=b.n>=4?pctl(b.leads,0.85):null;
+    const actMed=median(b.acts), loss=(p50!=null&&actMed!=null)?Math.max(0,p50-actMed):null;
+    return {name,n:b.n,p50Ms:p50,p90Ms:p90,p85Ms:p85,actMedMs:actMed,lossMs:loss,reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null,lowSample:b.n<3};
+  });
+  const sumP50=stageRows.reduce((acc,r)=>acc+(r.p50Ms||0),0);
+  stageRows.forEach(r=>{ r.sharePct=(sumP50>0&&r.p50Ms!=null)?Math.round(100*r.p50Ms/sumP50):0; });
+  stageRows.sort((a,b)=>(b.p50Ms||0)-(a.p50Ms||0));
+  const nameStat={}; stageRows.forEach(r=>nameStat[r.name]=r);
 
-  // grouped by stage name
-  const g = {};
-  cycles.forEach(c => { (g[c.name] || (g[c.name]={ms:[],rework:0})).ms.push(c.ms); if (c.hadRework) g[c.name].rework++; });
-  const grandMs = cycles.reduce((a,c)=>a+c.ms,0) || 1;
-  let stageRows = Object.keys(g).map(name => { const ms=g[name].ms, total=ms.reduce((a,b)=>a+b,0);
-    return { name, n:ms.length, p50Ms:median(ms), p90Ms:pctl(ms,90), totalMs:total,
-      sharePct:Math.round(100*total/grandMs), reworkPct:Math.round(100*g[name].rework/ms.length) }; });
-  stageRows.sort((a,b)=> b.totalMs-a.totalMs);
-  let bottleneck=null; stageRows.forEach(s => { if(!bottleneck || s.p50Ms>bottleneck.p50Ms) bottleneck={name:s.name,p50Ms:s.p50Ms,n:s.n}; });
-  stageRows.forEach(s => { s.bn = bottleneck && s.name===bottleneck.name; s.p50 = s.p50Ms/86400000; });
+  // Узкое место = реально макс. p50 (без фильтра по n; ненадёжность помечаем подписью n / «мало данных»).
+  let bottleneck=null; stageRows.forEach(r=>{ if(r.p50Ms!=null&&(!bottleneck||r.p50Ms>bottleneck.p50Ms)) bottleneck={name:r.name,p50Ms:r.p50Ms,n:r.n}; });
 
-  // project cycles
-  const projMs = [];
-  Object.keys(projFirstActive).forEach(pid => { const fa=projFirstActive[pid], ld=projLastDone[pid];
-    if (fa!=null && ld!=null && ld>fa) projMs.push(ld-fa); });
-  const projMedianMs = projMs.length ? median(projMs) : null;
+  // Цикл проекта: span min(старт)→max(финиш); только проекты с ≥2 РАЗНЫМИ измеренными этапами (иначе это длительность 1 этапа).
+  const projAgg={};
+  instances.forEach(it=>{ const a=projAgg[it.pid]||(projAgg[it.pid]={minStart:it.startMs,maxEnd:it.completeAt,names:new Set()}); if(it.startMs<a.minStart) a.minStart=it.startMs; if(it.completeAt>a.maxEnd) a.maxEnd=it.completeAt; a.names.add(it.name); });
+  const spans=Object.keys(projAgg).filter(pid=>projAgg[pid].names.size>=2).map(pid=>projAgg[pid].maxEnd-projAgg[pid].minStart).sort((a,b)=>a-b);
+  const projMedianMs=spans.length?median(spans):null, projCount=spans.length;
 
-  // trend by month of completion (last 6 months with data)
-  const MON = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  const byMonth={}, mKeys=[];
-  cycles.forEach(c => { const d=new Date(c.doneTime); const key=d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0');
-    if(!byMonth[key]){ byMonth[key]={m:d.getMonth(),ms:[]}; mKeys.push(key); } byMonth[key].ms.push(c.ms); });
-  mKeys.sort();
-  const last = mKeys.slice(-6);
-  const trend = { vals: last.map(k=> +(median(byMonth[k].ms)/86400000).toFixed(1)), labels: last.map(k=> MON[byMonth[k].m]) };
+  // Застрявшие WIP: открыты дольше своего p85 (p85 честен от n≥4). Заморож. бюджет ≈ mrr/30.44 × дней.
+  const agingRows=[];
+  wips.forEach(w=>{ const st=nameStat[w.name], thr=(st&&st.p85Ms!=null)?st.p85Ms:null;
+    if(thr!=null&&w.sinceMs>thr){ const mrr=mrrById[w.pid]||0, daysIn=w.sinceMs/86400000, frozen=mrr>0?Math.round(mrr/30.44*daysIn):null;
+      agingRows.push({client:nameById[w.pid]||'—',stage:w.name,sinceMs:w.sinceMs,overPct:Math.round((w.sinceMs/thr-1)*100),frozen}); } });
+  agingRows.sort((a,b)=>b.sinceMs-a.sinceMs);
 
-  // client benchmark
-  const byProj={};
-  cycles.forEach(c => { (byProj[c.pid] || (byProj[c.pid]={ms:[],rework:0})).ms.push(c.ms); if (c.hadRework) byProj[c.pid].rework++; });
-  let clients = Object.keys(byProj).map(pid => { const ms=byProj[pid].ms;
-    return { client:nameById[pid]||'—', n:ms.length, medianMs:median(ms), avgMs:mean(ms), reworkPct:Math.round(100*byProj[pid].rework/ms.length) }; });
-  clients.sort((a,b)=> b.n-a.n);
+  // Тренд: медиана lead по месяцу завершения (последние 6 месяцев с данными).
+  const MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const byMonth={};
+  instances.forEach(it=>{ const d=new Date(it.completeAt), key=d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'); (byMonth[key]||(byMonth[key]={m:d.getMonth(),y:d.getFullYear(),leads:[]})).leads.push(it.leadMs); });
+  const mk=Object.keys(byMonth).sort().slice(-6);
+  const trend={vals:mk.map(k=>median(byMonth[k].leads)),labels:mk.map(k=>MON[byMonth[k].m]+' '+String(byMonth[k].y).slice(2))};
 
-  // stuck now: currently-active stages running longer than p85 of historical cycles
-  const allMs = cycles.map(c=>c.ms);
-  const stuckThresholdMs = allMs.length>=3 ? pctl(allMs,85) : 7*86400000;
-  let stuckNow=0;
-  stages.filter(s=>s.status==='active').forEach(s => { const rows=byStage[s.id]; if(!rows) return;
-    let fa=null; rows.forEach(r=>{ if(r.new_status==='active'){ const t=new Date(r.created_at).getTime(); if(fa==null||t<fa)fa=t; } });
-    if (fa!=null && (now-fa)>stuckThresholdMs) stuckNow++; });
+  // Бенчмарк по клиентам (проектам): средний/медианный цикл завершённого этапа.
+  const byClient={};
+  instances.forEach(it=>{ const b=byClient[it.pid]||(byClient[it.pid]={leads:[],rework:0,n:0}); b.leads.push(it.leadMs); if(it.returns>0) b.rework++; b.n++; });
+  const clients=Object.keys(byClient).map(pid=>{ const b=byClient[pid]; return {client:nameById[pid]||'—',n:b.n,medianMs:median(b.leads),avgMs:mean(b.leads),reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null}; }).sort((a,b)=>(b.medianMs||0)-(a.medianMs||0));
 
-  CYCLES = { projMedianMs, projCount:projMs.length, bottleneck,
-    coverageDone, coverageTotal, coveragePct, stuckNow, stuckThresholdMs,
-    stages:stageRows, trend, clients };
+  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,trend,clients};
 };
 
 /* ===== TEAM · live aggregation (workload & activity per member) ===== */
