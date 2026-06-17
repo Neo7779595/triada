@@ -3601,18 +3601,19 @@ function renderTeam(){
   if(teamTab==='employees'){
     body=`<div class="card">
       <div class="card-h"><div class="t">Сотрудники <span class="c">${TEAM.length} в команде · задачи и активность</span></div></div>
-      <table><thead><tr><th>Сотрудник</th><th>Задач</th><th>Выполнено</th><th>В работе</th><th>Просрочено</th><th>Этапов·30д</th><th>Активность</th><th>Выполнение</th><th></th></tr></thead>
+      <table><thead><tr><th>Сотрудник</th><th>Задач</th><th>Выполнено</th><th>В работе</th><th>Просрочено</th><th>Закрыто·30д</th><th>Переделки</th><th>Активность</th><th>Выполнение</th><th></th></tr></thead>
       <tbody>${TEAM.length?TEAM.map((e,i)=>`<tr>
         <td><div class="ag-name"><span class="ag-dot" style="background:${e.color};border-radius:50%"></span><div><div class="nm">${e.name}</div><div class="sl" style="font-family:var(--font)">${e.role} · ${e.dept}</div></div></div></td>
         <td class="num">${e._assigned||0}</td>
         <td class="num" style="color:${(e._done||0)?'var(--pos)':'var(--txt-3)'}">${e._done||0}</td>
         <td class="num">${e._open||0}</td>
         <td class="num" style="color:${e._overdue?'var(--neg)':'var(--txt-3)'}">${e._overdue||0}</td>
-        <td class="num">${e._v30||0}</td>
+        <td class="num"><div>${e._uniq30||0}</div>${((e._sUniq30||0)+(e._tUniq30||0))?`<div style="font-family:var(--font);font-size:9px;color:var(--txt-3);margin-top:1px;font-weight:500">${e._sUniq30||0} эт · ${e._tUniq30||0} зад</div>`:''}</td>
+        <td class="num" title="Повторно завершено за 30 дней · возвратов всего: ${e._rework||0}" style="color:${(e._redo30||0)>0?'var(--warn)':'var(--txt-3)'}"><div>${e._redo30||0}</div>${(e._rework||0)?`<div style="font-family:var(--font);font-size:9px;color:var(--txt-3);margin-top:1px;font-weight:500">↩ ${e._rework} возвр.</div>`:''}</td>
         <td style="color:${actColor(e._lastDays)};font-size:11.5px">${fmtDays(e._lastDays)}</td>
         <td>${e._compPct!=null?`<div class="eff"><span style="color:${effColor(e._compPct)}">${e._compPct}%</span><div class="bar"><i style="width:${e._compPct}%;background:${effColor(e._compPct)}"></i></div></div>`:'<span style="color:var(--txt-3)">—</span>'}</td>
         <td style="text-align:right;white-space:nowrap"><button class="btn-ghost" style="padding:5px 11px;font-size:11px" onclick="event.stopPropagation();openEmpEdit(${i})">Изм.</button></td>
-      </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--txt-3);padding:24px">Нет сотрудников</td></tr>'}</tbody></table></div>`;
+      </tr>`).join(''):'<tr><td colspan="10" style="text-align:center;color:var(--txt-3);padding:24px">Нет сотрудников</td></tr>'}</tbody></table></div>`;
   } else if(teamTab==='workload'){
     const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
     const sorted=[...TEAM].sort((a,b)=>((b._open||0)+(b._done||0))-((a._open||0)+(a._done||0)));
@@ -3643,7 +3644,7 @@ function renderTeam(){
       const conc=d.open?Math.round(100*d.maxOpen/d.open):0;
       const reworkHigh=d.done && Math.round(100*d.rework/Math.max(d.done,1))>=20;
       return `<div class="dept-card">
-        <div class="dept-h"><div><div class="dept-cy">${d.v30}<span class="u"> этап.</span></div><div style="font-size:11px;color:var(--txt-3);margin-top:5px">закрыто за 30 дн · ${d.emps.length} сотр.</div></div>
+        <div class="dept-h"><div><div class="dept-cy">${d.v30}<span class="u"> закр.</span></div><div style="font-size:11px;color:var(--txt-3);margin-top:5px">закрыто за 30 дн · ${d.emps.length} сотр.</div></div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px"><div class="dept-name">${d.name}</div>${reworkHigh?'<span class="badge b-susp" style="font-size:9.5px"><span class="bd"></span>Возвраты высокие</span>':''}</div></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><span style="font-size:11px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em">Выполнение задач</span><span class="num" style="font-size:18px;color:${comp!=null?effColor(comp):'var(--txt-3)'}">${comp!=null?comp+'%':'—'}</span></div>
         <div class="dept-bar"><i style="width:${comp||0}%"></i></div>
@@ -3654,12 +3655,12 @@ function renderTeam(){
   }
   document.getElementById('content-ag').innerHTML=`
     <div class="ph"><div><div class="eyebrow">Агентство · команда</div><h1>Команда</h1>
-    <div class="s">Реальная загрузка и активность: задачи по исполнителям, закрытые этапы, возвраты.</div></div></div>
+    <div class="s">Реальная загрузка и выработка: задачи по исполнителям, закрытые этапы и задачи (уникальные), переделки и возвраты.</div></div></div>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi"><div class="l">Сотрудников</div><div class="v num">${TEAM.length}</div><div class="sub">в команде</div><div class="kfoot">${A.assigned} задач всего</div></div>
       <div class="kpi"><div class="l">Задач в работе</div><div class="v num">${A.open}</div><div class="sub">открытых задач</div><div class="kfoot">по всем сотрудникам</div></div>
       <div class="kpi"><div class="l">Просрочено у команды</div><div class="v num" style="${A.overdue?'color:var(--neg)':''}">${A.overdue}</div><div class="sub ${A.overdue?'':'pos'}">${A.overdue?'требуют внимания':'всё в срок'}</div><div class="kfoot">открытых задач с дедлайном в прошлом</div></div>
-      <div class="kpi"><div class="l">Этапов закрыто · 30д</div><div class="v num">${A.v30}</div><div class="sub">темп команды</div><div class="kfoot">по истории статусов</div></div>
+      <div class="kpi"><div class="l">Закрыто · 30 дней</div><div class="v num">${A.v30}</div><div class="sub">темп команды</div><div class="kfoot">уникальные · этапы + задачи</div></div>
     </div>
     <div class="tabs-row">
       <div class="segm">
@@ -4497,33 +4498,56 @@ window.tLoadTeam = async () => {
   const now = Date.now();
   const today = new Date(); today.setHours(0,0,0,0);
   const iso30 = new Date(now - 30*86400000).toISOString();
-  const [tr, hr] = await Promise.all([
+  const [tr, hr, thr] = await Promise.all([
     SB.from('project_tasks').select('assignee_id,status,due_date'),
-    SB.from('stage_history').select('changed_by,old_status,new_status,created_at')
+    SB.from('stage_history').select('stage_id,changed_by,old_status,new_status,created_at'),
+    SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at')
   ]);
   const tasks = tr.data||[], hist = hr.data||[];
+  const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];   // task_history может ещё не существовать
   const rank = { wait:0, active:1, done:2 };
   const stat = {};
-  const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,overdue:0,v30:0,rework:0,last:null });
+  const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null });
 
   tasks.forEach(t => { if (!t.assignee_id) return; const a = S(t.assignee_id); a.assigned++;
     if (t.status==='done') a.done++;
     else { a.open++; if (t.status==='wait') a.wait++; if (t.status==='active') a.active++;
       if (t.due_date && new Date(t.due_date+'T00:00:00') < today) a.overdue++; } });
 
-  hist.forEach(h => { if (!h.changed_by) return; const a = S(h.changed_by);
-    const tt = new Date(h.created_at).getTime(); if (a.last==null || tt>a.last) a.last = tt;
-    const f = rank[h.old_status], to = rank[h.new_status]; if (f!=null && to!=null && to<f) a.rework++;
-    if (h.new_status==='done' && h.created_at>=iso30) a.v30++; });
+  /* кредитуем выработку/возвраты по changed_by; уникальные vs повторные — по первому done предмета за всю историю */
+  const creditHist = (rows, idKey, isStage) => {
+    const doneCount = {};
+    const sorted = rows.slice().sort((a,b)=> (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+    sorted.forEach(h => {
+      if (!h.changed_by) return;
+      const a = S(h.changed_by);
+      const tt = new Date(h.created_at).getTime();
+      if (a.last==null || tt>a.last) a.last = tt;
+      const f = rank[h.old_status], to = rank[h.new_status];
+      if (f!=null && to!=null && to<f) a.rework++;                  // переход назад = возврат
+      if (h.new_status==='done') {
+        const idv = h[idKey];
+        const isFirst = !(doneCount[idv] > 0);
+        doneCount[idv] = (doneCount[idv]||0) + 1;
+        if (h.created_at >= iso30) {
+          if (isFirst) { a.uniq30++; if(isStage) a.sUniq30++; else a.tUniq30++; }
+          else         { a.redo30++; }                              // вернули и закрыли заново = переделка
+        }
+      }
+    });
+  };
+  creditHist(hist, 'stage_id', true);
+  creditHist(taskHist, 'task_id', false);
 
   let tA=0, tO=0, tOv=0, tV=0;
   (typeof TEAM!=='undefined'?TEAM:[]).forEach(m => {
-    const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,overdue:0,v30:0,rework:0,last:null };
+    const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null };
     m._assigned=a.assigned; m._done=a.done; m._open=a.open; m._wait=a.wait; m._active=a.active;
-    m._overdue=a.overdue; m._v30=a.v30; m._rework=a.rework;
+    m._overdue=a.overdue; m._uniq30=a.uniq30; m._redo30=a.redo30; m._sUniq30=a.sUniq30; m._tUniq30=a.tUniq30;
+    m._v30=a.uniq30; m._rework=a.rework;   // _v30 = объединённая уникальная выработка (для отделов/KPI)
     m._lastDays = a.last!=null ? Math.floor((now - a.last)/86400000) : null;
     m._compPct = a.assigned ? Math.round(100*a.done/a.assigned) : null;
-    tA+=a.assigned; tO+=a.open; tOv+=a.overdue; tV+=a.v30;
+    tA+=a.assigned; tO+=a.open; tOv+=a.overdue; tV+=a.uniq30;
   });
   TEAMAGG = { assigned:tA, open:tO, overdue:tOv, v30:tV };
 };
