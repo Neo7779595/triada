@@ -4176,18 +4176,22 @@ window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i
   const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+function _pkRerender(){ try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }
 window.tTaskMove = async (id,status) => { try {
     const t=_findTask(id); const patch={status}; const now=new Date().toISOString();
     if(t){ let spent=t.time_spent||0; if(t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
-      patch.time_spent=spent; patch.timer_started=(status==='active')?now:null; }
+      patch.time_spent=spent; patch.timer_started=(status==='active')?now:null;
+      t.status=status; t.time_spent=spent; t.timer_started=patch.timer_started; _pkRerender(); }  // мгновенно: смена колонки + автостарт таймера в «В работе»
     const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
-    await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+    await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
   toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
 window.tTimerPause = async (id) => { try { const t=_findTask(id); let spent=(t&&t.time_spent)||0; if(t&&t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
-  const {error}=await SB.from('project_tasks').update({time_spent:spent,timer_started:null}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tTimerResume = async (id) => { try { const {error}=await SB.from('project_tasks').update({timer_started:new Date().toISOString()}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  if(t){ t.time_spent=spent; t.timer_started=null; _pkRerender(); }  // мгновенная пауза
+  const {error}=await SB.from('project_tasks').update({time_spent:spent,timer_started:null}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
+window.tTimerResume = async (id) => { try { const t=_findTask(id); const now=new Date().toISOString(); if(t){ t.timer_started=now; _pkRerender(); }  // мгновенное продолжение
+  const {error}=await SB.from('project_tasks').update({timer_started:now}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
 
 window.tLoadTags = async () => {
   if (!SB) return;
