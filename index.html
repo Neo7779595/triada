@@ -1081,6 +1081,18 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .dlx-owner{grid-column:2;margin-top:3px}
   .dlx-dist{display:none}
 }
+.cyc-av{position:relative;width:26px;height:26px;border-radius:7px;background:var(--bg-3);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);overflow:hidden;flex-shrink:0;font-family:var(--font)}
+@keyframes cycRow{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.ctbl thead th{border-bottom:1px solid var(--line-2)}
+.ctbl thead th+th,.ctbl tbody td+td{border-left:1px solid var(--line)}
+.ctbl tbody tr{animation:cycRow .45s var(--ease-out) both}
+.cyc-hz:hover{fill:rgba(255,255,255,.045)}
+#cyc-tip{position:fixed;z-index:9999;pointer-events:none;display:none;background:#12161D;border:1px solid var(--line-2);border-radius:11px;padding:11px 13px;min-width:162px;box-shadow:0 10px 32px rgba(0,0,0,.55)}
+#cyc-tip .tt-h{font-weight:700;font-size:12.5px;margin-bottom:7px;color:var(--txt)}
+#cyc-tip .tt-r{display:flex;justify-content:space-between;gap:20px;padding:2.5px 0;font-size:11.5px;color:var(--txt-2)}
+#cyc-tip .tt-r b{font-family:var(--mono);color:var(--txt);font-weight:600}
+#cyc-tip .tt-bn{margin-top:6px;color:var(--neg);font-size:11px;font-weight:600}
+#cyc-tip .tt-mut{color:var(--txt-3);font-size:11.5px}
 </style>
 </head>
 <body>
@@ -3053,7 +3065,9 @@ function svgCycleBars(stages){
     if(prev) p90l+=`<line x1="${prev.x.toFixed(1)}" y1="${prev.y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--violet)" stroke-width="1.8"/>`;
     prev={x:cx,y};
   });
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bars}${p90l}${p90d}${xl}</svg>`;
+  let hz='';
+  stages.forEach((s,i)=>{ const x0=padL+gW*i; hz+=`<rect class="cyc-hz" x="${x0.toFixed(1)}" y="${padT}" width="${gW.toFixed(1)}" height="${iH}" fill="transparent" onmouseenter="_cycTipShow(event,${i})" onmousemove="_cycTipMove(event)" onmouseleave="_cycTipHide()"/>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bars}${p90l}${p90d}${xl}${hz}</svg>`;
 }
 function svgCycleTrend(msVals,labels){
   const W=1100,H=240,padL=54,padR=26,padT=30,padB=40;
@@ -3075,8 +3089,23 @@ function svgCycleTrend(msVals,labels){
   const xlabs=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" fill="#7A828C" font-size="11">${l}</text>`).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;height:auto"><polygon class="c-area" points="${area}" fill="var(--accent-dim)"/>${grid}${yl}<polyline class="c-line" pathLength="1" points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>${dots}${vlabs}${xlabs}</svg>`;
 }
+function _cycTipShow(e,i){
+  const d=(window._cycChart||[])[i], el=document.getElementById('cyc-tip'); if(!d||!el) return;
+  let h='<div class="tt-h">'+d.name+'</div>';
+  if(d.unmeasured){ h+='<div class="tt-mut">Нет измеренных циклов</div>'; }
+  else{
+    h+='<div class="tt-r"><span>Медиана (p50)</span><b>'+_cycDur(d.p50Ms)+'</b></div>';
+    h+='<div class="tt-r"><span>Худший (p90)</span><b>'+(d.p90Ms!=null?_cycDur(d.p90Ms):'—')+'</b></div>';
+    h+='<div class="tt-r"><span>Циклов (n)</span><b>'+(d.n!=null?d.n:'—')+'</b></div>';
+    if(d.bn) h+='<div class="tt-bn">● Узкое место</div>';
+  }
+  el.innerHTML=h; el.style.display='block'; _cycTipMove(e);
+}
+function _cycTipMove(e){ const el=document.getElementById('cyc-tip'); if(!el||el.style.display==='none') return; const p=14,w=el.offsetWidth,hh=el.offsetHeight; let x=e.clientX+p,y=e.clientY+p; if(x+w>window.innerWidth-8)x=e.clientX-w-p; if(y+hh>window.innerHeight-8)y=e.clientY-hh-p; el.style.left=x+'px'; el.style.top=y+'px'; }
+function _cycTipHide(){ const el=document.getElementById('cyc-tip'); if(el) el.style.display='none'; }
 function renderCycles(){
-  const C = CYCLES;
+  const C = CYCLES; window._cycChart = C.chartStages;
+  if(!document.getElementById('cyc-tip')){ const _t=document.createElement('div'); _t.id='cyc-tip'; document.body.appendChild(_t); }
   const has = C.stages.length>0;
   const bn = C.bottleneck;
   const aging = C.agingRows||[];
@@ -3095,7 +3124,7 @@ function renderCycles(){
     ${aging.length?`<div class="card" style="margin-top:16px;border-color:var(--accent-line)">
       <div class="card-h"><div class="t" style="color:var(--neg)">Застрявшие этапы <span class="c">дольше своего p85</span></div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
-        ${aging.map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--neg-dim);border:1px solid var(--neg-dim);border-radius:10px">
+        ${aging.map((a,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--neg-dim);border:1px solid var(--neg-dim);border-radius:10px;animation:cycRow .4s var(--ease-out) both;animation-delay:${i*55}ms">
           <div style="min-width:0"><div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.client}</div><div style="font-size:11px;color:var(--txt-2);font-family:var(--mono);margin-top:2px">${a.stage}</div></div>
           <div style="text-align:right;flex-shrink:0"><div class="num" style="font-weight:800;font-size:15px;color:var(--neg)">${_cycDur(a.sinceMs)}</div><div style="font-size:10px;color:var(--warn);font-family:var(--mono);margin-top:2px">+${a.overPct}% к норме${a.frozen!=null?' · ~'+money(a.frozen)+' заморож.':''}</div></div>
         </div>`).join('')}
@@ -3116,9 +3145,9 @@ function renderCycles(){
 
     <div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">Детализация по этапам</div></div>
-      <table>
+      <table class="ctbl">
         <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th>Доля</th><th>% возвратов</th><th>Простой</th></tr></thead>
-        <tbody>${C.stages.map(s=>`<tr>
+        <tbody>${C.stages.map((s,i)=>`<tr style="animation-delay:${i*45}ms">
           <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${s.name}${s.lowSample?' <span style="color:var(--warn);font-size:10px;font-family:var(--mono)">мало данных</span>':''}</td>
           <td class="num">${s.n}</td>
           <td class="num" style="color:var(--accent)">${_cycDur(s.p50Ms)}</td>
@@ -3137,10 +3166,10 @@ function renderCycles(){
 
     ${C.clients.length?`<div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">Бенчмарк по клиентам <span class="c">средний цикл завершённого этапа</span></div></div>
-      <table>
+      <table class="ctbl">
         <thead><tr><th>Клиент</th><th>Этапов</th><th>Медиана</th><th>Среднее</th><th>% возвратов</th></tr></thead>
-        <tbody>${C.clients.map(c=>`<tr>
-          <td><div class="ag-name"><span class="ag-dot" style="background:var(--accent)"></span><div class="nm">${c.client}</div></div></td>
+        <tbody>${C.clients.map((c,i)=>`<tr style="animation-delay:${i*45}ms">
+          <td><div class="ag-name" style="gap:11px"><span class="cyc-av">${logoFill(c.logoUrl,c.logo)}</span><div class="nm">${c.client}</div></div></td>
           <td class="num">${c.n}</td>
           <td class="num" style="color:var(--accent)">${_cycDur(c.medianMs)}</td>
           <td class="num" style="color:var(--txt-3)">${_cycDur(c.avgMs)}</td>
@@ -4288,8 +4317,8 @@ window.tLoadCycles = async () => {
     SB.from('project_stages').select('name')
   ]);
   const hist = hr.data||[];
-  const nameById={}, mrrById={};
-  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; });
+  const nameById={}, mrrById={}, logoById={};
+  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; logoById[p.id]={url:p.logoUrl||'', letter:(p.logo||(p.name?p.name[0]:'?'))}; });
 
   // TRIADA-статусы → семантика цикла: done=закрытие инстанса, active=работа, wait=возврат (откат).
   // done→active НЕ возврат, а НОВЫЙ цикл (его открывает следующий active). Возврат = active→wait внутри открытого инстанса.
@@ -4370,12 +4399,12 @@ window.tLoadCycles = async () => {
   // Бенчмарк по клиентам (проектам): средний/медианный цикл завершённого этапа.
   const byClient={};
   instances.forEach(it=>{ const b=byClient[it.pid]||(byClient[it.pid]={leads:[],rework:0,n:0}); b.leads.push(it.leadMs); if(it.returns>0) b.rework++; b.n++; });
-  const clients=Object.keys(byClient).map(pid=>{ const b=byClient[pid]; return {client:nameById[pid]||'—',n:b.n,medianMs:median(b.leads),avgMs:mean(b.leads),reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null}; }).sort((a,b)=>(b.medianMs||0)-(a.medianMs||0));
+  const clients=Object.keys(byClient).map(pid=>{ const b=byClient[pid]; const lg=logoById[pid]||{url:'',letter:'?'}; return {client:nameById[pid]||'—',logoUrl:lg.url,logo:lg.letter,n:b.n,medianMs:median(b.leads),avgMs:mean(b.leads),reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null}; }).sort((a,b)=>(b.medianMs||0)-(a.medianMs||0));
 
   // Полный конвейер для графика: все этапы (даже без замера) — как в DTR: ось заполнена, узкое место слева, неизмеренные нули справа.
   const bnName=bottleneck?bottleneck.name:null;
   const allNames=[...new Set([...(sr.data||[]).map(r=>r.name).filter(Boolean), ...stageRows.map(r=>r.name)])];
-  const chartStages=allNames.map(nm=>{ const st=nameStat[nm]; return st?{name:nm,p50Ms:st.p50Ms,p90Ms:st.p90Ms,bn:nm===bnName,unmeasured:false}:{name:nm,p50Ms:0,p90Ms:null,bn:false,unmeasured:true}; }).sort((a,b)=>(b.p50Ms||0)-(a.p50Ms||0));
+  const chartStages=allNames.map(nm=>{ const st=nameStat[nm]; return st?{name:nm,p50Ms:st.p50Ms,p90Ms:st.p90Ms,n:st.n,bn:nm===bnName,unmeasured:false}:{name:nm,p50Ms:0,p90Ms:null,n:0,bn:false,unmeasured:true}; }).sort((a,b)=>(b.p50Ms||0)-(a.p50Ms||0));
 
   CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients};
 };
