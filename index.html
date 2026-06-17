@@ -2900,7 +2900,12 @@ function renderDeadlines(){
 }
 
 /* ——— OVERVIEW module · live data only (no mock) ——— */
-let OVERVIEW = { onTime:0, deadlineDone:0, v7:0, v30:0, vMonth:0, monthName:'', rework:0, trans:0, overdueItems:0, stageLoad:[] };
+let OVERVIEW = { monthName:'', taskHistoryExists:false,
+  onTime:0, deadlineDone:0, v7:0, v30:0, vMonth:0, rework:0, trans:0,
+  tOnTime:0, tDeadlineDone:0, tV7:0, tV30:0, tVMonth:0, tRework:0, tTrans:0,
+  overdueItems:0, overdueStages:0, overdueTasks:0,
+  stOpen:0, stActive:0, stWait:0, stDone:0, tkOpen:0, tkActive:0, tkWait:0, tkDone:0,
+  stageLoad:[] };
 let ovFilter = 'all';
 function setOvFilter(f){ ovFilter = f; renderOverview(); }
 function ovOpen(id){ const i=(typeof PROJECTS!=='undefined'?PROJECTS:[]).findIndex(x=>x.id===id); if(i>=0) openProject(i); }
@@ -2938,6 +2943,23 @@ function renderOverview(){
   const churnB = stale===0 ? ['b-active','Норма'] : stale<=1 ? ['b-trial','Внимание'] : ['b-susp','Риск'];
   const reworkB= reworkPct>=20 ? ['b-susp','Высокий'] : reworkPct>=8 ? ['b-trial','Средний'] : ['b-active','Низкий'];
 
+  /* —— этапы + задачи: объединённые значения и токены-обозначения —— */
+  const TH = O.taskHistoryExists;
+  const v30C = O.v30 + O.tV30, v7C = O.v7 + O.tV7, vMonC = O.vMonth + O.tVMonth;
+  const reworkC = O.rework + O.tRework, transC = O.trans + O.tTrans;
+  const reworkPctC = transC ? Math.round(100*reworkC/transC) : 0;
+  const otDoneC = O.deadlineDone + O.tDeadlineDone, otOkC = O.onTime + O.tOnTime;
+  const otPctC = otDoneC ? Math.round(100*otOkC/otDoneC) : null;
+  const reworkBC = reworkPctC>=20 ? ['b-susp','Высокий'] : reworkPctC>=8 ? ['b-trial','Средний'] : ['b-active','Низкий'];
+  const IC_ST = '<path d="M3 12h4l2 6 4-14 2 8h6"/>';
+  const IC_TK = '<rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="14" y="4" width="6" height="10" rx="1.5"/>';
+  const _svg = ic => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">${ic}</svg>`;
+  const split = (sv,tv,needJ,suf) => { suf=suf||'';
+    const st = `<span class="ov-tok st">${_svg(IC_ST)}${sv}${suf}</span>`;
+    const tk = (needJ && !TH) ? `<span class="ov-tok tk dim">${_svg(IC_TK)}нет журнала</span>`
+                              : `<span class="ov-tok tk">${_svg(IC_TK)}${tv}${suf}</span>`;
+    return `<div class="ov-split">${st}${tk}</div>`; };
+
   /* —— portfolio rows (respect the active filter tab) —— */
   const rows = P.filter(p => ovFilter==='all' ? true : ovFilter==='active' ? p.status!=='done' : ovFilter==='overdue' ? !!p._overdue : p.status==='done');
   const seg = (k,lbl,dot) => `<button class="${ovFilter===k?'on':''}" onclick="setOvFilter('${k}')">${dot||''}${lbl}</button>`;
@@ -2952,18 +2974,29 @@ function renderOverview(){
     <div class="ph"><div><div class="eyebrow">Агентство · обзор</div><h1>Сводка</h1>
     <div class="s">Состояние портфеля одним экраном: здоровье, скорость, риски, нагрузка. Все цифры считаются из ваших проектов.</div></div></div>
 
+    <style>
+      #content-ag .ov-tok{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;white-space:nowrap}
+      #content-ag .ov-tok svg{width:12px;height:12px;flex:none}
+      #content-ag .ov-tok.st{color:var(--accent)} #content-ag .ov-tok.tk{color:var(--violet)} #content-ag .ov-tok.dim{color:var(--txt-3);opacity:.75}
+      #content-ag .ov-split{display:flex;gap:13px;margin-top:8px;flex-wrap:wrap}
+      #content-ag .ov-leg{display:flex;gap:13px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--txt-3);margin:-2px 0 14px}
+      #content-ag .ov-rtok{display:inline-flex;width:19px;height:19px;border-radius:5px;align-items:center;justify-content:center;flex:none}
+      #content-ag .ov-rtok svg{width:11px;height:11px} #content-ag .ov-rtok.st{background:var(--accent-dim);color:var(--accent)} #content-ag .ov-rtok.tk{background:rgba(138,143,255,.14);color:var(--violet)}
+    </style>
+    <div class="ov-leg"><span style="color:var(--txt-2);font-weight:600">Обозначения</span><span class="ov-tok st">${_svg(IC_ST)}Этапы</span><span class="ov-tok tk">${_svg(IC_TK)}Задачи</span><span>— скорость, откаты, on-time и просрочка считаются по обоим${TH?'':' · <b style="color:var(--warn)">журнал задач не создан — выполните SQL, см. сообщение</b>'}</span></div>
+
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi"><div class="l">Индекс здоровья</div><div class="v num" style="color:${hMeta[0]}">${health}<span class="u">%</span></div><div class="sub">${hMeta[1]}</div><div class="kfoot">${active.length} активных · ${doneN} завершено</div></div>
-      <div class="kpi"><div class="l">On-time delivery</div><div class="v num">${otPct==null?'—':otPct+'<span class="u">%</span>'}</div><div class="sub">${otPct==null?'нет завершённых с дедлайном':'этапов сдано в срок'}</div><div class="kfoot">${O.deadlineDone} с дедлайном · ${O.onTime} в срок</div></div>
-      <div class="kpi"><div class="l">Просрочено сейчас</div><div class="v num" style="color:${O.overdueItems?'var(--neg)':'inherit'}">${O.overdueItems}</div><div class="sub ${O.overdueItems?'':'pos'}">${O.overdueItems?'требуют действия':'всё в норме'}</div><div class="kfoot">${overdueProjects} проектов · ${O.overdueItems} этапов/задач</div></div>
-      <div class="kpi"><div class="l">Velocity · 30 дней</div><div class="v num">${O.v30}</div><div class="sub">этапов закрыто</div><div class="kfoot">за 7 дней: ${O.v7} · ${O.monthName}: ${O.vMonth} · 30 дн: ${O.v30}</div></div>
+      <div class="kpi"><div class="l">On-time delivery</div><div class="v num">${otPctC==null?'—':otPctC+'<span class="u">%</span>'}</div><div class="sub">${otPctC==null?'нет завершённых с дедлайном':'сдано в срок · в срок / всего'}</div>${split(O.onTime+'/'+O.deadlineDone,O.tOnTime+'/'+O.tDeadlineDone,true)}</div>
+      <div class="kpi"><div class="l">Просрочено сейчас</div><div class="v num" style="color:${O.overdueItems?'var(--neg)':'inherit'}">${O.overdueItems}</div><div class="sub ${O.overdueItems?'':'pos'}">${O.overdueItems?'требуют действия':'всё в норме'}</div>${split(O.overdueStages,O.overdueTasks,false)}<div class="kfoot">${overdueProjects} ${overdueProjects===1?'проект':'проектов'} затронуто</div></div>
+      <div class="kpi"><div class="l">Velocity · 30 дней</div><div class="v num">${v30C}</div><div class="sub">этапов и задач закрыто</div>${split(O.v30,O.tV30,true)}<div class="kfoot">7 дн: ${v7C} · ${O.monthName}: ${vMonC}</div></div>
     </div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10"/><path d="M12 2v10h10A10 10 0 0012 2z"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Концентрация портфеля</div><span class="badge ${concB[0]}" style="font-size:9px;padding:2px 7px">${concB[1]}</span></div><div class="v num" style="color:${concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${concentration}<span class="u">%</span></div><div class="sub">${concTop} · крупнейший</div></div></div>
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Средний прогресс</div><span class="badge ${progB[0]}" style="font-size:9px;padding:2px 7px">${progB[1]}</span></div><div class="v num">${avgProg}<span class="u">%</span></div><div class="sub">в среднем по активным</div></div></div>
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.9 17.9A10 10 0 0112 20C5 20 1 12 1 12a18 18 0 015-5.9M9.9 4.2A9 9 0 0112 4c7 0 11 8 11 8a18 18 0 01-2.2 3.2m-6.7-1.1a3 3 0 11-4.2-4.2"/><path d="M1 1l22 22"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Риск оттока</div><span class="badge ${churnB[0]}" style="font-size:9px;padding:2px 7px">${churnB[1]}</span></div><div class="v num" style="color:${stale?'var(--warn)':'inherit'}">${stale}</div><div class="sub">${stale?('без активности ≥ '+STALE+' дн'):'активность в норме'}</div></div></div>
-      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Откаты (rework)</div><span class="badge ${reworkB[0]}" style="font-size:9px;padding:2px 7px">${reworkB[1]}</span></div><div class="v num" style="color:${reworkPct>=20?'var(--neg)':'inherit'}">${O.rework}</div><div class="sub">${reworkPct}% переходов назад</div></div></div>
+      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Откаты (rework)</div><span class="badge ${reworkBC[0]}" style="font-size:9px;padding:2px 7px">${reworkBC[1]}</span></div><div class="v num" style="color:${reworkPctC>=20?'var(--neg)':'inherit'}">${reworkC}</div><div class="sub">${reworkPctC}% переходов назад</div>${split(O.rework,O.tRework,true)}</div></div>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -3000,8 +3033,8 @@ function renderOverview(){
     <div class="row2" style="margin-top:16px">
       <div class="card">
         <div class="card-h"><div class="t">Радар дедлайнов <span class="c">просрочено · сегодня · неделя</span></div></div>
-        <div class="card-body">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);return `<div class="rd-row">
-          <div class="rd-date">${d.day} ${d.mon}</div>
+        <div class="card-body">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);const tt=d.type==='task'?`<span class="ov-rtok tk" title="Задача">${_svg(IC_TK)}</span>`:`<span class="ov-rtok st" title="Этап">${_svg(IC_ST)}</span>`;return `<div class="rd-row">
+          ${tt}<div class="rd-date">${d.day} ${d.mon}</div>
           <div class="rd-main"><div class="rd-stage">${d.stage}</div><div class="rd-proj">${d.project}</div></div>
           <span class="badge ${rb[0]}" style="font-size:9px;padding:2px 7px">${rb[1]}</span>
         </div>`;}).join(''):'<div class="empty-mini">Нет ближайших дедлайнов</div>'}</div>
@@ -4144,10 +4177,13 @@ window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i
 window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tTaskMove = async (id,status) => { try {
-    const t=_findTask(id); const patch={status}; const now=new Date().toISOString();
+    const t=_findTask(id); const old=t?t.status:null; const patch={status}; const now=new Date().toISOString();
     if(t){ let spent=t.time_spent||0; if(t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
       patch.time_spent=spent; patch.timer_started=(status==='active')?now:null; }
     const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
+    if(old!==status){ try{ const me=(window.tMe&&window.tMe())||null;
+      await SB.from('task_history').insert({ task_id:id, project_id:t?t.project_id:null, task_title:t?t.title:null, old_status:old, new_status:status, changed_by:me?me.id:null }); }
+      catch(_){ /* task_history ещё не создана — метрики задач включатся после SQL ниже */ } }
     await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
   toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
@@ -4249,31 +4285,45 @@ window.tLoadOverview = async () => {
   const isoMon = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
   const MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-  const [sr, tr, hr] = await Promise.all([
+  const [sr, tr, hr, thr] = await Promise.all([
     SB.from('project_stages').select('id,project_id,name,status,due_date'),
-    SB.from('project_tasks').select('project_id,status,due_date'),
-    SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at')
+    SB.from('project_tasks').select('id,project_id,status,due_date'),
+    SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at'),
+    SB.from('task_history').select('task_id,project_id,old_status,new_status,created_at')   // может ещё не существовать
   ]);
   const stages = sr.data||[], tasks = tr.data||[], hist = hr.data||[];
+  const taskHistoryExists = !!(thr && !thr.error);                 // создана ли таблица журнала задач
+  const taskHist = (taskHistoryExists && thr.data) ? thr.data : [];
   const rank = { wait:0, active:1, done:2 };
-  const dueOf = {}; stages.forEach(s => { dueOf[s.id] = s.due_date; });
+  const dueOfStage = {}; stages.forEach(s => { dueOfStage[s.id] = s.due_date; });
+  const dueOfTask  = {}; tasks.forEach(t => { dueOfTask[t.id]  = t.due_date; });
 
-  let v7=0, v30=0, vMonth=0, rework=0, trans=0, onTime=0, deadlineDone=0;
+  /* —— общий разбор журнала переходов: velocity / откаты / on-time / последняя активность —— */
+  const tally = (rows, dueMap, idKey) => {
+    const o = { v7:0, v30:0, vMonth:0, rework:0, trans:0, onTime:0, deadlineDone:0, lastAct:{} };
+    rows.forEach(h => {
+      const t = new Date(h.created_at).getTime();
+      if (!(h.project_id in o.lastAct) || t > o.lastAct[h.project_id]) o.lastAct[h.project_id] = t;
+      o.trans++;
+      const f = rank[h.old_status], to = rank[h.new_status];
+      if (f != null && to != null && to < f) o.rework++;          // переход назад = откат
+      if (h.new_status === 'done') {
+        if (h.created_at >= iso30) o.v30++;
+        if (h.created_at >= iso7)  o.v7++;
+        if (h.created_at >= isoMon) o.vMonth++;
+        const due = dueMap[h[idKey]];
+        if (due) { o.deadlineDone++; if (t <= new Date(due+'T23:59:59').getTime()) o.onTime++; }
+      }
+    });
+    return o;
+  };
+  const S = tally(hist,     dueOfStage, 'stage_id');   // этапы
+  const T = tally(taskHist, dueOfTask,  'task_id');    // задачи
+
+  /* последняя активность по проекту — из обоих журналов */
   const lastAct = {};
-  hist.forEach(h => {
-    const t = new Date(h.created_at).getTime();
-    if (!(h.project_id in lastAct) || t > lastAct[h.project_id]) lastAct[h.project_id] = t;
-    trans++;
-    const f = rank[h.old_status], to = rank[h.new_status];
-    if (f != null && to != null && to < f) rework++;            // переход назад = откат
-    if (h.new_status === 'done') {
-      if (h.created_at >= iso30)  v30++;
-      if (h.created_at >= iso7)   v7++;
-      if (h.created_at >= isoMon)  vMonth++;
-      const due = dueOf[h.stage_id];
-      if (due) { deadlineDone++; if (t <= new Date(due+'T23:59:59').getTime()) onTime++; }
-    }
-  });
+  [S.lastAct, T.lastAct].forEach(m => Object.keys(m).forEach(pid => {
+    if (!(pid in lastAct) || m[pid] > lastAct[pid]) lastAct[pid] = m[pid]; }));
 
   /* per-project rollup: done / total / nearest deadline / overdue flag */
   const roll = {};
@@ -4285,11 +4335,16 @@ window.tLoadOverview = async () => {
     if (new Date(t.due_date+'T00:00:00') < today) a.over = true;
     if (!a.next || t.due_date < a.next) a.next = t.due_date; } });
 
-  let overdueItems = 0;
-  const over = (status, due) => { if (status==='done' || !due) return;
-    if (new Date(due+'T00:00:00') < today) overdueItems++; };
-  stages.forEach(s => over(s.status, s.due_date));
-  tasks.forEach(t => over(t.status, t.due_date));
+  /* просрочка — раздельно этапы и задачи (точечное состояние, журнал не нужен) */
+  const isOver = (status, due) => status!=='done' && !!due && new Date(due+'T00:00:00') < today;
+  let overdueStages = 0, overdueTasks = 0;
+  stages.forEach(s => { if (isOver(s.status, s.due_date)) overdueStages++; });
+  tasks.forEach(t  => { if (isOver(t.status, t.due_date)) overdueTasks++; });
+  const overdueItems = overdueStages + overdueTasks;
+
+  /* открытые / в работе / ожидание — раздельно (точечное состояние) */
+  const cnt = rows => { const o={open:0,active:0,wait:0,done:0}; rows.forEach(r=>{ if(o[r.status]!=null)o[r.status]++; if(r.status!=='done')o.open++; }); return o; };
+  const stC = cnt(stages), tkC = cnt(tasks);
 
   /* enrich PROJECTS in place (read by renderOverview / portfolio table) */
   (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => {
@@ -4304,8 +4359,18 @@ window.tLoadOverview = async () => {
     lm[nm].total++; if (s.status==='done') lm[nm].done++; });
   const stageLoad = lo.map(n => lm[n]).sort((a,b)=> (b.total-a.total) || a.name.localeCompare(b.name,'ru'));
 
-  OVERVIEW = { onTime, deadlineDone, v7, v30, vMonth, monthName: MON[today.getMonth()],
-    rework, trans, overdueItems, stageLoad };
+  OVERVIEW = {
+    monthName: MON[today.getMonth()], taskHistoryExists,
+    /* этапы */
+    onTime:S.onTime, deadlineDone:S.deadlineDone, v7:S.v7, v30:S.v30, vMonth:S.vMonth, rework:S.rework, trans:S.trans,
+    /* задачи */
+    tOnTime:T.onTime, tDeadlineDone:T.deadlineDone, tV7:T.v7, tV30:T.v30, tVMonth:T.vMonth, tRework:T.rework, tTrans:T.trans,
+    /* просрочка */
+    overdueItems, overdueStages, overdueTasks,
+    /* точечные счётчики статусов */
+    stOpen:stC.open, stActive:stC.active, stWait:stC.wait, stDone:stC.done,
+    tkOpen:tkC.open, tkActive:tkC.active, tkWait:tkC.wait, tkDone:tkC.done,
+    stageLoad };
 };
 
 /* ===== CYCLES · live aggregation (cycle time from stage history) ===== */
