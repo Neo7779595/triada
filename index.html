@@ -4177,13 +4177,10 @@ window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i
 window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tTaskMove = async (id,status) => { try {
-    const t=_findTask(id); const old=t?t.status:null; const patch={status}; const now=new Date().toISOString();
+    const t=_findTask(id); const patch={status}; const now=new Date().toISOString();
     if(t){ let spent=t.time_spent||0; if(t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
       patch.time_spent=spent; patch.timer_started=(status==='active')?now:null; }
     const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
-    if(old!==status){ try{ const me=(window.tMe&&window.tMe())||null;
-      await SB.from('task_history').insert({ task_id:id, project_id:t?t.project_id:null, task_title:t?t.title:null, old_status:old, new_status:status, changed_by:me?me.id:null }); }
-      catch(_){ /* task_history ещё не создана — метрики задач включатся после SQL ниже */ } }
     await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
   toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
