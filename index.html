@@ -1153,7 +1153,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 #cyc-tip .tt-r b{font-family:var(--mono);color:var(--txt);font-weight:600}
 #cyc-tip .tt-bn{margin-top:6px;color:var(--neg);font-size:11px;font-weight:600}
 #cyc-tip .tt-mut{color:var(--txt-3);font-size:11.5px}
-.ptile{display:flex;align-items:stretch;gap:18px;background:var(--bg-1);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r);padding:16px 18px;margin-bottom:12px;transition:.16s;cursor:pointer;animation:riseIn .5s var(--ease-out) both}
+.ptile{display:flex;align-items:stretch;gap:0;background:var(--bg-1);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r);padding:20px 12px;margin-bottom:12px;transition:.16s;cursor:pointer;animation:riseIn .5s var(--ease-out) both}
+.pt-l,.pt-id,.pt-gauge,.pt-metrics,.pt-act{padding-left:24px;padding-right:24px}
+.pt-id,.pt-gauge,.pt-metrics,.pt-act{border-left:1px solid var(--line)}
+.pt-l{padding-left:8px}
+.pt-act{padding-right:8px}
 .ptile:hover{background:var(--bg-2)}
 .pt-l{flex:0 0 auto;display:flex;align-items:center}
 .pt-ring{position:relative;width:76px;height:76px}
@@ -1186,10 +1190,11 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .sg-active{background:var(--violet);animation:dotPulse 1.8s ease-in-out infinite}
 .sg-wait{background:var(--bg-3)}
 .pt-note{font-size:11.5px;color:var(--txt-2);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:440px;font-style:italic}
-.pt-gauge{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0 10px;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+.pt-gauge{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.pt-gauge-s{font-size:8.5px;font-family:var(--mono);color:var(--txt-3);margin-top:1px;text-align:center}
 .pt-gauge-l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
 .pt-gauge-v{font-size:12.5px;font-weight:700}
-.pt-metrics{flex:0 0 auto;display:grid;grid-template-columns:repeat(5,minmax(56px,1fr));gap:9px;align-items:center}
+.pt-metrics{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,minmax(72px,1fr));gap:20px;align-items:center}
 .ptm{text-align:center}
 .ptm .l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
 .ptm .v{font-size:13px;font-weight:600;font-family:var(--mono);margin-top:3px;color:var(--txt)}
@@ -1197,7 +1202,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-act{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;justify-content:center}
 .pt-act button{width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s}
 .pt-act button:hover{color:var(--accent);border-color:var(--accent-line)}
-@media(max-width:1280px){.pt-metrics{grid-template-columns:repeat(3,1fr)}.pt-gauge{display:none}}
+@media(max-width:1180px){.pt-gauge{display:none}}
 @media(max-width:1000px){.pt-pipe,.pt-note{display:none}}
 </style>
 </head>
@@ -2132,14 +2137,18 @@ function _projTariff(p){ if(p.tariff) return {name:p.tariff,derived:false}; cons
 function _ltvOf(p){ if(!p.createdAt||!p.mrr) return {ltv:0,months:0}; const months=Math.max(0,(Date.now()-new Date(p.createdAt).getTime())/(30.44*86400000)); return {ltv:Math.round(p.mrr*months),months}; }
 function _projComplexity(p){
   const tot=parseInt((p.stages||'0 / 0').split('/')[1])||0;
-  const lengthScore=Math.min(100,(tot/12)*100);
-  let score,hasData=false,n=0;
   const cy=(typeof CYCLES!=='undefined'&&CYCLES.clients)?CYCLES.clients.find(c=>c.client===p.name):null;
-  if(cy&&cy.medianMs!=null){ const days=cy.medianMs/86400000; const cycleScore=Math.min(100,Math.max(0,(Math.log10(days*24+1)/Math.log10(14*24+1))*100)); const reworkScore=Math.min(100,cy.reworkPct||0); score=Math.round(0.45*cycleScore+0.30*reworkScore+0.25*lengthScore); hasData=true; n=cy.n; }
-  else { const w=p.svc==='PROD'?80:p.svc==='SMM'?55:40; score=Math.round(0.6*lengthScore+0.4*w); }
-  const label=score>66?'Высокая':score>=34?'Средняя':'Низкая';
-  const color=score>66?'var(--neg)':score>=34?'var(--warn)':'var(--pos)';
-  return {score,label,color,hasData,n};
+  if(cy&&cy.medianMs!=null&&cy.n>=1){
+    const days=cy.medianMs/86400000;
+    const cycleScore=Math.min(100,Math.max(0,(Math.log10(days*24+1)/Math.log10(14*24+1))*100));
+    const reworkScore=Math.min(100,cy.reworkPct||0);
+    const lengthScore=Math.min(100,(tot/12)*100);
+    const score=Math.round(0.45*cycleScore+0.30*reworkScore+0.25*lengthScore);
+    const label=score>66?'Высокая':score>=34?'Средняя':'Низкая';
+    const color=score>66?'var(--neg)':score>=34?'var(--warn)':'var(--pos)';
+    return {score,label,color,hasData:true,n:cy.n,stages:tot};
+  }
+  return {score:0,label:'нет замеров',color:'var(--txt-3)',hasData:false,n:0,stages:tot};
 }
 function _projRisk(p){
   if(p.status==='done') return {lvl:'done',label:'Завершён',color:'var(--txt-3)'};
@@ -2152,7 +2161,8 @@ function _projRisk(p){
 }
 function _ringSVG(pct,color){ const r=30,c=2*Math.PI*r,off=c*(1-Math.min(Math.max(pct,0),100)/100);
   return `<svg viewBox="0 0 76 76" width="76" height="76" style="transform:rotate(-90deg)"><circle cx="38" cy="38" r="${r}" fill="none" stroke="var(--bg-3)" stroke-width="7"/><circle class="pt-ring-fg" cx="38" cy="38" r="${r}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>`; }
-function _gaugeSVG(score,color){ const sc=Math.min(Math.max(score,0),100),r=30,cx=40,cy=40,a=Math.PI*(1-sc/100),nx=cx+r*Math.cos(a),ny=cy-r*Math.sin(a),Ln=Math.PI*r,bg=`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`;
+function _gaugeSVG(score,color,dim){ const sc=Math.min(Math.max(score,0),100),r=30,cx=40,cy=40,a=Math.PI*(1-sc/100),nx=cx+r*Math.cos(a),ny=cy-r*Math.sin(a),Ln=Math.PI*r,bg=`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`;
+  if(dim) return `<svg viewBox="0 0 80 50" width="78" height="48"><path d="${bg}" fill="none" stroke="var(--bg-3)" stroke-width="6" stroke-linecap="round"/><text x="40" y="35" text-anchor="middle" fill="var(--txt-3)" font-size="14" font-family="ui-monospace,monospace">?</text></svg>`;
   return `<svg viewBox="0 0 80 50" width="78" height="48"><path d="${bg}" fill="none" stroke="var(--bg-3)" stroke-width="6" stroke-linecap="round"/><path d="${bg}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${Ln.toFixed(1)}" stroke-dashoffset="${(Ln*(1-sc/100)).toFixed(1)}"/><line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--txt)" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="2.6" fill="var(--txt)"/></svg>`; }
 function _pipeBar(pp){ const seg=(n,cls)=> n>0?`<i class="${cls}" style="flex:${n}"></i>`:''; return `<div class="pt-pipe-bar">${pp.total>0?(seg(pp.done,'sg-done')+seg(pp.active,'sg-active')+seg(pp.wait,'sg-wait')):'<i class="sg-wait" style="flex:1"></i>'}</div>`; }
 const _projCard=(p)=>{
@@ -2190,13 +2200,11 @@ const _projCard=(p)=>{
           <div class="pt-pipe"><div class="pt-pipe-h">Этапы <span>${pp.done} done · ${pp.active} в работе · ${pp.wait} в очереди</span></div>${_pipeBar(pp)}</div>
           ${noteEsc?`<div class="pt-note" title="${noteEsc}">«${noteEsc}»</div>`:''}
         </div>
-        <div class="pt-gauge">${_gaugeSVG(cx.score,cx.color)}<div class="pt-gauge-l">Сложность</div><div class="pt-gauge-v" style="color:${cx.color}">${cx.label}${cx.hasData?'':'°'}</div></div>
+        <div class="pt-gauge">${_gaugeSVG(cx.score,cx.color,!cx.hasData)}<div class="pt-gauge-l">Сложность</div><div class="pt-gauge-v" style="color:${cx.color};${cx.hasData?'':'font-size:11px'}">${cx.label}</div><div class="pt-gauge-s">${cx.hasData?('по циклам · n='+cx.n):(cx.stages+' этап. · оценка')}</div></div>
         <div class="pt-metrics">
-          <div class="ptm"><div class="l">MRR</div><div class="v">${_kmrr(p.mrr)}</div></div>
-          <div class="ptm"><div class="l">Маржа</div><div class="v" style="color:${mC}">${margin==null?'—':margin+'%'}</div></div>
           <div class="ptm"><div class="l">LTV</div><div class="v">${_kmrr(lt.ltv)}</div><div class="sub">${lt.months.toFixed(1)} мес</div></div>
-          <div class="ptm"><div class="l">Дедлайн</div><div class="v" style="color:${dueC};font-size:11.5px">${dueMain}</div>${dueSub?`<div class="sub" style="color:${dueC}">${dueSub}</div>`:''}</div>
-          <div class="ptm"><div class="l">Темп</div><div class="v" style="color:${paceC};font-size:10.5px">${paceT}</div></div>
+          <div class="ptm"><div class="l">Дедлайн</div><div class="v" style="color:${dueC};font-size:12px">${dueMain}</div>${dueSub?`<div class="sub" style="color:${dueC}">${dueSub}</div>`:'<div class="sub">—</div>'}</div>
+          <div class="ptm"><div class="l">Темп</div><div class="v" style="color:${paceC};font-size:11px">${paceT}</div></div>
         </div>
         <div class="pt-act">
           <button onclick="event.stopPropagation();projNote(${idx})" title="Заметка"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></button>
@@ -2230,7 +2238,7 @@ function renderProjects(){
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi"><div class="l">MRR портфеля</div><div class="v num">${money(_mrrTot)}</div><div class="sub">активный recurring</div><div class="kfoot">${_act.length} активных · ${_done.length} завершено</div></div>
-      <div class="kpi"><div class="l">Средняя маржа</div><div class="v num" style="color:${_marginW==null?'':_marginW>=40?'var(--pos)':_marginW>=20?'var(--warn)':'var(--neg)'}">${_marginW==null?'—':_marginW+'%'}</div><div class="sub">по портфелю (взвеш.)</div><div class="kfoot">выручка ${money(_mrrTot)} − расходы ${money(_costTot)}</div></div>
+      <div class="kpi"><div class="l">Средний прогресс</div><div class="v num">${_avg}%</div><div class="sub">по активным проектам</div><div class="kfoot">${_stDone} этапов завершено · ${_act.length} в работе</div></div>
       <div class="kpi"><div class="l">Просрочено</div><div class="v num" style="${_ovdN?'color:var(--neg)':''}">${_ovdN}</div><div class="sub">просроченных этапов и задач</div><div class="kfoot ${_ovdN?'':'pos'}">${_ovdN?(_ovdProj+' проект. затронуто'):'Всё в срок ✓'}</div></div>
       <div class="kpi"><div class="l">LTV портфеля</div><div class="v num">${money(_ltvTot)}</div><div class="sub">накоплено выручки</div><div class="kfoot">ср. срок ${_tenAvg.toFixed(1)} мес</div></div>
     </div>
