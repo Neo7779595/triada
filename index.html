@@ -1238,7 +1238,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div class="fld"><label>Название агентства</label><input id="f-name" placeholder="Apex Legal"></div>
       <div class="fld2">
         <div class="fld"><label>Slug</label><input id="f-slug" placeholder="apex-legal"></div>
-        <div class="fld"><label>Тариф</label><div class="dd seldd" id="seldd-f-plan"><input type="hidden" id="f-plan" value="trial"><button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('f-plan')"><span class="dd-v" id="f-plan-lbl" style="">Trial</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu"><button type="button" class="dd-opt on" data-v="trial" data-l="Trial" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Trial<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="basic" data-l="Basic" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Basic<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="pro" data-l="Pro" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Pro<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="enterprise" data-l="Enterprise" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Enterprise<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button></div></div></div>
+        <div class="fld"><label>Тариф</label>${selField('f-plan',[['trial','Trial'],['basic','Basic'],['pro','Pro'],['enterprise','Enterprise']],'trial')}</div>
       </div>
       <div class="fld"><label>Логотип — URL (необязательно)</label><input id="f-logo" placeholder="https://…/logo.png — иначе буква"></div>
       <div class="fld"><label>Владелец — логин</label><input id="f-owner" placeholder="owner"><div class="hint" id="f-email">логин владельца: owner@apex-legal.triada.app</div></div>
@@ -1276,7 +1276,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="fld"><label>Роль</label><input id="e-role" placeholder="SMM-менеджер, дизайнер…"></div>
       </div>
       <div class="fld2">
-        <div class="fld"><label>Отдел</label><div class="dd seldd" id="seldd-e-dept"><input type="hidden" id="e-dept" value="Продакшн"><button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('e-dept')"><span class="dd-v" id="e-dept-lbl" style="">Продакшн</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu"><button type="button" class="dd-opt on" data-v="Продакшн" data-l="Продакшн" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Продакшн<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Администрация" data-l="Администрация" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Администрация<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Руководство" data-l="Руководство" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Руководство<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button></div></div></div>
+        <div class="fld"><label>Отдел</label>${selField('e-dept',['Продакшн','Администрация','Руководство'],'Продакшн')}</div>
         <div class="fld"><label>Цвет</label><div class="swatches" id="e-sw"></div></div>
       </div>
       <div class="fld"><label>Доступ к модулям — видит / редактирует</label><div class="perm-grid" id="e-perms"></div></div>
@@ -1342,6 +1342,17 @@ let AGENCIES = [
   {id:4,name:'Medica PR',slug:'medica-pr',vertical:'Медицина · PR',plan:'pro',status:'trial',accent:'#43D88C',employees:5,clients:6,projects:8,mrr:0,active:'вчера',owner:'medica'},
   {id:5,name:'Nomad Travel',slug:'nomad-travel',vertical:'Туризм',plan:'basic',status:'suspended',accent:'#F0785C',employees:3,clients:2,projects:2,mrr:9000000,active:'12 дн назад',owner:'nomad'},
 ];
+/* ——— единые определения платформенных метрик (один источник истины) ———
+   замороженные (suspended) не приносят регулярного дохода → исключаются из MRR и из «платящих».
+   trial — это статус, а не платный план: в выручку по тарифам не попадает. */
+const agActiveMrr = a => (a && a.status!=='suspended') ? (a.mrr||0) : 0;
+const platMrr     = L => L.reduce((s,a)=>s+agActiveMrr(a),0);
+const payingCount = L => L.filter(a=>agActiveMrr(a)>0).length;
+const planRevenue = L => { const r={basic:0,pro:0,enterprise:0};
+  L.forEach(a=>{ if(a.status!=='suspended' && r[a.plan]!==undefined) r[a.plan]+=(a.mrr||0); }); return r; };
+const mrrMedian   = L => { const v=L.filter(a=>agActiveMrr(a)>0).map(a=>a.mrr).sort((x,y)=>x-y);
+  if(!v.length) return 0; const m=Math.floor(v.length/2); return v.length%2 ? v[m] : (v[m-1]+v[m])/2; };
+
 let _seq=6, _editId=null, _delId=null, _accent=ACCENTS[0], _chart=null;
 
 /* ——— routing ——— */
@@ -1418,14 +1429,15 @@ function statusBadge(s){
 }
 function renderAnalytics(){
   const A=AGENCIES, M=v=>(v/1e6).toFixed(1).replace(/\.0$/,'')+' М';
-  const totMrr=A.reduce((s,a)=>s+a.mrr,0);
-  const paying=A.filter(a=>a.mrr>0).length;
+  const totMrr=platMrr(A);
+  const paying=payingCount(A);
   const trial=A.filter(a=>a.status==='trial').length;
   const susp=A.filter(a=>a.status==='suspended').length;
   const clients=A.reduce((s,a)=>s+a.clients,0);
   const projects=A.reduce((s,a)=>s+a.projects,0);
-  const arpa=totMrr/A.length;
-  const planRev={basic:0,pro:0,enterprise:0}; A.forEach(a=>planRev[a.plan]+=a.mrr);
+  const arpa=paying?totMrr/paying:0;
+  const medMrr=mrrMedian(A);
+  const planRev=planRevenue(A);
   const planMax=Math.max(...Object.values(planRev),1);
   const planColor={basic:'#8A8FFF',pro:'#37E6C8',enterprise:'#43D88C'};
   const leaders=[...A].sort((x,y)=>y.mrr-x.mrr);
@@ -1435,16 +1447,17 @@ function renderAnalytics(){
   document.getElementById('content').innerHTML=`
   <div class="ph"><div><div class="eyebrow">Платформа · аналитика</div><h1>Аналитика платформы</h1></div>
     <button class="btn-add" onclick="exportAgencies()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Экспорт</button></div>
+  <div style="margin:-2px 0 14px;font-size:12px;color:var(--txt-3);line-height:1.5;max-width:980px">Операционные суммы — <b style="color:var(--txt-2)">MRR, ARPA, медиана, доли тарифов</b> — считаются из ваших агентств (замороженные исключены). «MRR платформы» здесь — регулярный доход <b style="color:var(--txt-2)">под управлением</b> агентств, а не выручка TRIADA по подпискам. Метрики динамики (рост, конверсия, NRR, прогноз, воронка) помечены <b style="color:var(--txt-2)">«план»</b> — это ориентиры, для них нужна история.</div>
   <div class="kpis" style="grid-template-columns:repeat(6,1fr)">
-    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">+12% м/м</div><div class="kfoot pos">прогноз Q3: 128 М</div></div>
-    <div class="kpi"><div class="l">ARPA</div><div class="v num">${M(arpa)}<span class="u">сум</span></div><div class="sub">на агентство</div><div class="kfoot">медиана: 18.5 М</div></div>
+    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">+12% м/м · план</div><div class="kfoot pos">прогноз Q3: 128 М</div></div>
+    <div class="kpi"><div class="l">ARPA</div><div class="v num">${M(arpa)}<span class="u">сум</span></div><div class="sub">на платящее агентство</div><div class="kfoot">медиана: ${M(medMrr)}</div></div>
     <div class="kpi"><div class="l">Платящих</div><div class="v num">${paying}<span class="u">/${A.length}</span></div><div class="sub">${Math.round(paying/A.length*100)}% базы</div><div class="kfoot">${trial} триал · ${susp} заморож.</div></div>
     <div class="kpi"><div class="l">Клиентов всего</div><div class="v num">${clients}</div><div class="sub">по агентствам</div><div class="kfoot">${projects} проектов</div></div>
-    <div class="kpi"><div class="l">Конверсия триала</div><div class="v num" style="color:var(--pos)">50<span class="u">%</span></div><div class="sub">1 из 2 в оплату</div><div class="kfoot">цель: 65%</div></div>
-    <div class="kpi"><div class="l">NRR</div><div class="v num" style="color:var(--pos)">108<span class="u">%</span></div><div class="sub">удержание дохода</div><div class="kfoot pos">расширение > отток</div></div>
+    <div class="kpi"><div class="l">Конверсия триала</div><div class="v num" style="color:var(--pos)">50<span class="u">%</span></div><div class="sub">ориентир · план</div><div class="kfoot">цель: 65%</div></div>
+    <div class="kpi"><div class="l">NRR</div><div class="v num" style="color:var(--pos)">108<span class="u">%</span></div><div class="sub">удержание дохода · план</div><div class="kfoot pos">расширение > отток</div></div>
   </div>
   <div class="row2" style="margin-top:16px">
-    <div class="card"><div class="card-h"><div class="t">Рост MRR платформы</div><div class="c">млн сум · 7 мес</div></div><div class="card-body">${svgLine(trendV,trendL)}<div style="text-align:center;font-size:11.5px;color:var(--pos);margin-top:6px">↑ +81% с начала года</div></div></div>
+    <div class="card"><div class="card-h"><div class="t">Рост MRR платформы</div><div class="c">млн сум · 7 мес</div></div><div class="card-body">${svgLine(trendV,trendL)}<div style="text-align:center;font-size:11.5px;color:var(--pos);margin-top:6px">↑ +${Math.round((trendV[trendV.length-1]/trendV[0]-1)*100)}% с начала года · план</div></div></div>
     <div class="card"><div class="card-h"><div class="t">MRR по тарифам</div></div><div class="card-body">
       ${['enterprise','pro','basic'].map(k=>`<div style="margin-top:14px">
         <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="display:flex;align-items:center;gap:8px;text-transform:capitalize"><span style="width:8px;height:8px;border-radius:2px;background:${planColor[k]}"></span>${k}</span><span class="num">${M(planRev[k])} сум</span></div>
@@ -1472,7 +1485,7 @@ function renderAnalytics(){
         <div style="height:6px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:6px"><div class="bf" style="width:${m/vMax*100}%;height:100%;background:var(--accent);border-radius:4px"></div></div>
       </div>`).join('')}
     </div></div>
-    <div class="card"><div class="card-h"><div class="t">Воронка платформы</div></div><div class="card-body">
+    <div class="card"><div class="card-h"><div class="t">Воронка платформы <span class="c" style="color:var(--txt-3)">иллюстрация</span></div></div><div class="card-body">
       ${[{l:'Демо-запросы',v:48,c:'var(--txt-2)'},{l:'Активировано',v:12,c:'#8A8FFF'},{l:'На триале',v:6,c:'var(--warn)'},{l:'Платящих',v:paying,c:'var(--accent)'},{l:'Расширение (апсейл)',v:2,c:'var(--pos)'}].map((s,i,arr)=>`<div style="margin-top:12px">
         <div style="display:flex;justify-content:space-between;font-size:12.5px"><span>${s.l}</span><span class="num">${s.v}</span></div>
         <div style="height:8px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:6px"><div class="bf" style="width:${s.v/arr[0].v*100}%;height:100%;background:${s.c};border-radius:4px"></div></div>
@@ -1513,8 +1526,8 @@ function tariffDel(i){const n=TARIFFS[i].name;TARIFFS.splice(i,1);pd2Close();ren
 function renderTariffs(){
   const A=AGENCIES, M=v=>(v/1e6).toFixed(1).replace(/\.0$/,'')+' М';
   const cnt={trial:A.filter(a=>a.status==='trial').length,basic:A.filter(a=>a.plan==='basic').length,pro:A.filter(a=>a.plan==='pro').length,enterprise:A.filter(a=>a.plan==='enterprise').length};
-  const planRev={basic:0,pro:0,enterprise:0}; A.forEach(a=>planRev[a.plan]+=a.mrr);
-  const totMrr=A.reduce((s,a)=>s+a.mrr,0), paying=A.filter(a=>a.mrr>0).length;
+  const planRev=planRevenue(A);
+  const totMrr=platMrr(A), paying=payingCount(A), medMrr=mrrMedian(A);
   const ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
   const xk='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
   const PLANS=TARIFFS;
@@ -1522,9 +1535,9 @@ function renderTariffs(){
   <div class="ph"><div><div class="eyebrow">Платформа · тарифы</div><h1>Тарифы</h1></div>
     <button class="btn-add" onclick="tariffEdit(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый тариф</button></div>
   <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">сумма тарифов</div><div class="kfoot pos">+12% м/м</div></div>
+    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">MRR под управлением</div><div class="kfoot pos">+12% м/м · план</div></div>
     <div class="kpi"><div class="l">Платящих агентств</div><div class="v num">${paying}</div><div class="sub">на оплате</div><div class="kfoot">${cnt.trial} на триале</div></div>
-    <div class="kpi"><div class="l">Средний чек</div><div class="v num">${M(totMrr/paying)}<span class="u">сум</span></div><div class="sub">ARPA платящих</div><div class="kfoot">медиана: 18.5 М</div></div>
+    <div class="kpi"><div class="l">Средний чек</div><div class="v num">${M(paying?totMrr/paying:0)}<span class="u">сум</span></div><div class="sub">ARPA платящих</div><div class="kfoot">медиана: ${M(medMrr)}</div></div>
     <div class="kpi"><div class="l">Популярный тариф</div><div class="v num">Pro</div><div class="sub">${cnt.pro} агентства</div><div class="kfoot pos">${Math.round(planRev.pro/totMrr*100)}% MRR</div></div>
   </div>
   <div class="price-grid">${PLANS.map((p,i)=>`<div class="price-card ${p.pop?'pop':''}">
@@ -1594,7 +1607,7 @@ function renderGeneral(){
   const emp=AGENCIES.reduce((s,a)=>s+a.employees,0);
   const proj=AGENCIES.reduce((s,a)=>s+a.projects,0);
   const cli=AGENCIES.reduce((s,a)=>s+a.clients,0);
-  const mrr=AGENCIES.reduce((s,a)=>s+a.mrr,0);
+  const mrr=platMrr(AGENCIES);
 
   document.getElementById('content').innerHTML = `
     <div class="ph">
@@ -1608,7 +1621,7 @@ function renderGeneral(){
       <div class="kpi"><div class="l">Активных</div><div class="v num">${active}</div><div class="sub pos">${Math.round(active/total*100)}% базы</div></div>
       <div class="kpi"><div class="l">Сотрудников</div><div class="v num">${emp}</div><div class="sub">по всем агентствам</div></div>
       <div class="kpi"><div class="l">Проектов</div><div class="v num">${proj}</div><div class="sub">в работе</div></div>
-      <div class="kpi"><div class="l">MRR платформы</div><div class="v num">${fmt(Math.round(mrr/1e6))}<span class="u">M сум</span></div><div class="sub">сумма тарифов</div></div>
+      <div class="kpi"><div class="l">MRR платформы</div><div class="v num">${fmt(Math.round(mrr/1e6))}<span class="u">M сум</span></div><div class="sub">MRR под управлением</div></div>
       <div class="kpi"><div class="l">Активность</div><div class="v num">${active}<span class="u">/${total}</span></div><div class="sub">онлайн сегодня</div></div>
     </div>
 
@@ -1701,7 +1714,7 @@ function openAgency(id){
   document.getElementById('ov-agency').classList.add('on');
 }
 function pickAccent(c,el){_accent=c;[...el.parentNode.children].forEach(s=>s.classList.remove('on'));el.classList.add('on');}
-function f(id,v){const e=document.getElementById('f-'+id);if(v!==undefined){e.value=v;selSync('f-'+id);}return e.value;}
+function f(id,v){const e=document.getElementById('f-'+id);if(v!==undefined)e.value=v;return e.value;}
 function syncEmail(){const o=f('owner')||'owner',s=f('slug')||'agency';document.getElementById('f-email').textContent='логин владельца: '+o+'@'+s+'.triada.app';}
 document.getElementById('f-owner').addEventListener('input',syncEmail);
 document.getElementById('f-slug').addEventListener('input',syncEmail);
@@ -1931,7 +1944,6 @@ function selField(id, options, cur){
 }
 function selToggle(id){ const el=document.getElementById('seldd-'+id); if(!el)return; const o=el.classList.contains('open'); _closePops(); if(!o)el.classList.add('open'); }
 function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } const el=document.getElementById('seldd-'+id); if(el)el.classList.remove('open'); }
-function selSync(id){ const h=document.getElementById(id); if(!h)return; const lblEl=document.getElementById(id+'-lbl'); if(!lblEl)return; const v=h.value; let lbl=v; const menu=document.getElementById('seldd-'+id); if(menu){ menu.querySelectorAll('.dd-opt').forEach(function(o){ var on=String(o.dataset.v)===String(v); o.classList.toggle('on',on); if(on)lbl=o.dataset.l; }); } lblEl.textContent=lbl; lblEl.style.color=''; lblEl.style.fontWeight=''; }
 function tagCombo(id,label,options,cur,ph,kind){
   cur=cur||''; kind=kind||''; const opts=[...new Set((options||[]).filter(Boolean))];
   (window._cmb=window._cmb||{})[id]={opts,kind};
@@ -2893,7 +2905,7 @@ function renderOverview(){
   const avgProg = active.length ? Math.round(active.reduce((s,p)=>s+(p.pct||0),0)/active.length) : 0;
   const overdueProjects = active.filter(p => p._overdue).length;
   const STALE = 14;
-  const stale = active.filter(p => p._lastActDays == null || p._lastActDays >= STALE).length;
+  const stale = active.filter(p => p._lastActDays != null && p._lastActDays >= STALE).length;
   const openOf = p => Math.max((p._stot||0)-(p._sdone||0), 0);
   const opens = active.map(openOf), openSum = opens.reduce((a,b)=>a+b,0);
   let concentration = 0, concTop = '—';
@@ -3159,9 +3171,9 @@ function pfPLHtml(){
   h+=pfLine('↳ На проект', t.pr?'−'+money(t.pr):'—', 'var(--txt-3)');
   PFIN.projex.forEach(r=>{ if((r.name&&r.name.trim())||r.amount) h+=pfLine(r.name||'—', money(r.amount||0), 'var(--txt-3)', true); });
   h+=pfLine('Итого расходы', money(t.cost), 'var(--neg)');
-  h+=pfLine('Маржа', (t.profit>=0?'+':'')+money(t.profit), t.profit>=0?'var(--pos)':'var(--neg)', false, true);
+  h+=pfLine('Прибыль', (t.profit>=0?'+':'')+money(t.profit), t.profit>=0?'var(--pos)':'var(--neg)', false, true);
   const mc=t.margin==null?'var(--txt-3)':t.margin>=50?'var(--pos)':t.margin>=25?'var(--accent)':'var(--neg)';
-  h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2);font-weight:700">Маржинальность</span><span class="num" style="font-size:13px;color:${mc};font-weight:700">${t.margin!=null?t.margin+'%':'—'}</span></div>`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2);font-weight:700">Рентабельность</span><span class="num" style="font-size:13px;color:${mc};font-weight:700">${t.margin!=null?t.margin+'%':'—'}</span></div>`;
   return h;
 }
 function pfSection(list,title,sub,ph){
@@ -3312,7 +3324,10 @@ function renderFinance(){
         + '</div><div class="pdist-split-lg">'
         + split.map(s=>`<span><i style="background:${s.color}"></i>${s.name||'—'} · ${s.pct}%</span>`).join('')
         + '</div></div>';
-      const cards = split.map(s=>{ const amt=Math.round(distBase*s.pct/100);
+      const _amts = split.map(s=>Math.round(distBase*(s.pct||0)/100));
+      const _rem = distBase - _amts.reduce((a,b)=>a+b,0);
+      if(_rem!==0){ let _bi=0; split.forEach((s,i)=>{ if((s.pct||0)>(split[_bi].pct||0)) _bi=i; }); _amts[_bi]+=_rem; }
+      const cards = split.map((s,i)=>{ const amt=_amts[i];
           const ini=((s.name||'?').trim()[0]||'?').toUpperCase();
           return `<div class="pdist-card" style="--c:${s.color};--c-soft:${s.color}1f;--c-line:${s.color}66">`
             +`<div class="pdist-top"><span class="pdist-av">${logoFill(s.avatar,ini)}</span>`
@@ -3553,7 +3568,7 @@ function openEmp(){
   empColor=ACCENTS[0];
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass'].forEach(id=>document.getElementById('e-'+id).value='');
-  document.getElementById('e-dept').value='Продакшн'; selSync('e-dept');
+  document.getElementById('e-dept').value='Продакшн';
   document.getElementById('e-email').textContent='ivan@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Новый сотрудник';
   document.getElementById('emp-save').textContent='Создать сотрудника';
@@ -3567,7 +3582,7 @@ function openEmpEdit(i){
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   document.getElementById('e-name').value=e.name||'';
   document.getElementById('e-role').value=e.role||'';
-  document.getElementById('e-dept').value=e.dept||'Продакшн'; selSync('e-dept');
+  document.getElementById('e-dept').value=e.dept||'Продакшн';
   document.getElementById('e-login').value=e.login||'';
   document.getElementById('e-pass').value='';
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
