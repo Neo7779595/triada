@@ -3006,7 +3006,7 @@ function renderOverview(){
 }
 
 /* ——— CYCLES module ——— */
-let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], trend:{vals:[],labels:[]}, clients:[] };
+let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[] };
 function _cycDur(ms){ if(ms==null) return '—'; if(ms<=0) return '0'; if(ms<60000) return Math.round(ms/1000)+' с'; const m=ms/60000; if(m<60) return Math.round(m)+' мин'; const h=m/60; if(h<24) return (h<10?h.toFixed(1).replace('.0',''):''+Math.round(h))+' ч'; const d=h/24; return (d<10?d.toFixed(1).replace('.0',''):''+Math.round(d))+' дн'; }
 function svgLine(vals,labels){
   const W=1100,H=230,padL=46,padR=26,padT=30,padB=38;
@@ -3028,11 +3028,11 @@ function _cycAxis(maxMs){ if(maxMs>=86400000) return {div:86400000,unit:'д'}; i
 function _niceMax(v){ if(v<=0||!isFinite(v)) return 1; const exp=Math.floor(Math.log10(v)); const base=Math.pow(10,exp); const f=v/base; const steps=[1,1.5,2,2.5,3,4,5,6,8,10]; let nf=10; for(let j=0;j<steps.length;j++){ if(f<=steps[j]+1e-9){ nf=steps[j]; break; } } return nf*base; }
 function _axLbl(v){ if(v===0) return '0'; if(v<1) return (+v.toFixed(2))+''; if(v<10) return (+v.toFixed(1))+''; return ''+Math.round(v); }
 function svgCycleBars(stages){
-  const W=1100,H=340,padL=48,padR=20,padT=18,padB=92;
+  const W=1200,H=248,padL=44,padR=16,padT=14,padB=80;
   const iW=W-padL-padR,iH=H-padT-padB;
   const maxMs=Math.max(...stages.map(s=>s.p50Ms||0), ...stages.map(s=>s.p90Ms||0), 1);
-  const ax=_cycAxis(maxMs), maxV=_niceMax(maxMs/ax.div*1.05), nDiv=4;
-  const n=Math.max(stages.length,1),gW=iW/n,bW=Math.min(gW*0.46,52);
+  const ax=_cycAxis(maxMs), maxV=_niceMax(maxMs/ax.div*1.08), nDiv=4;
+  const n=Math.max(stages.length,1), gW=iW/n, bW=Math.min(gW*0.5,34);
   const yOf=v=>padT+iH-(v/maxV)*iH;
   let grid='',yl='';
   for(let k=0;k<=nDiv;k++){ const v=maxV*k/nDiv, y=yOf(v);
@@ -3041,16 +3041,16 @@ function svgCycleBars(stages){
   let bars='',xl='';
   stages.forEach((s,i)=>{
     const cx=padL+gW*i+gW/2, v=(s.p50Ms||0)/ax.div, h=Math.max((v/maxV)*iH,0);
-    bars+=`<rect class="c-bar" style="animation-delay:${i*55}ms" x="${(cx-bW/2).toFixed(1)}" y="${(padT+iH-h).toFixed(1)}" width="${bW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${s.bn?'var(--neg)':'var(--accent)'}"/>`;
-    const lbl=s.name.length>18?s.name.slice(0,17)+'…':s.name;
-    xl+=`<text x="${cx.toFixed(1)}" y="${H-padB+18}" text-anchor="end" fill="#7A828C" font-size="9.5" transform="rotate(-30 ${cx.toFixed(1)} ${H-padB+18})">${lbl}</text>`;
+    if(h>0.4) bars+=`<rect class="c-bar" style="animation-delay:${i*40}ms" x="${(cx-bW/2).toFixed(1)}" y="${(padT+iH-h).toFixed(1)}" width="${bW.toFixed(1)}" height="${h.toFixed(1)}" rx="2.5" fill="${s.bn?'var(--neg)':'var(--accent)'}"/>`;
+    const lbl=s.name.length>16?s.name.slice(0,15)+'…':s.name;
+    xl+=`<text x="${cx.toFixed(1)}" y="${H-padB+14}" text-anchor="end" fill="${s.unmeasured?'#474C54':'#8A929C'}" font-size="9" transform="rotate(-32 ${cx.toFixed(1)} ${H-padB+14})">${lbl}</text>`;
   });
   let p90l='',p90d='',prev=null;
   stages.forEach((s,i)=>{
     if(s.p90Ms==null){ prev=null; return; }
     const cx=padL+gW*i+gW/2, y=yOf(s.p90Ms/ax.div);
-    p90d+=`<circle cx="${cx.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="var(--violet)"/>`;
-    if(prev) p90l+=`<line x1="${prev.x.toFixed(1)}" y1="${prev.y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--violet)" stroke-width="2"/>`;
+    p90d+=`<circle cx="${cx.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--violet)"/>`;
+    if(prev) p90l+=`<line x1="${prev.x.toFixed(1)}" y1="${prev.y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--violet)" stroke-width="1.8"/>`;
     prev={x:cx,y};
   });
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bars}${p90l}${p90d}${xl}</svg>`;
@@ -3111,7 +3111,7 @@ function renderCycles(){
           <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--violet)"></span>p90 (n≥5)</span>
         </div>
       </div>
-      <div class="card-body">${svgCycleBars(C.stages)}</div>
+      <div class="card-body">${svgCycleBars(C.chartStages)}</div>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -4283,9 +4283,10 @@ window.tLoadOverview = async () => {
 window.tLoadCycles = async () => {
   if (!SB) return;
   const now = Date.now();
-  const hr = await SB.from('stage_history')
-    .select('stage_id,project_id,stage_name,old_status,new_status,created_at')
-    .order('created_at',{ascending:true});
+  const [hr, sr] = await Promise.all([
+    SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true}),
+    SB.from('project_stages').select('name')
+  ]);
   const hist = hr.data||[];
   const nameById={}, mrrById={};
   (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; });
@@ -4371,7 +4372,12 @@ window.tLoadCycles = async () => {
   instances.forEach(it=>{ const b=byClient[it.pid]||(byClient[it.pid]={leads:[],rework:0,n:0}); b.leads.push(it.leadMs); if(it.returns>0) b.rework++; b.n++; });
   const clients=Object.keys(byClient).map(pid=>{ const b=byClient[pid]; return {client:nameById[pid]||'—',n:b.n,medianMs:median(b.leads),avgMs:mean(b.leads),reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null}; }).sort((a,b)=>(b.medianMs||0)-(a.medianMs||0));
 
-  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,trend,clients};
+  // Полный конвейер для графика: все этапы (даже без замера) — как в DTR: ось заполнена, узкое место слева, неизмеренные нули справа.
+  const bnName=bottleneck?bottleneck.name:null;
+  const allNames=[...new Set([...(sr.data||[]).map(r=>r.name).filter(Boolean), ...stageRows.map(r=>r.name)])];
+  const chartStages=allNames.map(nm=>{ const st=nameStat[nm]; return st?{name:nm,p50Ms:st.p50Ms,p90Ms:st.p90Ms,bn:nm===bnName,unmeasured:false}:{name:nm,p50Ms:0,p90Ms:null,bn:false,unmeasured:true}; }).sort((a,b)=>(b.p50Ms||0)-(a.p50Ms||0));
+
+  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients};
 };
 
 /* ===== TEAM · live aggregation (workload & activity per member) ===== */
