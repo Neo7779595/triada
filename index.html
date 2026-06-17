@@ -1238,7 +1238,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
       <div class="fld"><label>Название агентства</label><input id="f-name" placeholder="Apex Legal"></div>
       <div class="fld2">
         <div class="fld"><label>Slug</label><input id="f-slug" placeholder="apex-legal"></div>
-        <div class="fld"><label>Тариф</label>${selField('f-plan',[['trial','Trial'],['basic','Basic'],['pro','Pro'],['enterprise','Enterprise']],'trial')}</div>
+        <div class="fld"><label>Тариф</label><div class="dd seldd" id="seldd-f-plan"><input type="hidden" id="f-plan" value="trial"><button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('f-plan')"><span class="dd-v" id="f-plan-lbl" style="">Trial</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu"><button type="button" class="dd-opt on" data-v="trial" data-l="Trial" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Trial<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="basic" data-l="Basic" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Basic<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="pro" data-l="Pro" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Pro<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="enterprise" data-l="Enterprise" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Enterprise<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button></div></div></div>
       </div>
       <div class="fld"><label>Логотип — URL (необязательно)</label><input id="f-logo" placeholder="https://…/logo.png — иначе буква"></div>
       <div class="fld"><label>Владелец — логин</label><input id="f-owner" placeholder="owner"><div class="hint" id="f-email">логин владельца: owner@apex-legal.triada.app</div></div>
@@ -1276,7 +1276,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
         <div class="fld"><label>Роль</label><input id="e-role" placeholder="SMM-менеджер, дизайнер…"></div>
       </div>
       <div class="fld2">
-        <div class="fld"><label>Отдел</label>${selField('e-dept',['Продакшн','Администрация','Руководство'],'Продакшн')}</div>
+        <div class="fld"><label>Отдел</label><div class="dd seldd" id="seldd-e-dept"><input type="hidden" id="e-dept" value="Продакшн"><button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('e-dept')"><span class="dd-v" id="e-dept-lbl" style="">Продакшн</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu"><button type="button" class="dd-opt on" data-v="Продакшн" data-l="Продакшн" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Продакшн<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Администрация" data-l="Администрация" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Администрация<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Руководство" data-l="Руководство" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Руководство<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button></div></div></div>
         <div class="fld"><label>Цвет</label><div class="swatches" id="e-sw"></div></div>
       </div>
       <div class="fld"><label>Доступ к модулям — видит / редактирует</label><div class="perm-grid" id="e-perms"></div></div>
@@ -1714,7 +1714,7 @@ function openAgency(id){
   document.getElementById('ov-agency').classList.add('on');
 }
 function pickAccent(c,el){_accent=c;[...el.parentNode.children].forEach(s=>s.classList.remove('on'));el.classList.add('on');}
-function f(id,v){const e=document.getElementById('f-'+id);if(v!==undefined)e.value=v;return e.value;}
+function f(id,v){const e=document.getElementById('f-'+id);if(v!==undefined){e.value=v;selSync('f-'+id);}return e.value;}
 function syncEmail(){const o=f('owner')||'owner',s=f('slug')||'agency';document.getElementById('f-email').textContent='логин владельца: '+o+'@'+s+'.triada.app';}
 document.getElementById('f-owner').addEventListener('input',syncEmail);
 document.getElementById('f-slug').addEventListener('input',syncEmail);
@@ -1944,6 +1944,7 @@ function selField(id, options, cur){
 }
 function selToggle(id){ const el=document.getElementById('seldd-'+id); if(!el)return; const o=el.classList.contains('open'); _closePops(); if(!o)el.classList.add('open'); }
 function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } const el=document.getElementById('seldd-'+id); if(el)el.classList.remove('open'); }
+function selSync(id){ const h=document.getElementById(id); if(!h)return; const lblEl=document.getElementById(id+'-lbl'); if(!lblEl)return; const v=h.value; let lbl=v; const menu=document.getElementById('seldd-'+id); if(menu){ menu.querySelectorAll('.dd-opt').forEach(function(o){ var on=String(o.dataset.v)===String(v); o.classList.toggle('on',on); if(on)lbl=o.dataset.l; }); } lblEl.textContent=lbl; lblEl.style.color=''; lblEl.style.fontWeight=''; }
 function tagCombo(id,label,options,cur,ph,kind){
   cur=cur||''; kind=kind||''; const opts=[...new Set((options||[]).filter(Boolean))];
   (window._cmb=window._cmb||{})[id]={opts,kind};
@@ -3568,7 +3569,7 @@ function openEmp(){
   empColor=ACCENTS[0];
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass'].forEach(id=>document.getElementById('e-'+id).value='');
-  document.getElementById('e-dept').value='Продакшн';
+  document.getElementById('e-dept').value='Продакшн'; selSync('e-dept');
   document.getElementById('e-email').textContent='ivan@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Новый сотрудник';
   document.getElementById('emp-save').textContent='Создать сотрудника';
@@ -3582,7 +3583,7 @@ function openEmpEdit(i){
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   document.getElementById('e-name').value=e.name||'';
   document.getElementById('e-role').value=e.role||'';
-  document.getElementById('e-dept').value=e.dept||'Продакшн';
+  document.getElementById('e-dept').value=e.dept||'Продакшн'; selSync('e-dept');
   document.getElementById('e-login').value=e.login||'';
   document.getElementById('e-pass').value='';
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
