@@ -204,12 +204,13 @@ tbody tr:hover td{background:var(--bg-2)}
 @media(max-width:640px){.kpis{grid-template-columns:1fr 1fr}.content{padding:16px}.login-title{font-size:34px}
   thead th:nth-child(n+5),tbody td:nth-child(n+5){display:none}}
 /* ========== AGENCY CABINET ========== */
-.metrics-rail{padding:14px 12px;border-top:1px solid var(--line)}
-.metric{background:var(--bg-1);border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
-.metric .v{font-family:var(--mono);font-size:20px;color:var(--accent);line-height:1}
-.metric .l{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);margin-top:5px}
-.metric .ic{width:30px;height:30px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent)}
-.metric .ic svg{width:15px;height:15px}
+.metrics-rail{padding:12px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.metric{background:var(--bg-1);border:1px solid var(--line);border-radius:10px;padding:10px 11px;margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;overflow:hidden}
+.metric>div{min-width:0}
+.metric .v{font-family:var(--mono);font-size:17px;color:var(--accent);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.metric .l{font-size:8px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.metric .ic{width:26px;height:26px;border-radius:7px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent);flex:none}
+.metric .ic svg{width:13px;height:13px}
 
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;position:relative;z-index:20}
 .dl-range{display:flex;align-items:center;gap:8px;flex:none}
@@ -236,7 +237,11 @@ tbody tr:hover td{background:var(--bg-2)}
 .dd-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:40;min-width:190px;max-height:300px;overflow:auto;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:60;display:none;animation:ddIn .14s ease}
 .dd.right .dd-menu{left:auto;right:0}
 .dd.open .dd-menu{display:block}
-.toolbar:has(.dd.open),.toolbar:has(.dp-pop){z-index:80}
+.toolbar:has(.dd.open),.toolbar:has(.dp-pop),.ti-bar:has(.dd.open),.ti-bar:has(.dr-pop),.ti-bar:has(.dp-pop){z-index:80}
+.ti-cal{position:relative;display:inline-flex}
+.ti-cal .dpick{width:auto}
+.tm-range .dp-trigger{min-width:150px;font-size:12.5px;padding:8px 11px}
+.tm-range .dr-pop{left:0;right:auto}
 @keyframes ddIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 .dd-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;background:transparent;border:0;color:var(--txt-2);font-family:var(--font);font-size:12.5px;font-weight:500;padding:9px 10px;border-radius:7px;cursor:pointer;transition:.12s}
 .dd-opt:hover{background:var(--bg-3);color:var(--txt)}
@@ -349,7 +354,7 @@ tbody tr:hover td{background:var(--bg-2)}
 .wl-track i{height:100%}
 .wl-tot{font-family:var(--mono);font-size:13px;width:30px;text-align:right;flex:0 0 auto}
 /* ===== TEAM · Talent Intelligence ===== */
-.ti-bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;margin-bottom:14px}
+.ti-bar{position:relative;display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;margin-bottom:14px}
 .ti-bar .ti-lbl{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3);font-weight:500;margin:0 1px 0 4px}
 .ti-bar .sp{flex:1 1 8px}
 .ti-bar .vr{width:1px;height:22px;background:var(--line)}
@@ -1935,7 +1940,7 @@ let PROJECTS = [
   {name:'Тестовый проект',logo:'Т',cat:'Кофейня',svc:'DESIGN',pct:0,stages:'0 / 4',health:'В норме',dyn:'— 0 / 7д',status:'active'},
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
-let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='';
+let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all';
 let PROJECT_TAGS={category:[],service:[],tariff:[]};
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты'};
 
@@ -2145,6 +2150,7 @@ function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const list=docum
 document.addEventListener('click',e=>{if(!e.target.closest('.dd'))document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));});
 function setAgCat(v){agCat=v;renderProjects();}
 function setAgSvc(v){agSvc=v;renderProjects();}
+function setAgLead(v){agLead=v;renderProjects();}
 function setAgSort(v){agSort=v;renderProjects();}
 function projFiltered(){
   const q=(agQ||'').trim().toLowerCase();
@@ -2154,6 +2160,7 @@ function projFiltered(){
     if(agFilter==='overdue'&&!p._overdue)return false;
     if(agCat!=='all'&&p.cat!==agCat)return false;
     if(agSvc!=='all'&&p.svc!==agSvc)return false;
+    if(agLead!=='all'){ if(agLead==='__none'){ if(p.lead_id)return false; } else if(p.lead_id!==agLead)return false; }
     if(q&&!((p.name||'').toLowerCase().includes(q)||(p.cat||'').toLowerCase().includes(q)||(p.svc||'').toLowerCase().includes(q)))return false;
     return true;
   });
@@ -2278,6 +2285,7 @@ function renderProjects(){
   const list = projFiltered();
   const cats=[...new Set(PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>(a||'').localeCompare(b||'','ru'));
   const svcs=[...new Set(PROJECTS.map(p=>p.svc).filter(Boolean))];
+  const _tmL=(typeof TEAM!=='undefined'?TEAM:[]); const leadOpts=[['all','Все'],['__none','Не назначен']].concat(_tmL.map(m=>[m._id,m.name])); const leadLbl=agLead==='all'?'Все':(agLead==='__none'?'Не назначен':((_tmL.find(m=>m._id===agLead)||{}).name||'—'));
   const on=f=>agFilter===f?'on':'';
   const _act=PROJECTS.filter(p=>p.status==='active'), _done=PROJECTS.filter(p=>p.status==='done');
   const _avg=_act.length?Math.round(_act.reduce((s,p)=>s+p.pct,0)/_act.length):0;
@@ -2317,6 +2325,7 @@ function renderProjects(){
       </div>
       ${_dd('cat','Категория', agCat==='all'?'Все':agCat, [['all','Все категории']].concat(cats.map(c=>[c,c])), agCat, 'setAgCat')}
       ${_dd('svc','Услуга', agSvc==='all'?'Все':agSvc, [['all','Все услуги']].concat(svcs.map(x=>[x,x])), agSvc, 'setAgSvc')}
+      ${_dd('lead','Ответственный', leadLbl, leadOpts, agLead, 'setAgLead')}
       <div class="flex1"></div>
       ${_dd('sort','Сортировка', SORT_LABEL[agSort]||'По активности', SORT_OPTS, agSort, 'setAgSort', true)}
     </div>
@@ -2636,32 +2645,42 @@ document.addEventListener('click',e=>{ if(!e.target.closest('.dpick')){ _dpClose
 let _dr={y:0,m:0,anchor:null,hover:null};
 function _iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function _isoAdd(iso,n){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return _iso(d); }
+const DRCTX_DL={ from:()=>agDlFrom, to:()=>agDlTo, set:(f,t)=>{ agDlFrom=f; agDlTo=t; }, render:()=>renderDeadlines() };
+const DRCTX_TEAM={ from:()=>_teamPeriod.from||'', to:()=>_teamPeriod.to||'', set:(f,t)=>{ if(f&&t){ _teamPeriod.from=f; _teamPeriod.to=t; _teamPeriod.key='custom'; } else { _teamPeriod.from=null; _teamPeriod.to=null; _teamPeriod.key='30d'; _teamPeriod.days=30; } }, render:()=>renderTeam() };
+let _drCtx=DRCTX_DL;
 function _drBounds(){
   if(_dr.anchor){ const a=_dr.anchor,h=_dr.hover||_dr.anchor; return a<=h?[a,h]:[h,a]; }
-  if(agDlFrom&&agDlTo) return agDlFrom<=agDlTo?[agDlFrom,agDlTo]:[agDlTo,agDlFrom];
-  if(agDlFrom) return [agDlFrom,agDlFrom];
-  if(agDlTo) return [agDlTo,agDlTo];
+  const f=_drCtx.from(), t=_drCtx.to();
+  if(f&&t) return f<=t?[f,t]:[t,f];
+  if(f) return [f,f];
+  if(t) return [t,t];
   return [null,null];
 }
-function _drLabel(){
-  if(agDlFrom&&agDlTo) return dpFmt(agDlFrom)+' — '+dpFmt(agDlTo);
-  if(agDlFrom) return 'с '+dpFmt(agDlFrom);
-  if(agDlTo) return 'до '+dpFmt(agDlTo);
-  return 'Период';
-}
-function dlRangeField(){
-  const has=!!(agDlFrom||agDlTo);
-  return `<div class="dpick dr-wrap" id="dr-wrap">`
-    +`<button type="button" class="dp-trigger ${has?'':'empty'}" onclick="event.stopPropagation();drToggle()"><span class="dp-val">${_drLabel()}</span>`
-    +(has?`<span class="dr-clear" onclick="event.stopPropagation();drClear()" title="Сбросить период">✕</span>`
+function _drCalBtn(cls,which,has,label,clearFn){
+  return `<div class="dpick dr-wrap${cls}" id="dr-wrap">`
+    +`<button type="button" class="dp-trigger ${has?'':'empty'}" onclick="event.stopPropagation();drToggle('${which}')"><span class="dp-val">${label}</span>`
+    +(has?`<span class="dr-clear" onclick="event.stopPropagation();${clearFn}" title="Сбросить период">✕</span>`
         :`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`)
     +`</button></div>`;
 }
-function drToggle(){
+function dlRangeField(){
+  const has=!!(agDlFrom||agDlTo);
+  const lbl=(agDlFrom&&agDlTo)?(dpFmt(agDlFrom)+' — '+dpFmt(agDlTo)):(agDlFrom?('с '+dpFmt(agDlFrom)):(agDlTo?('до '+dpFmt(agDlTo)):'Период'));
+  return _drCalBtn('','dl',has,lbl,'dlClearRange()');
+}
+function teamRangeField(){
+  const f=_teamPeriod.from, t=_teamPeriod.to, has=(_teamPeriod.key==='custom' && !!(f||t));
+  const lbl=(f&&t)?(dpFmt(f)+' — '+dpFmt(t)):(f?('с '+dpFmt(f)):'Период');
+  return _drCalBtn(' tm-range','team',has,lbl,'teamClearRange()');
+}
+function dlClearRange(){ agDlFrom=''; agDlTo=''; renderDeadlines(); }
+function teamClearRange(){ _teamPeriod.from=null; _teamPeriod.to=null; _teamPeriod.key='30d'; _teamPeriod.days=30; renderTeam(); }
+function drToggle(which){
+  _drCtx = which==='team' ? DRCTX_TEAM : DRCTX_DL;
   const w=document.getElementById('dr-wrap'); if(!w) return;
   if(w.querySelector('.dr-pop')){ drClose(); return; }
   _closePops();
-  const base=agDlFrom||agDlTo||_iso(new Date()), a=base.split('-').map(Number);
+  const base=_drCtx.from()||_drCtx.to()||_iso(new Date()), a=base.split('-').map(Number);
   _dr.y=a[0]; _dr.m=a[1]-1; _dr.anchor=null; _dr.hover=null;
   const pop=document.createElement('div'); pop.className='dp-pop dr-pop';
   pop.addEventListener('click',ev=>ev.stopPropagation());
@@ -2672,17 +2691,17 @@ function _drRefresh(){ const w=document.getElementById('dr-wrap'), p=w&&w.queryS
 function drNav(delta){ let m=_dr.m+delta,y=_dr.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} _dr.y=y;_dr.m=m; _drRefresh(); }
 function drDay(iso){
   if(_dr.anchor===null){ _dr.anchor=iso; _dr.hover=iso; _drRefresh(); }
-  else { let a=_dr.anchor,b=iso; if(b<a){const t=a;a=b;b=t;} agDlFrom=a; agDlTo=b; _dr.anchor=null; _dr.hover=null; renderDeadlines(); }
+  else { let a=_dr.anchor,b=iso; if(b<a){const t=a;a=b;b=t;} _drCtx.set(a,b); _dr.anchor=null; _dr.hover=null; _drCtx.render(); }
 }
 function drHover(iso){ if(_dr.anchor!==null && _dr.hover!==iso){ _dr.hover=iso; _drRefresh(); } }
 function drPreset(kind){
   const t=new Date(), ti=_iso(t);
-  if(kind==='today'){ agDlFrom=ti; agDlTo=ti; }
-  else if(kind==='week'){ agDlFrom=ti; agDlTo=_isoAdd(ti,6); }
-  else if(kind==='month'){ const y=t.getFullYear(),m=t.getMonth(); agDlFrom=_iso(new Date(y,m,1)); agDlTo=_iso(new Date(y,m+1,0)); }
-  _dr.anchor=null; _dr.hover=null; renderDeadlines();
+  if(kind==='today') _drCtx.set(ti,ti);
+  else if(kind==='week') _drCtx.set(ti,_isoAdd(ti,6));
+  else if(kind==='month'){ const y=t.getFullYear(),m=t.getMonth(); _drCtx.set(_iso(new Date(y,m,1)),_iso(new Date(y,m+1,0))); }
+  _dr.anchor=null; _dr.hover=null; _drCtx.render();
 }
-function drClear(){ agDlFrom=''; agDlTo=''; _dr.anchor=null; _dr.hover=null; renderDeadlines(); }
+function drClear(){ _drCtx.set('',''); _dr.anchor=null; _dr.hover=null; _drCtx.render(); }
 function _drGrid(){
   const y=_dr.y, m=_dr.m, now=new Date(), tISO=_iso(now);
   const [lo,hi]=_drBounds();
@@ -2696,7 +2715,8 @@ function _drGrid(){
     cells+=`<button class="${cls}" onclick="drDay('${ci}')" onmouseenter="drHover('${ci}')">${d}</button>`; }
   const tot=start+dim, trail=(7-(tot%7))%7;
   for(let i=1;i<=trail;i++) cells+=`<button class="oth" disabled>${i}</button>`;
-  const hint=_dr.anchor?'Выберите конец периода':(agDlFrom&&agDlTo?(dpFmt(agDlFrom)+' — '+dpFmt(agDlTo)):agDlFrom?('с '+dpFmt(agDlFrom)):'Выберите начало периода');
+  const f=_drCtx.from(), tt=_drCtx.to();
+  const hint=_dr.anchor?'Выберите конец периода':(f&&tt?(dpFmt(f)+' — '+dpFmt(tt)):f?('с '+dpFmt(f)):'Выберите начало периода');
   return `<div class="dp-head"><div class="dp-title">${DP_MON[m]} ${y}</div><div class="dp-nav">`
     +`<button type="button" onclick="drNav(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>`
     +`<button type="button" onclick="drNav(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button></div></div>`
@@ -3106,7 +3126,6 @@ function renderDeadlines(){
 
     <div class="toolbar" style="position:relative;z-index:40">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по этапу, задаче или проекту…" value="${(agDlSearch||'').replace(/"/g,'&quot;')}" oninput="setDlSearch(this.value)"></div>
-      ${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}
       <div class="dl-range">${dlRangeField()}</div>
     </div>
 
@@ -3118,17 +3137,9 @@ function renderDeadlines(){
         <button class="${onF('week')}" onclick="setDlFilter('week')"><span class="d" style="background:var(--warn)"></span>Неделя</button>
         <button class="${onF('future')}" onclick="setDlFilter('future')">Будущие</button>
       </div>
-      <div class="segm">
-        <button class="${agDlType==='all'?'on':''}" onclick="setDlType('all')">Все типы</button>
-        <button class="${agDlType==='stage'?'on':''}" onclick="setDlType('stage')">Этапы</button>
-        <button class="${agDlType==='task'?'on':''}" onclick="setDlType('task')">Задачи</button>
-      </div>
-      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}`:''}
+      ${_dd('dltype','Тип', (agDlType==='all'?'Все':agDlType==='stage'?'Этапы':'Задачи'), [['all','Все типы'],['stage','Этапы'],['task','Задачи']], agDlType, 'setDlType')}
+      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}`:''}
       <div class="flex1"></div>
-      ${agDlView==='deadlines'?`<div class="segm">
-        <button class="${onG('urgency')}" onclick="setDlGroup('urgency')">⚡ Срочность</button>
-        <button class="${onG('project')}" onclick="setDlGroup('project')">▦ Проект</button>
-      </div>`:''}
       <div class="segm">
         <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
         <button class="${onV('activity')}" onclick="setDlView('activity')">Активность</button>
@@ -3991,6 +4002,7 @@ function teamSearch(v){ _teamFilter.q=v; window._tiFocus=1; renderTeam(); }
 function resetTeamFilters(){ _teamFilter={dept:'all',sort:'tpi',q:''}; _teamPeriod={key:'30d',days:30,from:null,to:null}; renderTeam(); }
 const _periodLbl=()=>({'7d':'7 дней','30d':'30 дней','90d':'90 дней','custom':'период'}[_teamPeriod.key]||'30 дней');
 
+const TM_SORT_OPTS=[['tpi','По TPI'],['throughput','По выработке'],['speed','По скорости'],['quality','По качеству'],['reliability','По надёжности'],['cycle','Самый быстрый цикл']];
 function renderTeam(){
   const M = computeTeamMetrics();
   const A = M.agg;
@@ -4073,19 +4085,11 @@ function renderTeam(){
         <button class="${_teamPeriod.key==='7d'?'on':''}" onclick="setTeamPeriod('7d')">7 дней</button>
         <button class="${_teamPeriod.key==='30d'?'on':''}" onclick="setTeamPeriod('30d')">30 дней</button>
         <button class="${_teamPeriod.key==='90d'?'on':''}" onclick="setTeamPeriod('90d')">90 дней</button>
-        <button class="${_teamPeriod.key==='custom'?'on':''}" onclick="setTeamPeriod('custom')">Период…</button>
       </div>
-      ${_teamPeriod.key==='custom'?`<div class="ti-date"><input type="date" value="${_teamPeriod.from||''}" max="${_today}" onchange="setTeamCustom('from',this.value)"><span>—</span><input type="date" value="${_teamPeriod.to||''}" max="${_today}" onchange="setTeamCustom('to',this.value)"></div>`:''}
+      <div class="ti-cal">${teamRangeField()}</div>
       ${teamTab==='employees'?`<span class="vr"></span>
-      <div class="ti-sel"><select onchange="setTeamDept(this.value)"><option value="all"${_teamFilter.dept==='all'?' selected':''}>Все отделы</option>${depts.map(d=>`<option value="${d}"${_teamFilter.dept===d?' selected':''}>${d}</option>`).join('')}</select></div>
-      <div class="ti-sel"><select onchange="setTeamSort(this.value)">
-        <option value="tpi"${_teamFilter.sort==='tpi'?' selected':''}>По TPI</option>
-        <option value="throughput"${_teamFilter.sort==='throughput'?' selected':''}>По выработке</option>
-        <option value="speed"${_teamFilter.sort==='speed'?' selected':''}>По скорости</option>
-        <option value="quality"${_teamFilter.sort==='quality'?' selected':''}>По качеству</option>
-        <option value="reliability"${_teamFilter.sort==='reliability'?' selected':''}>По надёжности</option>
-        <option value="cycle"${_teamFilter.sort==='cycle'?' selected':''}>Самый быстрый цикл</option>
-      </select></div>
+      ${_dd('tmdept','Отдел', _teamFilter.dept==='all'?'Все':_teamFilter.dept, [['all','Все отделы']].concat(depts.map(d=>[d,d])), _teamFilter.dept, 'setTeamDept')}
+      ${_dd('tmsort','Сортировка', (TM_SORT_OPTS.find(o=>o[0]===_teamFilter.sort)||['','—'])[1], TM_SORT_OPTS, _teamFilter.sort, 'setTeamSort')}
       <div class="ti-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="ti-search" placeholder="Поиск сотрудника" value="${(_teamFilter.q||'').replace(/"/g,'&quot;')}" oninput="teamSearch(this.value)" onfocus="window._tiFocus=1" onblur="window._tiFocus=0"></div>`:''}
       <span class="sp"></span>
       ${_dirty?`<button class="ti-reset" onclick="resetTeamFilters()">Сбросить</button>`:''}
