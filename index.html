@@ -1929,7 +1929,7 @@ let PROJECTS = [
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
 let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='';
-let PROJECT_TAGS={category:[],service:[]};
+let PROJECT_TAGS={category:[],service:[],tariff:[]};
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты'};
 
 function enterAgency(){
@@ -1967,12 +1967,15 @@ function projSettings(i){
   const p=PROJECTS[i];
   const cats=[...new Set([...(PROJECT_TAGS.category||[]),...PROJECTS.map(x=>x.cat).filter(c=>c&&c!=='—')])].sort((a,b)=>a.localeCompare(b,'ru'));
   const svcs=[...new Set(['SMM','PROD','DESIGN',...(PROJECT_TAGS.service||[]),...PROJECTS.map(x=>x.svc).filter(Boolean)])];
+  const tariffs=[...new Set(['Platinum','Gold','Silver',...(PROJECT_TAGS.tariff||[]),...PROJECTS.map(x=>x.tariff).filter(Boolean)])];
+  const leadOpts=[['','— не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name+(m.role?(' · '+m.role):'')]));
   pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Настройки · ${p.name}</h3><p>Карточка проекта · теги и статус</p></div>
+    <div class="modal-h"><h3>Настройки · ${p.name}</h3><p>Карточка проекта · теги, тариф, ответственный</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pj-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
       <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}${tagCombo('pj-svc','Услуга (тег)',svcs,p.svc,'Выбери или создай','service')}</div>
+      <div class="fld2">${tagCombo('pj-tariff','Тариф',tariffs,(p.tariff||''),'Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('pj-lead',leadOpts,(p.lead_id||''))}</div></div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
         <button data-st="active" class="${p.status!=='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--accent)"></span>В работе</button>
         <button data-st="done" class="${p.status==='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--pos)"></span>Завершён</button>
@@ -1983,9 +1986,9 @@ function projSettings(i){
 function pjSaveSettings(i){
   const p=PROJECTS[i];
   const b=document.querySelector('#pj-stseg button.on'); const status=b?b.dataset.st:p.status;
-  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:_v('pj-svc')||p.svc, status };
+  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:_v('pj-svc')||p.svc, tariff:(_v('pj-tariff')||null), lead_id:(_v('pj-lead')||null), status };
   if(window.LIVE&&window.tProjectUpdate) return window.tProjectUpdate(p.id,patch);
-  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.status=status;
+  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.lead_id=patch.lead_id; p._lead=null; p.status=status;
   pd2Close(); renderProjects(); toast('Проект обновлён');
 }
 function pjDeleteProject(i){ const p=PROJECTS[i];
@@ -2027,12 +2030,15 @@ function setAgFilter(f){agFilter=f;renderProjects();}
 function openNewProject(){
   const cats=[...new Set([...(PROJECT_TAGS.category||[]),...PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—')])].sort((a,b)=>a.localeCompare(b,'ru'));
   const svcs=[...new Set(['SMM','PROD','DESIGN',...(PROJECT_TAGS.service||[]),...PROJECTS.map(p=>p.svc).filter(Boolean)])];
+  const tariffs=[...new Set(['Platinum','Gold','Silver',...(PROJECT_TAGS.tariff||[]),...PROJECTS.map(p=>p.tariff).filter(Boolean)])];
+  const leadOpts=[['','— не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name+(m.role?(' · '+m.role):'')]));
   pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги и услуга задаются сразу</p></div>
+    <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги, тариф и ответственный</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. Uzbek Doner"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
       <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай','service')}</div>
+      <div class="fld2">${tagCombo('np-tariff','Тариф',tariffs,'','Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
       <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
@@ -2041,9 +2047,11 @@ function openNewProject(){
 function npSaveProject(){
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
   const svc=_v('np-svc')||'SMM';
+  const tariff=_v('np-tariff')||null;
+  const lead=_v('np-lead')||null;
   const totN=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).length;
-  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc}}); pd2Close(); return; }
-  PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,pct:0,stages:'0 / '+totN,health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
+  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
+  PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,pct:0,stages:'0 / '+totN,health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
 
@@ -2116,8 +2124,12 @@ function cmbPick(id,val,isNew){ const rec=(window._cmb||{})[id]||{opts:[],kind:'
   const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=val; lbl.style.color=''; lbl.style.fontWeight=''; }
   const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open'); }
 function cmbDel(id,val){ const rec=(window._cmb||{})[id]||{opts:[],kind:''};
+  const col=rec.kind==='category'?'cat':rec.kind==='service'?'svc':rec.kind==='tariff'?'tariff':null;
+  const used=col?(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>String(p[col]||'')===String(val)).length:0;
+  if(used>0 && !confirm(`Тег «${val}» используется в ${used} проект(ах). Удалить и снять его с этих проектов?`)) return;
   rec.opts=rec.opts.filter(o=>o!==val);
   if(rec.kind && window.LIVE && window.tTagDel) window.tTagDel(rec.kind,val);
+  else if(col){ const def=col==='tariff'?null:col==='svc'?'SMM':'—'; (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ if(String(p[col]||'')===String(val)){ p[col]=def; p._lead=p._lead; } }); if(typeof renderProjects==='function') renderProjects(); }
   cmbFilter(id); }
 function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const list=document.getElementById(id+'-list');
     const nb=list.querySelector('.cmb-new'); if(nb){ cmbPick(id,nb.dataset.v,true); return; }
@@ -2192,7 +2204,7 @@ const _projCard=(p)=>{
   else if(risk.lvl==='warn'&&risk.label==='Дедлайн близко'){ paceT='впритык'; paceC='var(--warn)'; }
   else { paceT='в графике'; paceC='var(--pos)'; }
   const noteEsc=(p.note||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const L=p._lead;
+  let L=p._lead; if(!L && p.lead_id){ const _x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===p.lead_id); if(_x) L={name:_x.name,color:_x.color||'var(--accent)',avatar:_x.avatar||null}; }
   const leadHTML = L
     ? `<span class="pt-lead-av" style="background:${L.color}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?')[0]||'?').toUpperCase()}</span><span class="pt-lead-nm">${L.name}</span><span class="pt-lead-r">ответственный</span>`
     : `<span class="pt-lead-av pt-lead-none">?</span><span class="pt-lead-nm" style="color:var(--txt-3)">не назначен</span>`;
@@ -4464,7 +4476,7 @@ const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.ver
 const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
   logoUrl:p.logo_url||'', cat:p.category||'—', svc:p.service||'SMM', pct:p.pct||0,
   stages:(p.stages_done||0)+' / '+(p.stages_total||6), health:p.health||'В норме',
-  dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null });
+  dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
   login:m.login||'', perms:m.permissions||{}, _id:m.id });
@@ -4595,9 +4607,9 @@ window.tLoadTags = async () => {
   if (!SB) return;
   const { data, error } = await SB.from('project_tags').select('kind,name').order('name');
   if (error) return;   // таблицы ещё нет — молча выходим
-  const t={category:[],service:[]};
+  const t={category:[],service:[],tariff:[]};
   (data||[]).forEach(r=>{ if(t[r.kind]) t[r.kind].push(r.name); });
-  if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; }
+  if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; PROJECT_TAGS.tariff=t.tariff; }
 };
 window.tTagAdd = async (kind,name) => { try { name=(name||'').trim(); if(!name)return;
   const { error } = await SB.from('project_tags').insert({ agency_id: ME&&ME.agency_id, kind, name });
@@ -4605,7 +4617,16 @@ window.tTagAdd = async (kind,name) => { try { name=(name||'').trim(); if(!name)r
   await window.tLoadTags(); } catch(e){ toast('Ошибка тега: '+(e.message||e)); } };
 window.tTagDel = async (kind,name) => { try {
   const { error } = await SB.from('project_tags').delete().eq('agency_id', ME&&ME.agency_id).eq('kind',kind).eq('name',name);
-  if (error) throw error; await window.tLoadTags(); toast('Тег удалён'); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  if (error) throw error;
+  // снимаем тег с проектов, иначе он «вернётся» из значений проектов
+  const col = kind==='category'?'category':kind==='service'?'service':kind==='tariff'?'tariff':null;
+  if(col){ const def = col==='tariff'?null:col==='service'?'SMM':'—';
+    const { error:e2 } = await SB.from('projects').update({[col]:def}).eq('agency_id', ME&&ME.agency_id).eq(col,name);
+    if(e2) throw e2; }
+  await window.tLoadTags();
+  if(window.tLoadAll && ME) await window.tLoadAll(ME.role);
+  if(typeof renderProjects==='function') renderProjects();
+  toast('Тег удалён'); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tUploadLogo = async (file, inputId, letter) => {
   try {
     if (!SB || !file) return;
@@ -4677,7 +4698,7 @@ window.tLoadProjectAggregates = async () => {
     p._dyn = d7>0?('↑ '+d7+' / 7д'):'— 0 / 7д';
     p._health = a.over?'Риск':(p.pct>=100?'Завершён':'В норме');
     p._healthCls = a.over?'risk':'ok';
-    const lid=top(a.by)||top(a.asg); p._lead = lid?mem(lid):null;
+    const lid=p.lead_id||top(a.by)||top(a.asg); p._lead = lid?mem(lid):null;
   });
 };
 
@@ -5118,7 +5139,15 @@ window.tProvisionClient = async (c) => {
   try { await SB.functions.invoke('provision-client', { body:{
       email:(c.login||'client')+'@'+(c.slug||'agency')+'.triada.app', password:c.pass,
       login:c.login, full_name:c.full_name, project:c.project }});
-    toast('Проект и клиентский доступ созданы'); await window.tLoadAll(ME.role);
+    await window.tLoadAll(ME.role);
+    // тариф/ответственный edge-функция может не сохранять — дожимаем прямым апдейтом
+    if (c.project && (c.project.tariff!==undefined || c.project.lead_id!==undefined)){
+      const cand=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name);
+      const np=cand[cand.length-1];
+      if (np && np.id){ const patch={}; if(c.project.tariff) patch.tariff=c.project.tariff; if(c.project.lead_id) patch.lead_id=c.project.lead_id;
+        if(Object.keys(patch).length){ try{ await SB.from('projects').update(patch).eq('id',np.id); await window.tLoadAll(ME.role); }catch(_e){} } }
+    }
+    toast('Проект и клиентский доступ созданы');
     if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
