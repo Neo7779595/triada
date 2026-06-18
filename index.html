@@ -1173,7 +1173,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-ring-c b{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--txt);line-height:1}
 .pt-ring-c span{font-family:var(--mono);font-size:9px;color:var(--txt-3);margin-top:2px}
 .pt-ring-fg{transition:stroke-dashoffset .9s var(--ease-out)}
-.pt-id{flex:1 1 auto;min-width:200px;display:flex;flex-direction:column;gap:9px;justify-content:center}
+.pt-id{flex:1 1 auto;min-width:220px;display:flex;flex-direction:row;align-items:center;gap:14px}
+.pt-id-main{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 auto}
 .pt-id-top{display:flex;align-items:center;gap:12px}
 .pt-av{width:40px;height:40px;flex:0 0 auto}
 .pt-name{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1202,18 +1203,23 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-gauge-s{font-size:8.5px;font-family:var(--mono);color:var(--txt-3);margin-top:1px;text-align:center}
 .pt-gauge-l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
 .pt-gauge-v{font-size:12.5px;font-weight:700}
-.pt-metrics{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,minmax(80px,1fr));gap:0;align-items:stretch}
-.ptm{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 18px}
+.pt-metrics{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,minmax(90px,1fr));align-items:stretch}
+.ptm{display:grid;grid-template-rows:auto 50px auto;align-content:center;justify-items:center;gap:6px;text-align:center;padding:0 16px}
 .ptm:first-child{padding-left:0}
 .ptm:last-child{padding-right:0}
 .ptm + .ptm{border-left:1px solid var(--line)}
 .ptm .l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
-.ptm .v{font-size:13px;font-weight:600;font-family:var(--mono);margin-top:4px;color:var(--txt)}
-.ptm .sub{font-size:9px;font-family:var(--mono);color:var(--txt-3);margin-top:3px}
+.ptm .mid{height:50px;display:flex;align-items:center;justify-content:center}
+.ptm .mid svg{height:34px;width:auto}
+.ptm .v{font-size:15px;font-weight:700;font-family:var(--mono);color:var(--txt);line-height:1.1;white-space:nowrap}
+.ptm .v .u{font-size:9px;color:var(--txt-3);font-weight:500;letter-spacing:0}
+.ptm .sub{font-size:9px;font-family:var(--mono);color:var(--txt-3);white-space:nowrap}
+.g-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.g-lvl{font-size:11px;font-weight:700;line-height:1}
 .pt-act{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;justify-content:center}
 .pt-act button{width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s}
 .pt-act button:hover{color:var(--accent);border-color:var(--accent-line)}
-@media(max-width:1180px){.pt-gauge{display:none}}
+@media(max-width:1180px){.ptm:first-child{display:none}}
 @media(max-width:1000px){.pt-pipe,.pt-note{display:none}}
 </style>
 </head>
@@ -2198,11 +2204,11 @@ const _projCard=(p)=>{
   const pp=p._pipeline||{wait:0,active:0,done:0,total:0};
   let dueMain='—',dueSub='',dueC='var(--txt-3)';
   if(p._nextDue){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(p._nextDue+'T00:00:00'); const diff=Math.round((d-t)/86400000); dueMain=_dDate(p._nextDue); dueSub=diff<0?('просрочен '+(-diff)+'д'):diff===0?'сегодня':diff===1?'завтра':('через '+diff+'д'); dueC=diff<0?'var(--neg)':diff<=3?'var(--warn)':'var(--txt-2)'; }
-  let paceT,paceC;
-  if(p.status==='done'){ paceT='завершён'; paceC='var(--txt-3)'; }
-  else if((p._overdueN||0)>0){ paceT='отстаёт · '+p._overdueN; paceC='var(--neg)'; }
-  else if(risk.lvl==='warn'&&risk.label==='Дедлайн близко'){ paceT='впритык'; paceC='var(--warn)'; }
-  else { paceT='в графике'; paceC='var(--pos)'; }
+  let paceMain,paceSub,paceC;
+  if(p.status==='done'){ paceMain='завершён'; paceSub='проект закрыт'; paceC='var(--txt-3)'; }
+  else if((p._overdueN||0)>0){ paceMain='отстаёт'; paceSub=p._overdueN+' просрочено'; paceC='var(--neg)'; }
+  else if(risk.lvl==='warn'&&risk.label==='Дедлайн близко'){ paceMain='впритык'; paceSub='дедлайн близко'; paceC='var(--warn)'; }
+  else { paceMain='в графике'; paceSub='по плану'; paceC='var(--pos)'; }
   const noteEsc=(p.note||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   let L=p._lead; if(!L && p.lead_id){ const _x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===p.lead_id); if(_x) L={name:_x.name,color:_x.color||'var(--accent)',avatar:_x.avatar||null}; }
   const leadHTML = L
@@ -2216,22 +2222,36 @@ const _projCard=(p)=>{
           <div class="pt-stages">${done} / ${tot} этапов</div>
         </div></div>
         <div class="pt-id">
-          <div class="pt-id-top">
-            <div class="pc-logo pt-av">${logoFill(p.logoUrl,p.logo)}</div>
-            <div style="min-width:0">
-              <div class="pt-name">${p.name}<span class="pt-rdot" style="background:${risk.color}" title="${risk.label}"></span></div>
-              <div class="pt-badges"><span class="tagx svc">${p.svc}</span><span class="tagx tariff t-${tar.name.toLowerCase()}">${tar.name}${tar.derived?'°':''}</span>${p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:''}</div>
-            </div>
+          <div class="pc-logo pt-av">${logoFill(p.logoUrl,p.logo)}</div>
+          <div class="pt-id-main">
+            <div class="pt-name">${p.name}<span class="pt-rdot" style="background:${risk.color}" title="${risk.label}"></span></div>
+            <div class="pt-badges"><span class="tagx svc">${p.svc}</span><span class="tagx tariff t-${tar.name.toLowerCase()}">${tar.name}${tar.derived?'°':''}</span>${p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:''}</div>
+            <div class="pt-lead">${leadHTML}</div>
+            <div class="pt-pipe"><div class="pt-pipe-h">Этапы <span>${pp.done} done · ${pp.active} в работе · ${pp.wait} в очереди</span></div>${_pipeBar(pp)}</div>
+            ${noteEsc?`<div class="pt-note" title="${noteEsc}">«${noteEsc}»</div>`:''}
           </div>
-          <div class="pt-lead">${leadHTML}</div>
-          <div class="pt-pipe"><div class="pt-pipe-h">Этапы <span>${pp.done} done · ${pp.active} в работе · ${pp.wait} в очереди</span></div>${_pipeBar(pp)}</div>
-          ${noteEsc?`<div class="pt-note" title="${noteEsc}">«${noteEsc}»</div>`:''}
         </div>
-        <div class="pt-gauge">${_gaugeSVG(cx.score,cx.color,!cx.hasData)}<div class="pt-gauge-l">Сложность</div><div class="pt-gauge-v" style="color:${cx.color};${cx.hasData?'':'font-size:11px'}">${cx.label}</div><div class="pt-gauge-s">${cx.hasData?('по циклам · n='+cx.n):(cx.stages+' этап. · оценка')}</div></div>
         <div class="pt-metrics">
-          <div class="ptm"><div class="l">LTV</div><div class="v">${lt.months.toFixed(1)} мес</div><div class="sub">срок жизни</div></div>
-          <div class="ptm"><div class="l">Дедлайн</div><div class="v" style="color:${dueC};font-size:12px">${dueMain}</div>${dueSub?`<div class="sub" style="color:${dueC}">${dueSub}</div>`:'<div class="sub">—</div>'}</div>
-          <div class="ptm"><div class="l">Темп</div><div class="v" style="color:${paceC};font-size:11px">${paceT}</div></div>
+          <div class="ptm">
+            <div class="l">Сложность</div>
+            <div class="mid"><div class="g-wrap">${_gaugeSVG(cx.score,cx.color,!cx.hasData)}<span class="g-lvl" style="color:${cx.color}">${cx.label}</span></div></div>
+            <div class="sub">${cx.hasData?('по циклам · n='+cx.n):(cx.stages+' этап. · оценка')}</div>
+          </div>
+          <div class="ptm">
+            <div class="l">LTV</div>
+            <div class="mid"><span class="v">${lt.months.toFixed(1)}<span class="u"> мес</span></span></div>
+            <div class="sub">срок жизни</div>
+          </div>
+          <div class="ptm">
+            <div class="l">Дедлайн</div>
+            <div class="mid"><span class="v" style="color:${dueC};font-size:13px">${dueMain}</span></div>
+            <div class="sub" style="color:${dueC}">${dueSub||'—'}</div>
+          </div>
+          <div class="ptm">
+            <div class="l">Темп</div>
+            <div class="mid"><span class="v" style="color:${paceC};font-size:12.5px">${paceMain}</span></div>
+            <div class="sub">${paceSub}</div>
+          </div>
         </div>
         <div class="pt-act">
           <button onclick="event.stopPropagation();projNote(${idx})" title="Заметка"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></button>
