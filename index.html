@@ -2164,6 +2164,12 @@ function projFiltered(){
 function _kmrr(v){ if(!v) return '—'; if(v>=1e6) return (Math.round(v/1e5)/10)+'M'; if(v>=1e3) return Math.round(v/1e3)+'K'; return ''+v; }
 function _projTariff(p){ if(p.tariff) return {name:p.tariff,derived:false}; const m=p.mrr||0; const name=m>=20000000?'Platinum':m>=10000000?'Gold':m>0?'Silver':'—'; return {name,derived:true}; }
 function _ltvOf(p){ if(!p.createdAt||!p.mrr) return {ltv:0,months:0}; const months=Math.max(0,(Date.now()-new Date(p.createdAt).getTime())/(30.44*86400000)); return {ltv:Math.round(p.mrr*months),months}; }
+function _lifeDur(months){ const u=t=>`<span class="u">${t}</span>`;
+  if(months==null||months<=0) return '0'+u(' дн');
+  if(months<1) return Math.round(months*30.44)+u(' дн');
+  let m=Math.floor(months), d=Math.round((months-m)*30.44);
+  if(d>=30){ m++; d=0; }
+  return d>0 ? (m+u(' мес ')+d+u(' дн')) : (m+u(' мес')); }
 function _projComplexity(p){
   const tot=parseInt((p.stages||'0 / 0').split('/')[1])||0;
   const cy=(typeof CYCLES!=='undefined'&&CYCLES.clients)?CYCLES.clients.find(c=>c.client===p.name):null;
@@ -2239,7 +2245,7 @@ const _projCard=(p)=>{
           </div>
           <div class="ptm">
             <div class="l">LTV</div>
-            <div class="mid"><span class="v">${lt.months.toFixed(1)}<span class="u"> мес</span></span></div>
+            <div class="mid"><span class="v">${_lifeDur(lt.months)}</span></div>
             <div class="sub">срок жизни</div>
           </div>
           <div class="ptm">
@@ -2273,6 +2279,10 @@ function renderProjects(){
   const _marginW=_mrrTot>0?Math.round(100*(_mrrTot-_costTot)/_mrrTot):null;
   const _ovdN=_act.reduce((s,p)=>s+(p._overdueAll||0),0), _ovdProj=_act.filter(p=>p._overdue).length;
   const _ltvTot=_act.reduce((s,p)=>s+(_ltvOf(p).ltv||0),0), _tenAvg=_act.length?(_act.reduce((s,p)=>s+(_ltvOf(p).months||0),0)/_act.length):0;
+  const _wip=_act.reduce((s,p)=>s+((p._pipeline&&p._pipeline.active)||0),0);
+  const _queue=_act.reduce((s,p)=>s+((p._pipeline&&p._pipeline.wait)||0),0);
+  const _stTot=_act.reduce((s,p)=>s+(parseInt((p.stages||'0 / 0').split('/')[1])||0),0);
+  const _maxMo=_act.reduce((m,p)=>Math.max(m,_ltvOf(p).months||0),0);
   const _nb=document.getElementById('ag-proj-ct'); if(_nb)_nb.textContent=_act.length;
   const _mA=document.getElementById('m-proj-act'); if(_mA)_mA.textContent=_act.length;
   const _mD=document.getElementById('m-proj-done'); if(_mD)_mD.textContent=_done.length;
@@ -2284,10 +2294,10 @@ function renderProjects(){
     </div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">MRR портфеля</div><div class="v num">${money(_mrrTot)}</div><div class="sub">активный recurring</div><div class="kfoot">${_act.length} активных · ${_done.length} завершено</div></div>
-      <div class="kpi"><div class="l">Средний прогресс</div><div class="v num">${_avg}%</div><div class="sub">по активным проектам</div><div class="kfoot">${_stDone} этапов завершено · ${_act.length} в работе</div></div>
+      <div class="kpi"><div class="l">Активный портфель</div><div class="v num">${_act.length}</div><div class="sub">${_wip} этап. в производстве</div><div class="kfoot">${_queue} в очереди · ${_done.length} завершено</div></div>
+      <div class="kpi"><div class="l">Средний прогресс</div><div class="v num">${_avg}%</div><div class="sub">по активным проектам</div><div class="kfoot">${_stDone} из ${_stTot} этапов</div></div>
       <div class="kpi"><div class="l">Просрочено</div><div class="v num" style="${_ovdN?'color:var(--neg)':''}">${_ovdN}</div><div class="sub">просроченных этапов и задач</div><div class="kfoot ${_ovdN?'':'pos'}">${_ovdN?(_ovdProj+' проект. затронуто'):'Всё в срок ✓'}</div></div>
-      <div class="kpi"><div class="l">LTV портфеля</div><div class="v num">${money(_ltvTot)}</div><div class="sub">накоплено выручки</div><div class="kfoot">ср. срок ${_tenAvg.toFixed(1)} мес</div></div>
+      <div class="kpi"><div class="l">Срок удержания</div><div class="v num">${_lifeDur(_tenAvg)}</div><div class="sub">средний срок клиента</div><div class="kfoot">макс · ${_lifeDur(_maxMo)}</div></div>
     </div>
 
     <div class="toolbar">
