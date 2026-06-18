@@ -2163,7 +2163,11 @@ function projFiltered(){
 }
 function _kmrr(v){ if(!v) return '—'; if(v>=1e6) return (Math.round(v/1e5)/10)+'M'; if(v>=1e3) return Math.round(v/1e3)+'K'; return ''+v; }
 function _projTariff(p){ if(p.tariff) return {name:p.tariff,derived:false}; const m=p.mrr||0; const name=m>=20000000?'Platinum':m>=10000000?'Gold':m>0?'Silver':'—'; return {name,derived:true}; }
-function _ltvOf(p){ if(!p.createdAt||!p.mrr) return {ltv:0,months:0}; const months=Math.max(0,(Date.now()-new Date(p.createdAt).getTime())/(30.44*86400000)); return {ltv:Math.round(p.mrr*months),months}; }
+function _ltvOf(p){
+  const months = p.createdAt ? Math.max(0,(Date.now()-new Date(p.createdAt).getTime())/(30.44*86400000)) : 0;
+  const ltv = (p.createdAt && p.mrr) ? Math.round(p.mrr*months) : 0;
+  return {ltv, months};
+}
 function _lifeDur(months){ const u=t=>`<span class="u">${t}</span>`;
   if(months==null||months<=0) return '0'+u(' дн');
   if(months<1) return Math.round(months*30.44)+u(' дн');
