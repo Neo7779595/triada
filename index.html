@@ -1160,6 +1160,14 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-act{padding-right:8px}
 .ptile:hover{background:var(--bg-2)}
 .pt-l{flex:0 0 auto;display:flex;align-items:center}
+.pt-prog{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:96px}
+.pt-pct{display:flex;align-items:baseline;gap:2px;line-height:1}
+.pt-pct b{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:-.04em;line-height:1}
+.pt-pct span{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--txt-3)}
+.pt-prog-bar{width:100%;height:3px;border-radius:2px;background:var(--bg-3);overflow:hidden}
+.pt-prog-bar i{display:block;height:100%;border-radius:2px;transition:width .9s var(--ease-out)}
+.pt-stages{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);letter-spacing:.02em;white-space:nowrap}
+/* legacy ring (kept for other views) */
 .pt-ring{position:relative;width:76px;height:76px}
 .pt-ring-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .pt-ring-c b{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--txt);line-height:1}
@@ -1194,11 +1202,14 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-gauge-s{font-size:8.5px;font-family:var(--mono);color:var(--txt-3);margin-top:1px;text-align:center}
 .pt-gauge-l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
 .pt-gauge-v{font-size:12.5px;font-weight:700}
-.pt-metrics{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,minmax(72px,1fr));gap:20px;align-items:center}
-.ptm{text-align:center}
+.pt-metrics{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,minmax(80px,1fr));gap:0;align-items:stretch}
+.ptm{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 18px}
+.ptm:first-child{padding-left:0}
+.ptm:last-child{padding-right:0}
+.ptm + .ptm{border-left:1px solid var(--line)}
 .ptm .l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
-.ptm .v{font-size:13px;font-weight:600;font-family:var(--mono);margin-top:3px;color:var(--txt)}
-.ptm .sub{font-size:9px;font-family:var(--mono);color:var(--txt-3);margin-top:2px}
+.ptm .v{font-size:13px;font-weight:600;font-family:var(--mono);margin-top:4px;color:var(--txt)}
+.ptm .sub{font-size:9px;font-family:var(--mono);color:var(--txt-3);margin-top:3px}
 .pt-act{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;justify-content:center}
 .pt-act button{width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s}
 .pt-act button:hover{color:var(--accent);border-color:var(--accent-line)}
@@ -2187,7 +2198,11 @@ const _projCard=(p)=>{
     : `<span class="pt-lead-av pt-lead-none">?</span><span class="pt-lead-nm" style="color:var(--txt-3)">не назначен</span>`;
   return `
       <div class="ptile" style="border-left-color:${risk.color}" onclick="openProject(${idx})">
-        <div class="pt-l"><div class="pt-ring">${_ringSVG(p.pct,(p.pct>=100?'var(--pos)':'var(--accent)'))}<div class="pt-ring-c"><b>${p.pct}%</b><span>${done}/${tot}</span></div></div></div>
+        <div class="pt-l"><div class="pt-prog">
+          <div class="pt-pct"><b style="color:${p.pct>=100?'var(--pos)':'var(--txt)'}">${p.pct}</b><span>%</span></div>
+          <div class="pt-prog-bar"><i style="width:${p.pct}%;background:${p.pct>=100?'var(--pos)':'var(--accent)'}"></i></div>
+          <div class="pt-stages">${done} / ${tot} этапов</div>
+        </div></div>
         <div class="pt-id">
           <div class="pt-id-top">
             <div class="pc-logo pt-av">${logoFill(p.logoUrl,p.logo)}</div>
@@ -2202,7 +2217,7 @@ const _projCard=(p)=>{
         </div>
         <div class="pt-gauge">${_gaugeSVG(cx.score,cx.color,!cx.hasData)}<div class="pt-gauge-l">Сложность</div><div class="pt-gauge-v" style="color:${cx.color};${cx.hasData?'':'font-size:11px'}">${cx.label}</div><div class="pt-gauge-s">${cx.hasData?('по циклам · n='+cx.n):(cx.stages+' этап. · оценка')}</div></div>
         <div class="pt-metrics">
-          <div class="ptm"><div class="l">LTV</div><div class="v">${_kmrr(lt.ltv)}</div><div class="sub">${lt.months.toFixed(1)} мес</div></div>
+          <div class="ptm"><div class="l">LTV</div><div class="v">${lt.months.toFixed(1)} мес</div><div class="sub">срок жизни</div></div>
           <div class="ptm"><div class="l">Дедлайн</div><div class="v" style="color:${dueC};font-size:12px">${dueMain}</div>${dueSub?`<div class="sub" style="color:${dueC}">${dueSub}</div>`:'<div class="sub">—</div>'}</div>
           <div class="ptm"><div class="l">Темп</div><div class="v" style="color:${paceC};font-size:11px">${paceT}</div></div>
         </div>
