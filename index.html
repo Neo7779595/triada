@@ -353,6 +353,40 @@ tbody tr:hover td{background:var(--bg-2)}
 .wl-track{flex:1;height:10px;background:var(--bg-3);border-radius:5px;overflow:hidden;display:flex}
 .wl-track i{height:100%}
 .wl-tot{font-family:var(--mono);font-size:13px;width:30px;text-align:right;flex:0 0 auto}
+/* ===== Workload exhibit · McKinsey-style ===== */
+.wlx-head{margin:2px 0 16px}
+.wlx-kicker{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt-3);font-weight:600;display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.wlx-kicker::before{content:"";width:18px;height:2px;background:var(--accent);border-radius:2px}
+.wlx-title{font-size:18px;font-weight:700;letter-spacing:-.02em;line-height:1.32;max-width:780px}
+.wlx-sub{font-size:12.5px;color:var(--txt-2);margin-top:7px}
+.wlx-sum{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.wlx-s{background:var(--bg-1);padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.wlx-s .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:baseline;gap:8px;line-height:1}
+.wlx-s .v small{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--txt-3)}
+.wlx-s .l{font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.1em;display:flex;align-items:center;gap:7px}
+.wlx-s .l .dt{width:7px;height:7px;border-radius:2px}
+.wlx-cardh{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.wlx-cardh>span{font-size:12px;font-weight:600;color:var(--txt-2)}
+.wlx-leg{display:flex;gap:14px;font-size:10.5px;color:var(--txt-3)}
+.wlx-leg i{display:inline-block;width:9px;height:9px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+.wlx-tbl{width:100%;border-collapse:collapse}
+.wlx-tbl thead th{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:600;padding:12px 16px;border-bottom:1px solid var(--line-2);white-space:nowrap;text-align:right}
+.wlx-tbl thead th:nth-child(1),.wlx-tbl thead th:nth-child(2){text-align:left}
+.wlx-tbl tbody td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:middle;text-align:right}
+.wlx-tbl tbody td:nth-child(1),.wlx-tbl tbody td:nth-child(2){text-align:left}
+.wlx-tbl tbody tr:last-child td{border-bottom:0}
+.wlx-tbl tbody tr{transition:.14s}
+.wlx-tbl tbody tr:hover td{background:var(--bg-2)}
+.wlx-id{display:flex;align-items:center;gap:11px}
+.wlx-av{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#06140f;font-weight:700;font-size:13px;flex:0 0 auto}
+.wlx-id .nm{font-weight:600;font-size:13px}
+.wlx-id .sl{font-family:var(--mono);font-size:10px;color:var(--txt-3);margin-top:1px}
+.wlx-dist{display:flex;gap:3px;height:12px;align-items:center;width:100%;max-width:340px}
+.wlx-dist i{height:100%;border-radius:2px;transform-origin:left;animation:growBar .8s var(--ease-out) both;min-width:4px}
+.wlx-cell{display:inline-block;min-width:34px;padding:5px 9px;border-radius:7px;font-family:var(--mono);font-size:13px;font-weight:600;font-feature-settings:"tnum" 1}
+.wlx-cell.z{background:transparent;color:var(--txt-3);font-weight:400;min-width:0;padding:5px 0}
+.wlx-tot{font-family:var(--mono);font-size:15px;font-weight:700;font-feature-settings:"tnum" 1}
+.wlx-foot{font-size:10.5px;color:var(--txt-3);font-family:var(--mono);padding:13px 16px;border-top:1px solid var(--line);letter-spacing:.01em}
 /* ===== TEAM · Talent Intelligence ===== */
 .ti-bar{position:relative;display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);padding:9px 11px;margin-bottom:14px}
 .ti-bar .ti-lbl{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3);font-weight:500;margin:0 1px 0 4px}
@@ -4089,24 +4123,43 @@ function renderTeam(){
       </tbody></table></div></div>`;
   } else if(teamTab==='workload'){
     const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
-    const sorted=[...TEAM].sort((a,b)=>((b._open||0)+(b._done||0))-((a._open||0)+(a._done||0)));
-    body=`<div class="wl-summary">
-        <div class="s"><div class="v" style="color:var(--warn)">${W}</div><div class="l">В ожидании</div></div>
-        <div class="s"><div class="v" style="color:var(--accent)">${I}</div><div class="l">В работе</div></div>
-        <div class="s"><div class="v" style="color:var(--pos)">${D}</div><div class="l">Завершено</div></div>
+    const TOT=W+I+D, shareOf=v=>TOT?Math.round(100*v/TOT):0;
+    const sorted=[...TEAM].sort((a,b)=>((b._wait||0)+(b._active||0)+(b._done||0))-((a._wait||0)+(a._active||0)+(a._done||0)));
+    let take;
+    if(TOT===0){ take='Задач пока нет — команда свободна'; }
+    else if(I===0){ take=`Активных задач нет: ${D} ${_plural(D,'завершена','завершены','завершено')}, ${W} в ожидании`; }
+    else { const top=[...TEAM].sort((a,b)=>(b._active||0)-(a._active||0))[0]; const topA=top._active||0; const sh=I?Math.round(100*topA/I):0;
+      take = (sh>=50 && topA>1) ? `Нагрузка смещена: ${top.name} ведёт ${sh}% задач в работе`
+           : `${I} ${_plural(I,'задача','задачи','задач')} в работе из ${TOT}; пик нагрузки — у ${top.name}`; }
+    const cell=(v,dim,col)=> v>0?`<span class="wlx-cell" style="background:${dim};color:${col}">${v}</span>`:'<span class="wlx-cell z">—</span>';
+    body=`
+      <div class="wlx-head">
+        <div class="wlx-kicker">Распределение нагрузки</div>
+        <div class="wlx-title">${take}</div>
+        <div class="wlx-sub">${TOT} ${_plural(TOT,'задача','задачи','задач')} у ${TEAM.length} ${_plural(TEAM.length,'сотрудника','сотрудников','сотрудников')} · разбивка по статусу и сотрудникам ниже</div>
       </div>
-      <div style="display:flex;gap:18px;margin:0 0 14px;font-size:11px;color:var(--txt-3)"><span><i style="display:inline-block;width:9px;height:9px;background:var(--warn);border-radius:2px;vertical-align:-1px"></i> Ожидание</span><span><i style="display:inline-block;width:9px;height:9px;background:var(--accent);border-radius:2px;vertical-align:-1px"></i> В работе</span><span><i style="display:inline-block;width:9px;height:9px;background:var(--pos);border-radius:2px;vertical-align:-1px"></i> Готово</span></div>
-      <div class="card"><table>
-        <thead><tr><th>Сотрудник</th><th style="width:42%">Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th></tr></thead>
-        <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d||1;return `<tr>
-          <td><div class="ag-name"><span class="wl-av" style="width:30px;height:30px;background:${e.color};font-size:12px">${(e.name||'?')[0]}</span><div><div class="nm">${e.name}</div><div class="sl" style="font-family:var(--font)">${w+a+d} задач</div></div></div></td>
-          <td><div style="height:9px;background:var(--bg-3);border-radius:5px;overflow:hidden;display:flex"><i style="width:${w/t*100}%;background:var(--warn)"></i><i style="width:${a/t*100}%;background:var(--accent)"></i><i style="width:${d/t*100}%;background:var(--pos)"></i></div></td>
-          <td style="color:var(--warn)">${w||'—'}</td>
-          <td style="color:${a?'var(--accent)':'var(--txt-3)'}">${a||'—'}</td>
-          <td style="color:var(--pos)">${d||'—'}</td>
-          <td class="num">${w+a+d}</td>
-        </tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--txt-3);padding:24px">Нет данных</td></tr>'}</tbody>
-      </table></div>`;
+      <div class="wlx-sum">
+        <div class="wlx-s"><div class="v" style="color:var(--warn)">${W}<small>${shareOf(W)}%</small></div><div class="l"><span class="dt" style="background:var(--warn)"></span>В ожидании</div></div>
+        <div class="wlx-s"><div class="v" style="color:var(--accent)">${I}<small>${shareOf(I)}%</small></div><div class="l"><span class="dt" style="background:var(--accent)"></span>В работе</div></div>
+        <div class="wlx-s"><div class="v" style="color:var(--pos)">${D}<small>${shareOf(D)}%</small></div><div class="l"><span class="dt" style="background:var(--pos)"></span>Завершено</div></div>
+      </div>
+      <div class="card">
+        <div class="wlx-cardh"><span>По сотрудникам · по убыванию нагрузки</span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
+        <table class="wlx-tbl">
+          <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th></tr></thead>
+          <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d,tt=t||1;
+            const dist=[[w,'var(--warn)'],[a,'var(--accent)'],[d,'var(--pos)']].map(([v,c])=>v>0?`<i style="width:${(v/tt*100).toFixed(1)}%;background:${c}"></i>`:'').join('');
+            return `<tr>
+              <td><div class="wlx-id"><span class="wlx-av" style="background:${e.color||'var(--accent)'}">${((e.name||'?')[0]||'?').toUpperCase()}</span><div><div class="nm">${e.name}</div><div class="sl">${t} ${_plural(t,'задача','задачи','задач')}</div></div></div></td>
+              <td><div class="wlx-dist">${dist||'<i style="width:100%;background:var(--bg-3)"></i>'}</div></td>
+              <td>${cell(w,'var(--warn-dim)','var(--warn)')}</td>
+              <td>${cell(a,'var(--accent-dim)','var(--accent)')}</td>
+              <td>${cell(d,'var(--pos-dim)','var(--pos)')}</td>
+              <td><span class="wlx-tot">${t}</span></td>
+            </tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--txt-3);padding:28px">Нет данных</td></tr>'}</tbody>
+        </table>
+        <div class="wlx-foot">Источник: трекер задач · ${TOT} ${_plural(TOT,'задача','задачи','задач')} по ${TEAM.length} ${_plural(TEAM.length,'сотруднику','сотрудникам','сотрудникам')} · обновляется в реальном времени</div>
+      </div>`;
   } else {
     const deptMap={};
     TEAM.forEach(e=>{ const d=e.dept||'—'; const x=deptMap[d]||(deptMap[d]={name:d,emps:[],assigned:0,done:0,open:0,v30:0,rework:0,maxOpen:0});
