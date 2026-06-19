@@ -4125,26 +4125,15 @@ function renderTeam(){
     const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
     const TOT=W+I+D, shareOf=v=>TOT?Math.round(100*v/TOT):0;
     const sorted=[...TEAM].sort((a,b)=>((b._wait||0)+(b._active||0)+(b._done||0))-((a._wait||0)+(a._active||0)+(a._done||0)));
-    let take;
-    if(TOT===0){ take='Задач пока нет — команда свободна'; }
-    else if(I===0){ take=`Активных задач нет: ${D} ${_plural(D,'завершена','завершены','завершено')}, ${W} в ожидании`; }
-    else { const top=[...TEAM].sort((a,b)=>(b._active||0)-(a._active||0))[0]; const topA=top._active||0; const sh=I?Math.round(100*topA/I):0;
-      take = (sh>=50 && topA>1) ? `Нагрузка смещена: ${top.name} ведёт ${sh}% задач в работе`
-           : `${I} ${_plural(I,'задача','задачи','задач')} в работе из ${TOT}; пик нагрузки — у ${top.name}`; }
     const cell=(v,dim,col)=> v>0?`<span class="wlx-cell" style="background:${dim};color:${col}">${v}</span>`:'<span class="wlx-cell z">—</span>';
     body=`
-      <div class="wlx-head">
-        <div class="wlx-kicker">Распределение нагрузки</div>
-        <div class="wlx-title">${take}</div>
-        <div class="wlx-sub">${TOT} ${_plural(TOT,'задача','задачи','задач')} у ${TEAM.length} ${_plural(TEAM.length,'сотрудника','сотрудников','сотрудников')} · разбивка по статусу и сотрудникам ниже</div>
-      </div>
       <div class="wlx-sum">
         <div class="wlx-s"><div class="v" style="color:var(--warn)">${W}<small>${shareOf(W)}%</small></div><div class="l"><span class="dt" style="background:var(--warn)"></span>В ожидании</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--accent)">${I}<small>${shareOf(I)}%</small></div><div class="l"><span class="dt" style="background:var(--accent)"></span>В работе</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--pos)">${D}<small>${shareOf(D)}%</small></div><div class="l"><span class="dt" style="background:var(--pos)"></span>Завершено</div></div>
       </div>
       <div class="card">
-        <div class="wlx-cardh"><span>По сотрудникам · по убыванию нагрузки</span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
+        <div class="wlx-cardh"><span>По сотрудникам</span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
         <table class="wlx-tbl">
           <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th></tr></thead>
           <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d,tt=t||1;
@@ -4158,7 +4147,6 @@ function renderTeam(){
               <td><span class="wlx-tot">${t}</span></td>
             </tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--txt-3);padding:28px">Нет данных</td></tr>'}</tbody>
         </table>
-        <div class="wlx-foot">Источник: трекер задач · ${TOT} ${_plural(TOT,'задача','задачи','задач')} по ${TEAM.length} ${_plural(TEAM.length,'сотруднику','сотрудникам','сотрудникам')} · обновляется в реальном времени</div>
       </div>`;
   } else {
     const deptMap={};
