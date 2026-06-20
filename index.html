@@ -451,13 +451,17 @@ tbody tr:hover td{background:var(--bg-2)}
 .tpi-meta{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .tpi-grade{font-family:var(--font);font-size:11px;font-weight:700;padding:1px 8px;border-radius:5px;letter-spacing:.02em}
 .tpi-meta .nb{font-family:var(--mono);font-size:9.5px;color:var(--txt-3)}
-.pillars{display:inline-flex;flex-direction:column;gap:5px;min-width:150px;text-align:left}
-.pbar{display:flex;align-items:center;gap:8px}
-.pbar .pl{font-size:9.5px;color:var(--txt-3);width:58px;letter-spacing:.01em;flex:0 0 auto}
-.pbar .pt{flex:1;height:4px;background:var(--bg-3);border-radius:3px;overflow:hidden;min-width:36px}
-.pbar .pt i{display:block;height:100%;border-radius:3px;transform-origin:left;animation:growBar .6s var(--ease-out) both}
-.pbar .pv{font-family:var(--mono);font-size:10px;color:var(--txt-2);width:20px;text-align:right;flex:0 0 auto}
-.pbar .pv.na{color:var(--txt-3)}
+.pillars{display:inline-flex;align-items:flex-end;gap:9px;height:48px}
+.eqi{display:flex;flex-direction:column;align-items:center;gap:4px}
+.eqi .vv{font-family:var(--mono);font-size:9px;color:var(--txt-2);height:11px;line-height:1}
+.eqi .trk{width:7px;height:30px;background:var(--bg-3);border-radius:4px;display:flex;align-items:flex-end;overflow:hidden}
+.eqi .trk i{width:100%;border-radius:4px;transform-origin:bottom center;animation:eqGrow .7s var(--ease-out) both}
+.eqi .ll{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--txt-3);line-height:1}
+.eqi.gh .trk{background:var(--bg-2)} .eqi.gh .vv{color:var(--txt-3)}
+@keyframes eqGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.ti-hint{font-size:10px;color:var(--accent);margin-top:3px;font-weight:500}
+.ti-tbl tr.ti-low td{opacity:.82}
+.ti-tbl .dash{color:var(--txt-3);font-family:var(--mono)}
 .ti-arch{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;padding:4px 10px;border-radius:7px;background:var(--bg-3);color:var(--txt-2);white-space:nowrap}
 .ti-arch .ad{width:5px;height:5px;border-radius:50%;flex:0 0 auto}
 .ti-spark{display:inline-block;vertical-align:middle}
@@ -3526,14 +3530,11 @@ function renderOverview(){
       #content-ag .ov-tok svg{width:12px;height:12px;flex:none}
       #content-ag .ov-tok.st{color:var(--accent)} #content-ag .ov-tok.tk{color:var(--violet)} #content-ag .ov-tok.dim{color:var(--txt-3);opacity:.75}
       #content-ag .ov-split{display:flex;gap:13px;margin-top:8px;flex-wrap:wrap}
-      #content-ag .ov-leg{display:flex;gap:13px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--txt-3);margin:-2px 0 14px}
       #content-ag .ov-rtok{display:inline-flex;width:19px;height:19px;border-radius:5px;align-items:center;justify-content:center;flex:none}
       #content-ag .ov-rtok svg{width:11px;height:11px} #content-ag .ov-rtok.st{background:var(--accent-dim);color:var(--accent)} #content-ag .ov-rtok.tk{background:rgba(138,143,255,.14);color:var(--violet)}
       #content-ag .ov-redo{display:flex;align-items:center;gap:6px;font-size:11px;margin-top:7px}
       #content-ag .ov-redo svg{width:12px;height:12px;flex:none} #content-ag .ov-redo b{font-family:var(--mono);font-weight:600}
     </style>
-    <div class="ov-leg"><span style="color:var(--txt-2);font-weight:600">Обозначения</span><span class="ov-tok st">${_svg(IC_ST)}Этапы</span><span class="ov-tok tk">${_svg(IC_TK)}Задачи</span><span>— скорость, откаты, on-time и просрочка считаются по обоим${TH?'':' · <b style="color:var(--warn)">журнал задач не создан — выполните SQL, см. сообщение</b>'}</span></div>
-
     <div class="px-ov">
       <div class="px-ov-cell">
         <div class="px-ov-l">Индекс здоровья</div>
@@ -4316,7 +4317,7 @@ function _tiSpark(series,col){
 }
 function _avInner(m){ const ini=((m.name||'?')[0]||'?').toUpperCase(); return m.avatar?`<span class="ph"><img src="${m.avatar}" alt=""></span>`:ini; }
 function _tiPillar(label,v){ const na=v==null; const col=na?'var(--txt-3)':v>=75?'var(--pos)':v>=50?'var(--accent)':v>=30?'var(--warn)':'var(--neg)';
-  return `<div class="pbar"><span class="pl">${label}</span><span class="pt">${na?'':`<i style="width:${Math.round(v)}%;background:${col}"></i>`}</span><span class="pv${na?' na':''}">${na?'—':Math.round(v)}</span></div>`; }
+  return `<div class="eqi${na?' gh':''}"><span class="vv">${na?'–':Math.round(v)}</span><span class="trk">${na?'':`<i style="height:${Math.max(5,Math.round(v))}%;background:${col}"></i>`}</span><span class="ll">${label}</span></div>`; }
 function _tiCountUp(){
   document.querySelectorAll('#content-ag [data-count]').forEach(el=>{
     const to=parseFloat(el.getAttribute('data-count'))||0, suf=el.getAttribute('data-suf')||'', dur=620, t0=performance.now();
@@ -4357,12 +4358,17 @@ function renderTeam(){
       ${rows.length?rows.map(r=>{const m=r.m,g=_gradeOf(r.tpi),st=actColor(m._lastDays),low=r.n<3;
         const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${m.name||'—'}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div></div></div>`;
         if(low){
-          const need=Math.max(0,3-r.n), pct=Math.round(100*_tClamp(r.n,0,3)/3);
-          return `<tr onclick="openEmpEdit(${r._i})">
+          const need=Math.max(0,3-r.n);
+          const hint=`<div class="ti-hint">${need>0?`ещё ${need} ${_taskWord(need)} до оценки`:'оценка формируется'}</div>`;
+          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${m.name||'—'}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div>${hint}</div></div>`;
+          return `<tr class="ti-low" onclick="openEmpEdit(${r._i})">
         <td><span class="ti-rank idle">–</span></td>
-        <td>${idCell}</td>
-        <td><div class="tpi-cell">${_tpiRing(null)}<div class="tpi-meta"><span class="nb" style="color:var(--txt-2)">накопление</span><span class="nb">${r.n} из 3 задач</span></div></div></td>
-        <td colspan="4" class="ti-accrue"><div class="awrap"><span class="aic">${_accrueIcon()}</span><div class="atx"><div class="att">Накопление данных для оценки</div><div class="apr"><span class="track"><i style="width:${pct}%"></i></span><span class="hint">${need>0?`ещё ${need} ${_taskWord(need)} до первой оценки`:'оценка формируется'}</span></div></div></div></td>
+        <td>${idCellLow}</td>
+        <td><div class="tpi-cell">${_tpiRing(null)}<div class="tpi-meta"><span class="nb" style="color:var(--txt-2)">накопление</span><span class="nb">${r.n} / 3</span></div></div></td>
+        <td><div class="pillars">${_tiPillar('O',null)}${_tiPillar('S',null)}${_tiPillar('Q',null)}${_tiPillar('R',null)}</div></td>
+        <td class="num"><span class="dash">—</span></td>
+        <td class="num"><span class="dash">—</span></td>
+        <td class="num"><span class="dash">—</span></td>
         <td class="col-spark"><span class="ti-spark-empty"></span></td>
         <td class="col-arch"><span class="ti-arch lowdata">${_accrueIcon()}Мало данных</span></td>
       </tr>`;}
@@ -4370,7 +4376,7 @@ function renderTeam(){
         <td><span class="ti-rank ${r.rank===1?'r1':r.rank===2?'r2':r.rank===3?'r3':''}">${r.rank||'—'}</span></td>
         <td>${idCell}</td>
         <td><div class="tpi-cell">${_tpiRing(r.tpi)}<div class="tpi-meta"><span class="tpi-grade" style="color:${g.c};background:${g.bg}">${g.g}</span><span class="nb">n=${r.n}</span></div></div></td>
-        <td><div class="pillars">${_tiPillar('Выраб.',r.sOutput)}${_tiPillar('Скор.',r.sSpeed)}${_tiPillar('Кач-во',r.sQuality)}${_tiPillar('Надёж.',r.sReliab)}</div></td>
+        <td><div class="pillars">${_tiPillar('O',r.sOutput)}${_tiPillar('S',r.sSpeed)}${_tiPillar('Q',r.sQuality)}${_tiPillar('R',r.sReliab)}</div></td>
         <td class="num"><span style="font-size:15px;color:${r.tp?'var(--txt)':'var(--txt-3)'}">${r.tp}</span>${r.redo?`<div style="font-size:9px;color:var(--warn);font-family:var(--font);margin-top:2px;font-weight:500">↩ ${r.redo} переделок</div>`:''}</td>
         <td class="num" style="color:${r.medCycle!=null?'var(--txt)':'var(--txt-3)'}">${r.medCycle!=null?_cycDur(r.medCycle):'—'}</td>
         <td class="num" style="color:${r.returns?'var(--neg)':'var(--txt-3)'}">${r.closes?Math.round(100*r.returns/r.closes)+'%':'—'}</td>
