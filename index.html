@@ -896,6 +896,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-card:hover .del{opacity:1}
 .pk-card .del:hover{background:var(--neg-dim);color:var(--neg)}
 .pk-card .del svg{width:13px;height:13px}
+.pk-card-acts{flex:none;display:flex;align-items:center;gap:2px}
+.pk-card .gear{flex:none;background:none;border:0;color:var(--txt-3);cursor:pointer;width:21px;height:21px;border-radius:6px;display:flex;align-items:center;justify-content:center;opacity:0;transition:.14s}
+.pk-card:hover .gear{opacity:1}
+.pk-card .gear:hover{background:var(--accent-dim);color:var(--accent)}
+.pk-card .gear svg{width:13px;height:13px}
+.pk-card .gear:hover svg{animation:gearSpin 1.4s linear infinite}
+@keyframes gearSpin{to{transform:rotate(1turn)}}
 .pk-stage{display:inline-flex;align-items:center;gap:6px;max-width:100%;margin-top:10px;font-size:10.5px;color:var(--txt-2);background:var(--bg-3);border:1px solid var(--line);padding:3px 8px;border-radius:6px}
 .pk-stage svg{width:11px;height:11px;color:var(--txt-3);flex:none}
 .pk-stage span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -951,18 +958,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-addbtn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;font-size:11.5px;font-weight:500;color:var(--txt-3);background:transparent;border:1px dashed var(--line-2);border-radius:9px;padding:9px;cursor:pointer;transition:.15s var(--ease);font-family:var(--font)}
 .pk-addbtn svg{width:14px;height:14px}
 .pk-addbtn:hover{color:var(--pk-accent);border-color:var(--pk-accent);background:color-mix(in srgb,var(--pk-accent) 7%,transparent)}
-.pk-qa{display:none}
-.pk-add-zone.open .pk-addbtn{display:none}
-.pk-add-zone.open .pk-qa{display:block;animation:qaIn .16s var(--ease-out)}
-@keyframes qaIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-.pk-qa-in{width:100%;background:var(--bg-2);border:1px solid var(--pk-accent);border-radius:9px;padding:10px 12px;color:var(--txt);font-family:var(--font);font-size:13px;box-shadow:0 0 0 3px color-mix(in srgb,var(--pk-accent) 13%,transparent)}
-.pk-qa-in::placeholder{color:var(--txt-3)}
-.pk-qa-in:focus{outline:none}
-.pk-qa-act{display:flex;gap:8px;margin-top:8px}
-.pk-qa-save{flex:1;background:var(--pk-accent);color:#04201B;font-weight:700;font-size:12px;border:0;border-radius:8px;padding:9px;cursor:pointer;transition:.15s}
-.pk-qa-save:hover{filter:brightness(1.06)}
-.pk-qa-cancel{background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-2);font-size:12px;border-radius:8px;padding:9px 13px;cursor:pointer}
-.pk-qa-cancel:hover{color:var(--txt)}
 @media(max-width:820px){.pk-board{grid-template-columns:1fr}.pd-hero-top{flex-direction:column;align-items:stretch;gap:22px}.pd-bignum{font-size:52px}.pd-statrow{grid-template-columns:repeat(2,1fr)}.pd-top,.pd-tabbar,.pd-scroll{padding-left:16px;padding-right:16px}.pd-right .pd-minibar{display:none}}
 
 /* ============ PROJECT SECONDARY MODALS (edit/report/cycles/material) ============ */
@@ -2595,16 +2590,6 @@ function closeProject(){document.getElementById('ov-proj').classList.remove('on'
 function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));renderPd();}
 const PD_STNEXT={wait:'active',active:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
-function pkQAOpen(st){ const z=document.querySelector('.pk-add-zone[data-st="'+st+'"]'); if(!z)return; document.querySelectorAll('.pk-add-zone.open').forEach(o=>o.classList.remove('open')); z.classList.add('open'); const inp=document.getElementById('pk-qa-in-'+st); if(inp){inp.value='';requestAnimationFrame(()=>inp.focus());} }
-function pkQAClose(st){ const z=document.querySelector('.pk-add-zone[data-st="'+st+'"]'); if(z)z.classList.remove('open'); }
-function pkQAKey(e,st){ if(e.key==='Enter'){e.preventDefault();pkQASave(st);} else if(e.key==='Escape'){e.preventDefault();pkQAClose(st);} }
-function pkQASave(st){
-  const inp=document.getElementById('pk-qa-in-'+st); const title=((inp&&inp.value)||'').trim();
-  if(!title){ if(inp)inp.focus(); return; }
-  const p=PROJECTS[pdIdx]; const T=p._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
-  const actStage=(p._stages||[]).find(s=>s.status==='active'); const stage_id=actStage?actStage.id:((p._stages||[])[0]?(p._stages||[])[0].id:null);
-  if(window.tTaskAdd) window.tTaskAdd(p.id,{title,stage_id,assignee_id:null,due_date:null,status:st,idx});
-}
 let _pkDrag=null;
 function pkDrag(e,id){ _pkDrag=id; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);}catch(_){}; const c=e.target.closest('.pk-card'); if(c) setTimeout(()=>c.classList.add('dragging'),0); }
 function pkDragEnd(e){ const c=e.target.closest('.pk-card'); if(c) c.classList.remove('dragging'); document.querySelectorAll('.pk-col.drag-over').forEach(x=>x.classList.remove('drag-over')); }
@@ -2628,7 +2613,9 @@ function pdAddStage(){ const name=_v('pd2-name'); if(!name){toast('Введи н
   if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,idx}); }
 function pdStageDel(id){ if(window.tStageDel) window.tStageDel(id); }
 function pdSeedStages(){ const names=PD_STAGE_SETS[PROJECTS[pdIdx].svc]||PD_STAGE_SETS.SMM; if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
-async function pdNewTask(){
+let pdNewSt='wait';
+async function pdNewTask(st){
+  pdNewSt=st||'wait';
   const p=PROJECTS[pdIdx];
   if(window.tLoadProjectWork) await window.tLoadProjectWork(p.id);   // активные этапы в реальном времени
   const active=(p._stages||[]).filter(s=>s.status==='active');
@@ -2654,8 +2641,28 @@ async function pdNewTask(){
 function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи задачу');return;}
   const stage_id=_v('pd2-stg'); if(!stage_id){toast('Выбери этап');return;}
   const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
-  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,status:'wait',idx}); }
+  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,status:pdNewSt,idx}); }
 function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
+async function pdTaskEdit(id){
+  const p=PROJECTS[pdIdx];
+  if(window.tLoadProjectWork) await window.tLoadProjectWork(p.id);
+  const t=(p._tasks||[]).find(x=>x.id===id); if(!t){toast('Задача не найдена');return;}
+  let stArr=(p._stages||[]).filter(s=>s.status==='active').map(s=>[s.id,s.name]);
+  if(t.stage_id && !stArr.some(x=>x[0]===t.stage_id)){ const cur=(p._stages||[]).find(s=>s.id===t.stage_id); if(cur) stArr.unshift([cur.id,cur.name+' · завершён']); }
+  const teamArr=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]);
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Редактировать задачу</h3><p>${p.name} · Операционка</p></div>
+    <div class="modal-b">
+      <div class="fld"><label>Что сделать</label><input id="pd2-ttl" value="${_attr(t.title)}" placeholder="напр. Смонтировать ролик"></div>
+      <div class="fld"><label>Этап</label>${selField('pd2-stg', stArr, t.stage_id||'')}</div>
+      <div class="fld2">
+        <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
+        <div class="fld"><label>Срок</label>${dateField('pd2-tdate', t.due_date||'')}</div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveTask('${id}')">Сохранить</button></div></div>`);
+}
+function pdSaveTask(id){ const title=_v('pd2-ttl'); if(!title){toast('Введи название');return;}
+  if(window.tTaskUpdate) window.tTaskUpdate(id,{title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null}); }
 const PD_MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 function _dDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+PD_MON[d.getMonth()]; }
 function _dDateFull(iso){ if(!iso) return '—'; const d=new Date(iso); return d.getDate()+' '+PD_MON[d.getMonth()]+' '+d.getFullYear(); }
@@ -2754,7 +2761,7 @@ function renderPd(){
             timer=`<div class="pk-timer mini"><span class="ic">${clk}</span><span class="pk-time" id="tmr-${c.id}">${pkFmtDur(el)}</span></div>`;
           }
           return `<div class="pk-card" draggable="true" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)" style="animation-delay:${(i*0.045).toFixed(2)}s">
-              <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+              <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
               <div class="pk-foot"><span class="pk-av" style="background:${w.c}">${(w.n[0]||'?')}</span><span class="pk-who">${_ddH(w.n)}</span>${due}${adv}</div>
@@ -2763,12 +2770,8 @@ function renderPd(){
         return `<div class="pk-col" style="--pk-accent:${color}" ondragover="pkOver(event)" ondragleave="pkLeave(event)" ondrop="pkDrop(event,'${st}')">
             <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${arr.length}</span></div>
             <div class="pk-body">${cards}</div>
-            <div class="pk-add-zone" data-st="${st}">
-              <button class="pk-addbtn" onclick="event.stopPropagation();pkQAOpen('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить</button>
-              <div class="pk-qa" id="pk-qa-${st}">
-                <input class="pk-qa-in" id="pk-qa-in-${st}" placeholder="Название задачи…" autocomplete="off" onkeydown="pkQAKey(event,'${st}')" onclick="event.stopPropagation()">
-                <div class="pk-qa-act"><button class="pk-qa-save" onclick="event.stopPropagation();pkQASave('${st}')">Создать</button><button class="pk-qa-cancel" onclick="event.stopPropagation();pkQAClose('${st}')">Отмена</button></div>
-              </div>
+            <div class="pk-add-zone">
+              <button class="pk-addbtn" onclick="event.stopPropagation();pdNewTask('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Задача</button>
             </div>
           </div>`; };
       const totalN=T.length, doneN=byst('done').length, activeN=byst('active').length;
@@ -4948,6 +4951,8 @@ window.tTaskMove = async (id,status) => { try {
     await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
   toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tTaskUpdate = async (id,patch) => { try { const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
+  if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
 window.tTimerPause = async (id) => { try { const t=_findTask(id); let spent=(t&&t.time_spent)||0; if(t&&t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
   if(t){ t.time_spent=spent; t.timer_started=null; _pkRerender(); }  // мгновенная пауза
