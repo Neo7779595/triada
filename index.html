@@ -314,8 +314,12 @@ tbody tr:hover td{background:var(--bg-2)}
 .ld-bar{flex:1;height:8px;background:var(--bg-3);border-radius:4px;overflow:hidden}
 .ld-bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
 .ld-ct{flex:0 0 auto;font-family:var(--mono);font-size:11.5px;color:var(--txt-3);width:34px;text-align:right}
-.rd-row{display:flex;align-items:center;gap:13px;padding:11px 2px;border-bottom:1px solid var(--line)}
-.rd-row:last-child{border-bottom:0}
+.rd-row{display:flex;align-items:center;gap:13px;padding:11px 13px;background:var(--bg-2);border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:10px;margin-top:8px;transition:border-color .15s,background .15s}
+.rd-row:first-child{margin-top:2px}
+.rd-row:hover{background:var(--bg-3);border-color:var(--line-2)}
+.rd-row.bk-overdue{border-left-color:var(--neg)}
+.rd-row.bk-today{border-left-color:var(--accent)}
+.rd-row.bk-week{border-left-color:var(--warn)}
 .rd-date{font-family:var(--mono);font-size:12px;color:var(--accent);width:48px;flex:0 0 auto}
 .rd-main{flex:1;min-width:0}
 .rd-stage{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2344,9 +2348,9 @@ const _projCard=(p)=>{
             <div class="sub">${cx.hasData?('по циклам · n='+cx.n):(cx.stages+' этап. · оценка')}</div>
           </div>
           <div class="ptm">
-            <div class="l">LTV</div>
+            <div class="l">Срок жизни</div>
             <div class="mid"><span class="v">${_lifeDur(lt.months)}</span></div>
-            <div class="sub">срок жизни</div>
+            <div class="sub">с запуска</div>
           </div>
           <div class="ptm">
             <div class="l">Дедлайн</div>
@@ -2374,7 +2378,7 @@ function renderProjects(){
   const _tmL=(typeof TEAM!=='undefined'?TEAM:[]); const leadOpts=[['all','Все'],['__none','Не назначен']].concat(_tmL.map(m=>[m._id,m.name])); const leadLbl=agLead==='all'?'Все':(agLead==='__none'?'Не назначен':((_tmL.find(m=>m._id===agLead)||{}).name||'—'));
   const on=f=>agFilter===f?'on':'';
   const _act=PROJECTS.filter(p=>p.status==='active'), _done=PROJECTS.filter(p=>p.status==='done');
-  const _avg=_act.length?Math.round(_act.reduce((s,p)=>s+p.pct,0)/_act.length):0;
+  const _avg=(()=>{const _d=_act.reduce((s,p)=>s+(parseInt(p.stages)||0),0),_t=_act.reduce((s,p)=>s+(parseInt((p.stages||'0 / 0').split('/')[1])||0),0);return _t?Math.round(100*_d/_t):0;})();
   const _stDone=_act.reduce((s,p)=>s+(parseInt(p.stages)||0),0);
   const _mrrTot=_act.reduce((s,p)=>s+(p.mrr||0),0), _costTot=_act.reduce((s,p)=>s+(p.cost||0),0);
   const _marginW=_mrrTot>0?Math.round(100*(_mrrTot-_costTot)/_mrrTot):null;
@@ -2398,8 +2402,8 @@ function renderProjects(){
       <div class="px-ov-cell">
         <div class="px-ov-l">Активный портфель</div>
         <div class="px-ov-v">${_act.length}</div>
-        <div class="px-ov-comp">${(_wip||_queue)?`${_wip?`<i style="flex:${_wip};background:var(--accent)"></i>`:''}${_queue?`<i style="flex:${_queue};background:var(--violet)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
-        <div class="px-ov-ctx">${_wip} в производстве · ${_queue} в очереди</div>
+        <div class="px-ov-comp">${(_stDone||_wip||_queue)?`${_stDone?`<i style="flex:${_stDone};background:var(--accent)"></i>`:''}${_wip?`<i style="flex:${_wip};background:var(--violet)"></i>`:''}${_queue?`<i style="flex:${_queue};background:var(--bg-3)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
+        <div class="px-ov-ctx">${_stDone} готово · ${_wip} в работе · ${_queue} в очереди</div>
       </div>
       <div class="px-ov-cell">
         <div class="px-ov-l">Средний прогресс</div>
@@ -3292,7 +3296,8 @@ function renderOverview(){
   const doneN  = P.filter(p => p.status === 'done').length;
   const onTrack = active.filter(p => !p._overdue).length;
   const health  = active.length ? Math.round(100 * onTrack / active.length) : 100;
-  const avgProg = active.length ? Math.round(active.reduce((s,p)=>s+(p.pct||0),0)/active.length) : 0;
+  const _actDoneN = active.reduce((s,p)=>s+(p._sdone||0),0), _actStgN = active.reduce((s,p)=>s+(p._stot||0),0);
+  const avgProg = _actStgN ? Math.round(100*_actDoneN/_actStgN) : 0;
   const overdueProjects = active.filter(p => p._overdue).length;
   const STALE = 14;
   const stale = active.filter(p => p._lastActDays != null && p._lastActDays >= STALE).length;
@@ -3389,7 +3394,7 @@ function renderOverview(){
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10"/><path d="M12 2v10h10A10 10 0 0012 2z"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Концентрация портфеля</div><span class="badge ${concB[0]}" style="font-size:9px;padding:2px 7px">${concB[1]}</span></div><div class="v num" style="color:${concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${concentration}<span class="u">%</span></div><div class="sub">${concTop} · крупнейший</div></div></div>
-      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Средний прогресс</div><span class="badge ${progB[0]}" style="font-size:9px;padding:2px 7px">${progB[1]}</span></div><div class="v num">${avgProg}<span class="u">%</span></div><div class="sub">в среднем по активным</div></div></div>
+      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Средний прогресс</div><span class="badge ${progB[0]}" style="font-size:9px;padding:2px 7px">${progB[1]}</span></div><div class="v num">${avgProg}<span class="u">%</span></div><div class="sub">по этапам активных</div></div></div>
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.9 17.9A10 10 0 0112 20C5 20 1 12 1 12a18 18 0 015-5.9M9.9 4.2A9 9 0 0112 4c7 0 11 8 11 8a18 18 0 01-2.2 3.2m-6.7-1.1a3 3 0 11-4.2-4.2"/><path d="M1 1l22 22"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Риск оттока</div><span class="badge ${churnB[0]}" style="font-size:9px;padding:2px 7px">${churnB[1]}</span></div><div class="v num" style="color:${stale?'var(--warn)':'inherit'}">${stale}</div><div class="sub">${stale?('без активности ≥ '+STALE+' дн'):'активность в норме'}</div></div></div>
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Откаты (rework)</div><span class="badge ${reworkBC[0]}" style="font-size:9px;padding:2px 7px">${reworkBC[1]}</span></div><div class="v num" style="color:${reworkPctC>=20?'var(--neg)':'inherit'}">${reworkC}</div><div class="sub">${reworkPctC}% переходов назад</div>${split(O.rework,O.tRework,true)}</div></div>
     </div>
@@ -3402,7 +3407,7 @@ function renderOverview(){
         <thead><tr><th>Проект</th><th>Категория</th><th>Прогресс</th><th>Этапы</th><th>Здоровье</th><th>Ближайший дедлайн</th><th>Активность</th></tr></thead>
         <tbody>${rows.length?rows.map(p=>{
           const dot = p.status==='done'?'var(--pos)':p._overdue?'var(--neg)':'var(--accent)';
-          const prog = p.pct||0;
+          const prog = p._stot ? Math.round(100*(p._sdone||0)/p._stot) : 0;
           const la = p._lastActDays;
           const laC = la==null?'var(--txt-3)':la>=14?'var(--neg)':la>=7?'var(--warn)':'var(--pos)';
           const laT = la==null?'—':la===0?'сегодня':la+'д назад';
@@ -3428,7 +3433,7 @@ function renderOverview(){
     <div class="row2" style="margin-top:16px">
       <div class="card">
         <div class="card-h"><div class="t">Радар дедлайнов <span class="c">просрочено · сегодня · неделя</span></div></div>
-        <div class="card-body">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);const tt=d.type==='task'?`<span class="ov-rtok tk" title="Задача">${_svg(IC_TK)}</span>`:`<span class="ov-rtok st" title="Этап">${_svg(IC_ST)}</span>`;return `<div class="rd-row">
+        <div class="card-body">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);const tt=d.type==='task'?`<span class="ov-rtok tk" title="Задача">${_svg(IC_TK)}</span>`:`<span class="ov-rtok st" title="Этап">${_svg(IC_ST)}</span>`;return `<div class="rd-row bk-${d.bucket}">
           ${tt}<div class="rd-date">${d.day} ${d.mon}</div>
           <div class="rd-main"><div class="rd-stage">${d.stage}</div><div class="rd-proj">${d.project}</div></div>
           <span class="badge ${rb[0]}" style="font-size:9px;padding:2px 7px">${rb[1]}</span>
@@ -4916,9 +4921,10 @@ window.tLoadProjectAggregates = async () => {
     const a=agg[p.id]||{over:false,next:null,overN:0,overAll:0,wait:0,active:0,done:0,by:{},asg:{}}, d7=done7[p.id]||0;
     p._nextDue=a.next; p._overdue=a.over; p._overdueN=a.overN||0; p._overdueAll=a.overAll||0;
     p._pipeline={wait:a.wait,active:a.active,done:a.done,total:a.wait+a.active+a.done};
+    { const _tot=a.wait+a.active+a.done; if(_tot>0){ p.pct=Math.round(100*a.done/_tot); p.stages=a.done+' / '+_tot; } }
     p._dyn = d7>0?('↑ '+d7+' / 7д'):'— 0 / 7д';
-    p._health = a.over?'Риск':(p.pct>=100?'Завершён':'В норме');
-    p._healthCls = a.over?'risk':'ok';
+    p._health = p.status==='done'?'Завершён':(a.over?'Риск':'В норме');
+    p._healthCls = (p.status!=='done'&&a.over)?'risk':'ok';
     const lid=p.lead_id||top(a.by)||top(a.asg); p._lead = lid?mem(lid):null;
   });
 };
@@ -5004,7 +5010,8 @@ window.tLoadOverview = async () => {
   (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => {
     const a = roll[p.id] || { done:0, total:0, next:null, over:false };
     p._sdone = a.done; p._stot = a.total; p._nextDue = a.next; p._overdue = a.over;
-    const la = lastAct[p.id]; p._lastActDays = (la != null) ? Math.floor((now - la)/86400000) : null;
+    const la = lastAct[p.id], _cr = p.createdAt ? new Date(p.createdAt).getTime() : null;
+    p._lastActDays = (la != null) ? Math.floor((now - la)/86400000) : (_cr != null ? Math.floor((now - _cr)/86400000) : null);
   });
 
   /* stage load grouped by stage name across the whole portfolio */
