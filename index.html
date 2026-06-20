@@ -946,6 +946,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-empty3 .ic svg{width:18px;height:18px}
 .pk-empty3 .t{font-size:12px;color:var(--txt-3);line-height:1.45;max-width:170px}
 .pk-col.drag-over .pk-empty3 .ic{border-color:var(--pk-accent);color:var(--pk-accent)}
+/* operations · inline quick-add per column */
+.pk-add-zone{border-top:1px solid var(--line);padding:10px 12px;flex:0 0 auto}
+.pk-addbtn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;font-size:11.5px;font-weight:500;color:var(--txt-3);background:transparent;border:1px dashed var(--line-2);border-radius:9px;padding:9px;cursor:pointer;transition:.15s var(--ease);font-family:var(--font)}
+.pk-addbtn svg{width:14px;height:14px}
+.pk-addbtn:hover{color:var(--pk-accent);border-color:var(--pk-accent);background:color-mix(in srgb,var(--pk-accent) 7%,transparent)}
+.pk-qa{display:none}
+.pk-add-zone.open .pk-addbtn{display:none}
+.pk-add-zone.open .pk-qa{display:block;animation:qaIn .16s var(--ease-out)}
+@keyframes qaIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.pk-qa-in{width:100%;background:var(--bg-2);border:1px solid var(--pk-accent);border-radius:9px;padding:10px 12px;color:var(--txt);font-family:var(--font);font-size:13px;box-shadow:0 0 0 3px color-mix(in srgb,var(--pk-accent) 13%,transparent)}
+.pk-qa-in::placeholder{color:var(--txt-3)}
+.pk-qa-in:focus{outline:none}
+.pk-qa-act{display:flex;gap:8px;margin-top:8px}
+.pk-qa-save{flex:1;background:var(--pk-accent);color:#04201B;font-weight:700;font-size:12px;border:0;border-radius:8px;padding:9px;cursor:pointer;transition:.15s}
+.pk-qa-save:hover{filter:brightness(1.06)}
+.pk-qa-cancel{background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-2);font-size:12px;border-radius:8px;padding:9px 13px;cursor:pointer}
+.pk-qa-cancel:hover{color:var(--txt)}
 @media(max-width:820px){.pk-board{grid-template-columns:1fr}.pd-hero-top{flex-direction:column;align-items:stretch;gap:22px}.pd-bignum{font-size:52px}.pd-statrow{grid-template-columns:repeat(2,1fr)}.pd-top,.pd-tabbar,.pd-scroll{padding-left:16px;padding-right:16px}.pd-right .pd-minibar{display:none}}
 
 /* ============ PROJECT SECONDARY MODALS (edit/report/cycles/material) ============ */
@@ -2578,6 +2595,16 @@ function closeProject(){document.getElementById('ov-proj').classList.remove('on'
 function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));renderPd();}
 const PD_STNEXT={wait:'active',active:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
+function pkQAOpen(st){ const z=document.querySelector('.pk-add-zone[data-st="'+st+'"]'); if(!z)return; document.querySelectorAll('.pk-add-zone.open').forEach(o=>o.classList.remove('open')); z.classList.add('open'); const inp=document.getElementById('pk-qa-in-'+st); if(inp){inp.value='';requestAnimationFrame(()=>inp.focus());} }
+function pkQAClose(st){ const z=document.querySelector('.pk-add-zone[data-st="'+st+'"]'); if(z)z.classList.remove('open'); }
+function pkQAKey(e,st){ if(e.key==='Enter'){e.preventDefault();pkQASave(st);} else if(e.key==='Escape'){e.preventDefault();pkQAClose(st);} }
+function pkQASave(st){
+  const inp=document.getElementById('pk-qa-in-'+st); const title=((inp&&inp.value)||'').trim();
+  if(!title){ if(inp)inp.focus(); return; }
+  const p=PROJECTS[pdIdx]; const T=p._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
+  const actStage=(p._stages||[]).find(s=>s.status==='active'); const stage_id=actStage?actStage.id:((p._stages||[])[0]?(p._stages||[])[0].id:null);
+  if(window.tTaskAdd) window.tTaskAdd(p.id,{title,stage_id,assignee_id:null,due_date:null,status:st,idx});
+}
 let _pkDrag=null;
 function pkDrag(e,id){ _pkDrag=id; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);}catch(_){}; const c=e.target.closest('.pk-card'); if(c) setTimeout(()=>c.classList.add('dragging'),0); }
 function pkDragEnd(e){ const c=e.target.closest('.pk-card'); if(c) c.classList.remove('dragging'); document.querySelectorAll('.pk-col.drag-over').forEach(x=>x.classList.remove('drag-over')); }
@@ -2736,6 +2763,13 @@ function renderPd(){
         return `<div class="pk-col" style="--pk-accent:${color}" ondragover="pkOver(event)" ondragleave="pkLeave(event)" ondrop="pkDrop(event,'${st}')">
             <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${arr.length}</span></div>
             <div class="pk-body">${cards}</div>
+            <div class="pk-add-zone" data-st="${st}">
+              <button class="pk-addbtn" onclick="event.stopPropagation();pkQAOpen('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить</button>
+              <div class="pk-qa" id="pk-qa-${st}">
+                <input class="pk-qa-in" id="pk-qa-in-${st}" placeholder="Название задачи…" autocomplete="off" onkeydown="pkQAKey(event,'${st}')" onclick="event.stopPropagation()">
+                <div class="pk-qa-act"><button class="pk-qa-save" onclick="event.stopPropagation();pkQASave('${st}')">Создать</button><button class="pk-qa-cancel" onclick="event.stopPropagation();pkQAClose('${st}')">Отмена</button></div>
+              </div>
+            </div>
           </div>`; };
       const totalN=T.length, doneN=byst('done').length, activeN=byst('active').length;
       const pctDone=totalN?Math.round(doneN/totalN*100):0;
