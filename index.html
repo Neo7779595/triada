@@ -1292,6 +1292,21 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-act{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;justify-content:center}
 .pt-act button{width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s}
 .pt-act button:hover{color:var(--accent);border-color:var(--accent-line);background:var(--accent-dim)}
+/* ===== Projects module · executive transform (scoped to projects) ===== */
+.ph-pulse{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--txt-2);margin-top:11px;font-family:var(--mono)}
+.ph-pulse .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.px-ov{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:22px}
+.px-ov-cell{background:var(--bg-1);padding:18px 20px;display:flex;flex-direction:column}
+.px-ov-l{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
+.px-ov-v{font-family:var(--mono);font-size:32px;font-weight:700;letter-spacing:-.03em;line-height:1.05;margin-top:10px;display:flex;align-items:baseline;gap:5px}
+.px-ov-v small{font-size:14px;font-weight:500;color:var(--txt-3)}
+.px-ov-comp{display:flex;gap:2px;height:5px;border-radius:3px;overflow:hidden;margin-top:13px}
+.px-ov-comp i{height:100%;transform-origin:left;animation:growBar .8s var(--ease-out) both;min-width:4px}
+.px-ov-ctx{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:11px}
+.list-h{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin:0 2px 12px;letter-spacing:.02em}
+.tb-proj .search input:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
+.tb-proj .segm button.on{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
+@media(max-width:1000px){.px-ov{grid-template-columns:1fr 1fr}}
 @media(max-width:1180px){.ptm:first-child{display:none}}
 @media(max-width:1000px){.pt-pipe,.pt-note{display:none}}
 </style>
@@ -2346,7 +2361,7 @@ const _projCard=(p)=>{
         </div>
       </div>`;
 };
-function _projListHTML(l){ return l.length ? l.map(_projCard).join('') : `<div class="modph"><h3>Нет проектов в этом фильтре</h3><p>Под выбранные фильтры ничего не нашлось — измени категорию, услугу или сбрось фильтры.</p></div>`; }
+function _projListHTML(l){ return l.length ? `<div class="list-h">${l.length} ${_plural(l.length,'проект','проекта','проектов')}</div>`+l.map(_projCard).join('') : `<div class="modph"><h3>Нет проектов в этом фильтре</h3><p>Под выбранные фильтры ничего не нашлось — измени категорию, услугу или сбрось фильтры.</p></div>`; }
 function paintProjList(){ const el=document.getElementById('pj-list'); if(el) el.innerHTML=_projListHTML(projFiltered()); }
 function renderProjects(){
   const list = projFiltered();
@@ -2371,18 +2386,35 @@ function renderProjects(){
   const _mT=document.getElementById('m-proj-all'); if(_mT)_mT.textContent=PROJECTS.length;
   document.getElementById('content-ag').innerHTML=`
     <div class="ph">
-      <div><div class="eyebrow">Агентство · портфель</div><h1>Проекты</h1>
-      <div class="s">Любой тип проекта · категория и услуга — кастомные теги агентства, без привязки к вертикали.</div></div>
+      <div><div class="eyebrow">Агентство · Портфель</div><h1>Проекты</h1>
+      <div class="ph-pulse"><span class="dot" style="background:${_ovdN?'var(--neg)':'var(--pos)'};box-shadow:0 0 8px -1px ${_ovdN?'var(--neg)':'var(--pos)'}"></span>${_act.length} активных · ${_avg}% средний прогресс · ${_ovdN?(_ovdN+' просрочено'):'всё в срок'}</div></div>
     </div>
 
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Активный портфель</div><div class="v num">${_act.length}</div><div class="sub">${_wip} этап. в производстве</div><div class="kfoot">${_queue} в очереди · ${_done.length} завершено</div></div>
-      <div class="kpi"><div class="l">Средний прогресс</div><div class="v num">${_avg}%</div><div class="sub">по активным проектам</div><div class="kfoot">${_stDone} из ${_stTot} этапов</div></div>
-      <div class="kpi"><div class="l">Просрочено</div><div class="v num" style="${_ovdN?'color:var(--neg)':''}">${_ovdN}</div><div class="sub">просроченных этапов и задач</div><div class="kfoot ${_ovdN?'':'pos'}">${_ovdN?(_ovdProj+' проект. затронуто'):'Всё в срок ✓'}</div></div>
-      <div class="kpi"><div class="l">Срок удержания</div><div class="v num">${_lifeDur(_tenAvg)}</div><div class="sub">средний срок клиента</div><div class="kfoot">макс · ${_lifeDur(_maxMo)}</div></div>
+    <div class="px-ov">
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Активный портфель</div>
+        <div class="px-ov-v">${_act.length}</div>
+        <div class="px-ov-comp">${(_wip||_queue)?`${_wip?`<i style="flex:${_wip};background:var(--accent)"></i>`:''}${_queue?`<i style="flex:${_queue};background:var(--violet)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
+        <div class="px-ov-ctx">${_wip} в производстве · ${_queue} в очереди</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Средний прогресс</div>
+        <div class="px-ov-v">${_avg}<small>%</small></div>
+        <div class="px-ov-ctx">${_stDone} из ${_stTot} этапов</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Просрочено</div>
+        <div class="px-ov-v" style="color:${_ovdN?'var(--neg)':'var(--pos)'}">${_ovdN}</div>
+        <div class="px-ov-ctx" style="color:${_ovdN?'var(--neg)':'var(--pos)'}">${_ovdN?(_ovdProj+' проект. затронуто'):'всё в срок ✓'}</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Срок удержания</div>
+        <div class="px-ov-v">${_lifeDur(_tenAvg)}</div>
+        <div class="px-ov-ctx">макс · ${_lifeDur(_maxMo)}</div>
+      </div>
     </div>
 
-    <div class="toolbar">
+    <div class="toolbar tb-proj">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск проекта…" value="${agQ.replace(/"/g,'&quot;')}" oninput="agQ=this.value;paintProjList()"></div>
       <div class="segm">
         <button class="${on('all')}" onclick="setAgFilter('all')">Все</button>
@@ -3179,24 +3211,41 @@ function renderDeadlines(){
   }
 
   document.getElementById('content-ag').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Агентство · контроль сроков</div><h1>Дедлайны</h1>
-    <div class="s">Сроки по этапам и задачам всех проектов — с ответственными, приоритетом по срочности и группировкой. Единая картина: что горит, что впереди, и кто за это отвечает.</div></div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · Контроль сроков</div><h1>Дедлайны</h1>
+    <div class="ph-pulse"><span class="dot" style="background:${over?'var(--neg)':(today?'var(--accent)':'var(--pos)')};box-shadow:0 0 8px -1px ${over?'var(--neg)':(today?'var(--accent)':'var(--pos)')}"></span>${over?(over+' просрочено'):'всё в срок'} · ${today} сегодня · ${upcoming} впереди</div></div></div>
 
     ${_dlInsight(over,today,weekN,futureN,done,unassigned)}
 
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-top:14px">
-      <div class="kpi"><div class="l">Просрочено</div><div class="v num" style="color:${over?'var(--neg)':'var(--txt)'}">${over}</div><div class="sub">${splitOf('overdue')}</div><div class="kfoot ${over?'':'pos'}">${over?'требует внимания':'всё в срок ✓'}</div></div>
-      <div class="kpi"><div class="l">Сегодня</div><div class="v num" style="color:${today?'var(--accent)':'var(--txt)'}">${today}</div><div class="sub">${splitOf('today')}</div><div class="kfoot">${weekN} на этой неделе</div></div>
-      <div class="kpi"><div class="l">Будущие</div><div class="v num">${upcoming}</div><div class="sub">${upS} эт. · ${upT} зад.</div><div class="kfoot">${weekN} на неделе · ${futureN} позже</div></div>
-      <div class="kpi"><div class="l">Выполнено</div><div class="v num" style="color:var(--pos)">${done}</div><div class="sub">${splitOf('done')}</div><div class="kfoot">${unassigned?unassigned+' задач без ответственного':'за всё время'}</div></div>
+    <div class="px-ov" style="margin-top:14px">
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Активные сроки</div>
+        <div class="px-ov-v">${over+today+upcoming}</div>
+        <div class="px-ov-comp">${(over+today+upcoming)?`${over?`<i style="flex:${over};background:var(--neg)"></i>`:''}${today?`<i style="flex:${today};background:var(--accent)"></i>`:''}${weekN?`<i style="flex:${weekN};background:var(--warn)"></i>`:''}${futureN?`<i style="flex:${futureN};background:var(--bg-3)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
+        <div class="px-ov-ctx">${over} просрочено · ${today} сегодня</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Просрочено</div>
+        <div class="px-ov-v" style="color:${over?'var(--neg)':'var(--pos)'}">${over}</div>
+        <div class="px-ov-ctx" style="color:${over?'var(--neg)':'var(--pos)'}">${over?'требует внимания':'всё в срок ✓'}</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Сегодня</div>
+        <div class="px-ov-v" style="${today?'color:var(--accent)':''}">${today}</div>
+        <div class="px-ov-ctx">${weekN} на этой неделе</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Выполнено</div>
+        <div class="px-ov-v" style="color:var(--pos)">${done}</div>
+        <div class="px-ov-ctx">${unassigned?(unassigned+' без ответственного'):'за всё время'}</div>
+      </div>
     </div>
 
-    <div class="toolbar" style="position:relative;z-index:40">
+    <div class="toolbar tb-proj" style="position:relative;z-index:40">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск по этапу, задаче или проекту…" value="${(agDlSearch||'').replace(/"/g,'&quot;')}" oninput="setDlSearch(this.value)"></div>
       <div class="dl-range">${dlRangeField()}</div>
     </div>
 
-    <div class="toolbar dl-controls" style="margin-top:-4px">
+    <div class="toolbar dl-controls tb-proj" style="margin-top:-4px">
       ${agDlView==='deadlines'?`<div class="segm">
         <button class="${onF('all')}" onclick="setDlFilter('all')">Все</button>
         <button class="${onF('overdue')}" onclick="setDlFilter('overdue')"><span class="d" style="background:var(--neg)"></span>Просрочены</button>
