@@ -3294,18 +3294,20 @@ function renderOverview(){
   /* —— scalars derived from the projects themselves (always match the table) —— */
   const active = P.filter(p => p.status !== 'done');
   const doneN  = P.filter(p => p.status === 'done').length;
-  const onTrack = active.filter(p => !p._overdue).length;
+  const STALE = 14;
+  const _isStale = p => p._lastActDays != null && p._lastActDays >= STALE;
+  const onTrack = active.filter(p => !p._overdue && !_isStale(p)).length;
   const health  = active.length ? Math.round(100 * onTrack / active.length) : 100;
   const _actDoneN = active.reduce((s,p)=>s+(p._sdone||0),0), _actStgN = active.reduce((s,p)=>s+(p._stot||0),0);
   const avgProg = _actStgN ? Math.round(100*_actDoneN/_actStgN) : 0;
   const overdueProjects = active.filter(p => p._overdue).length;
-  const STALE = 14;
-  const stale = active.filter(p => p._lastActDays != null && p._lastActDays >= STALE).length;
-  const openOf = p => Math.max((p._stot||0)-(p._sdone||0), 0);
-  const opens = active.map(openOf), openSum = opens.reduce((a,b)=>a+b,0);
+  const stale = active.filter(_isStale).length;
+  const staleOnly = active.filter(p => !p._overdue && _isStale(p)).length;
+  const mrrOf = p => p.mrr || 0;
+  const mrrs = active.map(mrrOf), mrrSum = mrrs.reduce((a,b)=>a+b,0);
   let concentration = 0, concTop = '—';
-  if (openSum > 0){ let mx=0, idx=-1; active.forEach((p,i)=>{ if(opens[i]>mx){ mx=opens[i]; idx=i; } });
-    concentration = Math.round(100*mx/openSum); if(idx>=0) concTop = active[idx].name; }
+  if (mrrSum > 0){ let mx=0, idx=-1; active.forEach((p,i)=>{ if(mrrs[i]>mx){ mx=mrrs[i]; idx=i; } });
+    concentration = Math.round(100*mx/mrrSum); if(idx>=0) concTop = active[idx].name; }
   const totDone = P.reduce((s,p)=>s+(p._sdone||0),0);
   const totStg  = P.reduce((s,p)=>s+(p._stot||0),0);
 
@@ -3372,7 +3374,7 @@ function renderOverview(){
       <div class="px-ov-cell">
         <div class="px-ov-l">Индекс здоровья</div>
         <div class="px-ov-v" style="color:${hMeta[0]}">${health}<small>%</small></div>
-        <div class="px-ov-comp">${active.length?`${onTrack?`<i style="flex:${onTrack};background:var(--pos)"></i>`:''}${overdueProjects?`<i style="flex:${overdueProjects};background:var(--neg)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
+        <div class="px-ov-comp">${active.length?`${onTrack?`<i style="flex:${onTrack};background:var(--pos)"></i>`:''}${staleOnly?`<i style="flex:${staleOnly};background:var(--warn)"></i>`:''}${overdueProjects?`<i style="flex:${overdueProjects};background:var(--neg)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
         <div class="px-ov-ctx">${hMeta[1]} · ${active.length} активных</div>
       </div>
       <div class="px-ov-cell">
@@ -3393,7 +3395,7 @@ function renderOverview(){
     </div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10"/><path d="M12 2v10h10A10 10 0 0012 2z"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Концентрация портфеля</div><span class="badge ${concB[0]}" style="font-size:9px;padding:2px 7px">${concB[1]}</span></div><div class="v num" style="color:${concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${concentration}<span class="u">%</span></div><div class="sub">${concTop} · крупнейший</div></div></div>
+      <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1010 10"/><path d="M12 2v10h10A10 10 0 0012 2z"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Концентрация портфеля</div><span class="badge ${concB[0]}" style="font-size:9px;padding:2px 7px">${concB[1]}</span></div><div class="v num" style="color:${concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${concentration}<span class="u">%</span></div><div class="sub">${concTop} · крупнейший по выручке</div></div></div>
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Средний прогресс</div><span class="badge ${progB[0]}" style="font-size:9px;padding:2px 7px">${progB[1]}</span></div><div class="v num">${avgProg}<span class="u">%</span></div><div class="sub">по этапам активных</div></div></div>
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.9 17.9A10 10 0 0112 20C5 20 1 12 1 12a18 18 0 015-5.9M9.9 4.2A9 9 0 0112 4c7 0 11 8 11 8a18 18 0 01-2.2 3.2m-6.7-1.1a3 3 0 11-4.2-4.2"/><path d="M1 1l22 22"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Риск оттока</div><span class="badge ${churnB[0]}" style="font-size:9px;padding:2px 7px">${churnB[1]}</span></div><div class="v num" style="color:${stale?'var(--warn)':'inherit'}">${stale}</div><div class="sub">${stale?('без активности ≥ '+STALE+' дн'):'активность в норме'}</div></div></div>
       <div class="kpi kpi-ic"><div class="ki"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/></svg></div><div class="kc"><div style="display:flex;justify-content:space-between;gap:8px"><div class="l">Откаты (rework)</div><span class="badge ${reworkBC[0]}" style="font-size:9px;padding:2px 7px">${reworkBC[1]}</span></div><div class="v num" style="color:${reworkPctC>=20?'var(--neg)':'inherit'}">${reworkC}</div><div class="sub">${reworkPctC}% переходов назад</div>${split(O.rework,O.tRework,true)}</div></div>
@@ -3897,10 +3899,10 @@ function renderFinance(){
     <div class="px-ov px-ov-6" style="margin-top:14px">
       <div class="px-ov-cell"><div class="px-ov-l">Выручка / час</div><div class="px-ov-v">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="px-ov-ctx">${F.revPerHour?'сум за час работы':'нужно ≥ 1ч трекинга'}</div></div>
       <div class="px-ov-cell"><div class="px-ov-l">Прибыль / час</div><div class="px-ov-v" style="color:${F.profitPerHour>0?'var(--pos)':F.profitPerHour<0?'var(--neg)':'var(--txt)'}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="px-ov-ctx">${F.profitPerHour?'чистыми за час':'логируйте часы'}</div></div>
-      <div class="px-ov-cell"><div class="px-ov-l">Runway</div><div class="px-ov-v" style="font-size:18px;color:${F.profit>=0?'var(--pos)':'var(--neg)'}">${F.profit>=0?'Стабильно':'Дефицит'}</div><div class="px-ov-ctx">${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Операция</div><div class="px-ov-v" style="font-size:18px;color:${F.profit>=0?'var(--pos)':'var(--neg)'}">${F.profit>=0?'Стабильно':'Дефицит'}</div><div class="px-ov-ctx">${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div></div>
       <div class="px-ov-cell"><div class="px-ov-l">Concentration</div><div class="px-ov-v" style="color:${F.concentrationPct>=50?'var(--neg)':F.concentrationPct>=30?'var(--warn)':'var(--txt)'}">${F.concentrationPct}<small>%</small></div><div class="px-ov-ctx">${F.concentrationTop}</div></div>
       <div class="px-ov-cell"><div class="px-ov-l">Break-even</div><div class="px-ov-v">${money(F.totalCost)}</div><div class="px-ov-ctx">минимум до нуля</div></div>
-      <div class="px-ov-cell"><div class="px-ov-l">EBITDA margin</div><div class="px-ov-v" style="color:${mColor(F.marginPct)}">${F.marginPct}<small>%</small></div><div class="px-ov-ctx">опер. эффективность</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Средний чек</div><div class="px-ov-v">${F.avgMrr?money(F.avgMrr):'—'}</div><div class="px-ov-ctx">MRR на клиента</div></div>
     </div>
 
     ${F.services.length?`<div class="card" style="margin-top:16px">
@@ -4078,20 +4080,19 @@ function computeTeamMetrics(){
     const rl=(m.role||'—'), roleMed=_tMed(roleCycles[rl])||_tMed(allCycles);
     a.pSpeed = (a.medCycle!=null && roleMed) ? _tClamp(70*roleMed/a.medCycle,8,100) : null;
     a.pQuality = a.closes>0 ? _tClamp(100*(1-a.returns/a.closes),0,100) : null;
-    a.pReliab = a.withDue>0 ? 100*a.onTime/a.withDue : (a.open>0 ? 100*(1-a.overdue/a.open) : null);
+    a.pReliab = a.withDue>0 ? 100*a.onTime/a.withDue : null;  // единое определение: пунктуальность по дедлайнам
   });
   // team means per pillar (для сглаживания)
   const mean=k=>{ const v=members.map(m=>M[m._id][k]).filter(x=>x!=null); return v.length?v.reduce((s,x)=>s+x,0)/v.length:50; };
   const tm={ output:mean('pOutput'), speed:mean('pSpeed'), quality:mean('pQuality'), reliability:mean('pReliab') };
   // shrink + TPI
   members.forEach(m=>{ const a=M[m._id];
-    const n=a.closes, c=n/(n+TPI_K);
-    const shr=(raw0,key)=> raw0==null?null:(c*raw0+(1-c)*tm[key]);
-    a.sOutput=shr(a.pOutput,'output'); a.sSpeed=shr(a.pSpeed,'speed'); a.sQuality=shr(a.pQuality,'quality'); a.sReliab=shr(a.pReliab,'reliability');
+    const shrN=(raw0,key,nn)=>{ if(raw0==null) return null; const c=nn/(nn+TPI_K); return c*raw0+(1-c)*tm[key]; };
+    a.sOutput=shrN(a.pOutput,'output',a.closes); a.sSpeed=shrN(a.pSpeed,'speed',a.cycles.length); a.sQuality=shrN(a.pQuality,'quality',a.closes); a.sReliab=shrN(a.pReliab,'reliability',a.withDue);
     let num=0,den=0; const add=(v,w)=>{ if(v!=null){ num+=v*w; den+=w; } };
     add(a.sOutput,TPI_W.output); add(a.sSpeed,TPI_W.speed); add(a.sQuality,TPI_W.quality); add(a.sReliab,TPI_W.reliability);
     a.tpi = den>0 ? Math.round(num/den) : null;
-    a.n=n;
+    a.n=a.closes;
   });
   // rank by TPI (только у кого есть данные)
   const ranked=members.filter(m=>M[m._id].tpi!=null).sort((x,y)=>M[y._id].tpi-M[x._id].tpi);
