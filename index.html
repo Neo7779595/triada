@@ -3343,8 +3343,8 @@ function renderOverview(){
   const rBadge = b => b==='overdue' ? ['b-susp','Просрочен'] : b==='today' ? ['b-cyan','Сегодня'] : ['b-trial','Неделя'];
 
   document.getElementById('content-ag').innerHTML = `
-    <div class="ph"><div><div class="eyebrow">Агентство · обзор</div><h1>Сводка</h1>
-    <div class="s">Состояние портфеля одним экраном: здоровье, скорость, риски, нагрузка. Все цифры считаются из ваших проектов.</div></div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · Обзор</div><h1>Сводка</h1>
+    <div class="ph-pulse"><span class="dot" style="background:${hMeta[0]};box-shadow:0 0 8px -1px ${hMeta[0]}"></span>здоровье ${health}% · ${active.length} активных · ${overdueProjects?(overdueProjects+' под риском'):'всё в норме'}</div></div></div>
 
     <style>
       #content-ag .ov-tok{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;white-space:nowrap}
@@ -3359,11 +3359,28 @@ function renderOverview(){
     </style>
     <div class="ov-leg"><span style="color:var(--txt-2);font-weight:600">Обозначения</span><span class="ov-tok st">${_svg(IC_ST)}Этапы</span><span class="ov-tok tk">${_svg(IC_TK)}Задачи</span><span>— скорость, откаты, on-time и просрочка считаются по обоим${TH?'':' · <b style="color:var(--warn)">журнал задач не создан — выполните SQL, см. сообщение</b>'}</span></div>
 
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Индекс здоровья</div><div class="v num" style="color:${hMeta[0]}">${health}<span class="u">%</span></div><div class="sub">${hMeta[1]}</div><div class="kfoot">${active.length} активных · ${doneN} завершено</div></div>
-      <div class="kpi"><div class="l">On-time delivery</div><div class="v num">${otPctC==null?'—':otPctC+'<span class="u">%</span>'}</div><div class="sub">${otPctC==null?'нет завершённых с дедлайном':'в срок / уникальных доставок'}</div>${split(O.onTime+'/'+O.deadlineDone,O.tOnTime+'/'+O.tDeadlineDone,true)}</div>
-      <div class="kpi"><div class="l">Просрочено сейчас</div><div class="v num" style="color:${O.overdueItems?'var(--neg)':'inherit'}">${O.overdueItems}</div><div class="sub ${O.overdueItems?'':'pos'}">${O.overdueItems?'требуют действия':'всё в норме'}</div>${split(O.overdueStages,O.overdueTasks,false)}<div class="kfoot">${overdueProjects} ${overdueProjects===1?'проект':'проектов'} затронуто</div></div>
-      <div class="kpi"><div class="l">Velocity · 30 дней</div><div class="v num">${uniq30C}</div><div class="sub">уникальных закрыто</div>${split(O.uniq30,O.tUniq30,true)}<div class="ov-redo" style="color:${redo30C>0?'var(--warn)':'var(--txt-3)'}" title="Вернули и завершили заново — переделки">${_svg(IC_REDO)}<b>${redo30C}</b> повторно завершено${redo30C?` <span style="opacity:.78">(◧ ${O.redo30} · ▥ ${O.tRedo30})</span>`:''}</div><div class="kfoot">7 дн: ${uniq7C} уник · ${O.monthName}: ${uniqMonC}</div></div>
+    <div class="px-ov">
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Индекс здоровья</div>
+        <div class="px-ov-v" style="color:${hMeta[0]}">${health}<small>%</small></div>
+        <div class="px-ov-comp">${active.length?`${onTrack?`<i style="flex:${onTrack};background:var(--pos)"></i>`:''}${overdueProjects?`<i style="flex:${overdueProjects};background:var(--neg)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
+        <div class="px-ov-ctx">${hMeta[1]} · ${active.length} активных</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">On-time delivery</div>
+        <div class="px-ov-v">${otPctC==null?'—':otPctC+'<small>%</small>'}</div>
+        <div class="px-ov-ctx">${otPctC==null?'нет доставок с дедлайном':('эт '+O.onTime+'/'+O.deadlineDone+(TH?(' · зад '+O.tOnTime+'/'+O.tDeadlineDone):''))}</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Просрочено сейчас</div>
+        <div class="px-ov-v" style="color:${O.overdueItems?'var(--neg)':'var(--pos)'}">${O.overdueItems}</div>
+        <div class="px-ov-ctx" style="${O.overdueItems?'':'color:var(--pos)'}">${O.overdueItems?('эт '+O.overdueStages+' · зад '+O.overdueTasks+' · '+overdueProjects+' проект.'):'всё в норме ✓'}</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Velocity · 30 дней</div>
+        <div class="px-ov-v">${uniq30C}</div>
+        <div class="px-ov-ctx">уник · 7д ${uniq7C}${redo30C?(' · '+redo30C+' повторно'):''}</div>
+      </div>
     </div>
 
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
