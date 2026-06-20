@@ -1267,7 +1267,18 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .dl-av{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:700;overflow:hidden;position:relative;flex:none}
 .dl-grouplbl{font-size:11px;color:var(--txt-3);align-self:center;letter-spacing:.02em}
 .dl-sec{margin-bottom:6px}
-.dlx{display:grid;grid-template-columns:46px 1fr 184px 64px 116px;align-items:center;gap:14px;padding:11px 15px;background:var(--bg-2);border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:11px;margin-bottom:8px;transition:.14s}
+.dl-sec + .dl-sec{margin-top:22px}
+.dl-gdot{width:8px;height:8px;border-radius:50%;background:var(--txt-3);flex:none}
+.dl-gdot.red{background:var(--neg)} .dl-gdot.cyan{background:var(--accent)} .dl-gdot.amber{background:var(--warn)} .dl-gdot.green{background:var(--pos)} .dl-gdot.mut{background:var(--txt-3)}
+.dl-glbl{color:var(--txt-2);font-weight:700}
+.dlx{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;align-items:center;gap:16px;padding:12px 15px;background:var(--bg-2);border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:11px;margin-bottom:8px;transition:.14s}
+.dlx:hover{border-color:var(--line-2)}
+.dlx .dl-av{border-radius:7px}
+.dlx-otag{display:inline-flex;align-items:center;gap:7px;max-width:170px;background:var(--bg-3);border:1px solid var(--line);border-radius:8px;padding:3px 11px 3px 4px;font-size:12px;color:var(--txt-2);white-space:nowrap;overflow:hidden}
+.dlx-otag .dl-av{border-radius:6px;flex:none}
+.dlx-otag.none{border-style:dashed;color:var(--txt-3);padding-left:4px}
+.dlx-otag .otag-q{width:20px;height:20px;border-radius:6px;background:var(--bg-2);border:1px dashed var(--line-2);display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:var(--txt-3);flex:none}
+.dlx-st .badge b{font-family:var(--mono);font-weight:700;margin-left:2px;opacity:.85}
 .dlx:hover{border-color:var(--line-2);background:var(--bg-3)}
 .dlx.red{border-left-color:var(--neg)} .dlx.cyan{border-left-color:var(--accent)} .dlx.amber{border-left-color:var(--warn)} .dlx.mut{border-left-color:var(--line-2)} .dlx.green{border-left-color:var(--pos)}
 .dlx-date{text-align:center}
@@ -3288,24 +3299,24 @@ function _loadPills(c){ const o=c('overdue'),t=c('today'),w=c('week')+c('future'
   return h||`<span class="dl-pill">— нет</span>`; }
 function _dlRow(it){
   const m=_dlMeta(it.bucket), o=_dlOwner(it), dist=_dlDist(it);
-  const owner = o.key==='__none'
-    ? `<span class="dl-av" style="width:24px;height:24px;background:var(--bg-3);color:var(--txt-3);font-size:11px;border:1px dashed var(--line-2)">?</span><span class="nm" style="color:var(--txt-3)">Не назначен</span>`
-    : `${_avInit(o.n,o.c,'',24)}<span class="nm">${o.n}</span>`;
+  const ownerTag = o.key==='__none'
+    ? `<span class="dlx-otag none"><span class="otag-q">?</span>Не назначен</span>`
+    : `<span class="dlx-otag">${_avInit(o.n,o.c,'',20)}${o.n}</span>`;
+  const mag = it.bucket==='overdue' && dist.t ? ` <b>${dist.t.replace('−','')}</b>` : '';
   return `<div class="dlx ${m.c}">
     <div class="dlx-date"><div class="d">${it.day}</div><div class="m">${it.mon}</div></div>
     <div class="dlx-main"><div class="dlx-title">${it.stage}</div>
       <div class="dlx-meta"><span class="dlx-proj">${_avInit(it.project,'var(--bg-3)',it.plogoUrl,18,true)}${it.project}</span><span class="badge ${it.type==='task'?'b-mut':'b-cyan'}" style="font-size:9px;padding:1px 6px">${it.type==='task'?'задача':'этап'}</span></div>
     </div>
-    <div class="dlx-owner">${owner}</div>
-    <div class="dlx-dist" style="color:${dist.c}" title="${dist.full||dist.t}">${dist.t}</div>
-    <div class="dlx-st"><span class="badge ${m.sc}"><span class="bd"></span>${m.st}</span></div>
+    <div class="dlx-owner">${ownerTag}</div>
+    <div class="dlx-st"><span class="badge ${m.sc}"><span class="bd"></span>${m.st}${mag}</span></div>
   </div>`;
 }
 function _dlByUrgency(FILT){
   const order=agDlFilter==='all'?['overdue','today','week','future','done']:[agDlFilter];
   return order.map(k=>{ const b=_dlMeta(k), items=FILT.filter(d=>d.bucket===k); if(!items.length) return '';
     items.sort((a,b)=>String(a.due||'').localeCompare(String(b.due||'')));
-    return `<div class="dl-sec"><div class="dl-group-h">${b.l}<span class="ct">${items.length}</span><span class="ln"></span></div>${items.map(_dlRow).join('')}</div>`;
+    return `<div class="dl-sec"><div class="dl-group-h"><span class="dl-gdot ${b.c}"></span><span class="dl-glbl">${b.l}</span><span class="ct">${items.length}</span><span class="ln"></span></div>${items.map(_dlRow).join('')}</div>`;
   }).join('');
 }
 function _dlByProject(FILT){
