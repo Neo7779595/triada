@@ -884,7 +884,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-col-h{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-2);padding:15px 15px 12px}
 .pk-col-h .dot{width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 3px color-mix(in srgb,var(--pk-accent) 24%,transparent)}
 .pk-col-h .ct{margin-left:auto;font-family:var(--mono);background:var(--bg-3);color:var(--txt);min-width:24px;text-align:center;padding:2px 8px;border-radius:7px;font-size:11px;font-weight:600}
-.pk-body{flex:1;display:flex;flex-direction:column;gap:10px;padding:0 12px 14px;min-height:70px}
+.pk-body{flex:1;display:flex;flex-direction:column;gap:10px;padding:0 12px 14px;min-height:70px;max-height:max(320px,calc(100vh - 348px));overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.pk-body::-webkit-scrollbar{width:10px}
+.pk-body::-webkit-scrollbar-track{background:transparent}
+.pk-body::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid transparent;background-clip:padding-box}
+.pk-body:hover::-webkit-scrollbar-thumb{background:var(--txt-3);background-clip:padding-box}
+.pk-col.collapsed{min-height:0}
+.pk-col.collapsed .pk-body{overflow:visible;max-height:none;min-height:0;padding-bottom:12px}
+.pk-coltog{margin-left:6px;flex:none;width:22px;height:22px;border-radius:6px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--ease)}
+.pk-coltog:hover{color:var(--txt);border-color:var(--pk-accent);background:var(--bg-3)}
+.pk-coltog svg{width:13px;height:13px;transition:transform .28s var(--ease)}
+.pk-coltog svg.open{transform:rotate(180deg)}
+.pk-showbtn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:15px;font-size:12px;font-weight:500;color:var(--txt-2);background:var(--bg-2);border:1px dashed var(--line-2);border-radius:11px;cursor:pointer;transition:.16s var(--ease)}
+.pk-showbtn:hover{color:var(--pk-accent);border-color:var(--pk-accent);background:color-mix(in srgb,var(--pk-accent) 6%,transparent)}
+.pk-showbtn svg{width:15px;height:15px;flex:none}
+.pk-colmore-wrap{padding:0 12px 12px}
+.pk-colmore{display:block;width:100%;padding:9px;font-size:11.5px;font-weight:500;color:var(--txt-3);background:transparent;border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:.15s var(--ease)}
+.pk-colmore:hover{color:var(--txt-2);border-color:var(--line-2);background:var(--bg-2)}
 .pk-card{position:relative;background:var(--bg-2);border:1px solid var(--line-2);border-radius:11px;padding:12px 13px 11px 16px;cursor:grab;transition:transform .16s var(--ease),box-shadow .16s var(--ease),border-color .16s var(--ease);animation:pkIn .34s var(--ease-out) both}
 .pk-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--pk-accent,var(--accent))}
 .pk-card:hover{border-color:var(--accent-line);transform:translateY(-2px);box-shadow:0 12px 28px -14px rgba(0,0,0,.65)}
@@ -2597,6 +2613,8 @@ function closeProject(){document.getElementById('ov-proj').classList.remove('on'
 function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));renderPd();}
 const PD_STNEXT={wait:'active',active:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
+const PK_DONE_LIMIT=10; let PK_DONE='recent';
+function pkDoneSet(m){ PK_DONE=m; if(typeof renderPd==='function') renderPd(); }
 let _pkDrag=null;
 function pkDrag(e,id){ _pkDrag=id; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);}catch(_){}; const c=e.target.closest('.pk-card'); if(c) setTimeout(()=>c.classList.add('dragging'),0); }
 function pkDragEnd(e){ const c=e.target.closest('.pk-card'); if(c) c.classList.remove('dragging'); document.querySelectorAll('.pk-col.drag-over').forEach(x=>x.classList.remove('drag-over')); }
@@ -2752,8 +2770,11 @@ function renderPd(){
     if(p._tasks===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка задач…</div>'; }
     else {
       const T=p._tasks, byst=st=>T.filter(t=>t.status===st);
-      const col=(st,label,color,emptyMsg,emptyIc)=>{ const arr=byst(st);
-        const cards=arr.length?arr.map((c,i)=>{
+      const col=(st,label,color,emptyMsg,emptyIc)=>{
+        const _all=byst(st), _total=_all.length, _isDone=st==='done', _collapsed=_isDone&&PK_DONE==='hidden';
+        let arr=_all;
+        if(_isDone&&!_collapsed&&PK_DONE==='recent'&&_total>PK_DONE_LIMIT) arr=_all.slice(-PK_DONE_LIMIT);
+        const cards=_collapsed?`<button class="pk-showbtn" onclick="event.stopPropagation();pkDoneSet('recent')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Показать последние ${PK_DONE_LIMIT} задач${_total>PK_DONE_LIMIT?' · '+_total:''}</button>`:(arr.length?arr.map((c,i)=>{
           const w=_who(c.assignee_id), stg=(p._stages||[]).find(x=>x.id===c.stage_id);
           const over=c.due_date && c.status!=='done' && new Date(c.due_date) < new Date(new Date().toDateString());
           const due=c.due_date?`<span class="pk-due ${over?'over':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${_dDate(c.due_date)}</span>`:'';
@@ -2773,10 +2794,13 @@ function renderPd(){
               ${timer}
               <div class="pk-foot"><span class="pk-av" style="background:${w.c}">${(w.n[0]||'?')}</span><span class="pk-who">${_ddH(w.n)}</span>${due}${adv}</div>
             </div>`;
-        }).join(''):`<div class="pk-empty3"><div class="ic">${emptyIc}</div><div class="t">${emptyMsg}</div></div>`;
-        return `<div class="pk-col" style="--pk-accent:${color}" ondragover="pkOver(event)" ondragleave="pkLeave(event)" ondrop="pkDrop(event,'${st}')">
-            <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${arr.length}</span></div>
+        }).join(''):`<div class="pk-empty3"><div class="ic">${emptyIc}</div><div class="t">${emptyMsg}</div></div>`);
+        const _tog=_isDone?`<button class="pk-coltog" title="${_collapsed?'Показать':'Скрыть'} задачи" onclick="event.stopPropagation();pkDoneSet('${_collapsed?'recent':'hidden'}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="${_collapsed?'':'open'}"><path d="M6 9l6 6 6-6"/></svg></button>`:'';
+        const _footer=(_isDone&&!_collapsed&&_total>PK_DONE_LIMIT)?`<div class="pk-colmore-wrap"><button class="pk-colmore" onclick="event.stopPropagation();pkDoneSet('${PK_DONE==='all'?'recent':'all'}')">${PK_DONE==='all'?'Свернуть до '+PK_DONE_LIMIT:'Показать все · '+_total}</button></div>`:'';
+        return `<div class="pk-col${_collapsed?' collapsed':''}" data-st="${st}" style="--pk-accent:${color}" ondragover="pkOver(event)" ondragleave="pkLeave(event)" ondrop="pkDrop(event,'${st}')">
+            <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${_total}</span>${_tog}</div>
             <div class="pk-body">${cards}</div>
+            ${_footer}
             <div class="pk-add-zone">
               <button class="pk-addbtn" onclick="event.stopPropagation();pdNewTask('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Задача</button>
             </div>
