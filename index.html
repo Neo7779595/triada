@@ -928,6 +928,24 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 @keyframes pkPulse{0%,100%{opacity:1}50%{opacity:.35}}
 .pd-chip #pk-total{font-variant-numeric:tabular-nums}
 .pk-empty{font-size:11.5px;color:var(--txt-3);text-align:center;padding:18px 0;font-family:var(--mono)}
+/* operations · stats strip */
+.pk-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:18px}
+.pk-mx{background:var(--bg-1);padding:18px 20px;transition:background .18s var(--ease)}
+.pk-mx:hover{background:var(--bg-2)}
+.pk-mx .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:500}
+.pk-mx .v{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;letter-spacing:-.02em;margin-top:11px;color:var(--txt)}
+.pk-mx .v.ac{color:var(--accent)} .pk-mx .v.neg{color:var(--neg)} .pk-mx .v.mut{color:var(--txt-3)}
+.pk-mx .v .u{font-size:18px;color:var(--txt-3);margin-left:1px}
+.pk-mx .s{font-size:11px;color:var(--txt-3);margin-top:8px;font-family:var(--mono)}
+.pk-mx .mb{height:4px;background:var(--bg-3);border-radius:2px;overflow:hidden;margin-top:12px}
+.pk-mx .mb i{display:block;height:100%;background:var(--pos);border-radius:2px;transform-origin:left center;animation:growX .9s var(--ease-out) .15s both}
+@media(max-width:900px){.pk-strip{grid-template-columns:1fr 1fr}}
+/* operations · inviting empty column */
+.pk-empty3{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;padding:34px 16px;text-align:center}
+.pk-empty3 .ic{width:38px;height:38px;border-radius:11px;background:var(--bg-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-3)}
+.pk-empty3 .ic svg{width:18px;height:18px}
+.pk-empty3 .t{font-size:12px;color:var(--txt-3);line-height:1.45;max-width:170px}
+.pk-col.drag-over .pk-empty3 .ic{border-color:var(--pk-accent);color:var(--pk-accent)}
 @media(max-width:820px){.pk-board{grid-template-columns:1fr}.pd-hero-top{flex-direction:column;align-items:stretch;gap:22px}.pd-bignum{font-size:52px}.pd-statrow{grid-template-columns:repeat(2,1fr)}.pd-top,.pd-tabbar,.pd-scroll{padding-left:16px;padding-right:16px}.pd-right .pd-minibar{display:none}}
 
 /* ============ PROJECT SECONDARY MODALS (edit/report/cycles/material) ============ */
@@ -2693,7 +2711,7 @@ function renderPd(){
     if(p._tasks===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка задач…</div>'; }
     else {
       const T=p._tasks, byst=st=>T.filter(t=>t.status===st);
-      const col=(st,label,color)=>{ const arr=byst(st);
+      const col=(st,label,color,emptyMsg,emptyIc)=>{ const arr=byst(st);
         const cards=arr.length?arr.map((c,i)=>{
           const w=_who(c.assignee_id), stg=(p._stages||[]).find(x=>x.id===c.stage_id);
           const over=c.due_date && c.status!=='done' && new Date(c.due_date) < new Date(new Date().toDateString());
@@ -2714,13 +2732,31 @@ function renderPd(){
               ${timer}
               <div class="pk-foot"><span class="pk-av" style="background:${w.c}">${(w.n[0]||'?')}</span><span class="pk-who">${_ddH(w.n)}</span>${due}${adv}</div>
             </div>`;
-        }).join(''):`<div class="pk-empty">— пусто —</div>`;
+        }).join(''):`<div class="pk-empty3"><div class="ic">${emptyIc}</div><div class="t">${emptyMsg}</div></div>`;
         return `<div class="pk-col" style="--pk-accent:${color}" ondragover="pkOver(event)" ondragleave="pkLeave(event)" ondrop="pkDrop(event,'${st}')">
             <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${arr.length}</span></div>
             <div class="pk-body">${cards}</div>
           </div>`; };
-      h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:13px;font-weight:600;color:var(--txt)">Операционка · ${T.length} задач</div><button class="btn-add pk-add" onclick="pdNewTask()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Задача</button></div>
-        <div class="pk-board">${col('wait','Ожидание','var(--warn)')}${col('active','В работе','var(--accent)')}${col('done','Готово','var(--pos)')}</div>
+      const totalN=T.length, doneN=byst('done').length, activeN=byst('active').length;
+      const pctDone=totalN?Math.round(doneN/totalN*100):0;
+      const totalSec=T.reduce((a,t)=>a+_taskElapsed(t),0);
+      const _t0=new Date(new Date().toDateString());
+      const overdueN=T.filter(t=>t.status!=='done'&&t.due_date&&new Date(t.due_date)<_t0).length;
+      const actStage=(p._stages||[]).find(s=>s.status==='active');
+      const strip=`<div class="pk-strip">
+        <div class="pk-mx"><div class="l">Время всего</div><div class="v">${pkFmtDur(totalSec)}</div><div class="s">отработано командой</div></div>
+        <div class="pk-mx"><div class="l">В работе</div><div class="v ${activeN?'ac':'mut'}">${activeN}</div><div class="s">активных задач</div></div>
+        <div class="pk-mx"><div class="l">Выполнено</div><div class="v">${pctDone}<span class="u">%</span></div><div class="mb"><i style="width:${pctDone}%"></i></div></div>
+        <div class="pk-mx"><div class="l">Просрочено</div><div class="v ${overdueN?'neg':'mut'}">${overdueN}</div><div class="s">${overdueN?'требуют внимания':'всё в срок'}</div></div>
+      </div>`;
+      const IC_INB='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5 5h14l3 7v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6z"/></svg>';
+      const IC_PLY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></svg>';
+      const IC_CHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>';
+      h=`<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;gap:16px">
+        <div><div class="eyebrow" style="letter-spacing:.08em">Проект · операционка</div><div style="font-size:20px;font-weight:700;letter-spacing:-.01em;margin-top:4px">Операционка</div>${actStage?`<div style="font-size:12px;color:var(--txt-3);margin-top:6px">активный этап: <b style="color:var(--accent);font-weight:500">${_ddH(actStage.name)}</b></div>`:''}</div>
+        <button class="btn-add pk-add" onclick="pdNewTask()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Задача</button></div>
+        ${strip}
+        <div class="pk-board">${col('wait','Ожидание','var(--warn)','Нет задач в ожидании',IC_INB)}${col('active','В работе','var(--accent)','Перетащи задачу сюда, чтобы начать',IC_PLY)}${col('done','Готово','var(--pos)','Пока ничего не завершено',IC_CHK)}</div>
         <div class="pk-hint"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l4-4M5 9l4 4M5 9h11a4 4 0 010 8h-1"/></svg>Перетащите карточку между колонками или нажмите «›», чтобы продвинуть по статусу</div>`;
     }
   } else if(pdTabCur==='reports'){
