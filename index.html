@@ -1307,6 +1307,10 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .tb-proj .search input:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .tb-proj .segm button.on{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
 @media(max-width:1000px){.px-ov{grid-template-columns:1fr 1fr}}
+.px-ov-6{grid-template-columns:repeat(6,1fr)}
+.px-ov-6 .px-ov-v{font-size:20px}
+@media(max-width:1100px){.px-ov-6{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.px-ov-6{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:1180px){.ptm:first-child{display:none}}
 @media(max-width:1000px){.pt-pipe,.pt-note{display:none}}
 </style>
@@ -3535,14 +3539,31 @@ function renderCycles(){
   const aging = C.agingRows||[];
   const rwCol = p => p==null?'var(--txt-3)':(p>=40?'var(--neg)':(p>=20?'var(--warn)':'var(--txt-3)'));
   document.getElementById('content-ag').innerHTML = `
-    <div class="ph"><div><div class="eyebrow">Агентство · cycle time</div><h1>Циклы</h1>
-    <div class="s">Сколько реально длятся этапы — от старта до завершения. Считается из истории статусов: каждая пара «в работе → завершён» — отдельный цикл.</div></div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · Cycle time</div><h1>Циклы</h1>
+    <div class="ph-pulse"><span class="dot" style="background:${C.stuckNow?'var(--neg)':'var(--accent)'};box-shadow:0 0 8px -1px ${C.stuckNow?'var(--neg)':'var(--accent)'}"></span>${C.projMedianMs!=null?('медиана '+_cycDur(C.projMedianMs)):'нет замеров'} · покрытие ${C.coveragePct}%${C.stuckNow?(' · '+C.stuckNow+' застряло'):''}</div></div></div>
 
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="l">Цикл проекта · медиана</div><div class="v num">${C.projMedianMs!=null?_cycDur(C.projMedianMs):'—'}</div><div class="sub">старт 1-го → финиш последнего</div><div class="kfoot">${C.projCount?('по '+C.projCount+' проект. · старт→финиш'):'нужно ≥2 этапа с замером'}</div></div>
-      <div class="kpi"><div class="l">Узкое место</div>${bn?`<div class="v" style="font-size:17px;font-weight:700;color:var(--neg);line-height:1.15;margin-top:10px">${bn.name}</div><div class="sub">самый долгий этап</div><div class="kfoot">медиана ${_cycDur(bn.p50Ms)} · n=${bn.n}${bn.n<3?' ⚠ мало данных':''}</div>`:`<div class="v num" style="margin-top:10px">—</div><div class="sub">нет данных</div><div class="kfoot">нужны завершённые этапы</div>`}</div>
-      <div class="kpi"><div class="l">Покрытие данными</div><div class="v num">${C.coveragePct}<span class="u">%</span></div><div class="sub">этапов с измеримым циклом</div><div class="kfoot">${C.coverageDone} из ${C.coverageTotal} завершённых</div></div>
-      <div class="kpi"><div class="l">Застряло сейчас</div><div class="v num" style="${C.stuckNow?'color:var(--neg)':''}">${C.stuckNow}</div><div class="sub">дольше нормы (p85)</div><div class="kfoot ${C.stuckNow?'':'pos'}">${C.stuckNow?'требуют внимания':'всё в норме'}</div></div>
+    <div class="px-ov">
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Цикл проекта · медиана</div>
+        <div class="px-ov-v">${C.projMedianMs!=null?_cycDur(C.projMedianMs):'—'}</div>
+        <div class="px-ov-ctx">${C.projCount?('по '+C.projCount+' проект. · старт→финиш'):'нужно ≥2 этапа с замером'}</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Узкое место</div>
+        <div class="px-ov-v" style="font-size:17px;letter-spacing:-.01em;color:${bn?'var(--neg)':'var(--txt-3)'}">${bn?bn.name:'—'}</div>
+        <div class="px-ov-ctx">${bn?('медиана '+_cycDur(bn.p50Ms)+' · n='+bn.n+(bn.n<3?' ⚠':'')):'нет данных'}</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Покрытие данными</div>
+        <div class="px-ov-v">${C.coveragePct}<small>%</small></div>
+        <div class="px-ov-comp">${C.coverageTotal>0?`${C.coverageDone>0?`<i style="flex:${C.coverageDone};background:var(--accent)"></i>`:''}<i style="flex:${Math.max(C.coverageTotal-C.coverageDone,0)||1};background:var(--bg-3)"></i>`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
+        <div class="px-ov-ctx">${C.coverageDone} из ${C.coverageTotal} завершённых</div>
+      </div>
+      <div class="px-ov-cell">
+        <div class="px-ov-l">Застряло сейчас</div>
+        <div class="px-ov-v" style="color:${C.stuckNow?'var(--neg)':'var(--pos)'}">${C.stuckNow}</div>
+        <div class="px-ov-ctx" style="${C.stuckNow?'':'color:var(--pos)'}">${C.stuckNow?'дольше нормы p85':'всё в норме ✓'}</div>
+      </div>
     </div>
 
     ${aging.length?`<div class="card" style="margin-top:16px;border-color:var(--accent-line)">
@@ -3857,7 +3878,7 @@ function renderFinance(){
 
   document.getElementById('content-ag').innerHTML=`
     <div class="ph"><div><div class="eyebrow">Агентство · P&L</div><h1>Финансы</h1>
-    <div class="s">Полная экономика портфеля: выручка, расходы, прибыль, маржа и распределение.</div></div></div>
+    <div class="ph-pulse"><span class="dot" style="background:${F.profit>=0?'var(--pos)':'var(--neg)'};box-shadow:0 0 8px -1px ${F.profit>=0?'var(--pos)':'var(--neg)'}"></span>MRR ${money(F.totalMrr)} · маржа ${F.marginPct}% · ${F.profit>=0?'операция прибыльна':'операция в дефиците'}</div></div></div>
 
     ${noData?`<div class="card" style="margin-top:16px;border-color:var(--warn)"><div class="card-body" style="display:flex;align-items:center;gap:11px"><span style="color:var(--warn);font-size:18px">⚠</span><div style="font-size:13px;color:var(--txt-2)">Поля добавлены, но суммы ещё не заданы. Откройте ⚙ на проекте и впишите доход и расходы — цифры оживут.</div></div></div>`:''}
 
@@ -3868,13 +3889,13 @@ function renderFinance(){
       <div class="fin-tcard"><div class="tl">Время</div><div class="tv" style="color:var(--accent)">${fmtHours(F.totalHours)}</div><div class="ts">часов по таймеру</div><div class="tf">${F.profitPerHour?money(F.profitPerHour)+' / час прибыли':'из канбана'}</div></div>
     </div>
 
-    <div class="kpis" style="grid-template-columns:repeat(6,1fr);margin-top:14px">
-      <div class="kpi"><div class="l">Выручка / час</div><div class="v num">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="sub">${F.revPerHour?'сум за час работы':'нужно ≥ 1ч трекинга'}</div></div>
-      <div class="kpi"><div class="l">Прибыль / час</div><div class="v num" style="color:${F.profitPerHour>0?'var(--pos)':F.profitPerHour<0?'var(--neg)':'var(--txt)'}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="sub">${F.profitPerHour?'чистыми за час':'логируйте часы в канбане'}</div></div>
-      <div class="kpi"><div class="l">Runway</div><div class="v" style="font-size:19px;font-weight:700;color:${F.profit>=0?'var(--pos)':'var(--neg)'};margin-top:6px">${F.profit>=0?'Стабильно':'Дефицит'}</div><div class="sub">${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div></div>
-      <div class="kpi"><div class="l">Concentration risk</div><div class="v num" style="color:${F.concentrationPct>=50?'var(--neg)':F.concentrationPct>=30?'var(--warn)':'var(--txt)'}">${F.concentrationPct}<span class="u">%</span></div><div class="sub">${F.concentrationTop}</div></div>
-      <div class="kpi"><div class="l">Break-even</div><div class="v num">${money(F.totalCost)}</div><div class="sub">минимум для нулевой прибыли</div></div>
-      <div class="kpi"><div class="l">EBITDA margin</div><div class="v num" style="color:${mColor(F.marginPct)}">${F.marginPct}<span class="u">%</span></div><div class="sub">операционная эффективность</div></div>
+    <div class="px-ov px-ov-6" style="margin-top:14px">
+      <div class="px-ov-cell"><div class="px-ov-l">Выручка / час</div><div class="px-ov-v">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="px-ov-ctx">${F.revPerHour?'сум за час работы':'нужно ≥ 1ч трекинга'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Прибыль / час</div><div class="px-ov-v" style="color:${F.profitPerHour>0?'var(--pos)':F.profitPerHour<0?'var(--neg)':'var(--txt)'}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="px-ov-ctx">${F.profitPerHour?'чистыми за час':'логируйте часы'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Runway</div><div class="px-ov-v" style="font-size:18px;color:${F.profit>=0?'var(--pos)':'var(--neg)'}">${F.profit>=0?'Стабильно':'Дефицит'}</div><div class="px-ov-ctx">${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Concentration</div><div class="px-ov-v" style="color:${F.concentrationPct>=50?'var(--neg)':F.concentrationPct>=30?'var(--warn)':'var(--txt)'}">${F.concentrationPct}<small>%</small></div><div class="px-ov-ctx">${F.concentrationTop}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Break-even</div><div class="px-ov-v">${money(F.totalCost)}</div><div class="px-ov-ctx">минимум до нуля</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">EBITDA margin</div><div class="px-ov-v" style="color:${mColor(F.marginPct)}">${F.marginPct}<small>%</small></div><div class="px-ov-ctx">опер. эффективность</div></div>
     </div>
 
     ${F.services.length?`<div class="card" style="margin-top:16px">
@@ -4236,9 +4257,9 @@ function renderTeam(){
   const _today=new Date().toISOString().slice(0,10);
   const _dirty=(_teamFilter.dept!=='all'||_teamFilter.q||_teamFilter.sort!=='tpi'||_teamPeriod.key!=='30d');
   document.getElementById('content-ag').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Агентство · талант-аналитика</div><h1>Команда</h1>
-    <div class="s">Эффективность каждого по выбранному периоду: выработка, скорость цикла, качество и надёжность — сведённые в индекс TPI с поправкой на объём данных.</div></div></div>
-    <div class="ti-bar">
+    <div class="ph"><div><div class="eyebrow">Агентство · Талант-аналитика</div><h1>Команда</h1>
+    <div class="ph-pulse"><span class="dot" style="background:${A.overdueNow?'var(--neg)':'var(--accent)'};box-shadow:0 0 8px -1px ${A.overdueNow?'var(--neg)':'var(--accent)'}"></span>${A.throughput} закрыто · ${A.activeCnt}/${A.total} активны · ${A.openNow} в работе${A.overdueNow?(' · '+A.overdueNow+' просрочено'):''}</div></div></div>
+    <div class="ti-bar tb-proj">
       <span class="ti-lbl">Период</span>
       <div class="segm">
         <button class="${_teamPeriod.key==='7d'?'on':''}" onclick="setTeamPeriod('7d')">7 дней</button>
@@ -4253,13 +4274,13 @@ function renderTeam(){
       <span class="sp"></span>
       ${_dirty?`<button class="ti-reset" onclick="resetTeamFilters()">Сбросить</button>`:''}
     </div>
-    <div class="kpis" style="grid-template-columns:repeat(6,1fr)">
-      <div class="kpi"><div class="l">Выработка</div><div class="v num" data-count="${A.throughput}">0</div><div class="sub">уникально закрыто · ${_periodLbl()}</div><div class="kfoot">${_kd(A.throughputDelta)}&nbsp;к пред. периоду</div></div>
-      <div class="kpi"><div class="l">Медиана цикла</div><div class="v num">${A.medCycleMs!=null?_cycDur(A.medCycleMs):'—'}</div><div class="sub">старт → финиш</div><div class="kfoot">по измеренным этапам</div></div>
-      <div class="kpi"><div class="l">Возвраты</div><div class="v num" data-count="${A.reworkPct}" data-suf="%" style="${A.reworkPct>=20?'color:var(--neg)':A.reworkPct>=10?'color:var(--warn)':''}">0%</div><div class="sub ${A.reworkPct<10?'pos':''}">${A.reworkPct<10?'низкие':'под контролем'}</div><div class="kfoot">откатов статуса от закрытий</div></div>
-      <div class="kpi"><div class="l">В срок</div><div class="v num">${A.onTimePct!=null?`<span data-count="${A.onTimePct}" data-suf="%">0%</span>`:'—'}</div><div class="sub">завершено к дедлайну</div><div class="kfoot">${A.onTimePct!=null?'по задачам с дедлайном':'нет задач с дедлайном'}</div></div>
-      <div class="kpi"><div class="l">Активны в периоде</div><div class="v num"><span data-count="${A.activeCnt}">0</span><span class="u">/ ${A.total}</span></div><div class="sub">закрывали работу</div><div class="kfoot">${A.total-A.activeCnt} простаивали</div></div>
-      <div class="kpi"><div class="l">Сейчас в работе</div><div class="v num" data-count="${A.openNow}">0</div><div class="sub ${A.overdueNow?'':'pos'}">${A.overdueNow?A.overdueNow+' просрочено':'всё в срок'}</div><div class="kfoot">открытых задач у команды</div></div>
+    <div class="px-ov px-ov-6">
+      <div class="px-ov-cell"><div class="px-ov-l">Выработка</div><div class="px-ov-v" data-count="${A.throughput}">0</div><div class="px-ov-ctx">${_kd(A.throughputDelta)} vs пред.</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Медиана цикла</div><div class="px-ov-v">${A.medCycleMs!=null?_cycDur(A.medCycleMs):'—'}</div><div class="px-ov-ctx">старт → финиш</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Возвраты</div><div class="px-ov-v" data-count="${A.reworkPct}" data-suf="%" style="${A.reworkPct>=20?'color:var(--neg)':A.reworkPct>=10?'color:var(--warn)':''}">0%</div><div class="px-ov-ctx">${A.reworkPct<10?'низкие откаты':'под контролем'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">В срок</div><div class="px-ov-v">${A.onTimePct!=null?`<span data-count="${A.onTimePct}" data-suf="%">0%</span>`:'—'}</div><div class="px-ov-ctx">${A.onTimePct!=null?'к дедлайну':'нет дедлайнов'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Активны в периоде</div><div class="px-ov-v"><span data-count="${A.activeCnt}">0</span><small>/ ${A.total}</small></div><div class="px-ov-ctx">${A.total-A.activeCnt} простаивали</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Сейчас в работе</div><div class="px-ov-v" data-count="${A.openNow}">0</div><div class="px-ov-ctx" style="${A.overdueNow?'color:var(--neg)':'color:var(--pos)'}">${A.overdueNow?A.overdueNow+' просрочено':'всё в срок'}</div></div>
     </div>
     <div class="tabs-row">
       <div class="segm">
@@ -4367,10 +4388,10 @@ function renderKB(){
       <div class="kb-items">${itemsHtml}</div></div>`;
   }).join('');
   document.getElementById('content-ag').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Агентство · знания</div><h1>База знаний</h1><div class="s">${kbProj} · категории и типы материалов настраиваются агентством</div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · Знания</div><h1>База знаний</h1><div class="ph-pulse"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px -1px var(--accent)"></span>${KB_PROJECTS.length} проектов · ${kbCount(kbProj)} материалов · «${kbProj}»</div></div>
       <div style="display:flex;gap:9px"><button class="btn-ghost" onclick="kbAddCat()">+ Категория</button><button class="btn-add" onclick="kbAddMat()">+ Добавить</button></div>
     </div>
-    <div class="kb-grid">
+    <div class="kb-grid tb-proj">
       <div>
         <div class="kb-stat"><div class="s"><div class="v">${KB_PROJECTS.length}</div><div class="l">Проектов</div></div><div class="s"><div class="v">${kbCount(kbProj)}</div><div class="l">Материалов</div></div></div>
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск проекта…"></div>
@@ -4402,7 +4423,7 @@ function renderTools(){
       <div class="tool-grid">${cards}${add}</div></div>`;
   }).join('');
   document.getElementById('content-ag').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Агентство · пространство</div><h1>Инструменты</h1><div class="s">Закладки на инструменты и продукты команды. Категории — кастомные.</div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · Пространство</div><h1>Инструменты</h1><div class="ph-pulse"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px -1px var(--accent)"></span>${TOOLS_DATA.length} категорий · ${TOOLS_DATA.reduce((s,x)=>s+x.items.length,0)} материалов</div></div>
       <div style="display:flex;gap:9px"><button class="btn-ghost" onclick="toolAddCat()">+ Категория</button><button class="btn-add" onclick="toolAdd(0)">+ Добавить</button></div>
     </div>
     ${secs}`;
