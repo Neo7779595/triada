@@ -886,6 +886,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-task .tmr svg{width:12px;height:12px}
 /* kanban */
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.cyc-insight{display:flex;align-items:flex-start;gap:9px;padding:11px 14px;background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:10px;font-size:12.5px;color:var(--txt-1);line-height:1.5}
+.cyc-insight svg{width:16px;height:16px;color:var(--accent);flex-shrink:0;margin-top:1px}
+.cyc-insight b{color:var(--accent)}
+.wk-row{display:flex;align-items:flex-start;gap:10px;padding:10px 13px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;animation:cycRow .4s var(--ease-out) both}
+.wk-bar{height:4px;background:var(--bg-3);border-radius:3px;overflow:hidden;margin:6px 0 4px}
+.wk-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.wk-team{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.wk-tcell{padding:12px 14px;background:var(--bg-1);border:1px solid var(--line);border-radius:11px;animation:cycRow .4s var(--ease-out) both}
+
 @media(max-width:760px){.rev-grid{grid-template-columns:1fr}}
 .rev-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;animation:cycRow .4s var(--ease-out) both}
 .rev-nm{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3830,7 +3839,7 @@ function renderOverview(){
 }
 
 /* ——— CYCLES module ——— */
-let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[], reviewTasks:[], reviewStages:[], reviewNow:0, reviewCount:0, reviewTotalSec:0, reviewAvgSec:0 };
+let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[], reviewTasks:[], reviewStages:[], reviewNow:0, reviewCount:0, reviewTotalSec:0, reviewAvgSec:0, workCount:0, workTotalSec:0, workMedianSec:0, workMeanSec:0, workP90Sec:0, workDoneCount:0, workDoneAvgSec:0, workStages:[], workTopTasks:[], workByAsg:[], workParetoPct:0 };
 function _cycDur(ms){ if(ms==null) return '—'; if(ms<=0) return '0'; if(ms<60000) return Math.round(ms/1000)+' с'; const m=ms/60000; if(m<60) return Math.round(m)+' мин'; const h=m/60; if(h<24) return (h<10?h.toFixed(1).replace('.0',''):''+Math.round(h))+' ч'; const d=h/24; return (d<10?d.toFixed(1).replace('.0',''):''+Math.round(d))+' дн'; }
 function svgLine(vals,labels){
   const W=1100,H=230,padL=46,padR=26,padT=30,padB=38;
@@ -3987,6 +3996,53 @@ function renderCycles(){
           </div>
         </div>
       `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.6">Пока нет задач, проходивших через утверждение.<br>Данные появятся, когда задачи начнут двигаться через колонку «На утверждении».</div>`}
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Трудозатраты по задачам <span class="c">сколько времени уходит на работу · из «В работе»</span></div></div>
+      <div class="card-body">
+      ${C.workCount?`
+        <div class="px-ov" style="margin-bottom:14px">
+          <div class="px-ov-cell"><div class="px-ov-l">Медиана на задачу</div><div class="px-ov-v">${_cycDur(C.workMedianSec*1000)}</div><div class="px-ov-ctx">типичная задача · p50</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Среднее на задачу</div><div class="px-ov-v">${_cycDur(C.workMeanSec*1000)}</div><div class="px-ov-ctx">${C.workCount} задач с трекингом</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Худшие 10% · p90</div><div class="px-ov-v" style="color:var(--warn)">${_cycDur(C.workP90Sec*1000)}</div><div class="px-ov-ctx">самые долгие задачи</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Средняя завершённая</div><div class="px-ov-v" style="color:var(--pos)">${C.workDoneCount?_cycDur(C.workDoneAvgSec*1000):'—'}</div><div class="px-ov-ctx">${C.workDoneCount} завершено · бенчмарк</div></div>
+        </div>
+        <div class="cyc-insight">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+          <div>Концентрация: <b>${C.workParetoPct}%</b> задач забирают <b>80%</b> рабочего времени${C.workParetoPct>0&&C.workParetoPct<=25?' — высокая концентрация, крупные задачи стоит дробить на подзадачи':(C.workParetoPct>=50?' — нагрузка распределена равномерно':'')}</div>
+        </div>
+        <div class="rev-grid" style="margin-top:14px">
+          <div>
+            <div class="eyebrow" style="margin-bottom:10px">Где уходит время · по этапам</div>
+            ${C.workStages.length?C.workStages.map((st,i)=>`<div class="wk-row" style="animation-delay:${i*40}ms">
+              <div style="min-width:0;flex:1"><div class="rev-nm">${_ddH(st.name)}</div>
+                <div class="wk-bar"><i style="width:${st.share}%"></i></div>
+                <div class="rev-sub">${st.count} задач · в среднем ${_cycDur(st.avg*1000)}</div></div>
+              <div style="text-align:right;flex-shrink:0;padding-left:10px"><div class="rev-val" style="color:var(--accent)">${_cycDur(st.total*1000)}</div><div class="rev-sub">${st.share}%</div></div>
+            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+          </div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:10px">Самые трудоёмкие задачи</div>
+            ${C.workTopTasks.length?C.workTopTasks.map((t,i)=>`<div class="rev-row" style="animation-delay:${i*40}ms">
+              <div style="min-width:0"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.done?' · <span style="color:var(--pos)">готово</span>':''}</div></div>
+              <div class="rev-val" style="color:var(--accent)">${_cycDur(t.sec*1000)}</div>
+            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <div class="eyebrow" style="margin-bottom:10px">Нагрузка по исполнителям</div>
+          <div class="wk-team">
+            ${C.workByAsg.map((a,i)=>`<div class="wk-tcell" style="animation-delay:${i*40}ms">
+              <div class="rev-nm">${_ddH(a.name)}</div>
+              <div style="font-weight:800;font-size:16px;color:var(--accent);margin:5px 0;font-variant-numeric:tabular-nums">${_cycDur(a.total*1000)}</div>
+              <div class="rev-sub">${a.count} задач · ${a.share}% времени</div>
+              <div class="rev-sub">в среднем ${_cycDur(a.avg*1000)}</div>
+            </div>`).join('')}
+          </div>
+        </div>
+      `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.6">Пока нет задач с отработанным временем.<br>Данные появятся, когда команда начнёт работать над задачами в колонке «В работе».</div>`}
       </div>
     </div>
 
@@ -5525,7 +5581,7 @@ window.tLoadCycles = async () => {
   const [hr, sr, tr] = await Promise.all([
     SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true}),
     SB.from('project_stages').select('id,name'),
-    SB.from('project_tasks').select('id,title,status,stage_id,project_id,review_spent,review_started,assignee_id')
+    SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id')
   ]);
   const hist = hr.data||[];
   const nameById={}, mrrById={}, logoById={};
@@ -5628,7 +5684,27 @@ window.tLoadCycles = async () => {
   const reviewCount=_rtasks.filter(t=>_revEl(t)>0).length;
   const reviewTotalSec=_rtasks.reduce((a,t)=>a+_revEl(t),0);
   const reviewAvgSec=reviewCount?Math.round(reviewTotalSec/reviewCount):0;
-  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients,reviewTasks,reviewStages,reviewNow,reviewCount,reviewTotalSec,reviewAvgSec};
+  // ——— трудозатраты по задачам (рабочее время из «В работе») ———
+  const _workEl=(t)=>{ let v=t.time_spent||0; if(t.timer_started && t.status==='active') v+=Math.max(0,Math.round((now-new Date(t.timer_started).getTime())/1000)); return v; };
+  const _wsecs=_rtasks.map(_workEl).filter(v=>v>0).sort((a,b)=>a-b);
+  const workCount=_wsecs.length;
+  const workTotalSec=_wsecs.reduce((a,b)=>a+b,0);
+  const workMedianSec=workCount?Math.round(pctl(_wsecs,0.5)):0;
+  const workMeanSec=workCount?Math.round(workTotalSec/workCount):0;
+  const workP90Sec=workCount?Math.round(pctl(_wsecs,0.9)):0;
+  const _wdone=_rtasks.filter(t=>t.status==='done'&&_workEl(t)>0);
+  const workDoneCount=_wdone.length;
+  const workDoneAvgSec=workDoneCount?Math.round(_wdone.reduce((a,t)=>a+_workEl(t),0)/workDoneCount):0;
+  const _wstg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_wstg[nm]||(_wstg[nm]={name:nm,total:0,count:0})); _wstg[nm].total+=v; _wstg[nm].count++; });
+  const workStages=Object.values(_wstg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total).slice(0,8);
+  const workTopTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_workEl(t),stage:_stNm[t.stage_id]||'—',done:t.status==='done'})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec).slice(0,7);
+  const _wasg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const aid=t.assignee_id||'__none'; (_wasg[aid]||(_wasg[aid]={id:aid,total:0,count:0})); _wasg[aid].total+=v; _wasg[aid].count++; });
+  const _tmName=(id)=>{ if(id==='__none')return 'Не назначен'; const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?m.name:'—'; };
+  const workByAsg=Object.values(_wasg).map(x=>({name:_tmName(x.id),total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total).slice(0,8);
+  let _cum=0,_p80=0; const _desc=[..._wsecs].sort((a,b)=>b-a); const _tgt=workTotalSec*0.8;
+  for(const v of _desc){ _cum+=v; _p80++; if(_cum>=_tgt)break; }
+  const workParetoPct=workCount?Math.round(100*_p80/workCount):0;
+  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients,reviewTasks,reviewStages,reviewNow,reviewCount,reviewTotalSec,reviewAvgSec,workCount,workTotalSec,workMedianSec,workMeanSec,workP90Sec,workDoneCount,workDoneAvgSec,workStages,workTopTasks,workByAsg,workParetoPct};
 };
 
 /* ===== TEAM · live aggregation (workload & activity per member) ===== */
