@@ -388,7 +388,7 @@ tbody tr:hover td{background:var(--bg-2)}
 .wlx-tbl tbody tr{transition:.14s}
 .wlx-tbl tbody tr:hover td{background:var(--bg-2)}
 .wlx-id{display:flex;align-items:center;gap:11px}
-.wlx-av{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#06140f;font-weight:700;font-size:13px;flex:0 0 auto}
+.wlx-av{position:relative;overflow:hidden;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#06140f;font-weight:700;font-size:13px;flex:0 0 auto}
 .wlx-id .nm{font-weight:600;font-size:13px}
 .wlx-id .sl{font-family:var(--mono);font-size:10px;color:var(--txt-3);margin-top:1px}
 .wlx-dist{display:flex;gap:3px;height:12px;align-items:center;width:100%;max-width:340px}
@@ -932,7 +932,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-stage svg{width:11px;height:11px;color:var(--txt-3);flex:none}
 .pk-stage span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-foot{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line)}
-.pk-av{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#06140f;flex:none}
+.pk-av{position:relative;overflow:hidden;width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#06140f;flex:none}
 .pk-who{font-size:11px;color:var(--txt-2);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:84px}
 .pk-due{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--txt-3);font-family:var(--mono);white-space:nowrap}
 .pk-due svg{width:11px;height:11px}
@@ -2775,7 +2775,7 @@ function avatarField(id,url,letter){
     <div style="font-size:12px;color:var(--txt-3);line-height:1.4">Нажми на фото,<br>чтобы загрузить или заменить</div>
   </div>`;
 }
-function _who(id){ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{n:m.name||'—',c:m.color||'var(--txt-3)'}:{n:'—',c:'var(--txt-3)'}; }
+function _who(id){ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{n:m.name||'—',c:m.color||'var(--txt-3)',avatar:m.avatar||null}:{n:'—',c:'var(--txt-3)',avatar:null}; }
 function pkFmtDur(sec){ sec=Math.max(0,Math.floor(sec||0)); const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),ss=sec%60; return h>0?(h+'ч '+String(m).padStart(2,'0')+'м'):(m+':'+String(ss).padStart(2,'0')); }
 function _taskElapsed(t){ let s=(t&&t.time_spent)||0; if(t&&t.timer_started){ s+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000)); } return s; }
 function pkProjTotal(){ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null; if(!p||!p._tasks) return 0; return p._tasks.reduce((a,t)=>a+_taskElapsed(t),0); }
@@ -2862,7 +2862,7 @@ function renderPd(){
               <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
-              <div class="pk-foot"><span class="pk-av" style="background:${w.c}">${(w.n[0]||'?')}</span><span class="pk-who">${_ddH(w.n)}</span>${due}${adv}</div>
+              <div class="pk-foot"><span class="pk-av" style="background:${w.c}">${logoFill(w.avatar,(w.n[0]||'?').toUpperCase())}</span><span class="pk-who">${_ddH(w.n)}</span>${due}${adv}</div>
             </div>`;
         }).join(''):`<div class="pk-empty3"><div class="ic">${emptyIc}</div><div class="t">${emptyMsg}</div></div>`);
         const _tog=_isDone?`<button class="pk-coltog" title="${_collapsed?'Показать':'Скрыть'} задачи" onclick="event.stopPropagation();pkDoneSet('${_collapsed?'recent':'hidden'}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="${_collapsed?'':'open'}"><path d="M6 9l6 6 6-6"/></svg></button>`:'';
@@ -3337,8 +3337,8 @@ function _dlDist(it){
   return {t:'+'+diff+'д', c: diff<=7?'var(--warn)':'var(--txt-2)', full:'через '+diff+' '+_plural(diff,'день','дня','дней')};
 }
 function _dlOwner(it){
-  if(it.assignee){ const w=_who(it.assignee); if(w&&w.n&&w.n!=='—') return {n:w.n, c:w.c, key:it.assignee}; }
-  return {n:'Не назначен', c:'var(--txt-3)', key:'__none'};
+  if(it.assignee){ const w=_who(it.assignee); if(w&&w.n&&w.n!=='—') return {n:w.n, c:w.c, key:it.assignee, avatar:w.avatar}; }
+  return {n:'Не назначен', c:'var(--txt-3)', key:'__none', avatar:null};
 }
 function _dlSortUrg(a,b){ const ord={overdue:0,today:1,week:2,future:3,done:4}; return ((ord[a.bucket]||0)-(ord[b.bucket]||0)) || String(a.due||'').localeCompare(String(b.due||'')); }
 function _loadPills(c){ const o=c('overdue'),t=c('today'),w=c('week')+c('future'),dn=c('done'); let h='';
@@ -3351,7 +3351,7 @@ function _dlRow(it){
   const m=_dlMeta(it.bucket), o=_dlOwner(it), dist=_dlDist(it);
   const ownerTag = o.key==='__none'
     ? `<span class="dlx-otag none"><span class="otag-q">?</span>Не назначен</span>`
-    : `<span class="dlx-otag">${_avInit(o.n,o.c,'',20)}${o.n}</span>`;
+    : `<span class="dlx-otag">${_avInit(o.n,o.c,o.avatar,20)}${o.n}</span>`;
   const mag = it.bucket==='overdue' && dist.t ? ` <b>${dist.t.replace('−','')}</b>` : '';
   return `<div class="dlx ${m.c}">
     <div class="dlx-date"><div class="d">${it.day}</div><div class="m">${it.mon}</div></div>
@@ -3387,7 +3387,7 @@ function _dlByOwner(FILT){
   FILT.forEach(it=>{ const o=_dlOwner(it), key=o.key; if(!groups[key]){groups[key]={o,items:[]};order.push(key);} groups[key].items.push(it); });
   order.sort((a,b)=>{ if(a==='__none')return 1; if(b==='__none')return -1; const ga=groups[a].items,gb=groups[b].items; const oa=ga.filter(x=>x.bucket==='overdue').length,ob=gb.filter(x=>x.bucket==='overdue').length; return ob-oa || gb.length-ga.length; });
   return order.map(key=>{ const g=groups[key], o=g.o, its=g.items.slice().sort(_dlSortUrg), c=k=>its.filter(x=>x.bucket===k).length;
-    const av = key==='__none' ? `<span class="dl-av" style="width:34px;height:34px;background:var(--bg-3);color:var(--txt-3);font-size:14px;border:1px dashed var(--line-2)">?</span>` : _avInit(o.n,o.c,'',34);
+    const av = key==='__none' ? `<span class="dl-av" style="width:34px;height:34px;background:var(--bg-3);color:var(--txt-3);font-size:14px;border:1px dashed var(--line-2)">?</span>` : _avInit(o.n,o.c,o.avatar,34);
     const sub = key==='__none' ? 'задачи без ответственного — назначьте исполнителя' : (its.length+' '+_plural(its.length,'дедлайн','дедлайна','дедлайнов')+' в зоне ответственности');
     return `<div class="dl-sec"><div class="dl-ghead">${av}
       <div><div class="gnm">${o.n}</div><div class="gsub">${sub}</div></div>
@@ -4463,7 +4463,7 @@ function renderTeam(){
           <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d,tt=t||1;
             const dist=[[w,'var(--warn)'],[a,'var(--accent)'],[d,'var(--pos)']].map(([v,c])=>v>0?`<i style="width:${(v/tt*100).toFixed(1)}%;background:${c}"></i>`:'').join('');
             return `<tr>
-              <td><div class="wlx-id"><span class="wlx-av" style="background:${e.color||'var(--accent)'}">${((e.name||'?')[0]||'?').toUpperCase()}</span><div><div class="nm">${e.name}</div><div class="sl">${t} ${_plural(t,'задача','задачи','задач')}</div></div></div></td>
+              <td><div class="wlx-id"><span class="wlx-av" style="background:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span><div><div class="nm">${e.name}</div><div class="sl">${t} ${_plural(t,'задача','задачи','задач')}</div></div></div></td>
               <td><div class="wlx-dist">${dist||'<i style="width:100%;background:var(--bg-3)"></i>'}</div></td>
               <td>${cell(w,'var(--warn-dim)','var(--warn)')}</td>
               <td>${cell(a,'var(--accent-dim)','var(--accent)')}</td>
@@ -4488,7 +4488,7 @@ function renderTeam(){
         <div class="dept-bar"><i style="width:${comp||0}%"></i></div>
         <div class="dept-stats"><div class="st"><div class="v">${d.open}</div><div class="l">В работе</div></div><div class="st"><div class="v" style="color:${d.rework?'var(--neg)':'var(--txt)'}">${d.rework}</div><div class="l">Возвратов</div></div><div class="st"><div class="v">${d.done}</div><div class="l">Выполнено</div></div></div>
         ${conc>=70&&d.emps.length>1?`<div class="dept-warn">⚠ ${conc}% открытых задач на одном исполнителе</div>`:''}
-        <div style="display:flex;margin-top:13px">${d.emps.slice(0,5).map((e,i)=>`<span style="width:28px;height:28px;border-radius:50%;background:${e.color};color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid var(--bg-1);margin-left:${i?'-6px':'0'}">${(e.name||'?')[0]}</span>`).join('')}</div>
+        <div style="display:flex;margin-top:13px">${d.emps.slice(0,5).map((e,i)=>`<span style="position:relative;overflow:hidden;width:28px;height:28px;border-radius:50%;background:${e.color};color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid var(--bg-1);margin-left:${i?'-6px':'0'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>`).join('')}</div>
       </div>`;}).join(''):'<div class="empty-mini">Нет отделов</div>'}</div>`;
   }
   const _today=new Date().toISOString().slice(0,10);
