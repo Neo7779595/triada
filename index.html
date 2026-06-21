@@ -961,6 +961,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-tbtn svg{width:13px;height:13px}
 .pk-timer.mini{margin-top:9px;padding:0;background:none;border:0}
 .pk-timer.mini .pk-time{font-size:11px;font-weight:600;color:var(--txt-2)}
+.pk-timer.review{border-color:color-mix(in srgb,#8A8FFF 28%,var(--line))}
+.pk-timer.review .ic{color:#8A8FFF}
+.pk-timer.review.running{border-color:color-mix(in srgb,#8A8FFF 55%,transparent);background:color-mix(in srgb,#8A8FFF 9%,var(--bg-1))}
+.pk-timer.review.running .ic{color:#8A8FFF;animation:pkPulse 1.5s ease-in-out infinite}
+.pk-timer.review.running .pk-time{color:#8A8FFF}
+.pk-timer.review.mini .pk-time{color:#8A8FFF}
+.pk-tlabel{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.06em;margin-left:auto}
 @keyframes pkPulse{0%,100%{opacity:1}50%{opacity:.35}}
 .pd-chip #pk-total{font-variant-numeric:tabular-nums}
 .pk-empty{font-size:11.5px;color:var(--txt-3);text-align:center;padding:18px 0;font-family:var(--mono)}
@@ -2890,8 +2897,9 @@ function avatarField(id,url,letter){
 function _who(id){ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{n:m.name||'—',c:m.color||'var(--txt-3)',avatar:m.avatar||null}:{n:'—',c:'var(--txt-3)',avatar:null}; }
 function pkFmtDur(sec){ sec=Math.max(0,Math.floor(sec||0)); const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),ss=sec%60; return h>0?(h+'ч '+String(m).padStart(2,'0')+'м'):(m+':'+String(ss).padStart(2,'0')); }
 function _taskElapsed(t){ let s=(t&&t.time_spent)||0; if(t&&t.timer_started){ s+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000)); } return s; }
+function _taskReviewElapsed(t){ let s=(t&&t.review_spent)||0; if(t&&t.review_started){ s+=Math.max(0,Math.round((Date.now()-new Date(t.review_started).getTime())/1000)); } return s; }
 function pkProjTotal(){ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null; if(!p||!p._tasks) return 0; return p._tasks.reduce((a,t)=>a+_taskElapsed(t),0); }
-function pkTickUpdate(){ try{ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null; if(!p||!p._tasks) return; let total=0; p._tasks.forEach(t=>{ const e=_taskElapsed(t); total+=e; const el=document.getElementById('tmr-'+t.id); if(el) el.textContent=pkFmtDur(e); }); const tot=document.getElementById('pk-total'); if(tot) tot.textContent=pkFmtDur(total); }catch(_){} }
+function pkTickUpdate(){ try{ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null; if(!p||!p._tasks) return; let total=0; p._tasks.forEach(t=>{ const e=_taskElapsed(t); total+=e; const el=document.getElementById('tmr-'+t.id); if(el) el.textContent=pkFmtDur(e); const re=_taskReviewElapsed(t); const rel=document.getElementById('rtmr-'+t.id); if(rel) rel.textContent=pkFmtDur(re); }); const tot=document.getElementById('pk-total'); if(tot) tot.textContent=pkFmtDur(total); }catch(_){} }
 setInterval(pkTickUpdate,1000);
 function renderPd(){
   const p=PROJECTS[pdIdx], d=p._d; let h='';
@@ -2962,7 +2970,9 @@ function renderPd(){
           const due=c.due_date?`<span class="pk-due ${over?'over':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${_dDate(c.due_date)}</span>`:'';
           const adv=st!=='done'?`<button class="pk-adv" title="Продвинуть дальше" onclick="event.stopPropagation();pkAdvance('${c.id}','${c.status}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 18l6-6-6-6"/></svg></button>`:`<span class="pk-done-ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg></span>`;
           const el=_taskElapsed(c), running=!!c.timer_started;
+          const rel=_taskReviewElapsed(c);
           const clk='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+          const eyeic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
           let timer='';
           if(c.status==='active'){
             const btn=running?`<button class="pk-tbtn" title="Пауза" onclick="event.stopPropagation();tTimerPause('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>`:`<button class="pk-tbtn" title="Продолжить" onclick="event.stopPropagation();tTimerResume('${c.id}')"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 5l12 7-12 7z"/></svg></button>`;
@@ -2970,10 +2980,17 @@ function renderPd(){
           } else if(el>0){
             timer=`<div class="pk-timer mini"><span class="ic">${clk}</span><span class="pk-time" id="tmr-${c.id}">${pkFmtDur(el)}</span></div>`;
           }
+          let rtimer='';
+          if(c.status==='review'){
+            rtimer=`<div class="pk-timer review running"><span class="ic">${eyeic}</span><span class="pk-time" id="rtmr-${c.id}">${pkFmtDur(rel)}</span><span class="pk-tlabel">утверждение</span></div>`;
+          } else if(rel>0){
+            rtimer=`<div class="pk-timer review mini"><span class="ic">${eyeic}</span><span class="pk-time" id="rtmr-${c.id}">${pkFmtDur(rel)}</span></div>`;
+          }
           return `<div class="pk-card" draggable="true" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)" style="animation-delay:${(i*0.045).toFixed(2)}s">
               <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
+              ${rtimer}
               <div class="pk-foot"><span class="pk-av" style="background:${w.c}">${logoFill(w.avatar,(w.n[0]||'?').toUpperCase())}</span><span class="pk-who">${_ddH(w.n)}</span>${due}${adv}</div>
             </div>`;
         }).join(''):`<div class="pk-empty3"><div class="ic">${emptyIc}</div><div class="t">${emptyMsg}</div></div>`);
@@ -5203,9 +5220,13 @@ window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('
 function _pkRerender(){ try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }
 window.tTaskMove = async (id,status) => { try {
     const t=_findTask(id); const patch={status}; const now=new Date().toISOString();
-    if(t){ let spent=t.time_spent||0; if(t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
-      patch.time_spent=spent; patch.timer_started=(status==='active')?now:null;
-      t.status=status; t.time_spent=spent; t.timer_started=patch.timer_started; _pkRerender(); }  // мгновенно: смена колонки + автостарт таймера в «В работе»
+    if(t){ const nowMs=Date.now();
+      let spent=t.time_spent||0; if(t.timer_started) spent+=Math.max(0,Math.round((nowMs-new Date(t.timer_started).getTime())/1000));
+      let rspent=t.review_spent||0; if(t.review_started) rspent+=Math.max(0,Math.round((nowMs-new Date(t.review_started).getTime())/1000));
+      patch.time_spent=spent; patch.review_spent=rspent;
+      patch.timer_started=(status==='active')?now:null;       // рабочий таймер — только в «В работе»
+      patch.review_started=(status==='review')?now:null;      // таймер утверждения — только в «На утверждении»
+      t.status=status; t.time_spent=spent; t.review_spent=rspent; t.timer_started=patch.timer_started; t.review_started=patch.review_started; _pkRerender(); }
     const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
     await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
