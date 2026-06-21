@@ -5303,7 +5303,14 @@ window.tLoadProjectWork = async (projectId) => {
     SB.from('project_tasks').select('*').eq('project_id',projectId).order('idx'),
     SB.from('reports').select('*').eq('project_id',projectId).order('published_at',{ascending:false}),
     SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40) ]);
-  p._stages = st.data||[]; p._tasks = tk.data||[]; p._reports = rp.data||[];
+  p._stages = st.data||[];
+  { // защита от гонки: недавние оптимистичные изменения таймеров не перетираем устаревшими данными из БД
+    const fresh=tk.data||[]; const prev=p._tasks||[]; const pby={}; prev.forEach(x=>{ if(x&&x.id!=null) pby[x.id]=x; }); const NM=Date.now();
+    p._tasks = fresh.map(fr=>{ const o=pby[fr.id];
+      if(o && o._mvTs && (NM-o._mvTs)<2500){ return Object.assign({}, fr, {status:o.status, timer_started:o.timer_started, review_started:o.review_started, time_spent:o.time_spent, review_spent:o.review_spent, _mvTs:o._mvTs}); }
+      return fr; });
+  }
+  p._reports = rp.data||[];
   p._history = (hs.data||[]).map(h => { const k = h.new_status==='done'?'done':h.new_status==='active'?'start':'back';
     const txt = k==='done'?'Этап завершён':k==='start'?'Команда начала этап':'Этап возвращён в ожидание';
     return { txt, tag:h.stage_name||'—', t:tAgo(h.created_at), k }; });
@@ -5327,7 +5334,7 @@ window.tTaskMove = async (id,status) => { try {
       patch.time_spent=spent; patch.review_spent=rspent;
       patch.timer_started=(status==='active')?now:null;       // рабочий таймер — только в «В работе»
       patch.review_started=(status==='review')?now:null;      // таймер утверждения — только в «На утверждении»
-      t.status=status; t.time_spent=spent; t.review_spent=rspent; t.timer_started=patch.timer_started; t.review_started=patch.review_started; _pkRerender(); }
+      t.status=status; t.time_spent=spent; t.review_spent=rspent; t.timer_started=patch.timer_started; t.review_started=patch.review_started; t._mvTs=Date.now(); _pkRerender(); }
     let {error}=await SB.from('project_tasks').update(patch).eq('id',id);
     if(error && /review_/.test(error.message||'')){           // полей review_* ещё нет в БД (не применена миграция 08)
       const {error:e2}=await SB.from('project_tasks').update({status:patch.status,time_spent:patch.time_spent,timer_started:patch.timer_started}).eq('id',id);
@@ -5341,9 +5348,9 @@ window.tTaskUpdate = async (id,patch) => { try { const {error}=await SB.from('pr
   if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
 window.tTimerPause = async (id) => { try { const t=_findTask(id); let spent=(t&&t.time_spent)||0; if(t&&t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
-  if(t){ t.time_spent=spent; t.timer_started=null; _pkRerender(); }  // мгновенная пауза
+  if(t){ t.time_spent=spent; t.timer_started=null; t._mvTs=Date.now(); _pkRerender(); }  // мгновенная пауза
   const {error}=await SB.from('project_tasks').update({time_spent:spent,timer_started:null}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
-window.tTimerResume = async (id) => { try { const t=_findTask(id); const now=new Date().toISOString(); if(t){ t.timer_started=now; _pkRerender(); }  // мгновенное продолжение
+window.tTimerResume = async (id) => { try { const t=_findTask(id); const now=new Date().toISOString(); if(t){ t.timer_started=now; t._mvTs=Date.now(); _pkRerender(); }  // мгновенное продолжение
   const {error}=await SB.from('project_tasks').update({timer_started:now}).eq('id',id); if(error)throw error; await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
 
 window.tLoadTags = async () => {
