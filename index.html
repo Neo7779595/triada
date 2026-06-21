@@ -889,7 +889,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-fclear{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--bd);color:var(--txt-2);border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .15s,color .15s}
 .pk-fclear:hover{border-color:var(--neg);color:var(--neg)}
 .pk-fcount{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-left:2px;white-space:nowrap}
-.pk-board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+.pk-board{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
 .pk-col{position:relative;display:flex;flex-direction:column;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;min-height:340px;overflow:hidden;transition:.18s var(--ease)}
 .pk-col::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--pk-accent,var(--accent));opacity:.9}
 .pk-col.drag-over{border-color:var(--pk-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--pk-accent) 18%,transparent)}
@@ -2758,7 +2758,7 @@ function openProject(i){
 }
 function closeProject(){document.getElementById('ov-proj').classList.remove('on');}
 function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));renderPd();}
-const PD_STNEXT={wait:'active',active:'done'};
+const PD_STNEXT={wait:'active',active:'review',review:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
 const PK_DONE_LIMIT=10; let PK_DONE='recent';
 /* ——— фильтры канбан-доски: этап / исполнитель / дедлайн ——— */
@@ -2988,6 +2988,7 @@ function renderPd(){
       const IC_INB='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5 5h14l3 7v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6z"/></svg>';
       const IC_PLY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></svg>';
       const IC_CHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>';
+      const IC_REV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
       const _pkStageOpts=[['all','Все этапы']].concat((p._stages||[]).map(x=>[x.id,x.name]));
       const _pkRespOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
       const _pkDueOpts=[['all','Любой срок'],['overdue','Просроченные'],['today','Сегодня'],['week','Ближайшие 7 дней'],['future','Позже'],['none','Без срока']];
@@ -3002,7 +3003,7 @@ function renderPd(){
         +`</div>`;
       h=`${strip}
         ${filterBar}
-        <div class="pk-board">${col('wait','Ожидание','var(--warn)','Нет задач в ожидании',IC_INB)}${col('active','В работе','var(--accent)','Перетащи задачу сюда, чтобы начать',IC_PLY)}${col('done','Готово','var(--pos)','Пока ничего не завершено',IC_CHK)}</div>
+        <div class="pk-board">${col('wait','Ожидание','var(--warn)','Нет задач в ожидании',IC_INB)}${col('active','В работе','var(--accent)','Перетащи задачу сюда, чтобы начать',IC_PLY)}${col('review','На утверждении','#8A8FFF','Нет задач на проверке',IC_REV)}${col('done','Готово','var(--pos)','Пока ничего не завершено',IC_CHK)}</div>
         <div class="pk-hint"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l4-4M5 9l4 4M5 9h11a4 4 0 010 8h-1"/></svg>Перетащите карточку между колонками или нажмите «›», чтобы продвинуть по статусу</div>`;
     }
   } else if(pdTabCur==='reports'){
@@ -4390,7 +4391,7 @@ function _tWindow(){
 }
 /* проходим историю по предмету: пары active→done = циклы; откаты = возвраты (вешаем на исполнителя последнего done) */
 function _tWalk(rows, idKey){
-  const rank={wait:0,active:1,done:2};
+  const rank={wait:0,active:1,review:2,done:3};
   const byItem={};
   (rows||[]).forEach(r=>{ const k=r[idKey]; if(k==null) return; (byItem[k]=byItem[k]||[]).push(r); });
   const closes=[], returns=[], seen={};
