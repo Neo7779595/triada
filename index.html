@@ -65,7 +65,7 @@ button{font-family:inherit}
 .side{background:var(--bg-side);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .side-top{padding:20px 18px 16px;border-bottom:1px solid var(--line)}
 .side-badge{display:flex;align-items:center;gap:11px}
-.side-badge . av{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#1f9d8a);display:flex;align-items:center;justify-content:center;color:var(--accent-ink);font-weight:700;font-size:15px;flex:0 0 auto}
+.side-badge .av{position:relative;overflow:hidden;width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#1f9d8a);display:flex;align-items:center;justify-content:center;color:var(--accent-ink);font-weight:700;font-size:15px;flex:0 0 auto}
 .side-badge .nm{font-weight:700;font-size:13.5px;line-height:1.1}
 .side-badge .rl{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);margin-top:3px}
 .nav{padding:14px 12px;flex:1;overflow-y:auto}
@@ -2157,6 +2157,9 @@ function enterAgency(){
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('app-ag').classList.add('on');
   _syncUchip();
+  (function(){ const me=(window.tMe&&window.tMe())||{}; const nm=me.agencyName||'DETROYD'; const lg=me.agencyLogo||'';
+    const ne=document.getElementById('ag-name'); if(ne) ne.textContent=nm;
+    const ae=document.getElementById('ag-av'); if(ae) ae.innerHTML=logoFill(lg,(nm[0]||'D').toUpperCase()); })();
   const _first=applyAgencyPerms(); agNav(_first||'projects');   // меню по правам сотрудника
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-ag .side')));
 }
@@ -5584,8 +5587,8 @@ async function routeByProfile(){
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
   ME = data || { role:'member' };
-  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent').eq('id', ME.agency_id).single();
-    if (ag) ME.agencySlug = ag.slug; }
+  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent,name,logo_url').eq('id', ME.agency_id).single();
+    if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; } }
   await window.tLoadAll(ME.role);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
   if (ME.role === 'superadmin') enter('general');
