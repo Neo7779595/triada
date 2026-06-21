@@ -1541,7 +1541,7 @@ button:active{transform:translateY(.5px) scale(.99)}
       <div class="pg" id="ag-tb">Агентство<b>Проекты</b></div>
       <div class="flex1"></div>
       <button class="tb-search" onclick="cmdkOpen()" title="Поиск (⌘K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><span>Поиск</span><kbd>⌘K</kbd></button>
-      <div class="u-chip"><span class="d"></span>Менеджер агентства</div>
+      <button class="u-chip" id="ag-uchip" onclick="myProfileOpen()" title="Мой профиль · сменить фото" style="background:none;font-family:inherit"><span class="d"></span><span id="ag-uchip-av" style="width:22px;height:22px;border-radius:6px;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10.5px;overflow:hidden;flex:none"></span><span id="ag-uchip-nm">Менеджер агентства</span></button>
     </header>
     <div class="content" id="content-ag"></div>
   </div>
@@ -2156,8 +2156,55 @@ const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overvie
 function enterAgency(){
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('app-ag').classList.add('on');
+  _syncUchip();
   const _first=applyAgencyPerms(); agNav(_first||'projects');   // меню по правам сотрудника
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-ag .side')));
+}
+/* ——— единый механизм прав: используется навигацией, поиском И модулями ——— */
+function agCanView(m){
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me || me.role!=='member') return true;          // владелец/админ видят всё
+  const p=me.permissions||{};
+  return !!(p[m]&&p[m].view);
+}
+function agIsOwner(){
+  const me=(window.tMe&&window.tMe())||null;
+  return !me || me.role!=='member';                   // управлять командой может только владелец/админ
+}
+function _syncUchip(){
+  const me=(window.tMe&&window.tMe())||null; if(!me) return;
+  const nm=document.getElementById('ag-uchip-nm');
+  const av=document.getElementById('ag-uchip-av');
+  if(nm) nm.textContent = me.full_name || (me.role==='agency_owner'?'Владелец агентства':'Сотрудник');
+  if(av){ const url=me.avatar_url||''; const letter=((me.full_name||'?')[0]||'?').toUpperCase();
+    av.innerHTML = url?`<img src="${url.replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:letter;
+    av.style.background = me.color||'var(--accent)'; }
+}
+function myProfileOpen(){
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me){ toast('Профиль ещё загружается'); return; }
+  const letter=((me.full_name||'?')[0]||'?').toUpperCase();
+  const url=me.avatar_url||'';
+  const pv=url?`<img src="${url.replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover">`:letter;
+  const roleNames={agency_owner:'Владелец агентства',member:'Сотрудник',superadmin:'Администратор',client:'Клиент'};
+  pd2Open(`<div class="modal" style="max-width:430px">
+    <div class="modal-h"><h3>Мой профиль</h3><p>Здесь можно изменить только фото профиля</p></div>
+    <div class="modal-b">
+      <div style="display:flex;align-items:center;gap:16px">
+        <label class="avup" title="Загрузить фото" style="width:74px;height:74px;border-radius:18px;overflow:hidden;flex:none;cursor:pointer;position:relative">
+          <div id="myav-pv" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${me.color||'var(--accent)'};color:#06140f;font-weight:800;font-size:27px">${pv}</div>
+          <input type="file" accept="image/*" style="display:none" onchange="if(this.files&&this.files[0])tUpdateMyAvatar(this.files[0])">
+          <span class="ovl"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+        </label>
+        <div style="min-width:0">
+          <div style="font-size:16px;font-weight:700">${(me.full_name||'—')}</div>
+          <div style="font-size:12.5px;color:var(--txt-2);margin-top:3px">${me.role_title||roleNames[me.role]||'Сотрудник'}${me.dept?(' · '+me.dept):''}</div>
+          <div style="font-size:11px;color:var(--txt-3);margin-top:8px;line-height:1.5">Имя, логин, отдел и доступы изменяет только владелец агентства.</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn-add" onclick="pd2Close()">Готово</button></div>
+  </div>`);
 }
 function applyAgencyPerms(){
   const me=(window.tMe&&window.tMe())||null;
@@ -2170,6 +2217,7 @@ function applyAgencyPerms(){
   return first;
 }
 function agNav(m){
+  if(!agCanView(m)){ toast('Нет доступа к этому разделу'); return; }
   document.querySelectorAll('#app-ag .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.m===m));
   document.getElementById('ag-tb').innerHTML='Агентство<b>'+AG_MODULES[m]+'</b>';
   if(m==='projects') renderProjects(); else if(m==='deadlines') renderDeadlines(); else if(m==='overview') renderOverview(); else if(m==='cycles') renderCycles(); else if(m==='finance') renderFinance(); else if(m==='team') renderTeam(); else if(m==='kb') renderKB(); else if(m==='tools') renderTools(); else renderModule(m);
@@ -3160,9 +3208,9 @@ function cmdkIndex(cab){
     AGENCIES.forEach(a=>L.push({g:'Агентства',t:a.name,s:a.vertical,badge:a.name[0],run:()=>{genNav('agencies');openDrawer(a.id);}}));
     [['agencies','Агентства'],['analytics','Аналитика'],['tariffs','Тарифы'],['settings','Настройки']].forEach(([k,l])=>L.push({g:'Разделы',t:l,s:'Генеральный кабинет',badge:l[0],run:()=>genNav(k)}));
   } else if(cab==='ag'){
-    PROJECTS.forEach((p,i)=>L.push({g:'Проекты',t:p.name,s:(p.cat&&p.cat!=='—'?p.cat+' · ':'')+p.svc,badge:p.logo,run:()=>{agNav('projects');openProject(i);}}));
-    (typeof TEAM!=='undefined'?TEAM:[]).forEach(e=>L.push({g:'Сотрудники',t:e.name,s:e.role,badge:e.name[0],run:()=>agNav('team')}));
-    Object.entries(AG_MODULES).forEach(([k,l])=>L.push({g:'Модули',t:l,s:'Агентский кабинет',badge:l[0],run:()=>agNav(k)}));
+    if(agCanView('projects')) PROJECTS.forEach((p,i)=>L.push({g:'Проекты',t:p.name,s:(p.cat&&p.cat!=='—'?p.cat+' · ':'')+p.svc,badge:p.logo,run:()=>{agNav('projects');openProject(i);}}));
+    if(agCanView('team')) (typeof TEAM!=='undefined'?TEAM:[]).forEach(e=>L.push({g:'Сотрудники',t:e.name,s:e.role,badge:e.name[0],run:()=>agNav('team')}));
+    Object.entries(AG_MODULES).filter(([k])=>agCanView(k)).forEach(([k,l])=>L.push({g:'Модули',t:l,s:'Агентский кабинет',badge:l[0],run:()=>agNav(k)}));
   } else if(cab==='cl'){
     [['overview','Обзор'],['stages','Этапы'],['reports','Отчёты'],['updates','Обновления']].forEach(([k,l])=>L.push({g:'Разделы',t:l,s:'Кабинет клиента',badge:l[0],run:()=>clNav(k)}));
   }
@@ -4372,7 +4420,7 @@ function renderTeam(){
           const need=Math.max(0,3-r.n);
           const hint=`<div class="ti-hint">${need>0?`ещё ${need} ${_taskWord(need)} до оценки`:'оценка формируется'}</div>`;
           const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${m.name||'—'}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div>${hint}</div></div>`;
-          return `<tr class="ti-low" onclick="openEmpEdit(${r._i})">
+          return `<tr class="ti-low" ${agIsOwner()?`onclick="openEmpEdit(${r._i})" style="cursor:pointer"`:'style="cursor:default"'}>
         <td><span class="ti-rank idle">–</span></td>
         <td>${idCellLow}</td>
         <td><div class="tpi-cell">${_tpiRing(null)}<div class="tpi-meta"><span class="nb" style="color:var(--txt-2)">накопление</span><span class="nb">${r.n} / 3</span></div></div></td>
@@ -4383,7 +4431,7 @@ function renderTeam(){
         <td class="col-spark"><span class="ti-spark-empty"></span></td>
         <td class="col-arch"><span class="ti-arch lowdata">${_accrueIcon()}Мало данных</span></td>
       </tr>`;}
-        return `<tr onclick="openEmpEdit(${r._i})">
+        return `<tr ${agIsOwner()?`onclick="openEmpEdit(${r._i})" style="cursor:pointer"`:'style="cursor:default"'}>
         <td><span class="ti-rank ${r.rank===1?'r1':r.rank===2?'r2':r.rank===3?'r3':''}">${r.rank||'—'}</span></td>
         <td>${idCell}</td>
         <td><div class="tpi-cell">${_tpiRing(r.tpi)}<div class="tpi-meta"><span class="tpi-grade" style="color:${g.c};background:${g.bg}">${g.g}</span><span class="nb">n=${r.n}</span></div></div></td>
@@ -4475,7 +4523,7 @@ function renderTeam(){
         <button class="${teamTab==='workload'?'on':''}" onclick="setTeamTab('workload')">Нагрузка</button>
         <button class="${teamTab==='depts'?'on':''}" onclick="setTeamTab('depts')">Отделы</button>
       </div>
-      <button class="btn-add" onclick="openEmp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить сотрудника</button>
+      ${agIsOwner()?`<button class="btn-add" onclick="openEmp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить сотрудника</button>`:''}
     </div>
     ${body}`;
   _tiCountUp();
@@ -4496,6 +4544,7 @@ function renderPermGrid(){
 }
 function togglePerm(k,t,v){ if(!empPerms[k])empPerms[k]={view:false,edit:false}; empPerms[k][t]=v; if(t==='view'&&!v)empPerms[k].edit=false; renderPermGrid(); }
 function openEmp(){
+  if(!agIsOwner()){ toast('Управление командой доступно только владельцу'); return; }
   empEditIdx=null;
   empPerms={};
   ['projects','deadlines','overview','cycles','finance','team','kb','tools'].forEach(k=>empPerms[k]={view:false,edit:false});
@@ -4510,6 +4559,7 @@ function openEmp(){
   document.getElementById('ov-emp').classList.add('on');
 }
 function openEmpEdit(i){
+  if(!agIsOwner()){ toast('Редактирование сотрудников доступно только владельцу'); return; }
   const e=TEAM[i]; empEditIdx=i; empColor=e.color||ACCENTS[0];
   empPerms = e.perms?JSON.parse(JSON.stringify(e.perms))
     :(()=>{const o={projects:{view:true,edit:false}};['deadlines','overview','cycles','finance','team','kb','tools'].forEach(k=>o[k]={view:false,edit:false});return o;})();
@@ -5069,6 +5119,27 @@ window.tUploadPartnerAvatar = async (file, idx) => {
     if(typeof peRender==='function') peRender();
     toast('Фото загружено');
   } catch(e){ toast('Ошибка загрузки: '+(e.message||e)); }
+};
+window.tUpdateMyAvatar = async (file) => {
+  try {
+    if(!SB || !file){ toast('Хранилище недоступно'); return; }
+    if(file.size > 4*1024*1024){ toast('Файл больше 4 МБ — сожми изображение'); return; }
+    const me = ME; if(!me || !me.id){ toast('Профиль ещё загружается'); return; }
+    const ag = me.agency_id || 'shared';
+    const ext = ((file.name||'').split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'') || 'png';
+    const path = ag + '/avatar-' + me.id + '-' + Date.now() + '.' + ext;
+    toast('Загрузка фото…');
+    const { error } = await SB.storage.from('project-logos').upload(path, file, { upsert:true, contentType:file.type||undefined });
+    if(error) throw error;
+    const { data } = SB.storage.from('project-logos').getPublicUrl(path);
+    const url = data.publicUrl;
+    const { error:e2 } = await SB.from('profiles').update({ avatar_url:url }).eq('id', me.id);  // self-update: разрешён только avatar_url (защита триггером)
+    if(e2) throw e2;
+    ME.avatar_url = url;
+    const pv = document.getElementById('myav-pv'); if(pv) pv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+    if(typeof _syncUchip==='function') _syncUchip();
+    toast('Аватар обновлён');
+  } catch(e){ toast('Ошибка загрузки: ' + (e.message||e)); }
 };
 window.tProjectUpdate = async (id,patch) => { try { const {error}=await SB.from('projects').update(patch).eq('id',id); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Проект обновлён'); await window.tLoadAll(ME.role); if(typeof renderProjects==='function')renderProjects(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
