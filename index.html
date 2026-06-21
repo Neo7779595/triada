@@ -885,6 +885,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-task .tmr{font-family:var(--mono);font-size:11px;color:var(--txt-3);display:flex;align-items:center;gap:4px}
 .pd-task .tmr svg{width:12px;height:12px}
 /* kanban */
+.rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.rev-grid{grid-template-columns:1fr}}
+.rev-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;animation:cycRow .4s var(--ease-out) both}
+.rev-nm{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev-sub{font-size:10.5px;color:var(--txt-3);font-family:var(--mono);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev-val{font-weight:800;font-size:14px;color:#8A8FFF;flex-shrink:0;font-variant-numeric:tabular-nums}
+.rev-empty{font-size:12px;color:var(--txt-3);padding:6px 2px}
 .pk-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0;position:relative;z-index:50}
 .pk-filters .pk-search-wrap{flex:0 1 300px;min-width:200px}
 .pk-fclear{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--bd);color:var(--txt-2);border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .15s,color .15s}
@@ -3823,7 +3830,7 @@ function renderOverview(){
 }
 
 /* ——— CYCLES module ——— */
-let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[] };
+let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[], reviewTasks:[], reviewStages:[], reviewNow:0, reviewCount:0, reviewTotalSec:0, reviewAvgSec:0 };
 function _cycDur(ms){ if(ms==null) return '—'; if(ms<=0) return '0'; if(ms<60000) return Math.round(ms/1000)+' с'; const m=ms/60000; if(m<60) return Math.round(m)+' мин'; const h=m/60; if(h<24) return (h<10?h.toFixed(1).replace('.0',''):''+Math.round(h))+' ч'; const d=h/24; return (d<10?d.toFixed(1).replace('.0',''):''+Math.round(d))+' дн'; }
 function svgLine(vals,labels){
   const W=1100,H=230,padL=46,padR=26,padT=30,padB=38;
@@ -3952,6 +3959,36 @@ function renderCycles(){
         </div>`).join('')}
       </div>
     </div>`:''}
+
+    <div class="card" style="margin-top:16px;border-color:color-mix(in srgb,#8A8FFF 22%,var(--line))">
+      <div class="card-h"><div class="t" style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:50%;background:#8A8FFF;box-shadow:0 0 7px -1px #8A8FFF"></span>Время на утверждении <span class="c">сколько задачи ждут согласования</span></div></div>
+      <div class="card-body">
+      ${C.reviewCount?`
+        <div class="px-ov" style="margin-bottom:16px">
+          <div class="px-ov-cell"><div class="px-ov-l">Сейчас на утверждении</div><div class="px-ov-v" style="color:${C.reviewNow?'#8A8FFF':'var(--txt-3)'}">${C.reviewNow}</div><div class="px-ov-ctx">задач ждут согласования</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Среднее время</div><div class="px-ov-v">${_cycDur(C.reviewAvgSec*1000)}</div><div class="px-ov-ctx">на одну задачу</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Суммарно</div><div class="px-ov-v">${_cycDur(C.reviewTotalSec*1000)}</div><div class="px-ov-ctx">всего на согласовании</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Задач проходило</div><div class="px-ov-v">${C.reviewCount}</div><div class="px-ov-ctx">через утверждение</div></div>
+        </div>
+        <div class="rev-grid">
+          <div>
+            <div class="eyebrow" style="margin-bottom:10px">Этапы дольше всего на утверждении</div>
+            ${C.reviewStages.length?C.reviewStages.map((st,i)=>`<div class="rev-row" style="animation-delay:${i*45}ms">
+              <div style="min-width:0"><div class="rev-nm">${_ddH(st.name)}</div><div class="rev-sub">${st.count} задач · в среднем</div></div>
+              <div class="rev-val">${_cycDur(st.avg*1000)}</div>
+            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+          </div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:10px">Задачи дольше всего на утверждении</div>
+            ${C.reviewTasks.length?C.reviewTasks.map((t,i)=>`<div class="rev-row" style="animation-delay:${i*45}ms">
+              <div style="min-width:0"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.project?' · '+_ddH(t.project):''}${t.onReview?' · <span style=\"color:#8A8FFF\">сейчас</span>':''}</div></div>
+              <div class="rev-val">${_cycDur(t.sec*1000)}</div>
+            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+          </div>
+        </div>
+      `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.6">Пока нет задач, проходивших через утверждение.<br>Данные появятся, когда задачи начнут двигаться через колонку «На утверждении».</div>`}
+      </div>
+    </div>
 
     ${has?`
     <div class="card" style="margin-top:16px">
@@ -5472,9 +5509,10 @@ window.tLoadOverview = async () => {
 window.tLoadCycles = async () => {
   if (!SB) return;
   const now = Date.now();
-  const [hr, sr] = await Promise.all([
+  const [hr, sr, tr] = await Promise.all([
     SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true}),
-    SB.from('project_stages').select('name')
+    SB.from('project_stages').select('id,name'),
+    SB.from('project_tasks').select('id,title,status,stage_id,project_id,review_spent,review_started,assignee_id')
   ]);
   const hist = hr.data||[];
   const nameById={}, mrrById={}, logoById={};
@@ -5566,7 +5604,18 @@ window.tLoadCycles = async () => {
   const allNames=[...new Set([...(sr.data||[]).map(r=>r.name).filter(Boolean), ...stageRows.map(r=>r.name)])];
   const chartStages=allNames.map(nm=>{ const st=nameStat[nm]; return st?{name:nm,p50Ms:st.p50Ms,p90Ms:st.p90Ms,n:st.n,bn:nm===bnName,unmeasured:false}:{name:nm,p50Ms:0,p90Ms:null,n:0,bn:false,unmeasured:true}; }).sort((a,b)=>(b.p50Ms||0)-(a.p50Ms||0));
 
-  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients};
+  // ——— аналитика времени на утверждении (review) ———
+  const _stNm={}; (sr.data||[]).forEach(st=>{ if(st&&st.id!=null) _stNm[st.id]=st.name; });
+  const _revEl=(t)=>{ let v=t.review_spent||0; if(t.review_started) v+=Math.max(0,Math.round((now-new Date(t.review_started).getTime())/1000)); return v; };
+  const _rtasks=(tr.data||[]);
+  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',onReview:!!t.review_started})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec).slice(0,8);
+  const _sg={}; _rtasks.forEach(t=>{ const sec=_revEl(t); if(sec<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_sg[nm]||(_sg[nm]={name:nm,total:0,count:0})); _sg[nm].total+=sec; _sg[nm].count++; });
+  const reviewStages=Object.values(_sg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count)})).sort((a,b)=>b.avg-a.avg).slice(0,8);
+  const reviewNow=_rtasks.filter(t=>t.status==='review').length;
+  const reviewCount=_rtasks.filter(t=>_revEl(t)>0).length;
+  const reviewTotalSec=_rtasks.reduce((a,t)=>a+_revEl(t),0);
+  const reviewAvgSec=reviewCount?Math.round(reviewTotalSec/reviewCount):0;
+  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients,reviewTasks,reviewStages,reviewNow,reviewCount,reviewTotalSec,reviewAvgSec};
 };
 
 /* ===== TEAM · live aggregation (workload & activity per member) ===== */
