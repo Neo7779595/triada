@@ -885,6 +885,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-task .tmr{font-family:var(--mono);font-size:11px;color:var(--txt-3);display:flex;align-items:center;gap:4px}
 .pd-task .tmr svg{width:12px;height:12px}
 /* kanban */
+.pk-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
+.pk-fclear{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--bd);color:var(--txt-2);border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .15s,color .15s}
+.pk-fclear:hover{border-color:var(--neg);color:var(--neg)}
+.pk-fcount{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-left:2px;white-space:nowrap}
 .pk-board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
 .pk-col{position:relative;display:flex;flex-direction:column;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;min-height:340px;overflow:hidden;transition:.18s var(--ease)}
 .pk-col::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--pk-accent,var(--accent));opacity:.9}
@@ -2757,6 +2761,28 @@ function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').for
 const PD_STNEXT={wait:'active',active:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
 const PK_DONE_LIMIT=10; let PK_DONE='recent';
+/* ——— фильтры канбан-доски: этап / исполнитель / дедлайн ——— */
+let PK_F_STAGE='all', PK_F_RESP='all', PK_F_DUE='all';
+function pkSetStage(v){PK_F_STAGE=v;if(typeof renderPd==='function')renderPd();}
+function pkSetResp(v){PK_F_RESP=v;if(typeof renderPd==='function')renderPd();}
+function pkSetDue(v){PK_F_DUE=v;if(typeof renderPd==='function')renderPd();}
+function pkResetFilters(){PK_F_STAGE='all';PK_F_RESP='all';PK_F_DUE='all';if(typeof renderPd==='function')renderPd();}
+function _pkDueBucket(t){
+  if(!t.due_date) return 'none';
+  const today=new Date(); today.setHours(0,0,0,0);
+  const due=new Date(t.due_date); due.setHours(0,0,0,0);
+  const diff=Math.round((due-today)/86400000);
+  if(t.status!=='done' && diff<0) return 'overdue';
+  if(diff===0) return 'today';
+  if(diff>=1 && diff<=7) return 'week';
+  return 'future';
+}
+function _pkMatch(t){
+  if(PK_F_STAGE!=='all' && String(t.stage_id||'')!==String(PK_F_STAGE)) return false;
+  if(PK_F_RESP!=='all'){ if(PK_F_RESP==='__none'){ if(t.assignee_id) return false; } else if(String(t.assignee_id||'')!==String(PK_F_RESP)) return false; }
+  if(PK_F_DUE!=='all' && _pkDueBucket(t)!==PK_F_DUE) return false;
+  return true;
+}
 function pkDoneSet(m){ PK_DONE=m; if(typeof renderPd==='function') renderPd(); }
 let _pkDrag=null;
 function pkDrag(e,id){ _pkDrag=id; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);}catch(_){}; const c=e.target.closest('.pk-card'); if(c) setTimeout(()=>c.classList.add('dragging'),0); }
@@ -2912,7 +2938,7 @@ function renderPd(){
   } else if(pdTabCur==='kanban'){
     if(p._tasks===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка задач…</div>'; }
     else {
-      const T=p._tasks, byst=st=>T.filter(t=>t.status===st);
+      const T=p._tasks, byst=st=>T.filter(t=>t.status===st&&_pkMatch(t));
       const col=(st,label,color,emptyMsg,emptyIc)=>{
         const _all=byst(st), _total=_all.length, _isDone=st==='done', _collapsed=_isDone&&PK_DONE==='hidden';
         let arr=_all;
@@ -2962,7 +2988,20 @@ function renderPd(){
       const IC_INB='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5 5h14l3 7v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6z"/></svg>';
       const IC_PLY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></svg>';
       const IC_CHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>';
+      const _pkStageOpts=[['all','Все этапы']].concat((p._stages||[]).map(x=>[x.id,x.name]));
+      const _pkRespOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
+      const _pkDueOpts=[['all','Любой срок'],['overdue','Просроченные'],['today','Сегодня'],['week','Ближайшие 7 дней'],['future','Позже'],['none','Без срока']];
+      const _pkLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
+      const _pkFActive=PK_F_STAGE!=='all'||PK_F_RESP!=='all'||PK_F_DUE!=='all';
+      const _pkShown=T.filter(_pkMatch).length;
+      const filterBar=`<div class="pk-filters">`
+        +_dd('pkstage','Этап',_pkLbl(_pkStageOpts,PK_F_STAGE),_pkStageOpts,PK_F_STAGE,'pkSetStage')
+        +_dd('pkresp','Исполнитель',_pkLbl(_pkRespOpts,PK_F_RESP),_pkRespOpts,PK_F_RESP,'pkSetResp')
+        +_dd('pkdue','Дедлайн',_pkLbl(_pkDueOpts,PK_F_DUE),_pkDueOpts,PK_F_DUE,'pkSetDue')
+        +(_pkFActive?`<button class="pk-fclear" onclick="pkResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button><span class="pk-fcount">${_pkShown} из ${T.length} задач</span>`:'')
+        +`</div>`;
       h=`${strip}
+        ${filterBar}
         <div class="pk-board">${col('wait','Ожидание','var(--warn)','Нет задач в ожидании',IC_INB)}${col('active','В работе','var(--accent)','Перетащи задачу сюда, чтобы начать',IC_PLY)}${col('done','Готово','var(--pos)','Пока ничего не завершено',IC_CHK)}</div>
         <div class="pk-hint"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9l4-4M5 9l4 4M5 9h11a4 4 0 010 8h-1"/></svg>Перетащите карточку между колонками или нажмите «›», чтобы продвинуть по статусу</div>`;
     }
