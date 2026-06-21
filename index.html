@@ -5264,7 +5264,12 @@ window.tTaskMove = async (id,status) => { try {
       patch.timer_started=(status==='active')?now:null;       // рабочий таймер — только в «В работе»
       patch.review_started=(status==='review')?now:null;      // таймер утверждения — только в «На утверждении»
       t.status=status; t.time_spent=spent; t.review_spent=rspent; t.timer_started=patch.timer_started; t.review_started=patch.review_started; _pkRerender(); }
-    const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
+    let {error}=await SB.from('project_tasks').update(patch).eq('id',id);
+    if(error && /review_/.test(error.message||'')){           // полей review_* ещё нет в БД (не применена миграция 08)
+      const {error:e2}=await SB.from('project_tasks').update({status:patch.status,time_spent:patch.time_spent,timer_started:patch.timer_started}).eq('id',id);
+      if(e2) throw e2; error=null; toast('Перенос выполнен. Таймер утверждения отключён — примените SQL-миграцию 08');
+    }
+    if(error)throw error;
     await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
   toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
