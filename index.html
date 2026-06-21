@@ -886,6 +886,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-task .tmr svg{width:12px;height:12px}
 /* kanban */
 .pk-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0;position:relative;z-index:50}
+.pk-filters .pk-search-wrap{flex:0 1 300px;min-width:200px}
 .pk-fclear{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--bd);color:var(--txt-2);border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:600;cursor:pointer;transition:border-color .15s,color .15s}
 .pk-fclear:hover{border-color:var(--neg);color:var(--neg)}
 .pk-fcount{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-left:2px;white-space:nowrap}
@@ -2762,11 +2763,16 @@ const PD_STNEXT={wait:'active',active:'review',review:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
 const PK_DONE_LIMIT=10; let PK_DONE='recent';
 /* ——— фильтры канбан-доски: этап / исполнитель / дедлайн ——— */
-let PK_F_STAGE='all', PK_F_RESP='all', PK_F_DUE='all';
+let PK_F_STAGE='all', PK_F_RESP='all', PK_F_DUE='all', PK_F_Q='';
 function pkSetStage(v){PK_F_STAGE=v;if(typeof renderPd==='function')renderPd();}
 function pkSetResp(v){PK_F_RESP=v;if(typeof renderPd==='function')renderPd();}
 function pkSetDue(v){PK_F_DUE=v;if(typeof renderPd==='function')renderPd();}
-function pkResetFilters(){PK_F_STAGE='all';PK_F_RESP='all';PK_F_DUE='all';if(typeof renderPd==='function')renderPd();}
+function pkResetFilters(){PK_F_STAGE='all';PK_F_RESP='all';PK_F_DUE='all';PK_F_Q='';if(typeof renderPd==='function')renderPd();}
+function pkSearch(v){
+  PK_F_Q=v;
+  if(typeof renderPd==='function') renderPd();
+  requestAnimationFrame(()=>{ const inp=document.getElementById('pk-search'); if(inp){ inp.focus(); const L=inp.value.length; try{inp.setSelectionRange(L,L);}catch(_){} } });
+}
 function _pkDueBucket(t){
   if(!t.due_date) return 'none';
   const today=new Date(); today.setHours(0,0,0,0);
@@ -2781,6 +2787,13 @@ function _pkMatch(t){
   if(PK_F_STAGE!=='all' && String(t.stage_id||'')!==String(PK_F_STAGE)) return false;
   if(PK_F_RESP!=='all'){ if(PK_F_RESP==='__none'){ if(t.assignee_id) return false; } else if(String(t.assignee_id||'')!==String(PK_F_RESP)) return false; }
   if(PK_F_DUE!=='all' && _pkDueBucket(t)!==PK_F_DUE) return false;
+  if(PK_F_Q){ const q=PK_F_Q.toLowerCase().trim(); if(q){
+    const p=(typeof PROJECTS!=='undefined'&&typeof pdIdx!=='undefined')?PROJECTS[pdIdx]:null;
+    const stg=p?(((p._stages||[]).find(x=>x.id===t.stage_id)||{}).name||''):'';
+    const w=(typeof _who==='function')?_who(t.assignee_id):null;
+    const hay=((t.title||'')+' '+stg+' '+((w&&w.n)||'')).toLowerCase();
+    if(!hay.includes(q)) return false;
+  }}
   return true;
 }
 function pkDoneSet(m){ PK_DONE=m; if(typeof renderPd==='function') renderPd(); }
@@ -2993,9 +3006,10 @@ function renderPd(){
       const _pkRespOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
       const _pkDueOpts=[['all','Любой срок'],['overdue','Просроченные'],['today','Сегодня'],['week','Ближайшие 7 дней'],['future','Позже'],['none','Без срока']];
       const _pkLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
-      const _pkFActive=PK_F_STAGE!=='all'||PK_F_RESP!=='all'||PK_F_DUE!=='all';
+      const _pkFActive=PK_F_STAGE!=='all'||PK_F_RESP!=='all'||PK_F_DUE!=='all'||!!PK_F_Q;
       const _pkShown=T.filter(_pkMatch).length;
       const filterBar=`<div class="pk-filters">`
+        +`<div class="search pk-search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pk-search" placeholder="Поиск по задаче, этапу, исполнителю…" value="${(PK_F_Q||'').replace(/"/g,'&quot;')}" oninput="pkSearch(this.value)" autocomplete="off" spellcheck="false"></div>`
         +_dd('pkstage','Этап',_pkLbl(_pkStageOpts,PK_F_STAGE),_pkStageOpts,PK_F_STAGE,'pkSetStage')
         +_dd('pkresp','Исполнитель',_pkLbl(_pkRespOpts,PK_F_RESP),_pkRespOpts,PK_F_RESP,'pkSetResp')
         +_dd('pkdue','Дедлайн',_pkLbl(_pkDueOpts,PK_F_DUE),_pkDueOpts,PK_F_DUE,'pkSetDue')
