@@ -3479,6 +3479,7 @@ function setDlSearch(q){agDlSearch=q;renderDeadlines();}
 function setDlFrom(d){agDlFrom=d;renderDeadlines();}
 function setDlTo(d){agDlTo=d;renderDeadlines();}
 function setDlType(t){agDlType=t;renderDeadlines();}
+function dlResetFilters(){agDlFilter='all';agDlType='all';agDlResp='all';agDlProj='all';agDlSearch='';agDlFrom='';agDlTo='';renderDeadlines();}
 function _dlFiltered(){
   const q=agDlSearch.trim().toLowerCase();
   const inRange=d=>{ if(!d.due) return !(agDlFrom||agDlTo);
@@ -3662,7 +3663,7 @@ function renderDeadlines(){
         <button class="${onF('future')}" onclick="setDlFilter('future')">Будущие</button>
       </div>
       ${_dd('dltype','Тип', (agDlType==='all'?'Все':agDlType==='stage'?'Этапы':'Задачи'), [['all','Все типы'],['stage','Этапы'],['task','Задачи']], agDlType, 'setDlType')}
-      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}`:''}
+      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}`:''}
       <div class="flex1"></div>
       <div class="segm">
         <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
@@ -3945,6 +3946,8 @@ function revSearch(v){REV_Q=v;renderCycles();_cycRestoreFocus('rev-q');}
 function workSetSort(v){WORK_SORT=v;renderCycles();}
 function workSetPeriod(v){WORK_PERIOD=v;renderCycles();}
 function workSetAsg(v){WORK_ASG=v;renderCycles();}
+function revResetFilters(){REV_SORT='desc';REV_Q='';REV_PERIOD='all';REV_ASG='all';renderCycles();}
+function workResetFilters(){WORK_SORT='desc';WORK_Q='';WORK_PERIOD='all';WORK_ASG='all';renderCycles();}
 function workSearch(v){WORK_Q=v;renderCycles();_cycRestoreFocus('work-q');}
 function _cycRestoreFocus(id){ requestAnimationFrame(()=>{ const el=document.getElementById(id); if(el){ el.focus(); const L=el.value.length; try{el.setSelectionRange(L,L);}catch(_){} } }); }
 function _cycFilterTasks(list,period,q,sort,asg){
@@ -3969,13 +3972,15 @@ function _cycFilterStages(list,q,sort){
 const _cycPeriodOpts=[['all','Всё время'],['7','7 дней'],['30','30 дней'],['90','90 дней']];
 const _cycSortOpts=[['desc','Дольше сверху'],['asc','Короче сверху']];
 const _cycLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
-function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA){
+function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA,reset){
   const asgOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
+  const _active=(sort!=='desc')||!!q||(period!=='all')||(asg!=='all');
   return `<div class="cyc-filters">`
     +`<div class="search cyc-search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="${pfx}-q" placeholder="Поиск по задаче или этапу…" value="${(q||'').replace(/"/g,'&quot;')}" oninput="${setQ}(this.value)" autocomplete="off" spellcheck="false"></div>`
     +_dd(pfx+'asg','Исполнитель',_cycLbl(asgOpts,asg),asgOpts,asg,setA)
     +_dd(pfx+'per','Период',_cycLbl(_cycPeriodOpts,period),_cycPeriodOpts,period,setP)
     +_dd(pfx+'srt','Сортировка',_cycLbl(_cycSortOpts,sort),_cycSortOpts,sort,setS)
+    +(_active?`<button class="pk-fclear" onclick="${reset}()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:'')
     +`</div>`;
 }
 function renderCycles(){
@@ -4091,7 +4096,7 @@ function renderCycles(){
           <div class="px-ov-cell"><div class="px-ov-l">Суммарно</div><div class="px-ov-v">${_cycDur(C.reviewTotalSec*1000)}</div><div class="px-ov-ctx">всего на согласовании</div></div>
           <div class="px-ov-cell"><div class="px-ov-l">Задач проходило</div><div class="px-ov-v">${C.reviewCount}</div><div class="px-ov-ctx">через утверждение</div></div>
         </div>
-        ${_cycFilterBar('rev',REV_PERIOD,REV_SORT,REV_Q,REV_ASG,'revSetPeriod','revSetSort','revSearch','revSetAsg')}
+        ${_cycFilterBar('rev',REV_PERIOD,REV_SORT,REV_Q,REV_ASG,'revSetPeriod','revSetSort','revSearch','revSetAsg','revResetFilters')}
         <div class="rev-grid">
           <div>
             <div class="eyebrow" style="margin-bottom:10px">Этапы дольше всего на утверждении <span class="cyc-cnt">${_revStagesF.length}</span></div>
@@ -4130,7 +4135,7 @@ function renderCycles(){
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
           <div>Концентрация: <b>${C.workParetoPct}%</b> задач забирают <b>80%</b> рабочего времени${C.workParetoPct>0&&C.workParetoPct<=25?' — высокая концентрация, крупные задачи стоит дробить на подзадачи':(C.workParetoPct>=50?' — нагрузка распределена равномерно':'')}</div>
         </div>
-        ${_cycFilterBar('work',WORK_PERIOD,WORK_SORT,WORK_Q,WORK_ASG,'workSetPeriod','workSetSort','workSearch','workSetAsg')}
+        ${_cycFilterBar('work',WORK_PERIOD,WORK_SORT,WORK_Q,WORK_ASG,'workSetPeriod','workSetSort','workSearch','workSetAsg','workResetFilters')}
         <div class="rev-grid">
           <div>
             <div class="eyebrow" style="margin-bottom:10px">Где уходит время · по этапам <span class="cyc-cnt">${_workStagesF.length}</span></div>
