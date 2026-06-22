@@ -2431,6 +2431,19 @@ function openNewProject(){
 .np-st-add input:focus{border-color:var(--accent-line)}
 .np-st-add button{flex:none;padding:0 14px;border:1px solid var(--accent-line);border-radius:9px;background:var(--accent-dim);color:var(--accent);cursor:pointer;font:inherit}
 .np-st-hint{font-size:12px;color:var(--txt-3);padding:2px 2px 0}
+.np-team{display:flex;flex-direction:column;gap:6px;margin-top:2px;max-height:230px;overflow:auto}
+.np-team-dept{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin:6px 2px 1px}
+.np-tm{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--txt-2);cursor:pointer;width:100%;text-align:left;font:inherit}
+.np-tm:hover{border-color:var(--line-2)}
+.np-tm.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--txt)}
+.np-tm-av{flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.np-tm-n{flex:1;font-size:13px}
+.np-tm-r{font-size:11px;color:var(--txt-3)}
+.np-tm-ck{flex:none;width:18px;height:18px;border:1.5px solid var(--txt-3);border-radius:5px;display:flex;align-items:center;justify-content:center;color:transparent}
+.np-tm.on .np-tm-ck{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.np-tm-ck svg{width:12px;height:12px}
+.np-team-empty{font-size:12px;color:var(--txt-3);padding:6px 2px}
+.np-team-hint{font-size:12px;color:var(--txt-3);padding:2px 2px 0}
     </style>
     <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги, тариф и ответственный</p></div>
     <div class="modal-b">
@@ -2438,11 +2451,12 @@ function openNewProject(){
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
       <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай','service')}</div>
       <div class="fld2">${tagCombo('np-tariff','Тариф',tariffs,'','Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
+      <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Этапы проекта</label><div id="np-stages" class="np-stages"></div></div>
       <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
-  setTimeout(()=>{npStagesReload();const n=document.getElementById('np-name');if(n)n.focus();},30);
+  setTimeout(()=>{npStagesReload();npTeamReset();const n=document.getElementById('np-name');if(n)n.focus();},30);
 }
 function npSaveProject(){
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
@@ -2450,8 +2464,9 @@ function npSaveProject(){
   const tariff=_v('np-tariff')||null;
   const lead=_v('np-lead')||null;
   const selStages=(typeof npSelectedStages==='function'?npSelectedStages():[]);
+  const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():[]);
   const totN=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).length;
-  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
+  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,team:selTeam,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
   PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,pct:0,stages:'0 / '+(selStages.length||totN),health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
@@ -2483,6 +2498,34 @@ function npStageAdd(){ const inp=document.getElementById('np-st-new'); if(!inp) 
 function npStageHint(){ const h=document.getElementById('np-st-hint'); if(!h) return; const n=npSelectedStages().length; h.textContent=n?('Этапов в проекте: '+n):'Этапов нет — проект создастся без этапов'; }
 function npSelectedStages(){ return (window.NP_STAGES||[]).map(s=>(s.name||'').trim()).filter(Boolean); }
 window.npReseedLast=async()=>{ const p=window._npPendingSeed; if(!p){toast('Нет ожидающего засева');return;} const ok=await window.tStageSeed(p.id,p.names); if(ok){ window._npPendingSeed=null; } };
+
+/* ——— project team multiselect by department (Фаза 2.2) ——— */
+function npTeamReset(){ window.NP_TEAM=new Set(); npRenderTeam(); }
+function npRenderTeam(){
+  const box=document.getElementById('np-team'); if(!box) return;
+  const team=(typeof TEAM!=='undefined'?TEAM:[]);
+  if(!team.length){ box.innerHTML='<div class="np-team-empty">Нет сотрудников — добавь их в модуле «Команда»</div>'; return; }
+  const sel=window.NP_TEAM||(window.NP_TEAM=new Set());
+  const ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  const groups={}; team.forEach(m=>{ const d=m.dept||'Без отдела'; (groups[d]=groups[d]||[]).push(m); });
+  let html='';
+  Object.keys(groups).forEach(dep=>{
+    html+='<div class="np-team-dept">'+_ddH(dep)+'</div>';
+    groups[dep].forEach(m=>{
+      const on=sel.has(m._id); const c=m.color||'#37E6C8'; const ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase());
+      html+='<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="npToggleTeam(\''+m._id+'\')">'
+        +'<span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+ltr+'</span>'
+        +'<span class="np-tm-n">'+_ddH(m.name||'—')+'</span>'
+        +'<span class="np-tm-r">'+_ddH(m.role||'')+'</span>'
+        +'<span class="np-tm-ck">'+ck+'</span></button>';
+    });
+  });
+  html+='<div class="np-team-hint" id="np-team-hint"></div>';
+  box.innerHTML=html; npTeamHint();
+}
+function npToggleTeam(id){ const s=window.NP_TEAM||(window.NP_TEAM=new Set()); const add=!s.has(id); if(add)s.add(id); else s.delete(id); const b=document.querySelector('#np-team .np-tm[data-id="'+id+'"]'); if(b)b.classList.toggle('on',add); npTeamHint(); }
+function npTeamHint(){ const h=document.getElementById('np-team-hint'); if(!h) return; const n=(window.NP_TEAM||new Set()).size; h.textContent=n?('В команде: '+n):'Команда не выбрана'; }
+function npSelectedTeam(){ return [...(window.NP_TEAM||new Set())]; }
 
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
@@ -6092,6 +6135,11 @@ window.tProvisionClient = async (c) => {
           if(confirm('Проект создан, но кастомные этапы не засеялись. Повторить засев?')){ await window.tStageSeed(np.id, c.stages); }
           else toast('Этапы можно задать в карточке проекта'); }
       } else { toast('Не удалось применить кастомные этапы — в проекте остался дефолтный набор'); }
+    }
+    // команда проекта (Фаза 2.2)
+    if (np && np.id && Array.isArray(c.team) && c.team.length){
+      try{ const rows=c.team.map(mid=>({project_id:np.id, member_id:mid})); const {error}=await SB.from('project_members').insert(rows); if(error)throw error; }
+      catch(e){ console.error('team insert',e); toast('Проект создан, но команда не сохранилась'); }
     }
     toast('Проект и клиентский доступ созданы');
     if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
