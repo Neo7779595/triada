@@ -1035,6 +1035,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 #ov-pd2 .modal{max-width:520px}
 #ov-npteam{z-index:70}
 #ov-npteam .modal{max-width:480px}
+.pt-team{display:flex;align-items:center;margin-top:9px}
+.pt-team-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin-right:8px}
+.pt-avs{display:flex;align-items:center}
+.pt-tm-av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid var(--bg-1);margin-left:-6px;overflow:hidden}
+.pt-avs .pt-tm-av:first-child{margin-left:0}
+.pt-tm-av.lead{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pt-tm-av img{width:100%;height:100%;object-fit:cover}
+.pt-tm-more{font-size:11px;color:var(--txt-3);margin-left:7px}
 .fld textarea{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;resize:vertical;min-height:74px}
 .fld textarea:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .st-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -2410,6 +2418,13 @@ function freezeTrials(){
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" style="background:var(--neg);color:#fff;box-shadow:0 0 0 1px rgba(224,86,106,.5)" onclick="pd2Close();toast('Триалы заморожены')">Заморозить</button></div></div>`);
 }
 
+function teamStripHTML(p){
+  const TM=(p&&p._team)||[]; if(!TM.length) return '';
+  const av=TM.slice(0,6).map(t=>{ const isL=t._id===p.lead_id; const c=t.color||'var(--accent)'; const nm=(t.name||'?'); const safe=nm.replace(/"/g,'');
+    return '<span class="pt-tm-av'+(isL?' lead':'')+'" style="background:'+c+'22;color:'+c+'" title="'+safe+(isL?' · ответственный':'')+'">'+(t.avatar?('<img src="'+String(t.avatar).replace(/"/g,'')+'" alt="">'):((nm[0]||'?').toUpperCase()))+'</span>';
+  }).join('');
+  return '<div class="pt-team"><span class="pt-team-lbl">команда</span><span class="pt-avs">'+av+(TM.length>6?('<span class="pt-tm-more">+'+(TM.length-6)+'</span>'):'')+'</span></div>';
+}
 function setAgFilter(f){agFilter=f;renderProjects();}
 
 /* ——— create project (mirrors projSettings shape) ——— */
@@ -2743,7 +2758,7 @@ const _projCard=(p)=>{
               <div class="pt-badges"><span class="tagx svc">${p.svc}</span><span class="tagx tariff t-${tar.name.toLowerCase()}">${tar.name}${tar.derived?'°':''}</span>${p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:''}</div>
             </div>
           </div>
-          <div class="pt-lead">${leadHTML}</div>
+          <div class="pt-lead">${leadHTML}</div>${teamStripHTML(p)}
           <div class="pt-pipe"><div class="pt-pipe-h">Этапы <span>${pp.done} done · ${pp.active} в работе · ${pp.wait} в очереди</span></div>${_pipeBar(pp)}</div>
           ${noteEsc?`<div class="pt-note" title="${noteEsc}">«${noteEsc}»</div>`:''}
         </div>
@@ -5647,10 +5662,12 @@ window.tLoadProjectAggregates = async () => {
   if (!SB) return;
   const today=new Date(); today.setHours(0,0,0,0);
   const wk=new Date(Date.now()-7*86400000).toISOString();
-  const [st,tk,hs]=await Promise.all([
+  const [st,tk,hs,pm]=await Promise.all([
     SB.from('project_stages').select('project_id,status,due_date'),
     SB.from('project_tasks').select('project_id,status,due_date,assignee_id'),
-    SB.from('stage_history').select('project_id,changed_by,new_status,created_at') ]);
+    SB.from('stage_history').select('project_id,changed_by,new_status,created_at'),
+    SB.from('project_members').select('project_id,member_id') ]);
+  const _pm={}; ((pm&&pm.data)||[]).forEach(r=>{ (_pm[r.project_id]=_pm[r.project_id]||[]).push(r.member_id); });
   const agg={};
   const A=pid=>(agg[pid]||(agg[pid]={over:false,next:null,overN:0,overAll:0,wait:0,active:0,done:0,by:{},asg:{}}));
   const add=(pid,status,due,stage)=>{ if(!pid)return; const a=A(pid);
@@ -5671,6 +5688,7 @@ window.tLoadProjectAggregates = async () => {
     p._health = p.status==='done'?'Завершён':(a.over?'Риск':'В норме');
     p._healthCls = (p.status!=='done'&&a.over)?'risk':'ok';
     const lid=p.lead_id||top(a.by)||top(a.asg); p._lead = lid?mem(lid):null;
+    p._team=(_pm[p.id]||[]).map(mid=>{ const m=mem(mid); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:mid}:null; }).filter(Boolean);
   });
 };
 
