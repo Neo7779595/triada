@@ -6168,8 +6168,9 @@ window.tProvisionClient = async (c) => {
   try { const { data:_pv, error:_pvErr } = await SB.functions.invoke('provision-client', { body:{
       email:(c.login||'client')+'@'+(c.slug||'agency')+'.triada.app', password:c.pass,
       login:c.login, full_name:c.full_name, project:c.project }});
-    const _pvMsg=_pvErr?(_pvErr.message||String(_pvErr)):((_pv&&_pv.error)?(_pv.error.message||_pv.error):null);
-    if(_pvMsg){ console.error('provision-client failed', _pvErr||_pv); toast('Не удалось создать проект: '+_pvMsg); return; }
+    let _pvMsg = _pvErr ? (_pvErr.message||String(_pvErr)) : ((_pv&&_pv.error)?(_pv.error.message||_pv.error):null);
+    if(_pvErr && _pvErr.context){ try{ const raw=await _pvErr.context.clone().text(); if(raw){ try{ const b=JSON.parse(raw); _pvMsg=b.error||b.message||b.msg||_pvMsg; }catch(_){ _pvMsg=raw; } } }catch(_){} }
+    if(_pvMsg){ console.error('provision-client failed', _pvErr||_pv); toast('Не удалось создать: '+_pvMsg); return; }
     await window.tLoadAll(ME.role);
     // найти созданный проект (последний с таким именем)
     const cand=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name);
