@@ -1033,6 +1033,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* ============ PROJECT SECONDARY MODALS (edit/report/cycles/material) ============ */
 #ov-pd2{z-index:60}
 #ov-pd2 .modal{max-width:520px}
+#ov-npteam{z-index:70}
+#ov-npteam .modal{max-width:480px}
 .fld textarea{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;resize:vertical;min-height:74px}
 .fld textarea:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .st-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -1773,6 +1775,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 </div>
 
 <div class="ov" id="ov-pd2" onclick="if(event.target===this)pd2Close()"></div>
+<div class="ov" id="ov-npteam" onclick="if(event.target===this)npTeamPickerClose()"></div>
 
 <div class="ov" id="cmdk" onclick="if(event.target===this)cmdkClose()">
   <div class="cmdk-box">
@@ -2431,7 +2434,15 @@ function openNewProject(){
 .np-st-add input:focus{border-color:var(--accent-line)}
 .np-st-add button{flex:none;padding:0 14px;border:1px solid var(--accent-line);border-radius:9px;background:var(--accent-dim);color:var(--accent);cursor:pointer;font:inherit}
 .np-st-hint{font-size:12px;color:var(--txt-3);padding:2px 2px 0}
-.np-team{display:flex;flex-direction:column;gap:6px;margin-top:2px;max-height:230px;overflow:auto}
+.np-team{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.np-team-btn{display:flex;align-items:center;gap:9px;width:100%;padding:9px 12px;border:1px dashed var(--line-2);border-radius:10px;background:transparent;color:var(--txt-2);cursor:pointer;font:inherit;text-align:left}
+.np-team-btn:hover{border-color:var(--accent-line);color:var(--txt)}
+.np-team-btn svg{flex:none;width:16px;height:16px}
+.np-chips{display:flex;flex-wrap:wrap;gap:6px}
+.np-chip{display:inline-flex;align-items:center;gap:7px;padding:4px 6px 4px 4px;border:1px solid var(--line-2);border-radius:20px;font-size:12px;color:var(--txt)}
+.np-chip-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.np-chip-x{border:none;background:transparent;color:var(--txt-3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
+.np-chip-x:hover{color:#F0785C}
 .np-team-dept{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin:6px 2px 1px}
 .np-tm{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--txt-2);cursor:pointer;width:100%;text-align:left;font:inherit}
 .np-tm:hover{border-color:var(--line-2)}
@@ -2443,7 +2454,12 @@ function openNewProject(){
 .np-tm.on .np-tm-ck{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .np-tm-ck svg{width:12px;height:12px}
 .np-team-empty{font-size:12px;color:var(--txt-3);padding:6px 2px}
-.np-team-hint{font-size:12px;color:var(--txt-3);padding:2px 2px 0}
+.np-pick-q{width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:9px 12px;font:inherit;outline:none;margin-bottom:10px}
+.np-pick-q:focus{border-color:var(--accent-line)}
+.np-pick-depts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.np-pick-dept{padding:5px 11px;border:1px solid var(--line);border-radius:16px;background:transparent;color:var(--txt-3);cursor:pointer;font:inherit;font-size:12px}
+.np-pick-dept.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--accent)}
+.np-pick-list{display:flex;flex-direction:column;gap:5px;max-height:46vh;overflow:auto}
     </style>
     <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги, тариф и ответственный</p></div>
     <div class="modal-b">
@@ -2499,33 +2515,51 @@ function npStageHint(){ const h=document.getElementById('np-st-hint'); if(!h) re
 function npSelectedStages(){ return (window.NP_STAGES||[]).map(s=>(s.name||'').trim()).filter(Boolean); }
 window.npReseedLast=async()=>{ const p=window._npPendingSeed; if(!p){toast('Нет ожидающего засева');return;} const ok=await window.tStageSeed(p.id,p.names); if(ok){ window._npPendingSeed=null; } };
 
-/* ——— project team multiselect by department (Фаза 2.2) ——— */
+/* ——— project team picker (Фаза 2.2 · вариант C: окно выбора) ——— */
 function npTeamReset(){ window.NP_TEAM=new Set(); npRenderTeam(); }
+function npSelectedTeam(){ return [...(window.NP_TEAM||new Set())]; }
+function npChipRemove(id){ const s=window.NP_TEAM; if(s)s.delete(id); npRenderTeam(); }
 function npRenderTeam(){
   const box=document.getElementById('np-team'); if(!box) return;
   const team=(typeof TEAM!=='undefined'?TEAM:[]);
-  if(!team.length){ box.innerHTML='<div class="np-team-empty">Нет сотрудников — добавь их в модуле «Команда»</div>'; return; }
-  const sel=window.NP_TEAM||(window.NP_TEAM=new Set());
-  const ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
-  const groups={}; team.forEach(m=>{ const d=m.dept||'Без отдела'; (groups[d]=groups[d]||[]).push(m); });
-  let html='';
-  Object.keys(groups).forEach(dep=>{
-    html+='<div class="np-team-dept">'+_ddH(dep)+'</div>';
-    groups[dep].forEach(m=>{
-      const on=sel.has(m._id); const c=m.color||'#37E6C8'; const ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase());
-      html+='<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="npToggleTeam(\''+m._id+'\')">'
-        +'<span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+ltr+'</span>'
-        +'<span class="np-tm-n">'+_ddH(m.name||'—')+'</span>'
-        +'<span class="np-tm-r">'+_ddH(m.role||'')+'</span>'
-        +'<span class="np-tm-ck">'+ck+'</span></button>';
-    });
-  });
-  html+='<div class="np-team-hint" id="np-team-hint"></div>';
-  box.innerHTML=html; npTeamHint();
+  const sel=[...(window.NP_TEAM||(window.NP_TEAM=new Set()))];
+  const chips=sel.map(id=>{ const m=team.find(x=>x._id===id); if(!m) return ''; const c=m.color||'#37E6C8';
+    return '<span class="np-chip"><span class="np-chip-av" style="background:'+c+'22;color:'+c+'">'+_ddH((m.name||'?').trim().charAt(0).toUpperCase())+'</span>'+_ddH(m.name||'—')+'<button type="button" class="np-chip-x" onclick="npChipRemove(\''+m._id+'\')">×</button></span>';
+  }).join('');
+  box.innerHTML='<button type="button" class="np-team-btn" onclick="npTeamPickerOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 19a6 6 0 0112 0"/><path d="M16 6.5a3 3 0 010 5.5M21 19a6 6 0 00-4-5.6"/></svg>'+(sel.length?('Команда: '+sel.length+' — изменить'):'Выбрать команду')+'</button>'+(chips?('<div class="np-chips">'+chips+'</div>'):'');
 }
-function npToggleTeam(id){ const s=window.NP_TEAM||(window.NP_TEAM=new Set()); const add=!s.has(id); if(add)s.add(id); else s.delete(id); const b=document.querySelector('#np-team .np-tm[data-id="'+id+'"]'); if(b)b.classList.toggle('on',add); npTeamHint(); }
-function npTeamHint(){ const h=document.getElementById('np-team-hint'); if(!h) return; const n=(window.NP_TEAM||new Set()).size; h.textContent=n?('В команде: '+n):'Команда не выбрана'; }
-function npSelectedTeam(){ return [...(window.NP_TEAM||new Set())]; }
+function npTeamPickerOpen(){
+  const ov=document.getElementById('ov-npteam'); if(!ov) return;
+  const team=(typeof TEAM!=='undefined'?TEAM:[]);
+  window._npPickWork=new Set(window.NP_TEAM||[]);
+  window._npPickDept='all';
+  const depts=[...new Set(team.map(m=>m.dept||'Без отдела'))];
+  const chips='<button type="button" class="np-pick-dept on" data-d="all" onclick="npPickDept(this)">Все</button>'+depts.map(d=>'<button type="button" class="np-pick-dept" data-d="'+_attr(d)+'" onclick="npPickDept(this)">'+_ddH(d)+'</button>').join('');
+  ov.innerHTML='<div class="modal"><div class="modal-h"><h3>Команда проекта</h3><p>Выбери участников · поиск и отделы</p></div>'
+    +'<div class="modal-b"><input id="np-pick-q" class="np-pick-q" placeholder="Поиск по имени или роли" oninput="npTeamPickerRender()">'
+    +'<div class="np-pick-depts">'+chips+'</div><div id="np-pick-list" class="np-pick-list"></div></div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="npTeamPickerClose()">Отмена</button><button class="btn-add" onclick="npTeamPickerDone()">Готово<span id="np-pick-cnt"></span></button></div></div>';
+  ov.classList.add('on'); npTeamPickerRender();
+  setTimeout(()=>{const q=document.getElementById('np-pick-q'); if(q)q.focus();},30);
+}
+function npPickDept(el){ window._npPickDept=el.dataset.d; document.querySelectorAll('#ov-npteam .np-pick-dept').forEach(b=>b.classList.toggle('on', b===el)); npTeamPickerRender(); }
+function npTeamPickerRender(){
+  const list=document.getElementById('np-pick-list'); if(!list) return;
+  const team=(typeof TEAM!=='undefined'?TEAM:[]); const work=window._npPickWork||(window._npPickWork=new Set());
+  const q=((document.getElementById('np-pick-q')||{}).value||'').trim().toLowerCase(); const dept=window._npPickDept||'all';
+  const ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  const rows=team.filter(m=>{ if(dept!=='all' && (m.dept||'Без отдела')!==dept) return false; if(q && !((m.name||'').toLowerCase().includes(q)||(m.role||'').toLowerCase().includes(q))) return false; return true; });
+  if(!rows.length){ list.innerHTML='<div class="np-team-empty">Никого не найдено</div>'; npPickCount(); return; }
+  const groups={}; rows.forEach(m=>{ const d=m.dept||'Без отдела'; (groups[d]=groups[d]||[]).push(m); });
+  let html=''; Object.keys(groups).forEach(d=>{ html+='<div class="np-team-dept">'+_ddH(d)+'</div>';
+    groups[d].forEach(m=>{ const on=work.has(m._id); const c=m.color||'#37E6C8'; const ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase());
+      html+='<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="npPickToggle(\''+m._id+'\')"><span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+ltr+'</span><span class="np-tm-n">'+_ddH(m.name||'—')+'</span><span class="np-tm-r">'+_ddH(m.role||'')+'</span><span class="np-tm-ck">'+ck+'</span></button>'; }); });
+  list.innerHTML=html; npPickCount();
+}
+function npPickToggle(id){ const s=window._npPickWork||(window._npPickWork=new Set()); const add=!s.has(id); if(add)s.add(id); else s.delete(id); const b=document.querySelector('#np-pick-list .np-tm[data-id="'+id+'"]'); if(b)b.classList.toggle('on',add); npPickCount(); }
+function npPickCount(){ const c=document.getElementById('np-pick-cnt'); if(c){ const n=(window._npPickWork||new Set()).size; c.textContent=n?(' · '+n):''; } }
+function npTeamPickerClose(){ const ov=document.getElementById('ov-npteam'); if(ov)ov.classList.remove('on'); }
+function npTeamPickerDone(){ window.NP_TEAM=new Set(window._npPickWork||[]); npTeamPickerClose(); npRenderTeam(); }
 
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
