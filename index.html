@@ -797,7 +797,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
 .pd-tab .cnt{font-family:var(--mono);font-size:10px;background:var(--accent-dim);color:var(--accent);padding:1px 7px;border-radius:20px}
 .pd-tabact{margin-left:auto;display:flex;align-items:center;gap:10px;padding-left:18px}
-.pdl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.pdl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.pdl-kpi[onclick]{cursor:pointer;transition:border-color .15s,transform .15s}
+.pdl-kpi[onclick]:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.pdl-kpi.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.pdl-filters{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:20px;position:relative;z-index:6}
+.pdl-filters .pdl-search{flex:0 1 260px;min-width:170px;display:flex;align-items:center;gap:8px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px;padding:0 12px;height:38px}
+.pdl-filters .pdl-search svg{position:static;transform:none;flex-shrink:0;width:15px;height:15px;color:var(--txt-3)}
+.pdl-filters .pdl-search input{position:static;border:none;background:transparent;padding:0;height:100%;flex:1;min-width:0;color:var(--txt);font-family:var(--font);font-size:13px;outline:none}
+.pdl-segm .d{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:6px}
 .pdl-kpi{background:var(--bg-1);border:1px solid var(--line);border-radius:13px;padding:16px 18px}
 .pdl-kpi .v{font-size:30px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
 .pdl-kpi .l{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--txt-3);margin-top:9px;font-weight:600}
@@ -3089,6 +3097,18 @@ function _taskReviewElapsed(t){ let s=(t&&t.review_spent)||0; if(t&&t.review_sta
 function pkProjTotal(){ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null; if(!p||!p._tasks) return 0; return p._tasks.reduce((a,t)=>a+_taskElapsed(t),0); }
 function pkTickUpdate(){ try{ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null; if(!p||!p._tasks) return; let total=0; p._tasks.forEach(t=>{ const e=_taskElapsed(t); total+=e; const el=document.getElementById('tmr-'+t.id); if(el) el.textContent=pkFmtDur(e); const re=_taskReviewElapsed(t); const rel=document.getElementById('rtmr-'+t.id); if(rel) rel.textContent=pkFmtDur(re); }); document.querySelectorAll('.pk-total-live').forEach(el=>{ el.textContent=pkFmtDur(total); }); }catch(_){} }
 setInterval(pkTickUpdate,1000);
+let PDL_SEG='all', PDL_TYPE='all', PDL_RESP='all', PDL_Q='';
+function pdlSetSeg(v){PDL_SEG=v;renderPd();}
+function pdlSetType(v){PDL_TYPE=v;renderPd();}
+function pdlSetResp(v){PDL_RESP=v;renderPd();}
+function pdlSearch(v){PDL_Q=v;renderPd();if(typeof _cycRestoreFocus==='function')_cycRestoreFocus('pdl-q');}
+function pdlReset(){PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';renderPd();}
+function _pdlMatch(it){
+  if(PDL_TYPE!=='all' && it.kind!==PDL_TYPE) return false;
+  if(PDL_RESP!=='all'){ if(PDL_RESP==='__none'){ if(it.asg) return false; } else if(String(it.asg||'')!==String(PDL_RESP)) return false; }
+  if(PDL_Q){ const q=PDL_Q.toLowerCase().trim(); if(q && !(((it.title||'')+' '+(it.stage||'')).toLowerCase().includes(q))) return false; }
+  return true;
+}
 function _pdDueBucket(due,status){
   if(status==='done') return 'done';
   if(!due) return 'none';
@@ -3108,19 +3128,34 @@ function _pdDeadlinesHTML(p){
   const stMap={}; (p._stages||[]).forEach(s=>{ stMap[s.id]=s.name; });
   const IC_T='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>';
   const IC_S='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22V4a1 1 0 011-1h10l1 2h4v9h-5l-1-2H6v10z"/></svg>';
-  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,status:t.status,who:(typeof _who==='function'?_who(t.assignee_id):null),stage:stMap[t.stage_id]||''}));
-  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,status:s.status,who:null,stage:''}));
+  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,status:t.status,who:(typeof _who==='function'?_who(t.assignee_id):null),asg:t.assignee_id,stage:stMap[t.stage_id]||''}));
+  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,status:s.status,who:null,asg:null,stage:''}));
   const all=tasks.concat(stages);
   if(!all.length) return '<div class="pk-empty" style="padding:48px 0">У проекта пока нет задач и этапов с дедлайнами.<br><span style="font-size:12px;color:var(--txt-3)">Назначь срок задаче или этапу — они появятся здесь.</span></div>';
+  // фильтры тип/ответственный/поиск (сегмент применяется при отображении)
+  const flt=all.filter(_pdlMatch);
   const B={overdue:[],today:[],week:[],future:[],done:[],none:[]};
-  all.forEach(it=>{ (B[_pdDueBucket(it.due,it.status)]||B.none).push(it); });
+  flt.forEach(it=>{ (B[_pdDueBucket(it.due,it.status)]||B.none).push(it); });
   Object.keys(B).forEach(k=>B[k].sort((a,b)=>a.due<b.due?-1:1));
-  const activeWithDue=all.filter(it=>it.status!=='done').length;
+  const activeWithDue=flt.filter(it=>it.status!=='done').length;
   const kpis=`<div class="pdl-kpis">
-    <div class="pdl-kpi"><div class="v" style="color:${B.overdue.length?'var(--neg)':'var(--txt-3)'}">${B.overdue.length}</div><div class="l">Просрочено</div></div>
-    <div class="pdl-kpi"><div class="v" style="color:${B.today.length?'var(--warn)':'var(--txt-3)'}">${B.today.length}</div><div class="l">Сегодня</div></div>
-    <div class="pdl-kpi"><div class="v" style="color:${B.week.length?'var(--accent)':'var(--txt-3)'}">${B.week.length}</div><div class="l">Ближайшие 7 дней</div></div>
+    <div class="pdl-kpi ${PDL_SEG==='overdue'?'on':''}" onclick="pdlSetSeg('${PDL_SEG==='overdue'?'all':'overdue'}')"><div class="v" style="color:${B.overdue.length?'var(--neg)':'var(--txt-3)'}">${B.overdue.length}</div><div class="l">Просрочено</div></div>
+    <div class="pdl-kpi ${PDL_SEG==='today'?'on':''}" onclick="pdlSetSeg('${PDL_SEG==='today'?'all':'today'}')"><div class="v" style="color:${B.today.length?'var(--warn)':'var(--txt-3)'}">${B.today.length}</div><div class="l">Сегодня</div></div>
+    <div class="pdl-kpi ${PDL_SEG==='week'?'on':''}" onclick="pdlSetSeg('${PDL_SEG==='week'?'all':'week'}')"><div class="v" style="color:${B.week.length?'var(--accent)':'var(--txt-3)'}">${B.week.length}</div><div class="l">Ближайшие 7 дней</div></div>
     <div class="pdl-kpi"><div class="v">${activeWithDue}</div><div class="l">Активных дедлайнов</div></div>
+  </div>`;
+  // панель фильтров
+  const segs=[['all','Все'],['overdue','Просрочены','var(--neg)'],['today','Сегодня','var(--warn)'],['week','Неделя','var(--accent)'],['future','Будущие'],['done','Завершённые','var(--pos)']];
+  const typeOpts=[['all','Все типы'],['task','Задачи'],['stage','Этапы']];
+  const respOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
+  const _lbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
+  const _active=PDL_SEG!=='all'||PDL_TYPE!=='all'||PDL_RESP!=='all'||!!PDL_Q;
+  const filterBar=`<div class="pdl-filters">
+    <div class="search pdl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pdl-q" placeholder="Поиск по задаче или этапу…" value="${(PDL_Q||'').replace(/"/g,'&quot;')}" oninput="pdlSearch(this.value)" autocomplete="off" spellcheck="false"></div>
+    <div class="segm pdl-segm">${segs.map(([k,l,c])=>`<button class="${k===PDL_SEG?'on':''}" onclick="pdlSetSeg('${k}')">${c?`<span class="d" style="background:${c}"></span>`:''}${l}</button>`).join('')}</div>
+    ${_dd('pdltype','Тип',_lbl(typeOpts,PDL_TYPE),typeOpts,PDL_TYPE,'pdlSetType')}
+    ${_dd('pdlresp','Ответственный',_lbl(respOpts,PDL_RESP),respOpts,PDL_RESP,'pdlSetResp')}
+    ${_active?`<button class="pk-fclear" onclick="pdlReset()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
   </div>`;
   const groups=[['overdue','Просрочено','var(--neg)'],['today','Сегодня','var(--warn)'],['week','Ближайшие 7 дней','var(--accent)'],['future','Позже','var(--txt-2)'],['done','Завершённые','var(--pos)']];
   const row=(it,color)=>`<div class="pdl-row" style="border-left-color:${color}">
@@ -3129,11 +3164,12 @@ function _pdDeadlinesHTML(p){
       <div class="pdl-meta"><span>${it.kind==='task'?'Задача':'Этап'}</span>${it.stage?`<span class="pdl-sep">·</span><span>${_ddH(it.stage)}</span>`:''}${it.who&&it.who.n?`<span class="pdl-sep">·</span><span>${_ddH(it.who.n)}</span>`:''}</div></div>
     <div class="pdl-due"><div class="pdl-date" style="color:${it.status==='done'?'var(--txt-2)':color}">${_dDate(it.due)}</div><div class="pdl-rel">${it.status==='done'?'выполнено':_relDue(it.due)}</div></div>
   </div>`;
-  const blocks=groups.filter(([k])=>B[k].length).map(([k,label,color])=>`<div class="pdl-group">
+  const shown=groups.filter(([k])=> (PDL_SEG==='all'||PDL_SEG===k) && B[k].length);
+  const blocks=shown.length?shown.map(([k,label,color])=>`<div class="pdl-group">
     <div class="pdl-ghead"><span class="pdl-gdot" style="background:${color}"></span>${label}<span class="pdl-gcount">${B[k].length}</span></div>
     ${B[k].map(it=>row(it,color)).join('')}
-  </div>`).join('');
-  return kpis+blocks;
+  </div>`).join(''):'<div class="pk-empty" style="padding:40px 0">Ничего не найдено по выбранным фильтрам.</div>';
+  return kpis+filterBar+blocks;
 }
 function renderPd(){
   const p=PROJECTS[pdIdx], d=p._d; let h='';
