@@ -6082,16 +6082,16 @@ window.tProvisionClient = async (c) => {
       const patch={}; if(c.project.tariff) patch.tariff=c.project.tariff; if(c.project.lead_id) patch.lead_id=c.project.lead_id;
       if(Object.keys(patch).length){ try{ const {error}=await SB.from('projects').update(patch).eq('id',np.id); if(error)throw error; await window.tLoadAll(ME.role); }catch(_e){ toast('Проект создан, но тариф/ответственный не сохранились'); } }
     }
-    // засев выбранных этапов (Фаза 1.2) — идемпотентно: сеем только если этапов ещё нет
+    // засев этапов (путь A): кастомный набор имеет приоритет над дефолтами edge-функции
     if (np && np.id && Array.isArray(c.stages) && c.stages.length){
-      let existing=0;
-      try{ const {count}=await SB.from('project_stages').select('id',{count:'exact',head:true}).eq('project_id',np.id); existing=count||0; }catch(_e){ existing=0; }
-      if(existing===0){
+      let cleared=false;
+      try{ const {error}=await SB.from('project_stages').delete().eq('project_id',np.id); cleared=!error; if(error)console.error('clear stages',error); }catch(_e){ console.error(_e); }
+      if(cleared){
         const okSeed=await window.tStageSeed(np.id, c.stages);
         if(!okSeed){ window._npPendingSeed={id:np.id,names:c.stages.slice()};
-          if(confirm('Проект создан, но этапы не засеялись. Повторить засев сейчас?')){ await window.tStageSeed(np.id, c.stages); }
-          else toast('Этапы можно засеять позже в карточке проекта'); }
-      }
+          if(confirm('Проект создан, но кастомные этапы не засеялись. Повторить засев?')){ await window.tStageSeed(np.id, c.stages); }
+          else toast('Этапы можно задать в карточке проекта'); }
+      } else { toast('Не удалось применить кастомные этапы — в проекте остался дефолтный набор'); }
     }
     toast('Проект и клиентский доступ созданы');
     if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
