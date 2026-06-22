@@ -6165,9 +6165,11 @@ window.tDeleteAgency = async (id) => {
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tProvisionClient = async (c) => {
-  try { await SB.functions.invoke('provision-client', { body:{
+  try { const { data:_pv, error:_pvErr } = await SB.functions.invoke('provision-client', { body:{
       email:(c.login||'client')+'@'+(c.slug||'agency')+'.triada.app', password:c.pass,
       login:c.login, full_name:c.full_name, project:c.project }});
+    const _pvMsg=_pvErr?(_pvErr.message||String(_pvErr)):((_pv&&_pv.error)?(_pv.error.message||_pv.error):null);
+    if(_pvMsg){ console.error('provision-client failed', _pvErr||_pv); toast('Не удалось создать проект: '+_pvMsg); return; }
     await window.tLoadAll(ME.role);
     // найти созданный проект (последний с таким именем)
     const cand=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name);
@@ -6193,7 +6195,8 @@ window.tProvisionClient = async (c) => {
       try{ const rows=c.team.map(mid=>({project_id:np.id, member_id:mid})); const {error}=await SB.from('project_members').insert(rows); if(error)throw error; }
       catch(e){ console.error('team insert',e); toast('Проект создан, но команда не сохранилась'); }
     }
-    toast('Проект и клиентский доступ созданы');
+    if(np && np.id) toast('Проект и клиентский доступ созданы');
+    else toast('Проект создан на сервере, но не появился в списке — обнови страницу');
     if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
