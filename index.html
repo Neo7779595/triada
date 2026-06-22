@@ -2444,9 +2444,10 @@ function npSaveProject(){
   const svc=_v('np-svc')||'SMM';
   const tariff=_v('np-tariff')||null;
   const lead=_v('np-lead')||null;
+  const selStages=(typeof npSelectedStages==='function'?npSelectedStages():[]);
   const totN=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).length;
-  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
-  PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,pct:0,stages:'0 / '+totN,health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
+  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
+  PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,pct:0,stages:'0 / '+(selStages.length||totN),health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
 
@@ -2471,6 +2472,7 @@ function npRenderStages(){
 function npToggleStage(el){ if(el) el.classList.toggle('on'); npStageHint(); }
 function npStageHint(){ const h=document.getElementById('np-st-hint'); if(!h) return; const n=npSelectedStages().length; h.textContent=n?('Выбрано этапов: '+n):'Этапы не выбраны — проект создастся без этапов'; }
 function npSelectedStages(){ return [...document.querySelectorAll('#np-stages .np-st.on')].map(b=>b.dataset.n); }
+window.npReseedLast=async()=>{ const p=window._npPendingSeed; if(!p){toast('Нет ожидающего засева');return;} const ok=await window.tStageSeed(p.id,p.names); if(ok){ window._npPendingSeed=null; } };
 
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
@@ -5433,7 +5435,7 @@ window.tStageAdd = async (projectId,row) => { try { const {error}=await SB.from(
 window.tStageDel = async (id) => { try { const {error}=await SB.from('project_stages').delete().eq('id',id); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Этап удалён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
-  const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); return true; } catch(e){ toast('Ошибка: '+(e.message||e)); return false; } };
 window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _pkRerender(){ try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }
@@ -6062,12 +6064,24 @@ window.tProvisionClient = async (c) => {
       email:(c.login||'client')+'@'+(c.slug||'agency')+'.triada.app', password:c.pass,
       login:c.login, full_name:c.full_name, project:c.project }});
     await window.tLoadAll(ME.role);
-    // тариф/ответственный edge-функция может не сохранять — дожимаем прямым апдейтом
-    if (c.project && (c.project.tariff!==undefined || c.project.lead_id!==undefined)){
-      const cand=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name);
-      const np=cand[cand.length-1];
-      if (np && np.id){ const patch={}; if(c.project.tariff) patch.tariff=c.project.tariff; if(c.project.lead_id) patch.lead_id=c.project.lead_id;
-        if(Object.keys(patch).length){ try{ await SB.from('projects').update(patch).eq('id',np.id); await window.tLoadAll(ME.role); }catch(_e){} } }
+    // найти созданный проект (последний с таким именем)
+    const cand=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name);
+    const np=cand[cand.length-1];
+    // тариф/ответственный edge-функция может не сохранять — дожимаем прямым апдейтом (сбой не глушим)
+    if (np && np.id && c.project && (c.project.tariff!==undefined || c.project.lead_id!==undefined)){
+      const patch={}; if(c.project.tariff) patch.tariff=c.project.tariff; if(c.project.lead_id) patch.lead_id=c.project.lead_id;
+      if(Object.keys(patch).length){ try{ const {error}=await SB.from('projects').update(patch).eq('id',np.id); if(error)throw error; await window.tLoadAll(ME.role); }catch(_e){ toast('Проект создан, но тариф/ответственный не сохранились'); } }
+    }
+    // засев выбранных этапов (Фаза 1.2) — идемпотентно: сеем только если этапов ещё нет
+    if (np && np.id && Array.isArray(c.stages) && c.stages.length){
+      let existing=0;
+      try{ const {count}=await SB.from('project_stages').select('id',{count:'exact',head:true}).eq('project_id',np.id); existing=count||0; }catch(_e){ existing=0; }
+      if(existing===0){
+        const okSeed=await window.tStageSeed(np.id, c.stages);
+        if(!okSeed){ window._npPendingSeed={id:np.id,names:c.stages.slice()};
+          if(confirm('Проект создан, но этапы не засеялись. Повторить засев сейчас?')){ await window.tStageSeed(np.id, c.stages); }
+          else toast('Этапы можно засеять позже в карточке проекта'); }
+      }
     }
     toast('Проект и клиентский доступ созданы');
     if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
