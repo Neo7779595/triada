@@ -4027,6 +4027,60 @@ function renderCycles(){
       </div>
     </div>`:''}
 
+
+
+    ${has?`
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Медиана (p50) и худший случай (p90) по этапам</div>
+        <div class="m" style="display:flex;gap:14px;font-size:11px;flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:var(--neg)"></span>Узкое место</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>Медиана (p50)</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--violet)"></span>p90 (n≥5)</span>
+        </div>
+      </div>
+      <div class="card-body">${svgCycleBars(C.chartStages)}</div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Детализация по этапам</div></div>
+      <table class="ctbl">
+        <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th>Доля</th><th>% возвратов</th><th>Простой</th></tr></thead>
+        <tbody>${C.stages.map((s,i)=>`<tr style="animation-delay:${i*45}ms">
+          <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${s.name}${s.lowSample?' <span style="color:var(--warn);font-size:10px;font-family:var(--mono)">мало данных</span>':''}</td>
+          <td class="num">${s.n}</td>
+          <td class="num" style="color:var(--accent)">${_cycDur(s.p50Ms)}</td>
+          <td class="num" style="color:var(--violet)">${s.p90Ms!=null?_cycDur(s.p90Ms):'—'}</td>
+          <td class="num">${s.sharePct}%</td>
+          <td class="num" style="color:${rwCol(s.reworkPct)}">${s.reworkPct!=null?s.reworkPct+'%':'—'}</td>
+          <td class="num" style="color:var(--txt-3)">${s.lossMs!=null?_cycDur(s.lossMs):'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+
+    ${C.trend.vals.length>=2?`<div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Тренд медианы цикла <span class="c">по месяцам</span></div></div>
+      <div class="card-body">${svgCycleTrend(C.trend.vals,C.trend.labels)}</div>
+    </div>`:''}
+
+    ${C.clients.length?`<div class="card" style="margin-top:16px">
+      <div class="card-h"><div class="t">Бенчмарк по клиентам <span class="c">средний цикл завершённого этапа</span></div></div>
+      <table class="ctbl">
+        <thead><tr><th>Клиент</th><th>Этапов</th><th>Медиана</th><th>Среднее</th><th>% возвратов</th></tr></thead>
+        <tbody>${C.clients.map((c,i)=>`<tr style="animation-delay:${i*45}ms">
+          <td><div class="ag-name" style="gap:11px"><span class="cyc-av">${logoFill(c.logoUrl,c.logo)}</span><div class="nm">${c.client}</div></div></td>
+          <td class="num">${c.n}</td>
+          <td class="num" style="color:var(--accent)">${_cycDur(c.medianMs)}</td>
+          <td class="num" style="color:var(--txt-3)">${_cycDur(c.avgMs)}</td>
+          <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span style="color:${rwCol(c.reworkPct)}">${c.reworkPct!=null?c.reworkPct+'%':'—'}</span><div style="width:60px;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div style="width:${Math.min(c.reworkPct||0,100)}%;height:100%;background:${(c.reworkPct||0)?'var(--neg)':'var(--accent)'}"></div></div></div></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`:''}
+    `:`
+    <div class="modph" style="margin-top:16px"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      <h3>Пока нет измеримых циклов</h3>
+      <p>Цикл считается от старта этапа (переход в «В работе») до его завершения (переход в «Завершён»). Чтобы этап стал измеримым, в истории должна быть записана пара «старт → финиш». Как только команда закроет первые этапы — здесь появятся медианы, p90, простой, узкое место, тренд по месяцам и бенчмарк по клиентам.</p>
+    </div>`}
+
     <div class="card" style="margin-top:16px;border-color:color-mix(in srgb,#8A8FFF 22%,var(--line))">
       <div class="card-h"><div class="t" style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:50%;background:#8A8FFF;box-shadow:0 0 7px -1px #8A8FFF"></span>Время на утверждении <span class="c">сколько задачи ждут согласования</span></div></div>
       <div class="card-body">
@@ -4113,58 +4167,7 @@ function renderCycles(){
       `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.6">Пока нет задач с отработанным временем.<br>Данные появятся, когда команда начнёт работать над задачами в колонке «В работе».</div>`}
       </div>
     </div>
-
-    ${has?`
-    <div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Медиана (p50) и худший случай (p90) по этапам</div>
-        <div class="m" style="display:flex;gap:14px;font-size:11px;flex-wrap:wrap">
-          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:var(--neg)"></span>Узкое место</span>
-          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent)"></span>Медиана (p50)</span>
-          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:var(--violet)"></span>p90 (n≥5)</span>
-        </div>
-      </div>
-      <div class="card-body">${svgCycleBars(C.chartStages)}</div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Детализация по этапам</div></div>
-      <table class="ctbl">
-        <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th>Доля</th><th>% возвратов</th><th>Простой</th></tr></thead>
-        <tbody>${C.stages.map((s,i)=>`<tr style="animation-delay:${i*45}ms">
-          <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${s.name}${s.lowSample?' <span style="color:var(--warn);font-size:10px;font-family:var(--mono)">мало данных</span>':''}</td>
-          <td class="num">${s.n}</td>
-          <td class="num" style="color:var(--accent)">${_cycDur(s.p50Ms)}</td>
-          <td class="num" style="color:var(--violet)">${s.p90Ms!=null?_cycDur(s.p90Ms):'—'}</td>
-          <td class="num">${s.sharePct}%</td>
-          <td class="num" style="color:${rwCol(s.reworkPct)}">${s.reworkPct!=null?s.reworkPct+'%':'—'}</td>
-          <td class="num" style="color:var(--txt-3)">${s.lossMs!=null?_cycDur(s.lossMs):'—'}</td>
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>
-
-    ${C.trend.vals.length>=2?`<div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Тренд медианы цикла <span class="c">по месяцам</span></div></div>
-      <div class="card-body">${svgCycleTrend(C.trend.vals,C.trend.labels)}</div>
-    </div>`:''}
-
-    ${C.clients.length?`<div class="card" style="margin-top:16px">
-      <div class="card-h"><div class="t">Бенчмарк по клиентам <span class="c">средний цикл завершённого этапа</span></div></div>
-      <table class="ctbl">
-        <thead><tr><th>Клиент</th><th>Этапов</th><th>Медиана</th><th>Среднее</th><th>% возвратов</th></tr></thead>
-        <tbody>${C.clients.map((c,i)=>`<tr style="animation-delay:${i*45}ms">
-          <td><div class="ag-name" style="gap:11px"><span class="cyc-av">${logoFill(c.logoUrl,c.logo)}</span><div class="nm">${c.client}</div></div></td>
-          <td class="num">${c.n}</td>
-          <td class="num" style="color:var(--accent)">${_cycDur(c.medianMs)}</td>
-          <td class="num" style="color:var(--txt-3)">${_cycDur(c.avgMs)}</td>
-          <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span style="color:${rwCol(c.reworkPct)}">${c.reworkPct!=null?c.reworkPct+'%':'—'}</span><div style="width:60px;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden"><div style="width:${Math.min(c.reworkPct||0,100)}%;height:100%;background:${(c.reworkPct||0)?'var(--neg)':'var(--accent)'}"></div></div></div></td>
-        </tr>`).join('')}</tbody>
-      </table>
-    </div>`:''}
-    `:`
-    <div class="modph" style="margin-top:16px"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-      <h3>Пока нет измеримых циклов</h3>
-      <p>Цикл считается от старта этапа (переход в «В работе») до его завершения (переход в «Завершён»). Чтобы этап стал измеримым, в истории должна быть записана пара «старт → финиш». Как только команда закроет первые этапы — здесь появятся медианы, p90, простой, узкое место, тренд по месяцам и бенчмарк по клиентам.</p>
-    </div>`}`;
+`;
 }
 
 /* ——— FINANCE module ——— */
