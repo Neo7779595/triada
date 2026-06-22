@@ -2416,16 +2416,28 @@ function openNewProject(){
   const tariffs=[...new Set(['Platinum','Gold','Silver',...(PROJECT_TAGS.tariff||[]),...PROJECTS.map(p=>p.tariff).filter(Boolean)])];
   const leadOpts=[['','— не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name+(m.role?(' · '+m.role):'')]));
   pd2Open(`<div class="modal">
+    <style>
+.np-stages{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.np-st{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 11px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--txt-2);cursor:pointer;font:inherit;transition:.12s}
+.np-st:hover{border-color:var(--line-2)}
+.np-st-box{flex:none;width:18px;height:18px;border:1.5px solid var(--txt-3);border-radius:5px;display:flex;align-items:center;justify-content:center;color:transparent}
+.np-st-box svg{width:13px;height:13px}
+.np-st.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--txt)}
+.np-st.on .np-st-box{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.np-st-n{flex:1}
+.np-st-hint{font-size:12px;color:var(--txt-3);padding:2px 2px 0}
+    </style>
     <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги, тариф и ответственный</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. Uzbek Doner"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
       <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай','service')}</div>
       <div class="fld2">${tagCombo('np-tariff','Тариф',tariffs,'','Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
+      <div class="fld"><label>Этапы проекта</label><div id="np-stages" class="np-stages"></div></div>
       <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
-  setTimeout(()=>{const n=document.getElementById('np-name');if(n)n.focus();},30);
+  setTimeout(()=>{npRenderStages();const n=document.getElementById('np-name');if(n)n.focus();},30);
 }
 function npSaveProject(){
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
@@ -2437,6 +2449,28 @@ function npSaveProject(){
   PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,pct:0,stages:'0 / '+totN,health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
+
+/* ——— stage templates in create modal (Фаза 1.1) ——— */
+function npStagePrecheck(name,idx,svc,tariff){
+  /* Дефолт: все этапы услуги включены (безопасный инклюзивный выбор — агент снимает лишние).
+     Здесь подключится правило «набор по тарифу», когда агентство задаст реальный состав;
+     пока такого маппинга нет — не выдумываем его. */
+  return true;
+}
+function npRenderStages(){
+  const box=document.getElementById('np-stages'); if(!box) return;
+  const svc=(_v('np-svc')||'SMM'); const tariff=(_v('np-tariff')||'');
+  const names=PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM;
+  const ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  box.innerHTML=names.map((n,i)=>{
+    const on=npStagePrecheck(n,i,svc,tariff);
+    return `<button type="button" class="np-st${on?' on':''}" data-n="${_attr(n)}" onclick="npToggleStage(this)"><span class="np-st-box">${ck}</span><span class="np-st-n">${_ddH(n)}</span></button>`;
+  }).join('')+`<div class="np-st-hint" id="np-st-hint"></div>`;
+  npStageHint();
+}
+function npToggleStage(el){ if(el) el.classList.toggle('on'); npStageHint(); }
+function npStageHint(){ const h=document.getElementById('np-st-hint'); if(!h) return; const n=npSelectedStages().length; h.textContent=n?('Выбрано этапов: '+n):'Этапы не выбраны — проект создастся без этапов'; }
+function npSelectedStages(){ return [...document.querySelectorAll('#np-stages .np-st.on')].map(b=>b.dataset.n); }
 
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
@@ -2505,7 +2539,8 @@ function cmbPick(id,val,isNew){ const rec=(window._cmb||{})[id]||{opts:[],kind:'
   if(isNew && rec.kind){ if(rec.opts.indexOf(val)<0) rec.opts.push(val); if(window.LIVE&&window.tTagAdd) window.tTagAdd(rec.kind,val); }
   const hh=document.getElementById(id); if(hh)hh.value=val;
   const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=val; lbl.style.color=''; lbl.style.fontWeight=''; }
-  const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open'); }
+  const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open');
+  if(id==='np-svc' && typeof npRenderStages==='function' && document.getElementById('np-stages')) npRenderStages(); }
 function cmbDel(id,val){ const rec=(window._cmb||{})[id]||{opts:[],kind:''};
   const col=rec.kind==='category'?'cat':rec.kind==='service'?'svc':rec.kind==='tariff'?'tariff':null;
   const used=col?(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>String(p[col]||'')===String(val)).length:0;
