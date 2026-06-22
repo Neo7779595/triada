@@ -886,6 +886,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-task .tmr svg{width:12px;height:12px}
 /* kanban */
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.cyc-filters{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:14px;position:relative;z-index:6}
+.cyc-filters .cyc-search-wrap{flex:0 1 250px;min-width:160px}
+.cyc-cnt{display:inline-block;margin-left:6px;padding:1px 7px;font-size:10.5px;font-weight:700;color:var(--txt-3);background:var(--bg-3);border-radius:20px;font-family:var(--mono);vertical-align:middle}
+.cyc-scroll{max-height:440px;overflow-y:auto;overflow-x:hidden;padding-right:6px;margin-right:-6px}
+.cyc-scroll::-webkit-scrollbar{width:6px}
+.cyc-scroll::-webkit-scrollbar-track{background:transparent}
+.cyc-scroll::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+.cyc-scroll::-webkit-scrollbar-thumb:hover{background:var(--txt-3)}
+
 .cyc-insight{display:flex;align-items:flex-start;gap:9px;padding:11px 14px;background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:10px;font-size:12.5px;color:var(--txt-1);line-height:1.5}
 .cyc-insight svg{width:16px;height:16px;color:var(--accent);flex-shrink:0;margin-top:1px}
 .cyc-insight b{color:var(--accent)}
@@ -3924,8 +3933,45 @@ function _cycTipShow(e,i){
 }
 function _cycTipMove(e){ const el=document.getElementById('cyc-tip'); if(!el||el.style.display==='none') return; const p=14,w=el.offsetWidth,hh=el.offsetHeight; let x=e.clientX+p,y=e.clientY+p; if(x+w>window.innerWidth-8)x=e.clientX-w-p; if(y+hh>window.innerHeight-8)y=e.clientY-hh-p; el.style.left=x+'px'; el.style.top=y+'px'; }
 function _cycTipHide(){ const el=document.getElementById('cyc-tip'); if(el) el.style.display='none'; }
+/* ——— фильтры аналитических блоков Циклов (период / сортировка / поиск) ——— */
+let REV_SORT='desc', REV_Q='', REV_PERIOD='all';
+let WORK_SORT='desc', WORK_Q='', WORK_PERIOD='all';
+function revSetSort(v){REV_SORT=v;renderCycles();}
+function revSetPeriod(v){REV_PERIOD=v;renderCycles();}
+function revSearch(v){REV_Q=v;renderCycles();_cycRestoreFocus('rev-q');}
+function workSetSort(v){WORK_SORT=v;renderCycles();}
+function workSetPeriod(v){WORK_PERIOD=v;renderCycles();}
+function workSearch(v){WORK_Q=v;renderCycles();_cycRestoreFocus('work-q');}
+function _cycRestoreFocus(id){ requestAnimationFrame(()=>{ const el=document.getElementById(id); if(el){ el.focus(); const L=el.value.length; try{el.setSelectionRange(L,L);}catch(_){} } }); }
+function _cycFilterTasks(list,period,q,sort){
+  const now=Date.now(); const cut=(period&&period!=='all')?(now-parseInt(period)*86400000):0;
+  let r=(list||[]).filter(t=>{
+    if(cut && t.date && new Date(t.date).getTime()<cut) return false;
+    if(q){ const s=q.toLowerCase().trim(); if(s && !(((t.title||'')+' '+(t.stage||'')).toLowerCase().includes(s))) return false; }
+    return true;
+  });
+  return r.slice().sort((a,b)=> sort==='asc'?a.sec-b.sec:b.sec-a.sec);
+}
+function _cycFilterStages(list,q,sort){
+  let r=(list||[]).filter(st=>{ if(q){ const s=q.toLowerCase().trim(); if(s && !((st.name||'').toLowerCase().includes(s))) return false; } return true; });
+  return r.slice().sort((a,b)=> sort==='asc'?(a.total||0)-(b.total||0):(b.total||0)-(a.total||0));
+}
+const _cycPeriodOpts=[['all','Всё время'],['7','7 дней'],['30','30 дней'],['90','90 дней']];
+const _cycSortOpts=[['desc','Дольше сверху'],['asc','Короче сверху']];
+const _cycLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
+function _cycFilterBar(pfx,period,sort,q,setP,setS,setQ){
+  return `<div class="cyc-filters">`
+    +`<div class="search cyc-search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="${pfx}-q" placeholder="Поиск по задаче или этапу…" value="${(q||'').replace(/"/g,'&quot;')}" oninput="${setQ}(this.value)" autocomplete="off" spellcheck="false"></div>`
+    +_dd(pfx+'per','Период',_cycLbl(_cycPeriodOpts,period),_cycPeriodOpts,period,setP)
+    +_dd(pfx+'srt','Сортировка',_cycLbl(_cycSortOpts,sort),_cycSortOpts,sort,setS)
+    +`</div>`;
+}
 function renderCycles(){
   const C = CYCLES; window._cycChart = C.chartStages;
+  const _revStagesF=_cycFilterStages(C.reviewStages,REV_Q,REV_SORT);
+  const _revTasksF=_cycFilterTasks(C.reviewTasks,REV_PERIOD,REV_Q,REV_SORT);
+  const _workStagesF=_cycFilterStages(C.workStages,WORK_Q,WORK_SORT);
+  const _workTasksF=_cycFilterTasks(C.workTopTasks,WORK_PERIOD,WORK_Q,WORK_SORT);
   if(!document.getElementById('cyc-tip')){ const _t=document.createElement('div'); _t.id='cyc-tip'; document.body.appendChild(_t); }
   const has = C.stages.length>0;
   const bn = C.bottleneck;
@@ -3979,20 +4025,25 @@ function renderCycles(){
           <div class="px-ov-cell"><div class="px-ov-l">Суммарно</div><div class="px-ov-v">${_cycDur(C.reviewTotalSec*1000)}</div><div class="px-ov-ctx">всего на согласовании</div></div>
           <div class="px-ov-cell"><div class="px-ov-l">Задач проходило</div><div class="px-ov-v">${C.reviewCount}</div><div class="px-ov-ctx">через утверждение</div></div>
         </div>
+        ${_cycFilterBar('rev',REV_PERIOD,REV_SORT,REV_Q,'revSetPeriod','revSetSort','revSearch')}
         <div class="rev-grid">
           <div>
-            <div class="eyebrow" style="margin-bottom:10px">Этапы дольше всего на утверждении</div>
-            ${C.reviewStages.length?C.reviewStages.map((st,i)=>`<div class="rev-row" style="animation-delay:${i*45}ms">
-              <div style="min-width:0"><div class="rev-nm">${_ddH(st.name)}</div><div class="rev-sub">${st.count} задач · в среднем</div></div>
-              <div class="rev-val">${_cycDur(st.avg*1000)}</div>
-            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+            <div class="eyebrow" style="margin-bottom:10px">Этапы дольше всего на утверждении <span class="cyc-cnt">${_revStagesF.length}</span></div>
+            <div class="cyc-scroll">
+            ${_revStagesF.length?_revStagesF.map((st,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
+              <div style="min-width:0"><div class="rev-nm">${_ddH(st.name)}</div><div class="rev-sub">${st.count} задач · в среднем ${_cycDur(st.avg*1000)}</div></div>
+              <div class="rev-val">${_cycDur(st.total*1000)}</div>
+            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
+            </div>
           </div>
           <div>
-            <div class="eyebrow" style="margin-bottom:10px">Задачи дольше всего на утверждении</div>
-            ${C.reviewTasks.length?C.reviewTasks.map((t,i)=>`<div class="rev-row" style="animation-delay:${i*45}ms">
+            <div class="eyebrow" style="margin-bottom:10px">Задачи дольше всего на утверждении <span class="cyc-cnt">${_revTasksF.length}</span></div>
+            <div class="cyc-scroll">
+            ${_revTasksF.length?_revTasksF.map((t,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
               <div style="min-width:0"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.project?' · '+_ddH(t.project):''}${t.onReview?' · <span style=\"color:#8A8FFF\">сейчас</span>':''}</div></div>
               <div class="rev-val">${_cycDur(t.sec*1000)}</div>
-            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
+            </div>
           </div>
         </div>
       `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.6">Пока нет задач, проходивших через утверждение.<br>Данные появятся, когда задачи начнут двигаться через колонку «На утверждении».</div>`}
@@ -4013,22 +4064,27 @@ function renderCycles(){
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
           <div>Концентрация: <b>${C.workParetoPct}%</b> задач забирают <b>80%</b> рабочего времени${C.workParetoPct>0&&C.workParetoPct<=25?' — высокая концентрация, крупные задачи стоит дробить на подзадачи':(C.workParetoPct>=50?' — нагрузка распределена равномерно':'')}</div>
         </div>
-        <div class="rev-grid" style="margin-top:14px">
+        ${_cycFilterBar('work',WORK_PERIOD,WORK_SORT,WORK_Q,'workSetPeriod','workSetSort','workSearch')}
+        <div class="rev-grid">
           <div>
-            <div class="eyebrow" style="margin-bottom:10px">Где уходит время · по этапам</div>
-            ${C.workStages.length?C.workStages.map((st,i)=>`<div class="wk-row" style="animation-delay:${i*40}ms">
+            <div class="eyebrow" style="margin-bottom:10px">Где уходит время · по этапам <span class="cyc-cnt">${_workStagesF.length}</span></div>
+            <div class="cyc-scroll">
+            ${_workStagesF.length?_workStagesF.map((st,i)=>`<div class="wk-row" style="animation-delay:${Math.min(i,12)*30}ms">
               <div style="min-width:0;flex:1"><div class="rev-nm">${_ddH(st.name)}</div>
                 <div class="wk-bar"><i style="width:${st.share}%"></i></div>
                 <div class="rev-sub">${st.count} задач · в среднем ${_cycDur(st.avg*1000)}</div></div>
               <div style="text-align:right;flex-shrink:0;padding-left:10px"><div class="rev-val" style="color:var(--accent)">${_cycDur(st.total*1000)}</div><div class="rev-sub">${st.share}%</div></div>
-            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
+            </div>
           </div>
           <div>
-            <div class="eyebrow" style="margin-bottom:10px">Самые трудоёмкие задачи</div>
-            ${C.workTopTasks.length?C.workTopTasks.map((t,i)=>`<div class="rev-row" style="animation-delay:${i*40}ms">
+            <div class="eyebrow" style="margin-bottom:10px">Самые трудоёмкие задачи <span class="cyc-cnt">${_workTasksF.length}</span></div>
+            <div class="cyc-scroll">
+            ${_workTasksF.length?_workTasksF.map((t,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
               <div style="min-width:0"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.done?' · <span style="color:var(--pos)">готово</span>':''}</div></div>
               <div class="rev-val" style="color:var(--accent)">${_cycDur(t.sec*1000)}</div>
-            </div>`).join(''):'<div class="rev-empty">Нет данных</div>'}
+            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
+            </div>
           </div>
         </div>
         <div style="margin-top:16px">
@@ -5588,7 +5644,7 @@ window.tLoadCycles = async () => {
   const [hr, sr, tr] = await Promise.all([
     SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true}),
     SB.from('project_stages').select('id,name'),
-    SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id')
+    SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at')
   ]);
   const hist = hr.data||[];
   const nameById={}, mrrById={}, logoById={};
@@ -5684,9 +5740,9 @@ window.tLoadCycles = async () => {
   const _stNm={}; (sr.data||[]).forEach(st=>{ if(st&&st.id!=null) _stNm[st.id]=st.name; });
   const _revEl=(t)=>{ let v=t.review_spent||0; if(t.review_started) v+=Math.max(0,Math.round((now-new Date(t.review_started).getTime())/1000)); return v; };
   const _rtasks=(tr.data||[]);
-  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',onReview:!!t.review_started})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec).slice(0,8);
+  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',onReview:!!t.review_started,date:t.created_at})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
   const _sg={}; _rtasks.forEach(t=>{ const sec=_revEl(t); if(sec<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_sg[nm]||(_sg[nm]={name:nm,total:0,count:0})); _sg[nm].total+=sec; _sg[nm].count++; });
-  const reviewStages=Object.values(_sg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count)})).sort((a,b)=>b.avg-a.avg).slice(0,8);
+  const reviewStages=Object.values(_sg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count)})).sort((a,b)=>b.total-a.total);
   const reviewNow=_rtasks.filter(t=>t.status==='review').length;
   const reviewCount=_rtasks.filter(t=>_revEl(t)>0).length;
   const reviewTotalSec=_rtasks.reduce((a,t)=>a+_revEl(t),0);
@@ -5703,8 +5759,8 @@ window.tLoadCycles = async () => {
   const workDoneCount=_wdone.length;
   const workDoneAvgSec=workDoneCount?Math.round(_wdone.reduce((a,t)=>a+_workEl(t),0)/workDoneCount):0;
   const _wstg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_wstg[nm]||(_wstg[nm]={name:nm,total:0,count:0})); _wstg[nm].total+=v; _wstg[nm].count++; });
-  const workStages=Object.values(_wstg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total).slice(0,8);
-  const workTopTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_workEl(t),stage:_stNm[t.stage_id]||'—',done:t.status==='done'})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec).slice(0,7);
+  const workStages=Object.values(_wstg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total);
+  const workTopTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_workEl(t),stage:_stNm[t.stage_id]||'—',done:t.status==='done',date:t.created_at})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
   const _wasg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const aid=t.assignee_id||'__none'; (_wasg[aid]||(_wasg[aid]={id:aid,total:0,count:0})); _wasg[aid].total+=v; _wasg[aid].count++; });
   const _tmName=(id)=>{ if(id==='__none')return 'Не назначен'; const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?m.name:'—'; };
   const workByAsg=Object.values(_wasg).map(x=>({name:_tmName(x.id),total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total).slice(0,8);
