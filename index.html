@@ -3126,23 +3126,24 @@ function _relDue(due){
 }
 function _pdDeadlinesHTML(p){
   const stMap={}; (p._stages||[]).forEach(s=>{ stMap[s.id]=s.name; });
-  const IC_T='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>';
-  const IC_S='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22V4a1 1 0 011-1h10l1 2h4v9h-5l-1-2H6v10z"/></svg>';
-  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,status:t.status,who:(typeof _who==='function'?_who(t.assignee_id):null),asg:t.assignee_id,stage:stMap[t.stage_id]||''}));
-  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,status:s.status,who:null,asg:null,stage:''}));
-  const all=tasks.concat(stages);
+  const MONS=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+  const enrich=o=>{ const d=new Date(o.due+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status); o.day=d.getDate(); o.mon=MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; return o; };
+  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||''}));
+  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,status:s.status,asg:null,parent:''}));
+  const all=tasks.concat(stages).map(enrich);
   if(!all.length) return '<div class="pk-empty" style="padding:48px 0">У проекта пока нет задач и этапов с дедлайнами.<br><span style="font-size:12px;color:var(--txt-3)">Назначь срок задаче или этапу — они появятся здесь.</span></div>';
-  // фильтры тип/ответственный/поиск (сегмент применяется при отображении)
   const flt=all.filter(_pdlMatch);
-  const B={overdue:[],today:[],week:[],future:[],done:[],none:[]};
-  flt.forEach(it=>{ (B[_pdDueBucket(it.due,it.status)]||B.none).push(it); });
+  const B={overdue:[],today:[],week:[],future:[],done:[]};
+  flt.forEach(it=>{ if(B[it.bucket]) B[it.bucket].push(it); });
   Object.keys(B).forEach(k=>B[k].sort((a,b)=>a.due<b.due?-1:1));
-  const activeWithDue=flt.filter(it=>it.status!=='done').length;
-  const kpis=`<div class="pdl-kpis">
-    <div class="pdl-kpi ${PDL_SEG==='overdue'?'on':''}" onclick="pdlSetSeg('${PDL_SEG==='overdue'?'all':'overdue'}')"><div class="v" style="color:${B.overdue.length?'var(--neg)':'var(--txt-3)'}">${B.overdue.length}</div><div class="l">Просрочено</div></div>
-    <div class="pdl-kpi ${PDL_SEG==='today'?'on':''}" onclick="pdlSetSeg('${PDL_SEG==='today'?'all':'today'}')"><div class="v" style="color:${B.today.length?'var(--warn)':'var(--txt-3)'}">${B.today.length}</div><div class="l">Сегодня</div></div>
-    <div class="pdl-kpi ${PDL_SEG==='week'?'on':''}" onclick="pdlSetSeg('${PDL_SEG==='week'?'all':'week'}')"><div class="v" style="color:${B.week.length?'var(--accent)':'var(--txt-3)'}">${B.week.length}</div><div class="l">Ближайшие 7 дней</div></div>
-    <div class="pdl-kpi"><div class="v">${activeWithDue}</div><div class="l">Активных дедлайнов</div></div>
+  const over=B.overdue.length, today=B.today.length, weekN=B.week.length, futureN=B.future.length, done=B.done.length, upcoming=weekN+futureN;
+  const unassigned=flt.filter(it=>it.type==='task'&&it.bucket!=='done'&&!it.asg).length;
+  const insight=_dlInsight(over,today,weekN,futureN,done,unassigned);
+  const kpis=`<div class="px-ov" style="margin-top:14px">
+    <div class="px-ov-cell"><div class="px-ov-l">Активные сроки</div><div class="px-ov-v">${over+today+upcoming}</div><div class="px-ov-comp">${(over+today+upcoming)?`${over?`<i style="flex:${over};background:var(--neg)"></i>`:''}${today?`<i style="flex:${today};background:var(--accent)"></i>`:''}${weekN?`<i style="flex:${weekN};background:var(--warn)"></i>`:''}${futureN?`<i style="flex:${futureN};background:var(--bg-3)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div><div class="px-ov-ctx">${over} просрочено · ${today} сегодня</div></div>
+    <div class="px-ov-cell"><div class="px-ov-l">Просрочено</div><div class="px-ov-v" style="color:${over?'var(--neg)':'var(--pos)'}">${over}</div><div class="px-ov-ctx" style="color:${over?'var(--neg)':'var(--pos)'}">${over?'требует внимания':'всё в срок ✓'}</div></div>
+    <div class="px-ov-cell"><div class="px-ov-l">Сегодня</div><div class="px-ov-v" style="${today?'color:var(--accent)':''}">${today}</div><div class="px-ov-ctx">${weekN} на этой неделе</div></div>
+    <div class="px-ov-cell"><div class="px-ov-l">Выполнено</div><div class="px-ov-v" style="color:var(--pos)">${done}</div><div class="px-ov-ctx">${unassigned?(unassigned+' без ответственного'):'за всё время'}</div></div>
   </div>`;
   // панель фильтров
   const segs=[['all','Все'],['overdue','Просрочены','var(--neg)'],['today','Сегодня','var(--warn)'],['week','Неделя','var(--accent)'],['future','Будущие'],['done','Завершённые','var(--pos)']];
@@ -3157,19 +3158,10 @@ function _pdDeadlinesHTML(p){
     ${_dd('pdlresp','Ответственный',_lbl(respOpts,PDL_RESP),respOpts,PDL_RESP,'pdlSetResp')}
     ${_active?`<button class="pk-fclear" onclick="pdlReset()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
   </div>`;
-  const groups=[['overdue','Просрочено','var(--neg)'],['today','Сегодня','var(--warn)'],['week','Ближайшие 7 дней','var(--accent)'],['future','Позже','var(--txt-2)'],['done','Завершённые','var(--pos)']];
-  const row=(it,color)=>`<div class="pdl-row" style="border-left-color:${color}">
-    <div class="pdl-ic">${it.kind==='task'?IC_T:IC_S}</div>
-    <div class="pdl-main"><div class="pdl-title">${_ddH(it.title)}</div>
-      <div class="pdl-meta"><span>${it.kind==='task'?'Задача':'Этап'}</span>${it.stage?`<span class="pdl-sep">·</span><span>${_ddH(it.stage)}</span>`:''}${it.who&&it.who.n?`<span class="pdl-sep">·</span><span>${_ddH(it.who.n)}</span>`:''}</div></div>
-    <div class="pdl-due"><div class="pdl-date" style="color:${it.status==='done'?'var(--txt-2)':color}">${_dDate(it.due)}</div><div class="pdl-rel">${it.status==='done'?'выполнено':_relDue(it.due)}</div></div>
-  </div>`;
-  const shown=groups.filter(([k])=> (PDL_SEG==='all'||PDL_SEG===k) && B[k].length);
-  const blocks=shown.length?shown.map(([k,label,color])=>`<div class="pdl-group">
-    <div class="pdl-ghead"><span class="pdl-gdot" style="background:${color}"></span>${label}<span class="pdl-gcount">${B[k].length}</span></div>
-    ${B[k].map(it=>row(it,color)).join('')}
-  </div>`).join(''):'<div class="pk-empty" style="padding:40px 0">Ничего не найдено по выбранным фильтрам.</div>';
-  return kpis+filterBar+blocks;
+  const order = PDL_SEG==='all' ? ['overdue','today','week','future','done'] : [PDL_SEG];
+  const blocks = order.map(k=>{ const b=_dlMeta(k), items=B[k]||[]; if(!items.length) return ''; return `<div class="dl-sec"><div class="dl-group-h"><span class="dl-gdot ${b.c}"></span><span class="dl-glbl">${b.l}</span><span class="ct">${items.length}</span><span class="ln"></span></div>${items.map(_dlRow).join('')}</div>`; }).join('');
+  const list = blocks || '<div class="pk-empty" style="padding:40px 0">Ничего не найдено по выбранным фильтрам.</div>';
+  return insight + kpis + filterBar + list;
 }
 function renderPd(){
   const p=PROJECTS[pdIdx], d=p._d; let h='';
