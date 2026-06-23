@@ -6269,9 +6269,9 @@ window.tProvisionClient = async (c) => {
     if(_pvErr && _pvErr.context){ try{ const raw=await _pvErr.context.clone().text(); if(raw){ try{ const b=JSON.parse(raw); _pvMsg=b.error||b.message||b.msg||_pvMsg; }catch(_){ _pvMsg=raw; } } }catch(_){} }
     if(_pvMsg){ console.error('provision-client failed', _pvErr||_pv); toast('Не удалось создать: '+_pvMsg); return; }
     await window.tLoadAll(ME.role);
-    // найти созданный проект (последний с таким именем)
-    const cand=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name);
-    const np=cand[cand.length-1];
+    // найти созданный проект (последний с таким именем); при гонке — одна повторная загрузка
+    let np=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name).pop();
+    if(!np){ await new Promise(r=>setTimeout(r,700)); await window.tLoadAll(ME.role); np=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name).pop(); }
     // тариф/ответственный edge-функция может не сохранять — дожимаем прямым апдейтом (сбой не глушим)
     if (np && np.id && c.project && (c.project.tariff!==undefined || c.project.lead_id!==undefined)){
       const patch={}; if(c.project.tariff) patch.tariff=c.project.tariff; if(c.project.lead_id) patch.lead_id=c.project.lead_id;
@@ -6293,8 +6293,8 @@ window.tProvisionClient = async (c) => {
       try{ const rows=c.team.map(mid=>({project_id:np.id, member_id:mid})); const {error}=await SB.from('project_members').insert(rows); if(error)throw error; }
       catch(e){ console.error('team insert',e); toast('Проект создан, но команда не сохранилась'); }
     }
-    if(np && np.id) toast('Проект и клиентский доступ созданы');
-    else toast('Проект создан на сервере, но не появился в списке — обнови страницу');
+    await window.tLoadAll(ME.role);
+    toast('Проект и клиентский доступ созданы');
     if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
