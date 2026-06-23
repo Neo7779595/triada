@@ -5790,9 +5790,11 @@ window.tStageSave = async (id,patch) => { try {
   const {error}=await SB.from('project_stages').update(patch).eq('id',id); if(error)throw error;
   if(patch.status && _st && patch.status!==_old){
     const pid=_st.project_id||curProjId();
-    if(patch.status==='active') tgNotify(pid,'stage_start',{stage_name:_st.name});
+    const _note=(patch.note!==undefined)?patch.note:_st.note;
+    const _link=(patch.link!==undefined)?patch.link:_st.link;
+    if(patch.status==='active') tgNotify(pid,'stage_start',{stage_name:_st.name, note:_note, link:_link});
     else if(patch.status==='done'){
-      tgNotify(pid,'stage_done',{stage_name:_st.name});
+      tgNotify(pid,'stage_done',{stage_name:_st.name, note:_note, link:_link});
       const others=((_p&&_p._stages)||[]).filter(s=>s.id!==id);
       if(others.length && others.every(s=>s.status==='done')) tgNotify(pid,'project_done',{});
     }
