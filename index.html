@@ -3117,7 +3117,7 @@ async function tgTeamModal(){
       <div class="tg-glist">${rows}</div>
       <div class="tg-bh" style="margin-top:16px">Командные сводки</div>
       <div style="padding:0 22px">
-        <button class="tg-test" style="margin:0 0 8px;width:100%" onclick="tgTeamSummary()">📊 Отправить сводку «кто сколько сделал»</button>
+        <button class="tg-test" style="margin:0 0 8px;width:100%" onclick="tgTeamSummary()">📊 Отправить сводку загрузки команды</button>
         <div class="tg-res" id="tgt-sum-res" style="padding:0 0 8px"></div>
         <button class="tg-test" style="margin:0;width:100%;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="tgTeamTest()">Тест во все группы</button>
         <div class="tg-res" id="tgt-test-res"></div>
@@ -5841,20 +5841,26 @@ async function tgTeamSummary(){
   const me=(typeof tMe==='function')?tMe():null; if(!me||!me.agency_id||!SB) return;
   const res=document.getElementById('tgt-sum-res'); if(res){ res.textContent='Считаем и отправляем…'; res.style.color='var(--txt-3)'; }
   try{
-    const { data:tasks } = await SB.from('project_tasks').select('assignee_id,status');
-    const by={}; (tasks||[]).forEach(t=>{ const a=t.assignee_id||'_none'; (by[a]||(by[a]={done:0,total:0})); by[a].total++; if(t.status==='done')by[a].done++; });
+    // ТЕКУЩАЯ ЗАГРУЗКА: только активные задачи (ожидание/в работе/на утверждении)
+    const { data:tasks } = await SB.from('project_tasks').select('assignee_id,status').neq('status','done');
+    const by={}; (tasks||[]).forEach(t=>{ const a=t.assignee_id||'_none'; (by[a]||(by[a]={active:0,wait:0,review:0,total:0})); by[a].total++;
+      if(t.status==='active')by[a].active++; else if(t.status==='wait')by[a].wait++; else if(t.status==='review')by[a].review++; });
     const team=(typeof TEAM!=='undefined')?TEAM:[];
-    const rows=team.map(m=>({name:m.name, s:by[m._id]||{done:0,total:0}})).filter(r=>r.s.total>0).sort((a,b)=>b.s.done-a.s.done);
-    let totalDone=0,totalAll=0; Object.values(by).forEach(s=>{ totalDone+=s.done; totalAll+=s.total; });
+    const rows=team.map(m=>({name:m.name, s:by[m._id]||{active:0,wait:0,review:0,total:0}})).filter(r=>r.s.total>0).sort((a,b)=>b.s.total-a.s.total);
+    let grand=0; Object.keys(by).forEach(k=>{ if(k!=='_none') grand+=by[k].total; });
+    const noneCnt=(by['_none']&&by['_none'].total)||0;
     const today=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
-    let html=`📊 <b>Сводка по команде</b>\n<i>${_htmlEsc(today)}</i>\n\n`;
-    if(rows.length){ rows.forEach(r=>{ const pct=r.s.total?Math.round(100*r.s.done/r.s.total):0; html+=`👤 <b>${_htmlEsc(r.name)}</b> — ${r.s.done}/${r.s.total} <i>(${pct}%)</i>\n`; }); }
-    else html+='Пока нет задач с исполнителями.\n';
-    html+=`\n<b>Итого:</b> ${totalDone}/${totalAll} задач выполнено`;
+    let html=`📊 <b>Текущая загрузка команды</b>\n<i>${_htmlEsc(today)}</i>\n\n`;
+    if(rows.length){
+      rows.forEach(r=>{ const parts=[]; if(r.s.active)parts.push(r.s.active+' в работе'); if(r.s.wait)parts.push(r.s.wait+' ждут'); if(r.s.review)parts.push(r.s.review+' на проверке');
+        html+=`👤 <b>${_htmlEsc(r.name)}</b> — ${r.s.total} <i>(${parts.join(', ')})</i>\n`; });
+    } else html+='Сейчас активных задач на сотрудниках нет.\n';
+    if(noneCnt) html+=`\n📭 <i>Без исполнителя: ${noneCnt}</i>\n`;
+    html+=`\n<b>Всего активных задач:</b> ${grand+noneCnt}`;
     const r=await fetch(TG_FN+'/tg-team',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
-      body:JSON.stringify({agency_id:me.agency_id, text:html, kind:'tasks'}) });
+      body:JSON.stringify({agency_id:me.agency_id, text:html, kind:'load'}) });
     const d=await r.json();
-    if(res){ if(d.ok){ res.textContent='✓ Сводка отправлена в группу'; res.style.color='var(--pos)'; }
+    if(res){ if(d.ok){ res.textContent='✓ Сводка отправлена'+(d.sent?(' ('+d.sent+')'):''); res.style.color='var(--pos)'; }
              else { res.textContent='✗ '+(d.error||d.skipped||'ошибка'); res.style.color='var(--neg)'; } }
   }catch(e){ if(res){ res.textContent='✗ '+(e.message||e); res.style.color='var(--neg)'; } }
 }
