@@ -783,6 +783,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-logo{width:42px;height:42px;border-radius:11px;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex:0 0 auto;border:1px solid var(--accent-line)}
 .pd-id .nm{font-size:19px;font-weight:700;letter-spacing:-.01em}
 .pd-id .ds{font-size:11px;color:var(--txt-3);margin-top:2px}
+.pd-id .pd-team .pt-team{margin-top:6px}
 .pd-right{margin-left:auto;display:flex;align-items:center;gap:16px}
 .pd-minibar{width:150px;height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden}
 .pd-minibar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .5s var(--ease-out)}
@@ -1798,7 +1799,7 @@ button:active{transform:translateY(.5px) scale(.99)}
     <div class="pd-top">
       <button class="pd-back" onclick="closeProject()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
       <div class="pd-logo" id="pd-logo">U</div>
-      <div class="pd-id"><div class="nm" id="pd-name">—</div><div class="ds" id="pd-desc">Нет описания</div></div>
+      <div class="pd-id"><div class="nm" id="pd-name">—</div><div class="ds" id="pd-desc">Нет описания</div><div class="pd-team" id="pd-team"></div></div>
       <div class="pd-right">
         <div class="pd-minibar"><i id="pd-minibar" style="width:0%"></i></div>
         <div class="pd-pctsm" id="pd-pct">0%</div>
@@ -2397,18 +2398,28 @@ function projSettings(i){
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
       <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}${tagCombo('pj-svc','Услуга (тег)',svcs,p.svc,'Выбери или создай','service')}</div>
       <div class="fld2">${tagCombo('pj-tariff','Тариф',tariffs,(p.tariff||''),'Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('pj-lead',leadOpts,(p.lead_id||''))}</div></div>
+      <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
         <button data-st="active" class="${p.status!=='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--accent)"></span>В работе</button>
         <button data-st="done" class="${p.status==='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--pos)"></span>Завершён</button>
       </div></div>
     </div>
     <div class="modal-f">${agIsOwner()?`<button class="btn-ghost" style="margin-right:auto;color:var(--neg)" onclick="pjDeleteProject(${i})">Удалить</button>`:''}<button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjSaveSettings(${i})">Сохранить</button></div></div>`);
+  window.NP_TEAM=new Set((((p&&p._team)||[]).map(t=>t._id)));
+  if(typeof npRenderTeam==='function') npRenderTeam();
+  if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_members').select('member_id').eq('project_id',p.id).then(r=>{ if(r&&r.data){ window.NP_TEAM=new Set(r.data.map(x=>x.member_id)); if(typeof npRenderTeam==='function') npRenderTeam(); } }); }catch(_e){} }
 }
-function pjSaveSettings(i){
+async function pjSaveSettings(i){
   const p=PROJECTS[i];
   const b=document.querySelector('#pj-stseg button.on'); const status=b?b.dataset.st:p.status;
   const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:_v('pj-svc')||p.svc, tariff:(_v('pj-tariff')||null), lead_id:(_v('pj-lead')||null), status };
-  if(window.LIVE&&window.tProjectUpdate) return window.tProjectUpdate(p.id,patch);
+  const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():null);
+  if(window.LIVE){
+    if(selTeam){ try{ await SB.from('project_members').delete().eq('project_id',p.id); if(selTeam.length){ const {error}=await SB.from('project_members').insert(selTeam.map(mid=>({project_id:p.id,member_id:mid}))); if(error)throw error; } }catch(e){ console.error('team save',e); toast('Команда не сохранилась'); } }
+    if(window.tProjectUpdate) return window.tProjectUpdate(p.id,patch);
+    return;
+  }
+  if(selTeam){ p._team=selTeam.map(id=>{ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:id}:null; }).filter(Boolean); }
   p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.lead_id=patch.lead_id; p._lead=null; p.status=status;
   pd2Close(); renderProjects(); toast('Проект обновлён');
 }
@@ -2952,6 +2963,7 @@ function openProject(i){
   document.getElementById('pd-logo').innerHTML=logoFill(p.logoUrl,p.logo);
   document.getElementById('pd-name').textContent=p.name;
   document.getElementById('pd-desc').textContent=p.cat&&p.cat!=='—'?p.cat:'Нет описания';
+  { const _pdt=document.getElementById('pd-team'); if(_pdt) _pdt.innerHTML=(typeof teamStripHTML==='function'?teamStripHTML(p):''); }
   document.getElementById('pd-pct').textContent=p.pct+'%';
   document.getElementById('pd-agency').textContent=(document.getElementById('ag-name')?.textContent||'detroyd').toLowerCase();
   document.getElementById('pd-tabbar').innerHTML=pdTabbar(p);
