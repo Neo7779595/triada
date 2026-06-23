@@ -9,7 +9,7 @@
 :root{
   --bg:#0A0B0D; --bg-1:#0F1116; --bg-2:#151920; --bg-3:#1C212A; --bg-side:#0C0E12;
   --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
-  --txt:#EAECEF; --txt-2:#9AA1AC; --txt-3:#5B616B;
+  --txt:#EAECEF; --txt-2:#9AA1AC; --txt-3:#7A828D;
   --accent:#37E6C8; --accent-dim:rgba(55,230,200,.13); --accent-line:rgba(55,230,200,.34); --accent-ink:#04201B;
   --pos:#43D88C; --pos-dim:rgba(67,216,140,.12);
   --neg:#F0785C; --neg-dim:rgba(240,120,92,.12);
@@ -17,7 +17,11 @@
   --violet:#8A8FFF;
   --font:'Geist','DM Sans',system-ui,-apple-system,sans-serif;
   --mono:'Geist Mono','DM Mono','JetBrains Mono',ui-monospace,monospace;
-  --r:12px;
+  --r:12px; --r-xs:6px; --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:999px;
+  /* единая модульная типо-шкала */
+  --fs-1:11px; --fs-2:12px; --fs-3:13px; --fs-4:14px; --fs-5:16px; --fs-6:18px; --fs-7:24px; --fs-8:32px; --fs-9:44px;
+  /* единая шкала теней */
+  --sh-1:0 1px 2px rgba(0,0,0,.35); --sh-2:0 10px 30px -14px rgba(0,0,0,.55); --sh-3:0 30px 80px -20px rgba(0,0,0,.7);
   --ease:cubic-bezier(.4,0,.2,1);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.4,.5,1);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -100,10 +104,11 @@ button{font-family:inherit}
 .content{padding:26px;width:100%;flex:1}
 
 /* ——— page head ——— */
-.ph{display:flex;align-items:flex-end;justify-content:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:14px}
-.ph > div:first-child{display:none}
-.ph h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
-.ph .s{color:var(--txt-2);font-size:13px;margin-top:5px}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:20px}
+.ph > div:first-child{display:block}
+.ph .eyebrow{margin-bottom:8px}
+.ph h1{font-size:var(--fs-7);font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.ph .s{color:var(--txt-2);font-size:13px;margin-top:6px;max-width:60ch}
 
 /* ——— KPI strip ——— */
 .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:18px}
@@ -200,8 +205,29 @@ tbody tr:hover td{background:var(--bg-2)}
 .toast .ti{color:var(--accent)}
 
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ——— глобальный клавиатурный фокус (a11y) ——— */
+[onclick]:not(input):not(textarea):not(select):focus-visible,
+[role="button"]:focus-visible,.nav-i:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* ——— мобильный гамбургер + затемнение ——— */
+.nav-toggle{display:none;width:36px;height:36px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+.nav-toggle:hover{color:var(--txt);border-color:var(--accent-line)}
+.nav-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nav-toggle svg{width:18px;height:18px}
+.nav-scrim{position:fixed;inset:0;background:rgba(5,6,8,.6);backdrop-filter:blur(2px);z-index:59;opacity:0;visibility:hidden;transition:.25s var(--ease)}
+.nav-scrim.on{opacity:1;visibility:visible}
+/* ——— премиум: единые тонкие скроллбары ——— */
+*{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--txt-3);background-clip:padding-box}
+*::-webkit-scrollbar-track{background:transparent}
 @media(max-width:1080px){.kpis{grid-template-columns:repeat(3,1fr)}.row2{grid-template-columns:1fr}}
-@media(max-width:860px){.app.on{grid-template-columns:1fr}.side{display:none}}
+@media(max-width:860px){.app.on{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;height:100vh;width:264px;z-index:60;transform:translateX(-100%);transition:transform .28s var(--ease-out);box-shadow:30px 0 80px -30px rgba(0,0,0,.7)}
+  .side.open{transform:none}
+  .nav-toggle{display:inline-flex}}
 @media(max-width:640px){.kpis{grid-template-columns:1fr 1fr}.content{padding:16px}.login-title{font-size:34px}
   thead th:nth-child(n+5),tbody td:nth-child(n+5){display:none}}
 /* ========== AGENCY CABINET ========== */
@@ -492,14 +518,32 @@ tbody tr:hover td{background:var(--bg-2)}
 .ti-arch.lowdata svg{width:11px;height:11px;opacity:.8}
 @media(max-width:1240px){.ti-tbl .col-spark,.ti-tbl thead th.col-spark{display:none}}
 @media(max-width:1080px){.ti-tbl .col-arch,.ti-tbl thead th.col-arch{display:none}}
-/* permission grid */
-.perm-grid{border:1px solid var(--line-2);border-radius:9px;overflow:hidden;max-height:236px;overflow-y:auto}
-.perm-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line)}
+/* permission grid — on-system custom control */
+.perm-grid{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.perm-head{display:grid;grid-template-columns:1fr 76px 76px;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-1)}
+.perm-head span{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-2);font-weight:600}
+.perm-head span+span{text-align:center}
+.perm-row{display:grid;grid-template-columns:1fr 76px 76px;gap:8px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line);transition:background .14s var(--ease)}
 .perm-row:last-child{border-bottom:0}
-.perm-name{flex:1;font-size:13px;color:var(--txt)}
-.perm-chk{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--txt-2);cursor:pointer;width:104px;flex:0 0 auto}
-.perm-chk input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
-.perm-chk.dis{opacity:.4}
+.perm-row:hover{background:var(--bg-1)}
+.perm-name{font-size:13px;font-weight:500;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.perm-cell{display:flex;justify-content:center}
+.perm-chk{position:relative;display:inline-flex;cursor:pointer}
+.perm-chk input{position:absolute;opacity:0;width:0;height:0}
+.perm-box{position:relative;width:19px;height:19px;border-radius:var(--r-xs);border:1.5px solid var(--line-2);background:var(--bg-2);flex:0 0 auto;transition:.16s var(--ease)}
+.perm-box svg{position:absolute;inset:0;margin:auto;width:12px;height:12px}
+.perm-box .ck{color:var(--accent-ink);opacity:0;transform:scale(.5);transition:.16s var(--spring)}
+.perm-box .lk{color:var(--txt-3);opacity:0;transition:.16s var(--ease)}
+.perm-chk:hover .perm-box{border-color:var(--accent-line)}
+.perm-chk input:checked + .perm-box{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-line),0 5px 14px -5px rgba(55,230,200,.55)}
+.perm-chk input:checked + .perm-box .ck{opacity:1;transform:none}
+.perm-chk input:focus-visible + .perm-box{box-shadow:0 0 0 3px var(--accent-dim);border-color:var(--accent-line)}
+.perm-chk.locked{cursor:not-allowed}
+.perm-chk input:disabled + .perm-box{background:transparent;border-color:var(--line);border-style:dashed}
+.perm-chk input:disabled + .perm-box .lk{opacity:.7}
+.perm-foot{padding:10px 14px;border-top:1px solid var(--line);background:var(--bg-1);font-family:var(--mono);font-size:11px;color:var(--txt-2);display:flex;gap:14px;align-items:center}
+.perm-foot b{color:var(--txt)}
+.perm-foot .dv{color:var(--accent)} .perm-foot .de{color:var(--warn)}
 /* knowledge base */
 .kb-grid{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start}
 .kb-stat{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
@@ -1671,11 +1715,11 @@ button:active{transform:translateY(.5px) scale(.99)}
     <div class="login-title">Triada<br><span class="t">Smart System</span></div>
     <div class="login-sub">Платформа аналитики нового поколения</div>
     <div class="login-form">
-      <div class="field"><input id="lg-login" type="text" placeholder="Логин" autocomplete="username"></div>
-      <div class="field"><input id="lg-pass" type="password" placeholder="Пароль" autocomplete="current-password"></div>
+      <div class="field"><input id="lg-login" type="text" placeholder="Логин" aria-label="Логин" autocomplete="username"></div>
+      <div class="field"><input id="lg-pass" type="password" placeholder="Пароль" aria-label="Пароль" autocomplete="current-password"></div>
       <button class="btn btn-primary" onclick="doLogin()">Войти</button>
     </div>
-    <div class="login-foot">© 2026 TRIADA SYSTEM GROUP · циан-токены провизорны</div>
+    <div class="login-foot">© 2026 TRIADA SYSTEM GROUP</div>
   </div>
 </section>
 
@@ -1858,7 +1902,7 @@ button:active{transform:translateY(.5px) scale(.99)}
         <div class="fld"><label>Отдел</label><div class="dd seldd" id="seldd-e-dept"><input type="hidden" id="e-dept" value="Продакшн"><button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('e-dept')"><span class="dd-v" id="e-dept-lbl" style="">Продакшн</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu"><button type="button" class="dd-opt on" data-v="Продакшн" data-l="Продакшн" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Продакшн<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Администрация" data-l="Администрация" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Администрация<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Руководство" data-l="Руководство" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Руководство<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button></div></div></div>
         <div class="fld"><label>Цвет</label><div class="swatches" id="e-sw"></div></div>
       </div>
-      <div class="fld"><label>Доступ к модулям — видит / редактирует</label><div class="perm-grid" id="e-perms"></div></div>
+      <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
       <div class="fld2">
         <div class="fld"><label>Логин</label><input id="e-login" placeholder="ivan"><div class="hint" id="e-email">ivan@detroyd.triada.app</div></div>
         <div class="fld"><label>Пароль</label><input id="e-pass" type="text" placeholder="Минимум 8 символов"></div>
@@ -5227,13 +5271,20 @@ function renderTeam(){
 function pickEmpColor(c,el){empColor=c;[...el.parentNode.children].forEach(s=>s.classList.remove('on'));el.classList.add('on');}
 function renderPermGrid(){
   const keys=['projects','deadlines','overview','cycles','finance','team','kb','tools'];
-  document.getElementById('e-perms').innerHTML=keys.map(k=>{
+  const CK='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
+  const LK='<svg class="lk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
+  const rows=keys.map(k=>{
     const p=empPerms[k]||{view:false,edit:false};
-    return `<div class="perm-row"><div class="perm-name">${AG_MODULES[k]}</div>
-      <label class="perm-chk"><input type="checkbox" ${p.view?'checked':''} onchange="togglePerm('${k}','view',this.checked)">Видит</label>
-      <label class="perm-chk ${p.view?'':'dis'}"><input type="checkbox" ${p.edit?'checked':''} ${p.view?'':'disabled'} onchange="togglePerm('${k}','edit',this.checked)">Редактирует</label>
-    </div>`;
+    return `<div class="perm-row"><div class="perm-name">${AG_MODULES[k]}</div>`+
+      `<div class="perm-cell"><label class="perm-chk" title="Просмотр «${AG_MODULES[k]}»"><input type="checkbox" ${p.view?'checked':''} onchange="togglePerm('${k}','view',this.checked)"><span class="perm-box">${CK}</span></label></div>`+
+      `<div class="perm-cell"><label class="perm-chk ${p.view?'':'locked'}" title="${p.view?'Редактирование':'Откроется после «Видит»'}"><input type="checkbox" ${p.edit?'checked':''} ${p.view?'':'disabled'} onchange="togglePerm('${k}','edit',this.checked)"><span class="perm-box">${CK}${LK}</span></label></div>`+
+    `</div>`;
   }).join('');
+  const v=keys.filter(k=>empPerms[k]&&empPerms[k].view).length;
+  const e=keys.filter(k=>empPerms[k]&&empPerms[k].edit).length;
+  document.getElementById('e-perms').innerHTML=
+    '<div class="perm-head"><span>Модуль</span><span>Видит</span><span>Редактирует</span></div>'+rows+
+    `<div class="perm-foot"><span class="dv">●</span><span>Видит&nbsp;<b>${v}</b></span><span class="de">●</span><span>Редактирует&nbsp;<b>${e}</b></span></div>`;
 }
 function togglePerm(k,t,v){ if(!empPerms[k])empPerms[k]={view:false,edit:false}; empPerms[k][t]=v; if(t==='view'&&!v)empPerms[k].edit=false; renderPermGrid(); }
 function openEmp(){
@@ -6508,6 +6559,62 @@ if (window.LIVE){
   const lg = document.getElementById('lg-login'); if (lg) lg.setAttribute('placeholder','Email');
   (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(); })();
 }
+</script>
+<script>
+/* ===== Премиум-слой: клавиатурная доступность + мобильная навигация ===== */
+(function(){
+  const NATIVE='a,button,input,select,textarea';
+  /* делаем кликабельные div'ы фокусируемыми и операбельными с клавиатуры */
+  function enhance(el){
+    if(!el||el.nodeType!==1)return;
+    if(el.hasAttribute('onclick')&&!el.matches(NATIVE)){
+      if(!el.hasAttribute('tabindex'))el.setAttribute('tabindex','0');
+      if(!el.hasAttribute('role'))el.setAttribute('role','button');
+    }
+    el.querySelectorAll&&el.querySelectorAll('[onclick]').forEach(n=>{
+      if(n.matches(NATIVE))return;
+      if(!n.hasAttribute('tabindex'))n.setAttribute('tabindex','0');
+      if(!n.hasAttribute('role'))n.setAttribute('role','button');
+    });
+  }
+  enhance(document.body);
+  new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(enhance)))
+    .observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'&&e.key!==' '&&e.key!=='Spacebar')return;
+    const el=document.activeElement;
+    if(!el||!el.hasAttribute('onclick')||el.matches(NATIVE))return;
+    e.preventDefault();el.click();
+  });
+
+  /* мобильная навигация: гамбургер + drawer + затемнение */
+  function getScrim(){
+    let s=document.getElementById('nav-scrim');
+    if(!s){s=document.createElement('div');s.id='nav-scrim';s.className='nav-scrim';
+      s.addEventListener('click',()=>navToggle(false));document.body.appendChild(s);}
+    return s;
+  }
+  window.navToggle=function(open){
+    const side=document.querySelector('.app.on .side');const scrim=getScrim();
+    if(!side){scrim.classList.remove('on');return;}
+    const willOpen=(open===undefined)?!side.classList.contains('open'):open;
+    side.classList.toggle('open',willOpen);scrim.classList.toggle('on',willOpen);
+  };
+  function initToggles(){
+    document.querySelectorAll('.topbar2').forEach(tb=>{
+      if(tb.querySelector('.nav-toggle'))return;
+      const b=document.createElement('button');
+      b.type='button';b.className='nav-toggle';b.setAttribute('aria-label','Открыть меню');
+      b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>';
+      b.addEventListener('click',()=>navToggle());
+      tb.insertBefore(b,tb.firstChild);
+    });
+  }
+  initToggles();
+  /* закрывать меню после выбора пункта и по Esc */
+  document.addEventListener('click',e=>{ if(e.target.closest&&e.target.closest('.nav-i'))navToggle(false); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape')navToggle(false); });
+})();
 </script>
 </body>
 </html>
