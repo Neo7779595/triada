@@ -2635,7 +2635,7 @@ function projSettings(i){
       <div class="fld2">${tagCombo('pj-tariff','Тариф',tariffs,(p.tariff||''),'Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('pj-lead',leadOpts,(p.lead_id||''))}</div></div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
-        <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span><input type="date" id="np-cstart"></div><div class="np-ct-d"><span>Окончание</span><input type="date" id="np-cend"></div></div>
+        <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('np-cstart','')}</div><div class="np-ct-d"><span>Окончание</span>${dateField('np-cend','')}</div></div>
         <div class="np-ct-presets"><button type="button" class="np-ct-p" onclick="npContractPreset(1)">1 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(3)">3 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(6)">6 мес</button></div>
       </div></div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
@@ -2771,7 +2771,7 @@ function openNewProject(){
       <div class="fld2">${tagCombo('np-tariff','Тариф',tariffs,'','Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
-        <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span><input type="date" id="np-cstart"></div><div class="np-ct-d"><span>Окончание</span><input type="date" id="np-cend"></div></div>
+        <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('np-cstart','')}</div><div class="np-ct-d"><span>Окончание</span>${dateField('np-cend','')}</div></div>
         <div class="np-ct-presets"><button type="button" class="np-ct-p" onclick="npContractPreset(1)">1 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(3)">3 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(6)">6 мес</button></div>
       </div></div>
       <div class="fld"><label>Этапы проекта</label><div id="np-stages" class="np-stages"></div></div>
@@ -2871,8 +2871,8 @@ function npTeamPickerDone(){ window.NP_TEAM=new Set(window._npPickWork||[]); npT
 /* ——— contract term (Фаза 3.2) ——— */
 function npToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function npAddMonths(ds,m){ if(!ds) return ''; const p=ds.split('-').map(Number); const d=new Date(p[0],p[1]-1+m,p[2]); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-function npContractInit(start,end){ const s=document.getElementById('np-cstart'), e=document.getElementById('np-cend'); if(s) s.value=start||npToday(); if(e) e.value=end||npAddMonths((s&&s.value)||npToday(),1); }
-function npContractPreset(m){ const s=document.getElementById('np-cstart'), e=document.getElementById('np-cend'); if(!s||!e) return; if(!s.value) s.value=npToday(); e.value=npAddMonths(s.value,m); }
+function npContractInit(start,end){ if(typeof dpPick!=='function') return; const ss=start||npToday(); dpPick('np-cstart',ss); dpPick('np-cend', end||npAddMonths(ss,1)); }
+function npContractPreset(m){ let sv=_v('np-cstart'); if(!sv){ sv=npToday(); dpPick('np-cstart',sv); } dpPick('np-cend', npAddMonths(sv,m)); }
 
 /* ——— completion / renewal modal (Фаза 4) ——— */
 function openCompletionModal(pid){
@@ -2891,7 +2891,7 @@ function openCompletionModal(pid){
       </div>
       <div class="cm-renew" id="cm-renew" style="display:none">
         <div class="cm-renew-h">Новый срок договора</div>
-        <div class="np-ct"><div class="np-ct-row"><div class="np-ct-d"><span>Начало</span><input type="date" id="cm-cstart" value="${ns}"></div><div class="np-ct-d"><span>Окончание</span><input type="date" id="cm-cend" value="${ne}"></div></div><div class="np-ct-presets"><button type="button" class="np-ct-p" onclick="cmRenewPreset(1)">1 мес</button><button type="button" class="np-ct-p" onclick="cmRenewPreset(3)">3 мес</button><button type="button" class="np-ct-p" onclick="cmRenewPreset(6)">6 мес</button></div></div>
+        <div class="np-ct"><div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('cm-cstart',ns)}</div><div class="np-ct-d"><span>Окончание</span>${dateField('cm-cend',ne)}</div></div><div class="np-ct-presets"><button type="button" class="np-ct-p" onclick="cmRenewPreset(1)">1 мес</button><button type="button" class="np-ct-p" onclick="cmRenewPreset(3)">3 мес</button><button type="button" class="np-ct-p" onclick="cmRenewPreset(6)">6 мес</button></div></div>
         <p class="cm-renew-note">Этапы сбросятся в новый цикл: первый — в работу, остальные — в очередь. История переходов сохранится в журнале.</p>
       </div>
     </div>
@@ -2901,7 +2901,7 @@ function openCompletionModal(pid){
 }
 function cmClose(){ const ov=document.getElementById('ov-complete'); if(ov) ov.classList.remove('on'); window._cmPid=null; }
 function cmShowRenew(){ const r=document.getElementById('cm-renew'), g=document.getElementById('cm-renew-go'); if(r)r.style.display='block'; if(g)g.style.display='inline-flex'; }
-function cmRenewPreset(m){ const s=document.getElementById('cm-cstart'), e=document.getElementById('cm-cend'); if(!s||!e)return; if(!s.value)s.value=npToday(); e.value=npAddMonths(s.value,m); }
+function cmRenewPreset(m){ let sv=_v('cm-cstart'); if(!sv){ sv=npToday(); dpPick('cm-cstart',sv); } dpPick('cm-cend', npAddMonths(sv,m)); }
 function cmComplete(){ const pid=window._cmPid; if(!pid)return; if(window.LIVE && window.tProjectComplete){ window.tProjectComplete(pid); } else { cmClose(); } }
 function cmRenew(){ const pid=window._cmPid; if(!pid)return; const ns=_v('cm-cstart'), ne=_v('cm-cend'); if(!ns||!ne){toast('Укажи новый срок договора');return;} if(window.LIVE && window.tProjectRenew){ window.tProjectRenew(pid,ns,ne); } else { cmClose(); } }
 
