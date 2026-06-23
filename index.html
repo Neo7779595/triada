@@ -1230,6 +1230,33 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cm-renew{margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}
 .cm-renew-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin-bottom:9px}
 .cm-renew-note{font-size:11.5px;color:var(--txt-3);margin-top:10px;line-height:1.5}
+.pd-sec-acts{display:flex;align-items:center;gap:8px}
+.pd-cyc-btn.ghost{background:transparent;border-color:var(--line-2);color:var(--txt-2)}
+.pd-cyc-btn.ghost:hover{border-color:var(--accent-line);color:var(--accent)}
+.cy-modal{max-width:520px}
+.cy-list{display:flex;flex-direction:column;gap:9px}
+.cy-empty{font-size:12.5px;color:var(--txt-3);padding:14px 2px;line-height:1.5}
+.cy-card{border:1px solid var(--line-2);border-radius:11px;overflow:hidden;background:var(--bg-2)}
+.cy-hd{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 14px;background:transparent;border:none;color:var(--txt);cursor:pointer;font:inherit;text-align:left}
+.cy-hd:hover{background:rgba(255,255,255,.02)}
+.cy-hd-l{display:flex;flex-direction:column;gap:2px}
+.cy-hd-l b{font-size:13.5px;font-weight:600}
+.cy-hd-l small{font-size:11px;color:var(--txt-3);font-family:var(--mono)}
+.cy-hd-r{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--txt-3);white-space:nowrap}
+.cy-chev{width:15px;height:15px;transition:.2s}
+.cy-hd.open .cy-chev{transform:rotate(180deg)}
+.cy-body{padding:4px 14px 13px;border-top:1px solid var(--line)}
+.cy-stage{padding:8px 0;border-bottom:1px solid var(--line)}
+.cy-stage:last-child{border-bottom:none}
+.cy-st-h{display:flex;align-items:center;gap:8px;font-size:13px}
+.cy-st-h b{font-weight:600}
+.cy-st-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--txt-3)}
+.cy-st-dot.done{background:var(--pos)}
+.cy-st-ct{font-size:10px;font-weight:700;color:var(--txt-3);background:var(--bg-1);border:1px solid var(--line-2);border-radius:10px;padding:1px 7px;margin-left:auto}
+.cy-tasks{margin:6px 0 2px;padding-left:16px;display:flex;flex-direction:column;gap:4px}
+.cy-task{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt-2)}
+.cy-tk-dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--txt-3);opacity:.6}
+.cy-tk-dot.done{background:var(--pos);opacity:1}
 .fld textarea{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;resize:vertical;min-height:74px}
 .fld textarea:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .st-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -1975,6 +2002,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <div class="ov" id="ov-pd2" onclick="if(event.target===this)pd2Close()"></div>
 <div class="ov" id="ov-npteam" onclick="if(event.target===this)npTeamPickerClose()"></div>
 <div class="ov" id="ov-complete" onclick="if(event.target===this)cmClose()"></div>
+<div class="ov" id="ov-cycles" onclick="if(event.target===this)cyClose()"></div>
 
 <div class="ov" id="cmdk" onclick="if(event.target===this)cmdkClose()">
   <div class="cmdk-box">
@@ -2826,6 +2854,39 @@ function cmRenewPreset(m){ const s=document.getElementById('cm-cstart'), e=docum
 function cmComplete(){ const pid=window._cmPid; if(!pid)return; if(window.LIVE && window.tProjectComplete){ window.tProjectComplete(pid); } else { cmClose(); } }
 function cmRenew(){ const pid=window._cmPid; if(!pid)return; const ns=_v('cm-cstart'), ne=_v('cm-cend'); if(!ns||!ne){toast('Укажи новый срок договора');return;} if(window.LIVE && window.tProjectRenew){ window.tProjectRenew(pid,ns,ne); } else { cmClose(); } }
 
+/* ——— archive of past cycles (Фаза 5.3) ——— */
+function openCyclesModal(pid){
+  const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===pid); if(!p) return;
+  const cy=(p._cycles||[]);
+  const ov=document.getElementById('ov-cycles'); if(!ov) return;
+  const body = cy.length ? cy.map((c,i)=>cycleCardHTML(c,i)).join('') : '<div class="cy-empty">Пока нет завершённых циклов. Они появятся здесь после продления контракта.</div>';
+  ov.innerHTML=`<div class="modal cy-modal">
+    <div class="modal-h"><h3>Прошлые периоды · ${_ddH(p.name)}</h3><p>Архив завершённых циклов работ — этапы и задачи каждого периода.</p></div>
+    <div class="modal-b"><div class="cy-list">${body}</div></div>
+    <div class="modal-f"><button class="btn-ghost" onclick="cyClose()">Закрыть</button></div>
+  </div>`;
+  ov.classList.add('on');
+}
+function cyClose(){ const ov=document.getElementById('ov-cycles'); if(ov) ov.classList.remove('on'); }
+function cyToggle(i){ const el=document.getElementById('cy-body-'+i), hd=document.getElementById('cy-hd-'+i); if(!el)return; const open=el.style.display!=='none'; el.style.display=open?'none':'block'; if(hd) hd.classList.toggle('open',!open); }
+function cycleCardHTML(c,i){
+  const snap=c.snapshot||{}; const stages=snap.stages||[]; const tasks=snap.tasks||[];
+  const fmt=d=>d?String(d).split('-').reverse().join('.'):'—';
+  const period=(c.period_start||c.period_end)?(fmt(c.period_start)+' — '+fmt(c.period_end)):'период не указан';
+  const stDone=stages.filter(s=>s.status==='done').length;
+  const names=new Set(stages.map(s=>s.name));
+  const byStage={}; tasks.forEach(t=>{ const k=names.has(t.stage)?t.stage:'__orphan'; (byStage[k]=byStage[k]||[]).push(t); });
+  const taskRow=t=>`<div class="cy-task"><span class="cy-tk-dot ${t.status==='done'?'done':''}"></span>${_ddH(t.title||'Задача')}</div>`;
+  const stageBlock=(name,status,list)=>`<div class="cy-stage"><div class="cy-st-h"><span class="cy-st-dot ${status==='done'?'done':''}"></span><b>${_ddH(name)}</b>${list.length?`<span class="cy-st-ct">${list.length}</span>`:''}</div>${list.length?`<div class="cy-tasks">${list.map(taskRow).join('')}</div>`:''}</div>`;
+  let inner=stages.map(s=>stageBlock(s.name,s.status,byStage[s.name]||[])).join('');
+  if(byStage.__orphan&&byStage.__orphan.length) inner+=stageBlock('Без этапа','',byStage.__orphan);
+  if(!inner) inner='<div class="cy-empty" style="padding:10px 0">Цикл без этапов и задач.</div>';
+  return `<div class="cy-card">
+    <button type="button" class="cy-hd" id="cy-hd-${i}" onclick="cyToggle(${i})"><span class="cy-hd-l"><b>Цикл ${c.cycle_no}</b><small>${period}</small></span><span class="cy-hd-r">${stDone}/${stages.length} эт. · ${tasks.length} зад.<svg class="cy-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></span></button>
+    <div class="cy-body" id="cy-body-${i}" style="display:none">${inner}</div>
+  </div>`;
+}
+
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
 const SORT_LABEL=Object.fromEntries(SORT_OPTS);
@@ -3534,7 +3595,7 @@ function renderPd(){
             </div></div>`;
         }).join('');
       }
-      h=hero+`<div class="pd-sec-h"><div class="t">Этапы проекта · ${total} шагов</div>${total?`<button class="pd-cyc-btn" onclick="pdNewStage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Этап</button>`:''}</div><div class="pd-stages">${list}</div>`;
+      h=hero+`<div class="pd-sec-h"><div class="t">Этапы проекта · ${total} шагов</div><div class="pd-sec-acts">${(p._cycles&&p._cycles.length)?`<button class="pd-cyc-btn ghost" onclick="openCyclesModal('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>Прошлые периоды · ${p._cycles.length}</button>`:''}${total?`<button class="pd-cyc-btn" onclick="pdNewStage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Этап</button>`:''}</div></div><div class="pd-stages">${list}</div>`;
     }
   } else if(pdTabCur==='kanban'){
     if(p._tasks===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка задач…</div>'; }
@@ -6080,12 +6141,14 @@ async function _pwReload(projectId){
 window.tLoadProjectWork = async (projectId) => {
   if (!SB || !projectId) return;
   const p = (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x => x.id===projectId); if (!p) return;
-  const [st, tk, rp, hs] = await Promise.all([
+  const [st, tk, rp, hs, cy] = await Promise.all([
     SB.from('project_stages').select('*').eq('project_id',projectId).order('idx'),
     SB.from('project_tasks').select('*').eq('project_id',projectId).order('idx'),
     SB.from('reports').select('*').eq('project_id',projectId).order('published_at',{ascending:false}),
-    SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40) ]);
+    SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40),
+    SB.from('project_cycles').select('id,cycle_no,period_start,period_end,snapshot,archived_at').eq('project_id',projectId).order('cycle_no',{ascending:false}) ]);
   p._stages = st.data||[];
+  p._cycles = cy.data||[];
   { // защита от гонки: недавние оптимистичные изменения таймеров не перетираем устаревшими данными из БД
     const fresh=tk.data||[]; const prev=p._tasks||[]; const pby={}; prev.forEach(x=>{ if(x&&x.id!=null) pby[x.id]=x; }); const NM=Date.now();
     p._tasks = fresh.map(fr=>{ const o=pby[fr.id];
@@ -6102,14 +6165,36 @@ window.tProjectComplete = async (pid) => { try {
   if(typeof cmClose==='function')cmClose(); toast('Проект завершён'); await window.tLoadAll(ME.role);
 } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tProjectRenew = async (pid, ns, ne) => { try {
-  const {error:ce}=await SB.from('project_contracts').upsert({project_id:pid, start_date:ns, end_date:ne, updated_at:new Date().toISOString()}, {onConflict:'project_id'}); if(ce)throw ce;
-  const {data:sts, error:se}=await SB.from('project_stages').select('id,idx').eq('project_id',pid).order('idx',{ascending:true}); if(se)throw se;
-  if(sts && sts.length){
-    const {error:ue1}=await SB.from('project_stages').update({status:'wait'}).eq('project_id',pid); if(ue1)throw ue1;
-    const {error:ue2}=await SB.from('project_stages').update({status:'active'}).eq('id',sts[0].id); if(ue2)throw ue2;
+  // 1. снимок текущего цикла + старый период договора + номер следующего цикла
+  const [stRes, tkRes, ctRes, cyRes] = await Promise.all([
+    SB.from('project_stages').select('id,name,status,idx').eq('project_id',pid).order('idx',{ascending:true}),
+    SB.from('project_tasks').select('title,status,stage_id,assignee_id,time_spent,due_date').eq('project_id',pid),
+    SB.from('project_contracts').select('start_date,end_date').eq('project_id',pid).maybeSingle(),
+    SB.from('project_cycles').select('cycle_no').eq('project_id',pid).order('cycle_no',{ascending:false}).limit(1)
+  ]);
+  if(stRes.error)throw stRes.error; if(tkRes.error)throw tkRes.error;
+  const stages=(stRes.data||[]);
+  const stName={}; stages.forEach(s=>{ stName[s.id]=s.name; });
+  const tasks=(tkRes.data||[]).map(t=>({title:t.title, status:t.status, stage:stName[t.stage_id]||'—', assignee_id:t.assignee_id||null, time_spent:t.time_spent||0, due_date:t.due_date||null}));
+  const oldPeriod=(ctRes&&ctRes.data)||{};
+  const nextNo=((cyRes&&cyRes.data&&cyRes.data[0]&&cyRes.data[0].cycle_no)||0)+1;
+  // 2. архивируем завершённый цикл (со СТАРЫМ периодом договора)
+  if(stages.length || tasks.length){
+    const snap={ stages: stages.map(s=>({name:s.name,status:s.status,idx:s.idx})), tasks };
+    const {error:ae}=await SB.from('project_cycles').insert({project_id:pid, cycle_no:nextNo, period_start:oldPeriod.start_date||null, period_end:oldPeriod.end_date||null, snapshot:snap});
+    if(ae)throw ae;
   }
+  // 3. аннулируем задачи завершённого цикла
+  { const {error:de}=await SB.from('project_tasks').delete().eq('project_id',pid); if(de)throw de; }
+  // 4. сбрасываем этапы в свежий цикл (первый — в работу, остальные — в очередь)
+  if(stages.length){
+    const {error:ue1}=await SB.from('project_stages').update({status:'wait'}).eq('project_id',pid); if(ue1)throw ue1;
+    const {error:ue2}=await SB.from('project_stages').update({status:'active'}).eq('id',stages[0].id); if(ue2)throw ue2;
+  }
+  // 5. новый период договора + проект активен
+  const {error:ce}=await SB.from('project_contracts').upsert({project_id:pid, start_date:ns, end_date:ne, updated_at:new Date().toISOString()}, {onConflict:'project_id'}); if(ce)throw ce;
   await SB.from('projects').update({status:'active'}).eq('id',pid);
-  if(typeof cmClose==='function')cmClose(); toast('Контракт продлён, новый цикл запущен'); await window.tLoadAll(ME.role);
+  if(typeof cmClose==='function')cmClose(); toast('Контракт продлён · прошлый цикл в архиве'); await window.tLoadAll(ME.role);
 } catch(e){ toast('Ошибка продления: '+(e.message||e)); } };
 window.tStageSave = async (id,patch) => { try {
   const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); const _old=_st&&_st.status;
