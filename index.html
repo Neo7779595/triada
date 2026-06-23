@@ -1216,6 +1216,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-ct{display:flex;align-items:center;align-self:stretch;padding-left:18px;border-left:1px solid var(--line)}
 .pd-ct:empty{display:none}
 .pd-ct .pt-ct{margin-top:0;align-self:center}
+.cm-modal{max-width:430px}
+.cm-choices{display:flex;flex-direction:column;gap:10px}
+.cm-choice{display:flex;align-items:center;gap:13px;width:100%;text-align:left;padding:14px 15px;border:1px solid var(--line-2);border-radius:12px;background:var(--bg-2);color:var(--txt);cursor:pointer;font:inherit;transition:.16s}
+.cm-choice:hover{border-color:var(--accent-line);background:var(--accent-dim)}
+.cm-ic{flex:none;width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.cm-ic svg{width:19px;height:19px}
+.cm-ic.done{background:rgba(67,216,140,.14);color:var(--pos)}
+.cm-ic.renew{background:var(--accent-dim);color:var(--accent)}
+.cm-tx{display:flex;flex-direction:column;gap:2px}
+.cm-tx b{font-size:14px;font-weight:600}
+.cm-tx small{font-size:11.5px;color:var(--txt-3)}
+.cm-renew{margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}
+.cm-renew-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin-bottom:9px}
+.cm-renew-note{font-size:11.5px;color:var(--txt-3);margin-top:10px;line-height:1.5}
 .fld textarea{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;resize:vertical;min-height:74px}
 .fld textarea:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .st-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -1960,6 +1974,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 
 <div class="ov" id="ov-pd2" onclick="if(event.target===this)pd2Close()"></div>
 <div class="ov" id="ov-npteam" onclick="if(event.target===this)npTeamPickerClose()"></div>
+<div class="ov" id="ov-complete" onclick="if(event.target===this)cmClose()"></div>
 
 <div class="ov" id="cmdk" onclick="if(event.target===this)cmdkClose()">
   <div class="cmdk-box">
@@ -2779,6 +2794,37 @@ function npToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getM
 function npAddMonths(ds,m){ if(!ds) return ''; const p=ds.split('-').map(Number); const d=new Date(p[0],p[1]-1+m,p[2]); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function npContractInit(start,end){ const s=document.getElementById('np-cstart'), e=document.getElementById('np-cend'); if(s) s.value=start||npToday(); if(e) e.value=end||npAddMonths((s&&s.value)||npToday(),1); }
 function npContractPreset(m){ const s=document.getElementById('np-cstart'), e=document.getElementById('np-cend'); if(!s||!e) return; if(!s.value) s.value=npToday(); e.value=npAddMonths(s.value,m); }
+
+/* ——— completion / renewal modal (Фаза 4) ——— */
+function openCompletionModal(pid){
+  const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===pid); if(!p) return;
+  window._cmPid=pid;
+  const ov=document.getElementById('ov-complete'); if(!ov) return;
+  const ct=p._contract||null;
+  const ns=(ct&&ct.end)||npToday();
+  const ne=npAddMonths(ns,1);
+  ov.innerHTML=`<div class="modal cm-modal">
+    <div class="modal-h"><h3>Все этапы завершены</h3><p>Проект «${_ddH(p.name)}» прошёл полный цикл работ. Что дальше?</p></div>
+    <div class="modal-b">
+      <div class="cm-choices">
+        <button type="button" class="cm-choice" onclick="cmComplete()"><span class="cm-ic done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="cm-tx"><b>Завершить проект</b><small>Закрыть и перенести в завершённые</small></span></button>
+        <button type="button" class="cm-choice" onclick="cmShowRenew()"><span class="cm-ic renew"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg></span><span class="cm-tx"><b>Продлить контракт</b><small>Новый период договора и свежий цикл этапов</small></span></button>
+      </div>
+      <div class="cm-renew" id="cm-renew" style="display:none">
+        <div class="cm-renew-h">Новый срок договора</div>
+        <div class="np-ct"><div class="np-ct-row"><div class="np-ct-d"><span>Начало</span><input type="date" id="cm-cstart" value="${ns}"></div><div class="np-ct-d"><span>Окончание</span><input type="date" id="cm-cend" value="${ne}"></div></div><div class="np-ct-presets"><button type="button" class="np-ct-p" onclick="cmRenewPreset(1)">1 мес</button><button type="button" class="np-ct-p" onclick="cmRenewPreset(3)">3 мес</button><button type="button" class="np-ct-p" onclick="cmRenewPreset(6)">6 мес</button></div></div>
+        <p class="cm-renew-note">Этапы сбросятся в новый цикл: первый — в работу, остальные — в очередь. История переходов сохранится в журнале.</p>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="cmClose()">Позже</button><button class="btn-add" id="cm-renew-go" style="display:none" onclick="cmRenew()">Продлить контракт</button></div>
+  </div>`;
+  ov.classList.add('on');
+}
+function cmClose(){ const ov=document.getElementById('ov-complete'); if(ov) ov.classList.remove('on'); window._cmPid=null; }
+function cmShowRenew(){ const r=document.getElementById('cm-renew'), g=document.getElementById('cm-renew-go'); if(r)r.style.display='block'; if(g)g.style.display='inline-flex'; }
+function cmRenewPreset(m){ const s=document.getElementById('cm-cstart'), e=document.getElementById('cm-cend'); if(!s||!e)return; if(!s.value)s.value=npToday(); e.value=npAddMonths(s.value,m); }
+function cmComplete(){ const pid=window._cmPid; if(!pid)return; if(window.LIVE && window.tProjectComplete){ window.tProjectComplete(pid); } else { cmClose(); } }
+function cmRenew(){ const pid=window._cmPid; if(!pid)return; const ns=_v('cm-cstart'), ne=_v('cm-cend'); if(!ns||!ne){toast('Укажи новый срок договора');return;} if(window.LIVE && window.tProjectRenew){ window.tProjectRenew(pid,ns,ne); } else { cmClose(); } }
 
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
@@ -6051,6 +6097,20 @@ window.tLoadProjectWork = async (projectId) => {
     const txt = k==='done'?'Этап завершён':k==='start'?'Команда начала этап':'Этап возвращён в ожидание';
     return { txt, tag:h.stage_name||'—', t:tAgo(h.created_at), k }; });
 };
+window.tProjectComplete = async (pid) => { try {
+  const {error}=await SB.from('projects').update({status:'done'}).eq('id',pid); if(error)throw error;
+  if(typeof cmClose==='function')cmClose(); toast('Проект завершён'); await window.tLoadAll(ME.role);
+} catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tProjectRenew = async (pid, ns, ne) => { try {
+  const {error:ce}=await SB.from('project_contracts').upsert({project_id:pid, start_date:ns, end_date:ne, updated_at:new Date().toISOString()}, {onConflict:'project_id'}); if(ce)throw ce;
+  const {data:sts, error:se}=await SB.from('project_stages').select('id,idx').eq('project_id',pid).order('idx',{ascending:true}); if(se)throw se;
+  if(sts && sts.length){
+    const {error:ue1}=await SB.from('project_stages').update({status:'wait'}).eq('project_id',pid); if(ue1)throw ue1;
+    const {error:ue2}=await SB.from('project_stages').update({status:'active'}).eq('id',sts[0].id); if(ue2)throw ue2;
+  }
+  await SB.from('projects').update({status:'active'}).eq('id',pid);
+  if(typeof cmClose==='function')cmClose(); toast('Контракт продлён, новый цикл запущен'); await window.tLoadAll(ME.role);
+} catch(e){ toast('Ошибка продления: '+(e.message||e)); } };
 window.tStageSave = async (id,patch) => { try {
   const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); const _old=_st&&_st.status;
   const {error}=await SB.from('project_stages').update(patch).eq('id',id); if(error)throw error;
@@ -6062,10 +6122,11 @@ window.tStageSave = async (id,patch) => { try {
     else if(patch.status==='done'){
       tgNotify(pid,'stage_done',{stage_name:_st.name, note:_note, link:_link});
       const others=((_p&&_p._stages)||[]).filter(s=>s.id!==id);
-      if(others.length && others.every(s=>s.status==='done')) tgNotify(pid,'project_done',{});
+      if(others.length && others.every(s=>s.status==='done')){ tgNotify(pid,'project_done',{}); window._cmPending=pid; }
     }
   }
-  if(typeof pd2Close==='function')pd2Close(); toast('Этап обновлён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  if(typeof pd2Close==='function')pd2Close(); toast('Этап обновлён'); await _pwReload(curProjId());
+  if(window._cmPending){ const _cpid=window._cmPending; window._cmPending=null; const _cp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===_cpid); if(_cp && _cp.status!=='done' && typeof openCompletionModal==='function') setTimeout(()=>openCompletionModal(_cpid),350); } } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageAdd = async (projectId,row) => { try { const {error}=await SB.from('project_stages').insert({project_id:projectId,...row}); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); toast('Этап создан'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageDel = async (id) => { try { const {error}=await SB.from('project_stages').delete().eq('id',id); if(error)throw error;
