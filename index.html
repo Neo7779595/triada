@@ -2656,6 +2656,13 @@ async function pjSaveSettings(i){
   const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:_v('pj-svc')||p.svc, tariff:(_v('pj-tariff')||null), lead_id:(_v('pj-lead')||null), status };
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():null);
   const ctTerm={start:_v('np-cstart')||null, end:_v('np-cend')||null};
+  if(window.LIVE && p.status==='done' && status==='active'){
+    window._reactData={ id:p.id, patch, selTeam, ctTerm, oldContract:(p._contract||null) };
+    pd2Open(`<div class="modal"><div class="modal-h"><h3>Вернуть проект в работу</h3><p>${_ddH(p.name)} · новый цикл</p></div>`
+      +`<div class="modal-b"><div style="font-size:13px;color:var(--txt-2);line-height:1.55">Проект возвращается в работу как <b>новый цикл</b>. Прошлый цикл (этапы и задачи) будет заархивирован в «Прошлые периоды», а текущие этапы и задачи — <b>обнулены</b>: первый этап в работу, остальные в очередь. Срок договора возьмётся из формы настроек.</div></div>`
+      +`<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjDoReactivate()">Вернуть и начать новый цикл</button></div></div>`);
+    return;
+  }
   if(window.LIVE){
     if(selTeam){ try{ await SB.from('project_members').delete().eq('project_id',p.id); if(selTeam.length){ const {error}=await SB.from('project_members').insert(selTeam.map(mid=>({project_id:p.id,member_id:mid}))); if(error)throw error; } }catch(e){ console.error('team save',e); toast('Команда не сохранилась'); } }
     if(ctTerm.start && ctTerm.end){ try{ const {error}=await SB.from('project_contracts').upsert({project_id:p.id, start_date:ctTerm.start, end_date:ctTerm.end, updated_at:new Date().toISOString()}, {onConflict:'project_id'}); if(error)throw error; }catch(e){ console.error('contract save',e); toast('Срок договора не сохранился'); } }
@@ -2665,6 +2672,19 @@ async function pjSaveSettings(i){
   if(selTeam){ p._team=selTeam.map(id=>{ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:id}:null; }).filter(Boolean); }
   p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.lead_id=patch.lead_id; p._lead=null; p.status=status;
   pd2Close(); renderProjects(); toast('Проект обновлён');
+}
+function pjDoReactivate(){
+  const d=window._reactData; if(!d) return; window._reactData=null;
+  (async()=>{
+    try{
+      if(d.selTeam){ await SB.from('project_members').delete().eq('project_id',d.id); if(d.selTeam.length){ const {error}=await SB.from('project_members').insert(d.selTeam.map(mid=>({project_id:d.id,member_id:mid}))); if(error) console.error('react team',error); } }
+      await SB.from('projects').update({name:d.patch.name, logo_url:d.patch.logo_url, category:d.patch.category, service:d.patch.service, tariff:d.patch.tariff, lead_id:d.patch.lead_id}).eq('id',d.id);
+    }catch(e){ console.error('reactivate fields',e); }
+    const ns=d.ctTerm.start || (d.oldContract&&d.oldContract.start) || (typeof npToday==='function'?npToday():null);
+    const ne=d.ctTerm.end || (typeof npAddMonths==='function'?npAddMonths(ns,1):null);
+    pd2Close();
+    if(window.tProjectRenew) window.tProjectRenew(d.id, ns, ne);
+  })();
 }
 function pjDeleteProject(i){ const p=PROJECTS[i];
   if(!agIsOwner()){ toast('Удаление проекта доступно только владельцу'); return; }
@@ -6262,7 +6282,7 @@ window.tProjectRenew = async (pid, ns, ne) => { try {
   // 5. новый период договора + проект активен
   const {error:ce}=await SB.from('project_contracts').upsert({project_id:pid, start_date:ns, end_date:ne, updated_at:new Date().toISOString()}, {onConflict:'project_id'}); if(ce)throw ce;
   await SB.from('projects').update({status:'active'}).eq('id',pid);
-  if(typeof cmClose==='function')cmClose(); toast('Контракт продлён · прошлый цикл в архиве'); await window.tLoadAll(ME.role);
+  if(typeof cmClose==='function')cmClose(); toast('Новый цикл запущен · прошлый в архиве'); await window.tLoadAll(ME.role);
 } catch(e){ toast('Ошибка продления: '+(e.message||e)); } };
 window.tSaveStageTemplate = async (service, stages) => { try {
   const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
