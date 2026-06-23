@@ -1178,6 +1178,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .sched-hour{padding:8px 8px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);border-radius:8px;font-family:var(--font);font-size:12px;cursor:pointer}
 .sched-add-btn{padding:8px 14px;border:none;background:var(--accent);color:var(--bg-0);border-radius:8px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
 .sched-add-btn:hover{filter:brightness(1.08)}
+.tg-banner-pv{width:100%;border-radius:11px;overflow:hidden;border:1px solid var(--line);background:var(--bg-1);max-height:160px;display:flex;align-items:center;justify-content:center}
+.tg-banner-pv img{width:100%;height:auto;display:block;object-fit:cover;max-height:160px}
 #ov-npteam{z-index:70}
 #ov-npteam .modal{max-width:480px}
 .pt-team{display:flex;align-items:center;margin-top:9px}
@@ -3387,6 +3389,20 @@ async function tgTeamModal(){
         <div class="tg-res" id="tgt-done-res" style="padding:0 0 8px"></div>
         <button class="tg-test" style="margin:0;width:100%;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="tgTeamTest()">Тест во все группы</button>
         <div class="tg-res" id="tgt-test-res"></div>
+      </div>
+      <div class="tg-bh" style="margin-top:16px">Баннер клиентских уведомлений</div>
+      <div style="padding:0 22px 4px">
+        <input type="file" accept="image/*" id="tg-banner-file" style="display:none" onchange="if(this.files&&this.files[0])tgBannerUpload(this.files[0])">
+        ${me.tg_banner_url?`
+          <div class="tg-banner-pv"><img src="${_ddH(me.tg_banner_url)}" alt=""></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button type="button" class="tg-test" style="margin:0;flex:1" onclick="document.getElementById('tg-banner-file').click()">Заменить</button>
+            <button type="button" class="tg-test" style="margin:0;flex:none;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="tgBannerRemove()">Убрать</button>
+          </div>
+        `:`
+          <button type="button" class="tg-test" style="margin:0;width:100%;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="document.getElementById('tg-banner-file').click()">Загрузить баннер</button>
+          <div class="tg-hint" style="padding:8px 0 0">Прикрепится к клиентским уведомлениям: этапы, отчёты, завершение проекта.</div>
+        `}
       </div>
       <div class="tg-bh" style="margin-top:16px">Автоотправка по расписанию</div>
       <div style="padding:0 22px">
@@ -6225,6 +6241,26 @@ function tgSchedHuman(sc){
   return `${dlabel} · ${hh}:00 · ${klabel}`;
 }
 window.tgSchedHuman=tgSchedHuman;
+/* ===== Баннер клиентских уведомлений ===== */
+window.tgBannerUpload = async (file) => {
+  try{
+    if(!SB||!file) return;
+    if(file.size>4*1024*1024){ toast('Файл больше 4 МБ — сожми изображение'); return; }
+    const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
+    const ext=((file.name||'').split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
+    const path=me.agency_id+'/banner-'+Date.now()+'.'+ext;
+    toast('Загрузка баннера…');
+    const {error}=await SB.storage.from('project-logos').upload(path,file,{upsert:true,contentType:file.type||undefined}); if(error)throw error;
+    const {data}=SB.storage.from('project-logos').getPublicUrl(path); const url=data.publicUrl;
+    const {error:e2}=await SB.from('agencies').update({tg_banner_url:url}).eq('id',me.agency_id); if(e2)throw e2;
+    me.tg_banner_url=url; toast('Баннер загружен'); if(typeof tgTeamModal==='function') tgTeamModal();
+  }catch(e){ toast('Ошибка: '+(e.message||e)); }
+};
+async function tgBannerRemove(){
+  const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id||!SB) return;
+  try{ await SB.from('agencies').update({tg_banner_url:null}).eq('id',me.agency_id); me.tg_banner_url=''; toast('Баннер убран'); if(typeof tgTeamModal==='function') tgTeamModal(); }catch(e){ toast('Ошибка'); }
+}
+window.tgBannerRemove=tgBannerRemove;
 let ME = null; window.tMe = () => ME;
 
 const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.vertical||'—',
@@ -7026,8 +7062,8 @@ async function routeByProfile(){
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
   ME = data || { role:'member' };
-  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent,name,logo_url,tg_team_code,tg_team_chat_id').eq('id', ME.agency_id).single();
-    if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; } }
+  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent,name,logo_url,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single();
+    if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } }
   await window.tLoadAll(ME.role);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
   if (ME.role === 'superadmin') enter('general');
