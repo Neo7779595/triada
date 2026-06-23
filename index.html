@@ -2622,9 +2622,9 @@ function pjTogStatus(el){[...el.parentNode.children].forEach(b=>b.classList.remo
 function projSettings(i){
   if(!agIsOwner()){ toast('Настройки проекта доступны только владельцу'); return; }
   const p=PROJECTS[i];
-  const cats=[...new Set([...(PROJECT_TAGS.category||[]),...PROJECTS.map(x=>x.cat).filter(c=>c&&c!=='—')])].sort((a,b)=>a.localeCompare(b,'ru'));
-  const svcs=[...new Set(['SMM','PROD','DESIGN',...(PROJECT_TAGS.service||[]),...PROJECTS.map(x=>x.svc).filter(Boolean)])];
-  const tariffs=[...new Set(['Platinum','Gold','Silver',...(PROJECT_TAGS.tariff||[]),...PROJECTS.map(x=>x.tariff).filter(Boolean)])];
+  const cats=_tagList('category',[],(p.cat&&p.cat!=='—')?p.cat:'');
+  const svcs=_tagList('service',['SMM','PROD','DESIGN'],p.svc);
+  const tariffs=_tagList('tariff',['Platinum','Gold','Silver'],p.tariff||'');
   const leadOpts=[['','— не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name+(m.role?(' · '+m.role):'')]));
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Настройки · ${p.name}</h3><p>Карточка проекта · теги, тариф, ответственный</p></div>
@@ -2742,9 +2742,9 @@ function setAgFilter(f){agFilter=f;renderProjects();}
 
 /* ——— create project (mirrors projSettings shape) ——— */
 function openNewProject(){
-  const cats=[...new Set([...(PROJECT_TAGS.category||[]),...PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—')])].sort((a,b)=>a.localeCompare(b,'ru'));
-  const svcs=[...new Set(['SMM','PROD','DESIGN',...(PROJECT_TAGS.service||[]),...PROJECTS.map(p=>p.svc).filter(Boolean)])];
-  const tariffs=[...new Set(['Platinum','Gold','Silver',...(PROJECT_TAGS.tariff||[]),...PROJECTS.map(p=>p.tariff).filter(Boolean)])];
+  const cats=_tagList('category',[],'');
+  const svcs=_tagList('service',['SMM','PROD','DESIGN'],'');
+  const tariffs=_tagList('tariff',['Platinum','Gold','Silver'],'');
   const leadOpts=[['','— не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name+(m.role?(' · '+m.role):'')]));
   pd2Open(`<div class="modal">
     <style>
@@ -3001,6 +3001,12 @@ function selField(id, options, cur){
 function selToggle(id){ const el=document.getElementById('seldd-'+id); if(!el)return; const o=el.classList.contains('open'); _closePops(); if(!o)el.classList.add('open'); }
 function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } const el=document.getElementById('seldd-'+id); if(el)el.classList.remove('open'); }
 function selSync(id){ const h=document.getElementById(id); if(!h)return; const lblEl=document.getElementById(id+'-lbl'); if(!lblEl)return; const v=h.value; let lbl=v; const menu=document.getElementById('seldd-'+id); if(menu){ menu.querySelectorAll('.dd-opt').forEach(function(o){ var on=String(o.dataset.v)===String(v); o.classList.toggle('on',on); if(on)lbl=o.dataset.l; }); } lblEl.textContent=lbl; lblEl.style.color=''; lblEl.style.fontWeight=''; }
+function _tagList(kind, fallback, cur){
+  let arr=((typeof PROJECT_TAGS!=='undefined' && PROJECT_TAGS[kind])?PROJECT_TAGS[kind]:[]).slice();
+  if(!arr.length) arr=(fallback||[]).slice();
+  if(cur && arr.indexOf(cur)<0) arr.unshift(cur);
+  return [...new Set(arr.filter(Boolean))];
+}
 function tagCombo(id,label,options,cur,ph,kind){
   cur=cur||''; kind=kind||''; const opts=[...new Set((options||[]).filter(Boolean))];
   (window._cmb=window._cmb||{})[id]={opts,kind};
@@ -3041,10 +3047,10 @@ function cmbPick(id,val,isNew){ const rec=(window._cmb||{})[id]||{opts:[],kind:'
 function cmbDel(id,val){ const rec=(window._cmb||{})[id]||{opts:[],kind:''};
   const col=rec.kind==='category'?'cat':rec.kind==='service'?'svc':rec.kind==='tariff'?'tariff':null;
   const used=col?(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>String(p[col]||'')===String(val)).length:0;
-  if(used>0 && !confirm(`Тег «${val}» используется в ${used} проект(ах). Удалить и снять его с этих проектов?`)) return;
+  if(used>0 && !confirm(`Тег «${val}» используется в ${used} проект(ах). Убрать из списка? Проекты сохранят своё значение.`)) return;
   rec.opts=rec.opts.filter(o=>o!==val);
   if(rec.kind && window.LIVE && window.tTagDel) window.tTagDel(rec.kind,val);
-  else if(col){ const def=col==='tariff'?null:col==='svc'?'SMM':'—'; (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ if(String(p[col]||'')===String(val)){ p[col]=def; p._lead=p._lead; } }); if(typeof renderProjects==='function') renderProjects(); }
+  else if(typeof renderProjects==='function') renderProjects();
   cmbFilter(id); }
 function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const list=document.getElementById(id+'-list');
     const nb=list.querySelector('.cmb-new'); if(nb){ cmbPick(id,nb.dataset.v,true); return; }
@@ -6361,13 +6367,7 @@ window.tTagAdd = async (kind,name) => { try { name=(name||'').trim(); if(!name)r
 window.tTagDel = async (kind,name) => { try {
   const { error } = await SB.from('project_tags').delete().eq('agency_id', ME&&ME.agency_id).eq('kind',kind).eq('name',name);
   if (error) throw error;
-  // снимаем тег с проектов, иначе он «вернётся» из значений проектов
-  const col = kind==='category'?'category':kind==='service'?'service':kind==='tariff'?'tariff':null;
-  if(col){ const def = col==='tariff'?null:col==='service'?'SMM':'—';
-    const { error:e2 } = await SB.from('projects').update({[col]:def}).eq('agency_id', ME&&ME.agency_id).eq(col,name);
-    if(e2) throw e2; }
   await window.tLoadTags();
-  if(window.tLoadAll && ME) await window.tLoadAll(ME.role);
   if(typeof renderProjects==='function') renderProjects();
   toast('Тег удалён'); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tUploadLogo = async (file, inputId, letter) => {
