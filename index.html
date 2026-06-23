@@ -6318,7 +6318,17 @@ window.tStageDel = async (id) => { try { const {error}=await SB.from('project_st
   if(typeof pd2Close==='function')pd2Close(); toast('Этап удалён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
   const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); return true; } catch(e){ toast('Ошибка: '+(e.message||e)); return false; } };
-window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
+window.tTaskAdd = async (projectId,row) => { try {
+  const _now=new Date().toISOString();
+  if(row && row.status==='active' && !row.timer_started) row.timer_started=_now;    // автостарт рабочего таймера
+  if(row && row.status==='review' && !row.review_started) row.review_started=_now;   // автостарт таймера утверждения
+  let {error}=await SB.from('project_tasks').insert({project_id:projectId,...row});
+  if(error && /review_/.test(error.message||'')){                                    // колонок review_* ещё нет (миграция 08 не применена)
+    const {review_started,review_spent,...row2}=row||{};
+    const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}); error=r2.error;
+    if(!error) toast('Задача создана. Таймер утверждения отключён — примените SQL-миграцию 08');
+  }
+  if(error)throw error;
   if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
   if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 let _pkRaf=0;
