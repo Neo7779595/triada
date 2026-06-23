@@ -1102,6 +1102,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .np-pick-dept{padding:5px 11px;border:1px solid var(--line);border-radius:16px;background:transparent;color:var(--txt-3);cursor:pointer;font:inherit;font-size:12px}
 .np-pick-dept.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--accent)}
 .np-pick-list{display:flex;flex-direction:column;gap:5px;max-height:46vh;overflow:auto}
+.np-ct{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.np-ct-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.np-ct-d{display:flex;flex-direction:column;gap:4px}
+.np-ct-d span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3)}
+.np-ct-d input{background:var(--bg-2);border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:8px 11px;font:inherit;outline:none;color-scheme:dark}
+.np-ct-d input:focus{border-color:var(--accent-line)}
+.np-ct-presets{display:flex;gap:6px}
+.np-ct-p{padding:5px 12px;border:1px solid var(--line);border-radius:16px;background:transparent;color:var(--txt-3);cursor:pointer;font:inherit;font-size:12px}
+.np-ct-p:hover{border-color:var(--accent-line);color:var(--accent)}
 .fld textarea{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;resize:vertical;min-height:74px}
 .fld textarea:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .st-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -2527,11 +2536,15 @@ function openNewProject(){
       <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай','service')}</div>
       <div class="fld2">${tagCombo('np-tariff','Тариф',tariffs,'','Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
+      <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
+        <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span><input type="date" id="np-cstart"></div><div class="np-ct-d"><span>Окончание</span><input type="date" id="np-cend"></div></div>
+        <div class="np-ct-presets"><button type="button" class="np-ct-p" onclick="npContractPreset(1)">1 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(3)">3 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(6)">6 мес</button></div>
+      </div></div>
       <div class="fld"><label>Этапы проекта</label><div id="np-stages" class="np-stages"></div></div>
       <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
-  setTimeout(()=>{npStagesReload();npTeamReset();const n=document.getElementById('np-name');if(n)n.focus();},30);
+  setTimeout(()=>{npStagesReload();npTeamReset();npContractInit();const n=document.getElementById('np-name');if(n)n.focus();},30);
 }
 function npSaveProject(){
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
@@ -2540,8 +2553,9 @@ function npSaveProject(){
   const lead=_v('np-lead')||null;
   const selStages=(typeof npSelectedStages==='function'?npSelectedStages():[]);
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():[]);
+  const selContract={start:(_v('np-cstart')||null), end:(_v('np-cend')||null)};
   const totN=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).length;
-  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,team:selTeam,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
+  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,team:selTeam,contract:selContract,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
   PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,pct:0,stages:'0 / '+(selStages.length||totN),health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
@@ -2619,6 +2633,12 @@ function npPickToggle(id){ const s=window._npPickWork||(window._npPickWork=new S
 function npPickCount(){ const c=document.getElementById('np-pick-cnt'); if(c){ const n=(window._npPickWork||new Set()).size; c.textContent=n?(' · '+n):''; } }
 function npTeamPickerClose(){ const ov=document.getElementById('ov-npteam'); if(ov)ov.classList.remove('on'); }
 function npTeamPickerDone(){ window.NP_TEAM=new Set(window._npPickWork||[]); npTeamPickerClose(); npRenderTeam(); }
+
+/* ——— contract term (Фаза 3.2) ——— */
+function npToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function npAddMonths(ds,m){ if(!ds) return ''; const p=ds.split('-').map(Number); const d=new Date(p[0],p[1]-1+m,p[2]); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function npContractInit(start,end){ const s=document.getElementById('np-cstart'), e=document.getElementById('np-cend'); if(s) s.value=start||npToday(); if(e) e.value=end||npAddMonths((s&&s.value)||npToday(),1); }
+function npContractPreset(m){ const s=document.getElementById('np-cstart'), e=document.getElementById('np-cend'); if(!s||!e) return; if(!s.value) s.value=npToday(); e.value=npAddMonths(s.value,m); }
 
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
@@ -6309,6 +6329,11 @@ window.tProvisionClient = async (c) => {
     if (np && np.id && Array.isArray(c.team) && c.team.length){
       try{ const rows=c.team.map(mid=>({project_id:np.id, member_id:mid})); const {error}=await SB.from('project_members').insert(rows); if(error)throw error; }
       catch(e){ console.error('team insert',e); toast('Проект создан, но команда не сохранилась'); }
+    }
+    // срок договора (Фаза 3.2)
+    if (np && np.id && c.contract && c.contract.start && c.contract.end){
+      try{ const {error}=await SB.from('project_contracts').insert({project_id:np.id, start_date:c.contract.start, end_date:c.contract.end}); if(error)throw error; }
+      catch(e){ console.error('contract insert',e); toast('Проект создан, но срок договора не сохранился'); }
     }
     await window.tLoadAll(ME.role);
     toast('Проект и клиентский доступ созданы');
