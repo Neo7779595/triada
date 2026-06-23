@@ -1158,6 +1158,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .tg-add svg{width:18px;height:18px}
 .tg-hint{padding:0 22px 20px;font-size:11.5px;color:var(--txt-3);line-height:1.5}
 .tg-hint code{font-family:var(--mono);background:var(--bg-3);padding:2px 7px;border-radius:5px;color:var(--txt-2);font-size:11px}
+.tg-glist{padding:0 22px;display:flex;flex-direction:column;gap:7px}
+.tg-grow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px}
+.tg-gnm{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tg-grow .tg-unlink{margin:0;flex:none}
 #ov-npteam{z-index:70}
 #ov-npteam .modal{max-width:480px}
 .pt-team{display:flex;align-items:center;margin-top:9px}
@@ -3091,35 +3095,41 @@ function pdTabbar(p){
     <button class="pd-newbtn" onclick="pdNewReport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый отчёт</button>
   </div>`;
 }
-function tgTeamModal(){
+async function tgTeamModal(){
   const me=(window.tMe&&window.tMe())||null; if(!me){ toast('Профиль ещё загружается'); return; }
-  const linked=!!me.tg_team_chat_id;
-  const code=me.tg_team_code||'';
-  const uname=window.TG_BOT_USERNAME||'';
+  const code=me.tg_team_code||''; const uname=window.TG_BOT_USERNAME||'';
   const grpLink=`https://t.me/${uname}?startgroup=${encodeURIComponent(code)}`;
   const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>';
+  let groups=[];
+  try{ if(window.SB){ const {data}=await window.SB.from('telegram_team_groups').select('chat_id,title,linked_at').eq('agency_id',me.agency_id).order('linked_at'); groups=data||[]; } }catch(e){ console.warn('tg groups',e); }
+  const linked=groups.length>0;
+  const _plG=(n)=>{ const m=n%10,h=n%100; if(m===1&&h!==11)return 'группа'; if(m>=2&&m<=4&&(h<10||h>=20))return 'группы'; return 'групп'; };
+  const rows=groups.map(g=>`<div class="tg-grow"><span class="tg-gnm">${_ddH(g.title||'Рабочая группа')}</span><button class="tg-unlink" onclick="tgTeamUnlink('${String(g.chat_id).replace(/[^0-9-]/g,'')}')">Отвязать</button></div>`).join('');
   pd2Open(`<div class="modal tg-modal">
     <div class="tg-head">
       <div class="tg-hic">${ICON}</div>
-      <div style="flex:1;min-width:0"><div class="tg-title">Рабочая группа команды</div><div class="tg-sub">${_ddH(me.agencyName||'Агентство')}</div></div>
+      <div style="flex:1;min-width:0"><div class="tg-title">Рабочие группы команды</div><div class="tg-sub">${_ddH(me.agencyName||'Агентство')}</div></div>
       <button class="tg-x" onclick="pd2Close()">✕</button>
     </div>
-    <div class="tg-status ${linked?'on':''}"><span class="tg-dot"></span><b>${linked?'Группа подключена':'Группа не подключена'}</b></div>
+    <div class="tg-status ${linked?'on':''}"><span class="tg-dot"></span><b>${linked?(groups.length+' '+_plG(groups.length)+' подключено'):'Группы не подключены'}</b></div>
     ${linked?`
-      <div class="tg-bh">Командные сводки</div>
+      <div class="tg-bh">Подключённые группы</div>
+      <div class="tg-glist">${rows}</div>
+      <div class="tg-bh" style="margin-top:16px">Командные сводки</div>
       <div style="padding:0 22px">
         <button class="tg-test" style="margin:0 0 8px;width:100%" onclick="tgTeamSummary()">📊 Отправить сводку «кто сколько сделал»</button>
-        <div class="tg-res" id="tgt-sum-res" style="padding:0 0 10px"></div>
-        <button class="tg-test" style="margin:0;width:100%;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="tgTeamTest()">Тестовое сообщение в группу</button>
+        <div class="tg-res" id="tgt-sum-res" style="padding:0 0 8px"></div>
+        <button class="tg-test" style="margin:0;width:100%;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="tgTeamTest()">Тест во все группы</button>
         <div class="tg-res" id="tgt-test-res"></div>
       </div>
-      <div class="tg-hint">Чтобы отвязать — удалите бота из группы.</div>
+      <a class="tg-add" style="margin:14px 22px 4px" href="${grpLink}" target="_blank" rel="noopener">${ICON}Добавить ещё группу</a>
+      <div class="tg-hint">Сводка уходит сразу во все подключённые группы.</div>
     `:`
       <div class="tg-steps">
-        <div class="tg-step"><span class="tg-sn">1</span><span>Создайте рабочую Telegram-группу команды</span></div>
-        <div class="tg-step"><span class="tg-sn">2</span><span>Нажмите кнопку и выберите эту группу — бот добавится и привяжется сам</span></div>
+        <div class="tg-step"><span class="tg-sn">1</span><span>Создайте рабочую группу (команда, директора или инвесторы)</span></div>
+        <div class="tg-step"><span class="tg-sn">2</span><span>Нажмите кнопку и выберите группу — бот привяжется сам. Так можно добавить несколько групп.</span></div>
       </div>
-      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener">${ICON}Добавить бота в рабочую группу</a>
+      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener">${ICON}Добавить бота в группу</a>
       <div class="tg-hint">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
     `}
   </div>`);
@@ -5849,6 +5859,13 @@ async function tgTeamSummary(){
   }catch(e){ if(res){ res.textContent='✗ '+(e.message||e); res.style.color='var(--neg)'; } }
 }
 window.tgTeamSummary=tgTeamSummary;
+async function tgTeamUnlink(chatId){
+  const me=(typeof tMe==='function')?tMe():null; if(!me||!SB) return;
+  try{ await SB.from('telegram_team_groups').delete().eq('agency_id',me.agency_id).eq('chat_id',String(chatId));
+    toast('Группа отвязана'); if(typeof tgTeamModal==='function') tgTeamModal();
+  }catch(e){ toast('Ошибка отвязки'); }
+}
+window.tgTeamUnlink=tgTeamUnlink;
 let ME = null; window.tMe = () => ME;
 
 const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.vertical||'—',
