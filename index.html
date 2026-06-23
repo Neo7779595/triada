@@ -2488,6 +2488,19 @@ function myProfileOpen(){
           <div style="font-size:11px;color:var(--txt-3);margin-top:8px;line-height:1.5">Имя, логин, отдел и доступы изменяет только владелец агентства.</div>
         </div>
       </div>
+      ${(()=>{ const linked=!!me.tg_user_id; const code=me.tg_link_code||''; const uname=window.TG_BOT_USERNAME||''; const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>';
+        return `<div style="margin-top:18px;border-top:1px solid var(--line);padding-top:16px">
+        <div class="tg-bh" style="padding:0;margin-bottom:10px">Telegram · мои задачи и дедлайны</div>
+        <div class="tg-status ${linked?'on':''}" style="margin:0 0 12px"><span class="tg-dot"></span><b>${linked?'Подключено':'Не подключено'}</b></div>
+        ${linked?`
+          <button class="tg-test" style="margin:0;width:100%" onclick="tgStaffTest()">Отправить тест себе</button>
+          <div class="tg-res" id="tgs-test-res" style="padding:8px 0 0"></div>
+          <div class="tg-hint" style="padding:10px 0 0">Чтобы отключить — напишите боту <code>/stop</code>.</div>
+        `:`
+          <a class="tg-add" style="margin:0" href="https://t.me/${uname}?start=${encodeURIComponent(code)}" target="_blank" rel="noopener">${ICON}Подключить Telegram</a>
+          <div class="tg-hint" style="padding:10px 0 0">Откроется бот — нажмите «Запустить», и вы начнёте получать свои задачи и напоминания о дедлайнах.</div>
+        `}
+      </div>`; })()}
     </div>
     <div class="modal-f"><button class="btn-add" onclick="pd2Close()">Готово</button></div>
   </div>`);
@@ -5731,6 +5744,29 @@ async function tgUnlink(){
   }catch(e){ toast('Ошибка'); }
 }
 window.tgUnlink=tgUnlink;
+/* ===== Внутренний контур: персональные уведомления сотрудникам ===== */
+async function tgStaffNotify(profileId, eventType, data){
+  if(!profileId || !SB) return;
+  try{
+    await fetch(TG_FN+'/tg-staff', { method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
+      body:JSON.stringify({profile_id:profileId, event_type:eventType, data:data||{}}) });
+  }catch(e){ console.warn('[tg-staff]', e); }
+}
+window.tgStaffNotify=tgStaffNotify;
+async function tgStaffTest(){
+  const me=(typeof tMe==='function')?tMe():null; if(!me||!me.id) return;
+  const res=document.getElementById('tgs-test-res'); if(res){ res.textContent='Отправляем…'; res.style.color='var(--txt-3)'; }
+  try{
+    const r=await fetch(TG_FN+'/tg-staff',{ method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
+      body:JSON.stringify({profile_id:me.id,event_type:'test',data:{}}) });
+    const d=await r.json();
+    if(res){ if(d.ok){ res.textContent='✓ Отправлено — проверьте личный чат с ботом'; res.style.color='var(--pos)'; }
+             else { res.textContent='✗ '+(d.error||d.skipped||'ошибка'); res.style.color='var(--neg)'; } }
+  }catch(e){ if(res){ res.textContent='✗ '+(e.message||e); res.style.color='var(--neg)'; } }
+}
+window.tgStaffTest=tgStaffTest;
 let ME = null; window.tMe = () => ME;
 
 const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.vertical||'—',
@@ -5877,6 +5913,7 @@ window.tStageDel = async (id) => { try { const {error}=await SB.from('project_st
 window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
   const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); return true; } catch(e){ toast('Ошибка: '+(e.message||e)); return false; } };
 window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
+  if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId});
   if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _pkRerender(){ try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }
 window.tTaskMove = async (id,status) => { try {
@@ -5897,7 +5934,10 @@ window.tTaskMove = async (id,status) => { try {
     await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); await _pwReload(curProjId()); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
   toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tTaskUpdate = async (id,patch) => { try { const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
+window.tTaskUpdate = async (id,patch) => { try {
+  const _pu=_tgCurProj(); const _tu=(_pu&&_pu._tasks||[]).find(t=>t.id===id); const _oldAsg=_tu&&_tu.assignee_id;
+  const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
+  if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, project_name:(_pu&&_pu.name)||'', project_id:curProjId()});
   if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
 window.tTimerPause = async (id) => { try { const t=_findTask(id); let spent=(t&&t.time_spent)||0; if(t&&t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
