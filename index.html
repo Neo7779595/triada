@@ -1257,6 +1257,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cy-task{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt-2)}
 .cy-tk-dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--txt-3);opacity:.6}
 .cy-tk-dot.done{background:var(--pos);opacity:1}
+.tpl-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--line-2);border-radius:9px;background:transparent;color:var(--txt-2);cursor:pointer;font:inherit;font-size:12.5px}
+.tpl-btn:hover{border-color:var(--accent-line);color:var(--accent)}
+.tpl-btn svg{width:15px;height:15px}
+.tpl-modal{max-width:460px}
+.tpl-svcs{display:flex;flex-wrap:wrap;gap:7px}
+.tpl-svc{position:relative;padding:6px 13px;border:1px solid var(--line);border-radius:16px;background:transparent;color:var(--txt-3);cursor:pointer;font:inherit;font-size:12.5px}
+.tpl-svc.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--accent)}
+.tpl-dot{position:absolute;top:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg-1)}
+.tpl-list{display:flex;flex-direction:column;gap:6px}
+.tpl-empty{font-size:12.5px;color:var(--txt-3);padding:10px 2px}
+.tpl-row{display:flex;align-items:center;gap:7px}
+.tpl-idx{flex:none;width:20px;text-align:center;font-size:11px;color:var(--txt-3);font-family:var(--mono)}
+.tpl-row input{flex:1;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 11px;font:inherit;font-size:13px;outline:none}
+.tpl-row input:focus{border-color:var(--accent-line)}
+.tpl-mv,.tpl-rm{flex:none;width:30px;height:32px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--txt-3);cursor:pointer;font-size:13px}
+.tpl-mv:hover:not(:disabled),.tpl-rm:hover{border-color:var(--accent-line);color:var(--txt)}
+.tpl-mv:disabled{opacity:.35;cursor:default}
+.tpl-rm:hover{color:#F0785C;border-color:#C2564C}
+.tpl-add{display:flex;gap:7px;margin-top:2px}
+.tpl-add input{flex:1;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 11px;font:inherit;font-size:13px;outline:none}
+.tpl-add input:focus{border-color:var(--accent-line)}
+.tpl-add button{flex:none;padding:0 14px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-dim);color:var(--accent);cursor:pointer;font:inherit}
+.tpl-reset{align-self:flex-start;background:transparent;border:none;color:var(--txt-3);cursor:pointer;font:inherit;font-size:12px;text-decoration:underline;padding:4px 0}
+.tpl-reset:hover{color:var(--txt-2)}
 .fld textarea{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:11px 12px;color:var(--txt);font-family:var(--font);font-size:13.5px;resize:vertical;min-height:74px}
 .fld textarea:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .st-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -2003,6 +2027,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <div class="ov" id="ov-npteam" onclick="if(event.target===this)npTeamPickerClose()"></div>
 <div class="ov" id="ov-complete" onclick="if(event.target===this)cmClose()"></div>
 <div class="ov" id="ov-cycles" onclick="if(event.target===this)cyClose()"></div>
+<div class="ov" id="ov-tpl" onclick="if(event.target===this)tplClose()"></div>
 
 <div class="ov" id="cmdk" onclick="if(event.target===this)cmdkClose()">
   <div class="cmdk-box">
@@ -2507,6 +2532,12 @@ function agCanView(m){
   const p=me.permissions||{};
   return !!(p[m]&&p[m].view);
 }
+function agCanEdit(m){
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me || me.role!=='member') return true;          // владелец/админ редактируют всё
+  const p=me.permissions||{};
+  return !!(p[m]&&p[m].edit);
+}
 function agIsOwner(){
   const me=(window.tMe&&window.tMe())||null;
   return !me || me.role!=='member';                   // управлять командой может только владелец/админ
@@ -2737,14 +2768,14 @@ function npSaveProject(){
   const selStages=(typeof npSelectedStages==='function'?npSelectedStages():[]);
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():[]);
   const selContract={start:(_v('np-cstart')||null), end:(_v('np-cend')||null)};
-  const totN=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).length;
+  const totN=stageSetFor(svc).length;
   if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,team:selTeam,contract:selContract,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead}}); pd2Close(); return; }
   PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,pct:0,stages:'0 / '+(selStages.length||totN),health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
 
 /* ——— custom stages in create modal (путь A: добавить / переименовать / удалить / порядок) ——— */
-function npStagesReload(){ const svc=(_v('np-svc')||'SMM'); window.NP_STAGES=(PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).map(n=>({name:n})); npRenderStages(); }
+function npStagesReload(){ const svc=(_v('np-svc')||'SMM'); window.NP_STAGES=stageSetFor(svc).map(n=>({name:n})); npRenderStages(); }
 function npRenderStages(){
   const box=document.getElementById('np-stages'); if(!box) return;
   const sv=p=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">'+p+'</svg>';
@@ -2855,6 +2886,37 @@ function cmComplete(){ const pid=window._cmPid; if(!pid)return; if(window.LIVE &
 function cmRenew(){ const pid=window._cmPid; if(!pid)return; const ns=_v('cm-cstart'), ne=_v('cm-cend'); if(!ns||!ne){toast('Укажи новый срок договора');return;} if(window.LIVE && window.tProjectRenew){ window.tProjectRenew(pid,ns,ne); } else { cmClose(); } }
 
 /* ——— archive of past cycles (Фаза 5.3) ——— */
+/* ——— editable stage templates (Фаза 7A) ——— */
+function tplServices(){ const base=['SMM','PROD','DESIGN']; const extra=(typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>p.svc).filter(Boolean); return [...new Set([...base,...extra,...Object.keys(window.STAGE_TPL||{})])]; }
+function tplLoadWork(svc){ const t=window.STAGE_TPL&&window.STAGE_TPL[svc]; window.TPL_WORK=(Array.isArray(t)&&t.length)?t.slice():((PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).slice()); }
+function openTplModal(){
+  const ov=document.getElementById('ov-tpl'); if(!ov) return;
+  window.TPL_SVC=window.TPL_SVC||'SMM'; if(tplServices().indexOf(window.TPL_SVC)<0) window.TPL_SVC='SMM';
+  tplLoadWork(window.TPL_SVC);
+  ov.innerHTML=`<div class="modal tpl-modal">
+    <div class="modal-h"><h3>Шаблоны этапов</h3><p>Стандартный набор этапов под каждую услугу — преднаполняет список при создании проекта.</p></div>
+    <div class="modal-b">
+      <div class="tpl-svcs" id="tpl-svcs"></div>
+      <div class="tpl-list" id="tpl-list"></div>
+      <div class="tpl-add"><input id="tpl-new" placeholder="Новый этап…" onkeydown="if(event.key==='Enter'){event.preventDefault();tplAdd();}"><button type="button" onclick="tplAdd()">Добавить</button></div>
+      <button type="button" class="tpl-reset" onclick="tplReset()">Сбросить к встроенному набору</button>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="tplClose()">Закрыть</button><button class="btn-add" onclick="tplSave()">Сохранить шаблон</button></div>
+  </div>`;
+  tplRender(); ov.classList.add('on');
+}
+function tplClose(){ const ov=document.getElementById('ov-tpl'); if(ov) ov.classList.remove('on'); }
+function tplPick(svc){ window.TPL_SVC=svc; tplLoadWork(svc); tplRender(); }
+function tplRender(){ tplRenderSvcs(); tplRenderList(); }
+function tplRenderSvcs(){ const el=document.getElementById('tpl-svcs'); if(!el) return; el.innerHTML=tplServices().map(s=>{ const own=!!(window.STAGE_TPL&&window.STAGE_TPL[s]); return `<button type="button" class="tpl-svc ${s===window.TPL_SVC?'on':''}" onclick="tplPick('${_attr(s)}')">${_ddH(s)}${own?'<span class="tpl-dot" title="свой шаблон"></span>':''}</button>`; }).join(''); }
+function tplRenderList(){ const el=document.getElementById('tpl-list'); if(!el) return; const a=window.TPL_WORK||[]; if(!a.length){ el.innerHTML='<div class="tpl-empty">Этапов нет. Добавь первый ниже.</div>'; return; } el.innerHTML=a.map((n,i)=>`<div class="tpl-row"><span class="tpl-idx">${i+1}</span><input value="${_attr(n)}" oninput="tplRename(${i},this.value)"><button type="button" class="tpl-mv" onclick="tplMove(${i},-1)" ${i===0?'disabled':''}>↑</button><button type="button" class="tpl-mv" onclick="tplMove(${i},1)" ${i===a.length-1?'disabled':''}>↓</button><button type="button" class="tpl-rm" onclick="tplRemove(${i})">✕</button></div>`).join(''); }
+function tplRename(i,v){ if(window.TPL_WORK&&window.TPL_WORK[i]!==undefined) window.TPL_WORK[i]=v; }
+function tplAdd(){ const inp=document.getElementById('tpl-new'); if(!inp) return; const v=(inp.value||'').trim(); if(!v){ inp.focus(); return; } (window.TPL_WORK=window.TPL_WORK||[]).push(v); inp.value=''; tplRenderList(); inp.focus(); }
+function tplRemove(i){ if(!window.TPL_WORK) return; window.TPL_WORK.splice(i,1); tplRenderList(); }
+function tplMove(i,d){ const a=window.TPL_WORK; if(!a) return; const j=i+d; if(j<0||j>=a.length) return; const t=a[i]; a[i]=a[j]; a[j]=t; tplRenderList(); }
+function tplReset(){ window.TPL_WORK=(PD_STAGE_SETS[window.TPL_SVC]||PD_STAGE_SETS.SMM).slice(); tplRenderList(); }
+function tplSave(){ const svc=window.TPL_SVC; const clean=(window.TPL_WORK||[]).map(x=>(x||'').trim()).filter(Boolean); if(!clean.length){ toast('В шаблоне нет этапов'); return; } if(window.LIVE && window.tSaveStageTemplate){ window.tSaveStageTemplate(svc,clean); } else { window.STAGE_TPL=window.STAGE_TPL||{}; window.STAGE_TPL[svc]=clean; toast('Шаблон сохранён'); tplRenderSvcs(); } }
+
 function openCyclesModal(pid){
   const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===pid); if(!p) return;
   const cy=(p._cycles||[]);
@@ -3166,6 +3228,7 @@ function renderProjects(){
       ${_dd('svc','Услуга', agSvc==='all'?'Все':agSvc, [['all','Все услуги']].concat(svcs.map(x=>[x,x])), agSvc, 'setAgSvc')}
       ${_dd('lead','Ответственный', leadLbl, leadOpts, agLead, 'setAgLead')}${(agFilter!=='active'||agCat!=='all'||agSvc!=='all'||agLead!=='all'||agQ||agSort!=='active')?`<button class="pk-fclear" onclick="projResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
       <div class="flex1"></div>
+      ${agCanEdit('projects')?`<button class="tpl-btn" onclick="openTplModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h12"/></svg>Шаблоны этапов</button>`:''}
       ${_dd('sort','Сортировка', SORT_LABEL[agSort]||'По активности', SORT_OPTS, agSort, 'setAgSort', true)}
     </div>
 
@@ -3178,6 +3241,8 @@ const PD_STAGE_SETS={
   PROD:['Бриф','Сценарий','Препродакшн','Съёмка','Монтаж','Цветокор','Графика','Сдача','Финальный отчёт'],
   DESIGN:['Бриф','Мудборд','Концепт','Финальный дизайн'],
 };
+window.STAGE_TPL = window.STAGE_TPL || {};
+function stageSetFor(svc){ const t=window.STAGE_TPL&&window.STAGE_TPL[svc]; if(Array.isArray(t)&&t.length) return t; return PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM; }
 const PD_PEOPLE=[{n:'Абдурауф',c:'#37E6C8'},{n:'Шожахон',c:'#8A8FFF'},{n:'Шербек',c:'#E3B567'},{n:'Нур-Ислам',c:'#F0785C'}];
 const PD_ST_IC=['<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>','<path d="M12 2l2.4 6.9H22l-5.8 4.3 2.2 6.8L12 16l-6.4 4 2.2-6.8L2 8.9h7.6z"/>','<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/>','<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>','<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/>','<path d="M3 11l18-5v12L3 13zM11 18v3"/>','<path d="M4 4h16v12H4z"/><path d="M8 20h8"/>','<path d="M20 6L9 17l-5-5"/>','<path d="M12 20h9M3 20l9-16 9 16"/>'];
 const PD_TABS=[
@@ -3189,7 +3254,7 @@ const PD_TABS=[
   ['history','История','<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/>'],
 ];
 function buildDetail(p){
-  const base=PD_STAGE_SETS[p.svc]||PD_STAGE_SETS.SMM;
+  const base=stageSetFor(p.svc);
   const [doneN,totN]=p.stages.split('/').map(s=>parseInt(s.trim())||0);
   const names=base.slice(0,totN||base.length);
   const today='12 июня 2026';
@@ -3401,7 +3466,7 @@ function pdAddStage(){ const name=_v('pd2-name'); if(!name){toast('Введи н
   const S=PROJECTS[pdIdx]._stages||[]; const idx=S.length?Math.max(...S.map(s=>s.idx||0))+1:0;
   if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,idx}); }
 function pdStageDel(id){ if(window.tStageDel) window.tStageDel(id); }
-function pdSeedStages(){ const names=PD_STAGE_SETS[PROJECTS[pdIdx].svc]||PD_STAGE_SETS.SMM; if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
+function pdSeedStages(){ const names=stageSetFor(PROJECTS[pdIdx].svc); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
 let pdNewSt='wait';
 async function pdNewTask(st){
   pdNewSt=st||'wait';
@@ -6199,6 +6264,12 @@ window.tProjectRenew = async (pid, ns, ne) => { try {
   await SB.from('projects').update({status:'active'}).eq('id',pid);
   if(typeof cmClose==='function')cmClose(); toast('Контракт продлён · прошлый цикл в архиве'); await window.tLoadAll(ME.role);
 } catch(e){ toast('Ошибка продления: '+(e.message||e)); } };
+window.tSaveStageTemplate = async (service, stages) => { try {
+  const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
+  const {error}=await SB.from('stage_templates').upsert({agency_id:me.agency_id, service:service, stages:stages, updated_at:new Date().toISOString()}, {onConflict:'agency_id,service'}); if(error)throw error;
+  window.STAGE_TPL=window.STAGE_TPL||{}; window.STAGE_TPL[service]=stages;
+  toast('Шаблон сохранён'); if(typeof tplRenderSvcs==='function') tplRenderSvcs();
+} catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageSave = async (id,patch) => { try {
   const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); const _old=_st&&_st.status;
   const {error}=await SB.from('project_stages').update(patch).eq('id',id); if(error)throw error;
@@ -6780,11 +6851,13 @@ window.tLoadAll = async (role) => {
     AGENCIES.length = 0; (ag.data||[]).forEach(a => AGENCIES.push(mapAgency(a, c)));
     const nb = document.getElementById('nav-ag-ct'); if (nb) nb.textContent = AGENCIES.length;
   } else if (role === 'agency_owner' || role === 'member'){
-    const [pr, tm] = await Promise.all([
+    const [pr, tm, tpl] = await Promise.all([
       SB.from('projects').select('*').order('created_at'),
-      SB.from('profiles').select('*').eq('role','member').order('created_at') ]);
+      SB.from('profiles').select('*').eq('role','member').order('created_at'),
+      SB.from('stage_templates').select('service,stages') ]);
     PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
+    window.STAGE_TPL = {}; ((tpl&&tpl.data)||[]).forEach(r=>{ if(Array.isArray(r.stages)) window.STAGE_TPL[r.service]=r.stages.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()); });
     await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates(); await window.tLoadOverview(); await window.tLoadCycles(); await window.tLoadTeam(); await window.tLoadFinance(); await window.tLoadTags();
   }
   await loadTariffs();
