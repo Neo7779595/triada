@@ -1161,7 +1161,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .tg-glist{padding:0 22px;display:flex;flex-direction:column;gap:7px}
 .tg-grow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px}
 .tg-gnm{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 .tg-grow .tg-unlink{margin:0;flex:none}
+.sched-presets{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 4px}
+.sched-preset{flex:1;min-width:calc(50% - 4px);padding:9px 10px;border:1px solid var(--accent-line);background:var(--accent-dim);color:var(--accent);border-radius:9px;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sched-preset:hover{background:var(--accent);color:var(--bg-0)}
+.sched-manual{margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:11px;background:var(--bg-1)}
+.sched-manual-t{font-size:11px;font-weight:700;color:var(--txt-2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
+.sched-days{display:flex;gap:5px;margin-bottom:10px}
+.sched-day{flex:1;padding:8px 0;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-3);border-radius:7px;font-family:var(--font);font-size:11.5px;font-weight:600;cursor:pointer;transition:.12s}
+.sched-day.on{background:var(--accent);border-color:var(--accent);color:var(--bg-0)}
+.sched-row{display:flex;gap:7px;align-items:stretch}
+.sched-seg{display:flex;flex:1;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.sched-seg button{flex:1;padding:8px 6px;border:none;background:var(--bg-2);color:var(--txt-3);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer;transition:.12s}
+.sched-seg button.on{background:var(--accent-dim);color:var(--accent)}
+.sched-hour{padding:8px 8px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);border-radius:8px;font-family:var(--font);font-size:12px;cursor:pointer}
+.sched-add-btn{padding:8px 14px;border:none;background:var(--accent);color:var(--bg-0);border-radius:8px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
+.sched-add-btn:hover{filter:brightness(1.08)}
 #ov-npteam{z-index:70}
 #ov-npteam .modal{max-width:480px}
 .pt-team{display:flex;align-items:center;margin-top:9px}
@@ -3322,6 +3338,24 @@ function pdTabbar(p){
     <button class="pd-newbtn" onclick="pdNewReport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый отчёт</button>
   </div>`;
 }
+function tgSchedRenderForm(){
+  const el=document.getElementById('sched-form-body'); if(!el) return;
+  const f=window._schedForm||{kind:'load',days:[1,2,3,4,5,6],hour:18};
+  const DOW=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const days=DOW.map((d,i)=>`<button type="button" class="sched-day ${f.days.indexOf(i+1)>=0?'on':''}" onclick="tgSchedFormDay(${i+1})">${d}</button>`).join('');
+  const hours=Array.from({length:24},(_,h)=>`<option value="${h}" ${h===f.hour?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('');
+  el.innerHTML=`
+    <div class="sched-days">${days}</div>
+    <div class="sched-row">
+      <div class="sched-seg">
+        <button type="button" class="${f.kind==='load'?'on':''}" onclick="tgSchedFormKind('load')">Загрузка</button>
+        <button type="button" class="${f.kind==='done'?'on':''}" onclick="tgSchedFormKind('done')">Сделано за неделю</button>
+      </div>
+      <select class="sched-hour" onchange="tgSchedFormHour(this.value)">${hours}</select>
+      <button type="button" class="sched-add-btn" onclick="tgSchedAddFromForm()">Добавить</button>
+    </div>`;
+}
+window.tgSchedRenderForm=tgSchedRenderForm;
 async function tgTeamModal(){
   const me=(window.tMe&&window.tMe())||null; if(!me){ toast('Профиль ещё загружается'); return; }
   const code=me.tg_team_code||''; const uname=window.TG_BOT_USERNAME||'';
@@ -3329,7 +3363,10 @@ async function tgTeamModal(){
   const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>';
   let groups=[];
   try{ if(window.SB){ const {data}=await window.SB.from('telegram_team_groups').select('chat_id,title,linked_at').eq('agency_id',me.agency_id).order('linked_at'); groups=data||[]; } }catch(e){ console.warn('tg groups',e); }
+  let sched=[];
+  try{ sched=await tgSchedLoad(); }catch(e){ sched=[]; }
   const linked=groups.length>0;
+  const schedRows = sched.map(sc=>`<div class="tg-grow"><span class="tg-gnm">${tgSchedHuman(sc)}</span><button class="tg-unlink" onclick="tgSchedToggle(${sc.id},${sc.enabled?'false':'true'})">${sc.enabled?'выкл':'вкл'}</button><button class="tg-unlink" onclick="tgSchedDelete(${sc.id})">Удалить</button></div>`).join('');
   const _plG=(n)=>{ const m=n%10,h=n%100; if(m===1&&h!==11)return 'группа'; if(m>=2&&m<=4&&(h<10||h>=20))return 'группы'; return 'групп'; };
   const rows=groups.map(g=>`<div class="tg-grow"><span class="tg-gnm">${_ddH(g.title||'Рабочая группа')}</span><button class="tg-unlink" onclick="tgTeamUnlink('${String(g.chat_id).replace(/[^0-9-]/g,'')}')">Отвязать</button></div>`).join('');
   pd2Open(`<div class="modal tg-modal">
@@ -3351,8 +3388,20 @@ async function tgTeamModal(){
         <button class="tg-test" style="margin:0;width:100%;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="tgTeamTest()">Тест во все группы</button>
         <div class="tg-res" id="tgt-test-res"></div>
       </div>
+      <div class="tg-bh" style="margin-top:16px">Автоотправка по расписанию</div>
+      <div style="padding:0 22px">
+        ${schedRows||'<div class="tg-hint" style="padding:0 0 10px">Правил пока нет. Добавьте быстрый шаблон или настройте вручную.</div>'}
+        <div class="sched-presets">
+          <button type="button" class="sched-preset" onclick="tgSchedPreset('load',[1,2,3,4,5,6],18)">Пн–Сб 18:00 · загрузка</button>
+          <button type="button" class="sched-preset" onclick="tgSchedPreset('done',[6],18)">Суббота 18:00 · отчёт за неделю</button>
+        </div>
+        <div class="sched-manual">
+          <div class="sched-manual-t">Своё правило</div>
+          <div id="sched-form-body"></div>
+        </div>
+      </div>
       <a class="tg-add" style="margin:14px 22px 4px" href="${grpLink}" target="_blank" rel="noopener">${ICON}Добавить ещё группу</a>
-      <div class="tg-hint">Сводка уходит сразу во все подключённые группы.</div>
+      <div class="tg-hint">Сводки и авто-отправка работают по всем подключённым группам. Время — по Ташкенту.</div>
     `:`
       <div class="tg-steps">
         <div class="tg-step"><span class="tg-sn">1</span><span>Создайте рабочую группу (команда, директора или инвесторы)</span></div>
@@ -3362,6 +3411,7 @@ async function tgTeamModal(){
       <div class="tg-hint">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
     `}
   </div>`);
+  if(linked && typeof tgSchedRenderForm==='function') setTimeout(tgSchedRenderForm,0);
 }
 window.tgTeamModal=tgTeamModal;
 function tgOpenModal(){
@@ -6130,6 +6180,51 @@ async function tgTeamDone(){
   }catch(e){ if(res){ res.textContent='✗ '+(e.message||e); res.style.color='var(--neg)'; } }
 }
 window.tgTeamDone=tgTeamDone;
+/* ===== Авто-отправка сводок: правила расписаний ===== */
+window.TG_SCHED=window.TG_SCHED||[];
+const _DOW=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+async function tgSchedLoad(){
+  const me=(typeof tMe==='function')?tMe():null; if(!me||!me.agency_id||!SB) return [];
+  try{ const {data}=await SB.from('telegram_schedules').select('*').eq('agency_id',me.agency_id).order('hour'); window.TG_SCHED=data||[]; }catch(e){ window.TG_SCHED=[]; }
+  return window.TG_SCHED;
+}
+async function tgSchedAdd(kind,days,hour){
+  const me=(typeof tMe==='function')?tMe():null; if(!me||!me.agency_id||!SB) return;
+  if(!days||!days.length){ toast('Выберите хотя бы один день'); return; }
+  try{ const {error}=await SB.from('telegram_schedules').insert({agency_id:me.agency_id,kind:kind,days:days,hour:hour,enabled:true}); if(error)throw error;
+    toast('Правило добавлено'); if(typeof tgTeamModal==='function') tgTeamModal();
+  }catch(e){ toast('Ошибка: '+(e.message||e)); }
+}
+async function tgSchedDelete(id){
+  if(!SB) return;
+  try{ await SB.from('telegram_schedules').delete().eq('id',id); toast('Правило удалено'); if(typeof tgTeamModal==='function') tgTeamModal(); }catch(e){ toast('Ошибка'); }
+}
+async function tgSchedToggle(id,en){
+  if(!SB) return;
+  try{ await SB.from('telegram_schedules').update({enabled:en}).eq('id',id); if(typeof tgTeamModal==='function') tgTeamModal(); }catch(e){ toast('Ошибка'); }
+}
+// форма ручного добавления — состояние
+window._schedForm={kind:'load',days:[1,2,3,4,5,6],hour:18};
+function tgSchedFormDay(d){ const f=window._schedForm; const i=f.days.indexOf(d); if(i<0)f.days.push(d); else f.days.splice(i,1); f.days.sort((a,b)=>a-b); if(typeof tgSchedRenderForm==='function')tgSchedRenderForm(); }
+function tgSchedFormKind(k){ window._schedForm.kind=k; if(typeof tgSchedRenderForm==='function')tgSchedRenderForm(); }
+function tgSchedFormHour(h){ window._schedForm.hour=parseInt(h,10)||0; }
+function tgSchedAddFromForm(){ const f=window._schedForm; tgSchedAdd(f.kind,f.days.slice(),f.hour); }
+function tgSchedPreset(kind,days,hour){ tgSchedAdd(kind,days,hour); }
+window.tgSchedLoad=tgSchedLoad; window.tgSchedAdd=tgSchedAdd; window.tgSchedDelete=tgSchedDelete; window.tgSchedToggle=tgSchedToggle;
+window.tgSchedFormDay=tgSchedFormDay; window.tgSchedFormKind=tgSchedFormKind; window.tgSchedFormHour=tgSchedFormHour; window.tgSchedAddFromForm=tgSchedAddFromForm; window.tgSchedPreset=tgSchedPreset;
+function tgSchedHuman(sc){
+  const days=(sc.days||[]).slice().sort((a,b)=>a-b);
+  let dlabel;
+  if(days.length===7) dlabel='ежедневно';
+  else if(days.join()==='1,2,3,4,5,6') dlabel='Пн–Сб';
+  else if(days.join()==='1,2,3,4,5') dlabel='будни';
+  else if(days.join()==='6,7') dlabel='выходные';
+  else dlabel=days.map(d=>_DOW[d-1]).join(', ');
+  const klabel=sc.kind==='done'?'сделано за неделю':'загрузка команды';
+  const hh=String(sc.hour).padStart(2,'0');
+  return `${dlabel} · ${hh}:00 · ${klabel}`;
+}
+window.tgSchedHuman=tgSchedHuman;
 let ME = null; window.tMe = () => ME;
 
 const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.vertical||'—',
