@@ -3131,6 +3131,16 @@ function tgOpenModal(){
   </div>`);
 }
 window.tgOpenModal=tgOpenModal;
+function _tgDeepLink(){
+  try{
+    const u=new URL(location.href); const pid=u.searchParams.get('p'); if(!pid) return;
+    if(typeof PROJECTS==='undefined'||!PROJECTS||!PROJECTS.length) return;
+    const idx=PROJECTS.findIndex(x=>String(x.id)===String(pid));
+    if(idx>=0) openProject(idx);
+    history.replaceState(null,'',location.pathname);
+  }catch(e){ console.warn('[deeplink]',e); }
+}
+window._tgDeepLink=_tgDeepLink;
 function openProject(i){
   pdIdx=i;pdTabCur='stages';
   const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id;
@@ -5913,7 +5923,7 @@ window.tStageDel = async (id) => { try { const {error}=await SB.from('project_st
 window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
   const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); return true; } catch(e){ toast('Ошибка: '+(e.message||e)); return false; } };
 window.tTaskAdd = async (projectId,row) => { try { const {error}=await SB.from('project_tasks').insert({project_id:projectId,...row}); if(error)throw error;
-  if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId});
+  if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
   if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _pkRerender(){ try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }
 window.tTaskMove = async (id,status) => { try {
@@ -5937,7 +5947,7 @@ window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tas
 window.tTaskUpdate = async (id,patch) => { try {
   const _pu=_tgCurProj(); const _tu=(_pu&&_pu._tasks||[]).find(t=>t.id===id); const _oldAsg=_tu&&_tu.assignee_id;
   const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
-  if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, project_name:(_pu&&_pu.name)||'', project_id:curProjId()});
+  if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
   if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
 window.tTimerPause = async (id) => { try { const t=_findTask(id); let spent=(t&&t.time_spent)||0; if(t&&t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
@@ -6514,6 +6524,7 @@ async function routeByProfile(){
   if (ME.role === 'superadmin') enter('general');
   else if (ME.role === 'client') enterClient();
   else enterAgency();
+  if(typeof _tgDeepLink==='function') setTimeout(_tgDeepLink, 500);
 }
 
 window.tLogin = async () => {
