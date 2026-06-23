@@ -1988,7 +1988,7 @@ button:active{transform:translateY(.5px) scale(.99)}
         <div class="fld"><label>Роль</label><input id="e-role" placeholder="SMM-менеджер, дизайнер…"></div>
       </div>
       <div class="fld2">
-        <div class="fld"><label>Отдел</label><div class="dd seldd" id="seldd-e-dept"><input type="hidden" id="e-dept" value="Продакшн"><button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('e-dept')"><span class="dd-v" id="e-dept-lbl" style="">Продакшн</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu"><button type="button" class="dd-opt on" data-v="Продакшн" data-l="Продакшн" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Продакшн<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Администрация" data-l="Администрация" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Администрация<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="Руководство" data-l="Руководство" onclick="selPick('e-dept',this.dataset.v,this.dataset.l)">Руководство<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button></div></div></div>
+        <div id="e-dept-host"></div>
         <div class="fld"><label>Цвет</label><div class="swatches" id="e-sw"></div></div>
       </div>
       <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
@@ -2513,7 +2513,7 @@ let PROJECTS = [
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
 let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all';
-let PROJECT_TAGS={category:[],service:[],tariff:[]};
+let PROJECT_TAGS={category:[],service:[],tariff:[],dept:[]};
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты'};
 
 function enterAgency(){
@@ -5606,7 +5606,7 @@ function openEmp(){
   empColor=ACCENTS[0];
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass'].forEach(id=>document.getElementById('e-'+id).value='');
-  document.getElementById('e-dept').value='Продакшн'; selSync('e-dept');
+  document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Отдел',_tagList('dept',['Продакшн','Администрация','Руководство'],'Продакшн'),'Продакшн','Выбери или создай','dept');
   document.getElementById('e-email').textContent='ivan@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Новый сотрудник';
   document.getElementById('emp-save').textContent='Создать сотрудника';
@@ -5621,7 +5621,7 @@ function openEmpEdit(i){
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   document.getElementById('e-name').value=e.name||'';
   document.getElementById('e-role').value=e.role||'';
-  document.getElementById('e-dept').value=e.dept||'Продакшн'; selSync('e-dept');
+  var _ed=e.dept||'Продакшн'; document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Отдел',_tagList('dept',['Продакшн','Администрация','Руководство'],_ed),_ed,'Выбери или создай','dept');
   document.getElementById('e-login').value=e.login||'';
   document.getElementById('e-pass').value='';
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
@@ -6356,9 +6356,9 @@ window.tLoadTags = async () => {
   if (!SB) return;
   const { data, error } = await SB.from('project_tags').select('kind,name').order('name');
   if (error) return;   // таблицы ещё нет — молча выходим
-  const t={category:[],service:[],tariff:[]};
+  const t={category:[],service:[],tariff:[],dept:[]};
   (data||[]).forEach(r=>{ if(t[r.kind]) t[r.kind].push(r.name); });
-  if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; PROJECT_TAGS.tariff=t.tariff; }
+  if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; PROJECT_TAGS.tariff=t.tariff; PROJECT_TAGS.dept=t.dept; }
 };
 window.tTagAdd = async (kind,name) => { try { name=(name||'').trim(); if(!name)return;
   const { error } = await SB.from('project_tags').insert({ agency_id: ME&&ME.agency_id, kind, name });
