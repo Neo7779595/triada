@@ -5978,9 +5978,12 @@ async function tgTeamSummary(){
   const me=(typeof tMe==='function')?tMe():null; if(!me||!me.agency_id||!SB) return;
   const res=document.getElementById('tgt-sum-res'); if(res){ res.textContent='Считаем и отправляем…'; res.style.color='var(--txt-3)'; }
   try{
-    // ТЕКУЩАЯ ЗАГРУЗКА: только активные задачи (ожидание/в работе/на утверждении)
-    const { data:tasks } = await SB.from('project_tasks').select('assignee_id,status').neq('status','done');
-    const by={}; (tasks||[]).forEach(t=>{ const a=t.assignee_id||'_none'; (by[a]||(by[a]={active:0,wait:0,review:0,total:0})); by[a].total++;
+    // ТЕКУЩАЯ ЗАГРУЗКА: только активные задачи активных проектов
+    const [{ data:tasks }, { data:_dp }] = await Promise.all([
+      SB.from('project_tasks').select('assignee_id,status,project_id').neq('status','done'),
+      SB.from('projects').select('id').eq('status','done') ]);
+    const _ds=new Set((_dp||[]).map(x=>x.id));
+    const by={}; (tasks||[]).filter(t=>!_ds.has(t.project_id)).forEach(t=>{ const a=t.assignee_id||'_none'; (by[a]||(by[a]={active:0,wait:0,review:0,total:0})); by[a].total++;
       if(t.status==='active')by[a].active++; else if(t.status==='wait')by[a].wait++; else if(t.status==='review')by[a].review++; });
     const team=(typeof TEAM!=='undefined')?TEAM:[];
     const rows=team.map(m=>({name:m.name, s:by[m._id]||{active:0,wait:0,review:0,total:0}})).filter(r=>r.s.total>0).sort((a,b)=>b.s.total-a.s.total);
@@ -6626,12 +6629,14 @@ window.tLoadTeam = async () => {
   const now = Date.now();
   const today = new Date(); today.setHours(0,0,0,0);
   const iso30 = new Date(now - 30*86400000).toISOString();
-  const [tr, hr, thr] = await Promise.all([
+  const [tr, hr, thr, pr] = await Promise.all([
     SB.from('project_tasks').select('id,assignee_id,project_id,status,due_date'),
     SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at'),
-    SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at')
+    SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at'),
+    SB.from('projects').select('id,status')
   ]);
-  const tasks = tr.data||[], hist = hr.data||[];
+  const _doneProj = new Set(((pr&&pr.data)||[]).filter(x=>x.status==='done').map(x=>x.id));
+  const tasks = (tr.data||[]).filter(t=>!_doneProj.has(t.project_id)), hist = hr.data||[];
   const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];   // task_history может ещё не существовать
   const taskDue = {}; tasks.forEach(t=>{ if(t.id!=null) taskDue[t.id]=t.due_date||null; });
   window._teamRaw = { tasks, hist, taskHist, taskDue, loadedAt: now };
@@ -6692,7 +6697,7 @@ window.tLoadFinance = async () => {
   const trk = {};   // отслеженное время по проекту (сек), включая идущие таймеры
   (tt && !tt.error && tt.data ? tt.data : []).forEach(t => { let s=t.time_spent||0;
     if(t.timer_started) s+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000)); trk[t.project_id]=(trk[t.project_id]||0)+s; });
-  const rows = (res.data||[]).map(p => { const f=p.finance||{}; const tsec=trk[p.id]||0; const _mrr=Number(p.mrr)||0;
+  const rows = (res.data||[]).filter(p=>p.status!=='done').map(p => { const f=p.finance||{}; const tsec=trk[p.id]||0; const _mrr=Number(p.mrr)||0;
     return { id:p.id, name:p.name, service:p.service||'Прочее', status:p.status, cat:p.category||'—',
       tariff: p.tariff || (_mrr>=20000000?'Platinum':_mrr>=10000000?'Gold':_mrr>0?'Silver':'—'),
       logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(), logoUrl:p.logo_url||'',
