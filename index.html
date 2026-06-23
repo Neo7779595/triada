@@ -6075,13 +6075,13 @@ async function tgTeamSummary(){
     let grand=0; Object.keys(by).forEach(k=>{ if(k!=='_none') grand+=by[k].total; });
     const noneCnt=(by['_none']&&by['_none'].total)||0;
     const today=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
-    let html=`📊 <b>Текущая загрузка команды</b>\n<i>${_htmlEsc(today)}</i>\n\n`;
+    const DIV='\n────────────\n';
+    let html=`📊 <b>Загрузка команды</b>\n<i>${_htmlEsc(today)}</i>${DIV}`;
     if(rows.length){
-      rows.forEach(r=>{ const parts=[]; if(r.s.active)parts.push(r.s.active+' в работе'); if(r.s.wait)parts.push(r.s.wait+' ждут'); if(r.s.review)parts.push(r.s.review+' на проверке');
-        html+=`👤 <b>${_htmlEsc(r.name)}</b> — ${r.s.total} <i>(${parts.join(', ')})</i>\n`; });
-    } else html+='Сейчас активных задач на сотрудниках нет.\n';
-    if(noneCnt) html+=`\n📭 <i>Без исполнителя: ${noneCnt}</i>\n`;
-    html+=`\n<b>Всего активных задач:</b> ${grand+noneCnt}`;
+      html+=rows.map(r=>{ const parts=[]; if(r.s.active)parts.push(r.s.active+' в работе'); if(r.s.wait)parts.push(r.s.wait+' ждёт'); if(r.s.review)parts.push(r.s.review+' на проверке');
+        return `<b>${_htmlEsc(r.name)}</b> — ${r.s.total}\n└ ${parts.join(' · ')}`; }).join('\n\n');
+    } else html+='Сейчас активных задач на сотрудниках нет.';
+    html+=DIV+`Всего активных: <b>${grand+noneCnt}</b>`+(noneCnt?` · без исполнителя: ${noneCnt}`:'');
     const r=await fetch(TG_FN+'/tg-team',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
       body:JSON.stringify({agency_id:me.agency_id, text:html, kind:'load'}) });
     const d=await r.json();
@@ -6109,11 +6109,11 @@ async function tgTeamDone(){
     const total=Object.keys(by).filter(k=>k!=='_none').reduce((n,k)=>n+by[k],0);
     const noneN=by['_none']||0;
     const today=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
-    let html=`✅ <b>Сделано за 7 дней</b>\n<i>на ${_htmlEsc(today)}</i>\n\n`;
-    if(rows.length){ rows.forEach(r=>{ html+=`👤 <b>${_htmlEsc(r.name)}</b> — ${r.n}\n`; }); }
-    else html+='За неделю завершённых задач нет.\n';
-    if(noneN) html+=`\n📭 <i>Без исполнителя: ${noneN}</i>\n`;
-    html+=`\n<b>Всего закрыто:</b> ${total+noneN}`;
+    const DIV='\n────────────\n';
+    let html=`✅ <b>Сделано за 7 дней</b>\n<i>на ${_htmlEsc(today)}</i>${DIV}`;
+    if(rows.length){ html+=rows.map(r=>`<b>${_htmlEsc(r.name)}</b> — ${r.n}`).join('\n'); }
+    else html+='За неделю завершённых задач нет.';
+    html+=DIV+`Всего закрыто: <b>${total+noneN}</b>`+(noneN?` · без исполнителя: ${noneN}`:'');
     const r=await fetch(TG_FN+'/tg-team',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
       body:JSON.stringify({agency_id:me.agency_id, text:html, kind:'done'}) });
     const d=await r.json();
