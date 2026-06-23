@@ -3089,6 +3089,40 @@ function pdTabbar(p){
     <button class="pd-newbtn" onclick="pdNewReport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый отчёт</button>
   </div>`;
 }
+function tgTeamModal(){
+  const me=(window.tMe&&window.tMe())||null; if(!me){ toast('Профиль ещё загружается'); return; }
+  const linked=!!me.tg_team_chat_id;
+  const code=me.tg_team_code||'';
+  const uname=window.TG_BOT_USERNAME||'';
+  const grpLink=`https://t.me/${uname}?startgroup=${encodeURIComponent(code)}`;
+  const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>';
+  pd2Open(`<div class="modal tg-modal">
+    <div class="tg-head">
+      <div class="tg-hic">${ICON}</div>
+      <div style="flex:1;min-width:0"><div class="tg-title">Рабочая группа команды</div><div class="tg-sub">${_ddH(me.agencyName||'Агентство')}</div></div>
+      <button class="tg-x" onclick="pd2Close()">✕</button>
+    </div>
+    <div class="tg-status ${linked?'on':''}"><span class="tg-dot"></span><b>${linked?'Группа подключена':'Группа не подключена'}</b></div>
+    ${linked?`
+      <div class="tg-bh">Командные сводки</div>
+      <div style="padding:0 22px">
+        <button class="tg-test" style="margin:0 0 8px;width:100%" onclick="tgTeamSummary()">📊 Отправить сводку «кто сколько сделал»</button>
+        <div class="tg-res" id="tgt-sum-res" style="padding:0 0 10px"></div>
+        <button class="tg-test" style="margin:0;width:100%;background:var(--bg-3);border-color:var(--line-2);color:var(--txt-2)" onclick="tgTeamTest()">Тестовое сообщение в группу</button>
+        <div class="tg-res" id="tgt-test-res"></div>
+      </div>
+      <div class="tg-hint">Чтобы отвязать — удалите бота из группы.</div>
+    `:`
+      <div class="tg-steps">
+        <div class="tg-step"><span class="tg-sn">1</span><span>Создайте рабочую Telegram-группу команды</span></div>
+        <div class="tg-step"><span class="tg-sn">2</span><span>Нажмите кнопку и выберите эту группу — бот добавится и привяжется сам</span></div>
+      </div>
+      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener">${ICON}Добавить бота в рабочую группу</a>
+      <div class="tg-hint">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
+    `}
+  </div>`);
+}
+window.tgTeamModal=tgTeamModal;
 function tgOpenModal(){
   const p=(typeof PROJECTS!=='undefined'&&typeof pdIdx!=='undefined')?PROJECTS[pdIdx]:null; if(!p) return;
   const linked=!!p.tg_chat_id;
@@ -5297,7 +5331,7 @@ function renderTeam(){
         <button class="${teamTab==='workload'?'on':''}" onclick="setTeamTab('workload')">Нагрузка</button>
         <button class="${teamTab==='depts'?'on':''}" onclick="setTeamTab('depts')">Отделы</button>
       </div>
-      ${agIsOwner()?`<button class="btn-add" onclick="openEmp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить сотрудника</button>`:''}
+      ${agIsOwner()?`<button class="btn-ghost" onclick="tgTeamModal()" style="margin-right:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>Telegram-группа</button>`:''}${agIsOwner()?`<button class="btn-add" onclick="openEmp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить сотрудника</button>`:''}
     </div>
     ${body}`;
   _tiCountUp();
@@ -5777,6 +5811,42 @@ async function tgStaffTest(){
   }catch(e){ if(res){ res.textContent='✗ '+(e.message||e); res.style.color='var(--neg)'; } }
 }
 window.tgStaffTest=tgStaffTest;
+/* ===== Командная рабочая группа: привязка, тест, сводки ===== */
+const _htmlEsc=(x)=>String(x==null?'':x).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+async function tgTeamTest(){
+  const me=(typeof tMe==='function')?tMe():null; if(!me||!me.agency_id) return;
+  const res=document.getElementById('tgt-test-res'); if(res){ res.textContent='Отправляем…'; res.style.color='var(--txt-3)'; }
+  try{
+    const r=await fetch(TG_FN+'/tg-team',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
+      body:JSON.stringify({agency_id:me.agency_id, text:'🔔 <b>TRIADA</b> — рабочая группа подключена. Сюда будут приходить командные сводки.', kind:'test'}) });
+    const d=await r.json();
+    if(res){ if(d.ok){ res.textContent='✓ Отправлено — проверьте группу'; res.style.color='var(--pos)'; }
+             else { res.textContent='✗ '+(d.error||d.skipped||'ошибка'); res.style.color='var(--neg)'; } }
+  }catch(e){ if(res){ res.textContent='✗ '+(e.message||e); res.style.color='var(--neg)'; } }
+}
+window.tgTeamTest=tgTeamTest;
+async function tgTeamSummary(){
+  const me=(typeof tMe==='function')?tMe():null; if(!me||!me.agency_id||!SB) return;
+  const res=document.getElementById('tgt-sum-res'); if(res){ res.textContent='Считаем и отправляем…'; res.style.color='var(--txt-3)'; }
+  try{
+    const { data:tasks } = await SB.from('project_tasks').select('assignee_id,status');
+    const by={}; (tasks||[]).forEach(t=>{ const a=t.assignee_id||'_none'; (by[a]||(by[a]={done:0,total:0})); by[a].total++; if(t.status==='done')by[a].done++; });
+    const team=(typeof TEAM!=='undefined')?TEAM:[];
+    const rows=team.map(m=>({name:m.name, s:by[m._id]||{done:0,total:0}})).filter(r=>r.s.total>0).sort((a,b)=>b.s.done-a.s.done);
+    let totalDone=0,totalAll=0; Object.values(by).forEach(s=>{ totalDone+=s.done; totalAll+=s.total; });
+    const today=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+    let html=`📊 <b>Сводка по команде</b>\n<i>${_htmlEsc(today)}</i>\n\n`;
+    if(rows.length){ rows.forEach(r=>{ const pct=r.s.total?Math.round(100*r.s.done/r.s.total):0; html+=`👤 <b>${_htmlEsc(r.name)}</b> — ${r.s.done}/${r.s.total} <i>(${pct}%)</i>\n`; }); }
+    else html+='Пока нет задач с исполнителями.\n';
+    html+=`\n<b>Итого:</b> ${totalDone}/${totalAll} задач выполнено`;
+    const r=await fetch(TG_FN+'/tg-team',{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
+      body:JSON.stringify({agency_id:me.agency_id, text:html, kind:'tasks'}) });
+    const d=await r.json();
+    if(res){ if(d.ok){ res.textContent='✓ Сводка отправлена в группу'; res.style.color='var(--pos)'; }
+             else { res.textContent='✗ '+(d.error||d.skipped||'ошибка'); res.style.color='var(--neg)'; } }
+  }catch(e){ if(res){ res.textContent='✗ '+(e.message||e); res.style.color='var(--neg)'; } }
+}
+window.tgTeamSummary=tgTeamSummary;
 let ME = null; window.tMe = () => ME;
 
 const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.vertical||'—',
@@ -6517,8 +6587,8 @@ async function routeByProfile(){
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
   ME = data || { role:'member' };
-  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent,name,logo_url').eq('id', ME.agency_id).single();
-    if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; } }
+  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent,name,logo_url,tg_team_code,tg_team_chat_id').eq('id', ME.agency_id).single();
+    if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; } }
   await window.tLoadAll(ME.role);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
   if (ME.role === 'superadmin') enter('general');
