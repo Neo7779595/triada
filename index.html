@@ -4043,13 +4043,14 @@ function renderPd(){
   } else if(pdTabCur==='smm'){
     const sm=(p._reports||[]).filter(r=>r.kind==='SMM')[0];
     if(!sm){ h='<div class="pk-empty" style="padding:44px 0">Нет SMM-отчётов. Создай отчёт типа SMM — метрики появятся здесь.</div>'; }
-    else { const m=sm.payload||{};
+    else { const s=smmNormalize(sm.payload), m=s.metrics;
+      const f=v=>v==null?'—':Number(v).toLocaleString('ru-RU'), pc=v=>v==null?'—':(+v).toFixed(2)+'%';
       h=`<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-        <div class="kpi"><div class="l">Охват</div><div class="v num">${m.ohvat||'—'}</div><div class="sub">${_dDateFull(sm.published_at)}</div></div>
-        <div class="kpi"><div class="l">Вовлечённость</div><div class="v num" style="color:var(--accent)">${m.er||'—'}</div><div class="sub">ER</div></div>
-        <div class="kpi"><div class="l">Подписчики Δ</div><div class="v num" style="color:var(--pos)">${m.pod||'—'}</div><div class="sub">прирост</div></div>
-        <div class="kpi"><div class="l">Публикаций</div><div class="v num">${m.pub||'—'}</div><div class="sub">за период</div></div>
-      </div>${m.note?`<div class="rv-insight" style="margin-top:14px"><div class="h">◆ Вывод</div><p>${_ddH(m.note)}</p></div>`:''}`;
+        <div class="kpi"><div class="l">Охват</div><div class="v num">${f(m.reels_reach)}</div><div class="sub">${_dDateFull(sm.published_at)}</div></div>
+        <div class="kpi"><div class="l">Вовлечённость</div><div class="v num" style="color:var(--accent)">${pc(m.er)}</div><div class="sub">ER</div></div>
+        <div class="kpi"><div class="l">Подписчики Δ</div><div class="v num" style="color:var(--pos)">${m.followers==null?'—':(m.followers>0?'+':'')+f(m.followers)}</div><div class="sub">прирост</div></div>
+        <div class="kpi"><div class="l">Публикаций</div><div class="v num">${f(m.reels_count)}</div><div class="sub">за период</div></div>
+      </div>${s.note?`<div class="rv-insight" style="margin-top:14px"><div class="h">◆ Вывод</div><p>${_ddH(s.note)}</p></div>`:''}`;
     }
   } else if(pdTabCur==='deadlines'){
     h=_pdDeadlinesHTML(p);
@@ -4273,9 +4274,17 @@ function pd2RepType(v){pd2Rep=v;document.querySelectorAll('#pd2-rtseg button').f
 function pdSaveReport(){
   const period=_v('pd2-period')||'';
   const title=_v('pd2-title')||`${pd2Rep==='PERF'?'Performance':'SMM'}${period?' · '+period:''}`;
-  const payload=pd2Rep==='PERF'
-    ? {period, rost:_v('rp-rost'),traf:_v('rp-traf'),chek:_v('rp-chek'),fakt:_v('rp-fakt'),baza:_v('rp-baza'),note:_v('rp-note')}
-    : {period, ohvat:_v('rp-ohvat'),er:_v('rp-er'),pod:_v('rp-pod'),pub:_v('rp-pub'),note:_v('rp-note')};
+  let payload;
+  if(pd2Rep==='PERF'){
+    payload={period, rost:_v('rp-rost'),traf:_v('rp-traf'),chek:_v('rp-chek'),fakt:_v('rp-fakt'),baza:_v('rp-baza'),note:_v('rp-note')};
+  } else {
+    payload=smmEmptyPayload();
+    payload.period=period; payload.note=_v('rp-note');
+    payload.metrics.reels_reach=smmNumOf(_v('rp-ohvat'));
+    payload.metrics.er=smmNumOf(_v('rp-er'));
+    payload.metrics.followers=smmNumOf(_v('rp-pod'));
+    payload.metrics.reels_count=smmNumOf(_v('rp-pub'));
+  }
   if(window.tReportAdd) window.tReportAdd(PROJECTS[pdIdx].id,{title,kind:pd2Rep,payload});
   else { pd2Close(); toast('Нужен бэкенд'); }
 }
@@ -4296,8 +4305,49 @@ function pdCycles(){
   </div>`);
 }
 
+/* ——— SMM payload · каноническая схема + нормализатор (Фаза 1) ——— */
+function smmEmptyPayload(){
+  return {
+    period:'', bench:50000, note:'',
+    metrics:{ reels_count:null, posts_count:null, stories_count:null,
+      reels_reach:null, stories_reach:null, reels_views:null, stories_views:null,
+      followers:null, subscribers_current:null, ad_creatives:null, frequency:null,
+      er:null, lr:null, tr:null, shr:null, sr:null },
+    prev:{ followers:null, er:null, lr:null, tr:null, shr:null, sr:null },
+    goals:{ er:null, lr:null, tr:null, shr:null, sr:null },
+    reels:[], rubrics:[]
+  };
+}
+function smmNumOf(v){ if(v==null||v==='') return null; const n=parseFloat(String(v).replace(/[^\d.,\-]/g,'').replace(',','.')); return isNaN(n)?null:n; }
+function smmNormalize(payload){
+  const b=smmEmptyPayload();
+  const p=(payload&&typeof payload==='object')?payload:{};
+  const merge=(dst,src)=>{ if(src&&typeof src==='object') Object.keys(dst).forEach(k=>{ if(src[k]!==undefined) dst[k]=src[k]; }); };
+  b.period=p.period||''; b.bench=(+p.bench)||50000; b.note=p.note||'';
+  if(!p.metrics && (p.ohvat!=null||p.er!=null||p.pod!=null||p.pub!=null)){
+    /* миграция старого «плоского» SMM-отчёта (поля были свободным текстом) */
+    b.metrics.reels_reach=smmNumOf(p.ohvat);
+    b.metrics.er=smmNumOf(p.er);
+    b.metrics.followers=smmNumOf(p.pod);
+    b.metrics.reels_count=smmNumOf(p.pub);
+    b._legacy=true;
+  } else {
+    merge(b.metrics,p.metrics); merge(b.prev,p.prev); merge(b.goals,p.goals);
+    b.reels=Array.isArray(p.reels)?p.reels:[];
+    b.rubrics=Array.isArray(p.rubrics)?p.rubrics:[];
+  }
+  return b;
+}
+
 /* ——— report viewer (PERF / SMM) ——— */
-function openReportProj(i){ const r=(PROJECTS[pdIdx]._reports||[])[i]; if(!r) return; openReport(r.kind, Object.assign({t:r.title,date:_dDateFull(r.published_at),_real:true}, r.payload||{})); }
+function openReportProj(i){
+  const r=(PROJECTS[pdIdx]._reports||[])[i]; if(!r) return;
+  if(r.kind==='SMM'){
+    openReport('SMM',{t:r.title,date:_dDateFull(r.published_at),_real:true,_smm:smmNormalize(r.payload)});
+  } else {
+    openReport(r.kind, Object.assign({t:r.title,date:_dDateFull(r.published_at),_real:true}, r.payload||{}));
+  }
+}
 function openReport(ty,d){
   d=d||{}; const isP=ty==='PERF'; const col=isP?'#37E6C8':'#8A8FFF';
   const icon=isP?'<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/>':'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>';
@@ -4307,12 +4357,15 @@ function openReport(ty,d){
       ['Ср. чек Δ',d.chek||'—',(d.chek&&d.chek.includes('↓'))?'var(--neg)':'var(--pos)'],
       ['Выручка факт',d.fakt||'—','var(--txt)'],
       ['База сравнения',d.baza||'—','var(--txt-3)'],
-    ]:[
-      ['Охват',d.ohvat||'—','var(--txt)'],
-      ['Вовлечённость (ER)',d.er||'—','var(--accent)'],
-      ['Подписчики Δ',d.pod||'—','var(--pos)'],
-      ['Публикаций',d.pub||'—','var(--txt)'],
-    ];
+    ]:(function(){ const s=d._smm||smmNormalize(d); const m=s.metrics;
+      const f=v=>v==null?'—':Number(v).toLocaleString('ru-RU'); const pc=v=>v==null?'—':(+v).toFixed(2)+'%';
+      return [
+        ['Охват',f(m.reels_reach),'var(--txt)'],
+        ['Вовлечённость (ER)',pc(m.er),'var(--accent)'],
+        ['Подписчики Δ',m.followers==null?'—':(m.followers>0?'+':'')+f(m.followers),'var(--pos)'],
+        ['Публикаций',f(m.reels_count),'var(--txt)'],
+      ];
+    })();
   let chartBlock='', insightBlock='';
   if(!d._real){
     const vals=isP?[4.86,4.95,5.05,5.31,5.72]:[410,520,610,705,833];
@@ -4320,8 +4373,9 @@ function openReport(ty,d){
     const chTitle=isP?'Выручка по месяцам · млрд сум':'Охват по месяцам · тыс.';
     chartBlock=`<div class="rv-chart"><div class="ch">${chTitle}</div>${svgLine(vals,labels)}</div>`;
     insightBlock=`<div class="rv-insight"><div class="h">◆ Вывод аналитика</div><p>Демо-вывод. Реальные отчёты формируются из введённых метрик.</p></div>`;
-  } else if(d.note){
-    insightBlock=`<div class="rv-insight"><div class="h">◆ Вывод</div><p>${_ddH(d.note)}</p></div>`;
+  } else {
+    const _note=(d._smm&&d._smm.note)||d.note;
+    if(_note) insightBlock=`<div class="rv-insight"><div class="h">◆ Вывод</div><p>${_ddH(_note)}</p></div>`;
   }
   pd2Open(`<div class="modal" style="max-width:780px">
     <div class="modal-h" style="display:flex;align-items:flex-start;gap:13px">
@@ -6951,6 +7005,8 @@ window.tReportAdd = async (projectId,row) => { try { const {error}=await SB.from
   if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tReportDel = async (id) => { try { const {error}=await SB.from('reports').delete().eq('id',id); if(error)throw error;
   toast('Отчёт удалён'); await _pwReload(curProjId()); if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+window.tReportUpdate = async (id, patch) => { try { const {error}=await SB.from('reports').update(patch).eq('id',id); if(error)throw error;
+  toast('Отчёт обновлён'); await _pwReload(curProjId()); if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tLoadProjectAggregates = async () => {
   if (!SB) return;
   const today=new Date(); today.setHours(0,0,0,0);
