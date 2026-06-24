@@ -5346,9 +5346,9 @@ function finWaterfallSVG(steps){
   const y=v=>padT+plot*(1-v/maxv);
   const col={base:'#3a4150',pos:'var(--pos)',neg:'var(--neg)',net:'var(--accent)'};
   const tcol={base:'#9AA1AC',pos:'#43D88C',neg:'#F0785C',net:'#37E6C8'};
-  const M=v=>{ const x=Math.round(v/1e5)/10; return (x%1===0?String(x):x.toFixed(1)); };
+  const L=v=>fmt(Math.round(v));
   let svg='<svg class="dynx-wf" viewBox="0 0 '+W+' '+H+'" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Мост движения MRR за период">';
-  [0,maxv/2,maxv].forEach(gv=>{ const yy=y(gv); svg+='<line x1="'+padL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+yy.toFixed(1)+'" stroke="rgba(255,255,255,.05)"/><text class="m" x="'+(W-padR)+'" y="'+(yy-4).toFixed(1)+'" text-anchor="end" font-size="9" fill="#5f6670">'+Math.round(gv/1e6)+'M</text>'; });
+  [0,maxv/2,maxv].forEach(gv=>{ const yy=y(gv); svg+='<line x1="'+padL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+yy.toFixed(1)+'" stroke="rgba(255,255,255,.05)"/>'; });
   let run=0;
   steps.forEach((s,i)=>{
     const cx=padL+slot*i+slot/2, x=cx-bw/2; let top,h,prev;
@@ -5360,8 +5360,8 @@ function finWaterfallSVG(steps){
       svg+='<line class="dynx-wf-conn" x1="'+(cx-slot/2+2).toFixed(1)+'" y1="'+y(prev).toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+y(prev).toFixed(1)+'" stroke="rgba(255,255,255,.16)" stroke-dasharray="2 2"/>'; }
     h=Math.max(h,2);
     svg+='<rect class="dynx-wf-bar" style="--i:'+i+'" x="'+x.toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="2.5" fill="'+col[s.t]+'"/>';
-    let lbl=(s.t==='base'||s.t==='net')?M(s.v):((s.v>=0?'+':'−')+M(Math.abs(s.v)));
-    svg+='<text class="dynx-wf-vlab m" style="--i:'+i+'" x="'+cx.toFixed(1)+'" y="'+(top-7).toFixed(1)+'" text-anchor="middle" font-size="10.5" font-weight="600" fill="'+tcol[s.t]+'">'+lbl+'</text>';
+    let lbl=(s.t==='base'||s.t==='net')?L(s.v):((s.v>=0?'+':'−')+L(Math.abs(s.v)));
+    svg+='<text class="dynx-wf-vlab m" style="--i:'+i+'" x="'+cx.toFixed(1)+'" y="'+(top-7).toFixed(1)+'" text-anchor="middle" font-size="9.5" font-weight="600" fill="'+tcol[s.t]+'">'+lbl+'</text>';
     svg+='<text x="'+cx.toFixed(1)+'" y="'+(H-9)+'" text-anchor="middle" font-size="10" fill="#7A828D">'+s.l+'</text>';
   });
   return svg+'</svg>';
@@ -5500,9 +5500,13 @@ function renderFinance(){
       const hasHist=snaps.length>=2;
       const LB={month:1,quarter:3,year:12}, lb=LB[finPeriod]||1;
       const baseSnap=(finPeriod==='month'&&F.prevSnap)?F.prevSnap:(snaps.length?snaps[Math.max(0,snaps.length-lb)]:null);
-      const start=baseSnap?(Number(baseSnap.mrr)||0):0;
+      let start=baseSnap?(Number(baseSnap.mrr)||0):0;
       const end=Number(F.totalMrr)||0, newM=Number(F.newMrr)||0, churnM=Number(F.churnMrr)||0;
-      const resid=end-start-newM+churnM;                 // нетто расширение/сжатие базы
+      let resid=end-start-newM+churnM;                   // нетто расширение/сжатие базы
+      let rebased=false;
+      // защита от двойного учёта: весь текущий MRR помечен «новым», но уже сидит в стартовом снимке
+      // (типично для свежего аккаунта: старт≈итог, остаток ≈ −новые) → пересобираем чистый старт из потоков
+      if(newM>0 && resid<0 && (start-newM)<=Math.max(end*0.02,1)){ start=Math.max(0,end-newM+churnM); resid=end-start-newM+churnM; rebased=true; }
       const netMove=end-start;
       const netPct=start>0?Math.round(netMove/start*1000)/10:null;
       const nrr=start>0?Math.round((start+resid-churnM)/start*100):null;
@@ -5523,9 +5527,11 @@ function renderFinance(){
 
       const netChip=netPct==null?'':`<span class="dynx-delta ${netMove>=0?'up':'down'}">${netMove>=0?up:dn}${netMove>=0?'+':'−'}${Math.abs(netPct)}%</span>`;
 
-      const steps=[{l:'Старт',v:start,t:'base'},{l:'Новые',v:newM,t:'pos'}];
-      steps.push(resid>=0?{l:'Расшир.',v:resid,t:'pos'}:{l:'Сжатие',v:resid,t:'neg'});
-      steps.push({l:'Отток',v:-churnM,t:'neg'});
+      const eps=Math.max(end*0.005,1);
+      const steps=[{l:'Старт',v:start,t:'base'}];
+      if(newM>0) steps.push({l:'Новые',v:newM,t:'pos'});
+      if(Math.abs(resid)>=eps) steps.push(resid>=0?{l:'Расшир.',v:resid,t:'pos'}:{l:'Сжатие',v:resid,t:'neg'});
+      if(churnM>0) steps.push({l:'Отток',v:-churnM,t:'neg'});
       steps.push({l:'Итог',v:end,t:'net'});
       const wf=finWaterfallSVG(steps);
 
@@ -5556,8 +5562,8 @@ function renderFinance(){
         </div>
         <div class="dynx-grid">
           <div class="dynx-tile dynx-bridge">
-            <div class="dynx-th"><span class="l">Мост MRR за период</span><span class="r">млн сум</span></div>
-            <div class="dynx-net"><span class="v" style="color:var(--accent)">${netMove>=0?'+':'−'}${money(Math.abs(netMove))}</span>${netChip}<span class="dynx-vs">vs ${baseSnap?_finMonLabel(baseSnap.period):'старт'}</span></div>
+            <div class="dynx-th"><span class="l">Мост MRR за период</span><span class="r">сум</span></div>
+            <div class="dynx-net"><span class="v" style="color:var(--accent)">${netMove>=0?'+':'−'}${money(Math.abs(netMove))}</span>${netChip}<span class="dynx-vs">vs ${(rebased||!baseSnap)?'старт':_finMonLabel(baseSnap.period)}</span></div>
             <div class="dynx-wfwrap">${wf}</div>
           </div>
           <div class="dynx-gauges">${nrrRing}${marRing}</div>
