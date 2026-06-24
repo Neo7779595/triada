@@ -1545,6 +1545,21 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .fin-tcard .ts{font-size:12px;color:var(--txt-3);margin-top:8px}
 .fin-tcard .tf{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:16px;padding-top:13px;border-top:1px solid var(--line)}
 /* finance — hero + supporting grid (Variant B) */
+.fin-compare{margin-top:16px;border:1px solid var(--line);border-radius:16px;background:var(--bg-1);padding:16px 18px}
+.fc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.fc-title{font-size:13px;font-weight:700;color:var(--txt);display:flex;align-items:center;gap:8px}
+.fc-title span{font-size:10.5px;font-weight:600;color:var(--txt-3);text-transform:uppercase;letter-spacing:.05em}
+.fc-snap{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border:1px solid var(--accent-line);background:var(--accent-dim);color:var(--accent);border-radius:9px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.fc-snap:hover{background:var(--accent);color:var(--bg-0)}
+.fc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.fc-card{padding:13px 15px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
+.fc-card.fc-new{border-color:var(--accent-line);background:var(--accent-dim)}
+.fc-l{font-size:10px;font-weight:600;color:var(--txt-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+.fc-v{font-size:21px;font-weight:800;letter-spacing:-.02em;color:var(--txt);display:flex;align-items:center;gap:5px;line-height:1}
+.fc-v .fc-ar{font-size:12px}
+.fc-v.up{color:var(--pos)} .fc-v.down{color:var(--neg)} .fc-v.flat{color:var(--txt-2)}
+.fc-s{font-size:10.5px;color:var(--txt-3);margin-top:6px}
+.fc-empty{grid-column:1/-1;padding:16px;text-align:center;font-size:12px;color:var(--txt-3);border:1px dashed var(--line-2);border-radius:11px;background:var(--bg-2)}
 .fin-b{display:grid;grid-template-columns:1.12fr 2fr;gap:13px;margin-top:16px}
 .fin-hero{border-radius:16px;padding:26px 26px 24px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--line);background:var(--bg-1);background-image:linear-gradient(180deg,rgba(255,255,255,.015),transparent 44%);box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 16px 40px -30px rgba(0,0,0,.85)}
 .fin-hero.pos{border-color:rgba(67,216,140,.22);background:linear-gradient(158deg,rgba(67,216,140,.10),var(--bg-1) 56%)}
@@ -5325,6 +5340,30 @@ function renderFinance(){
       </div>
     </div>
 
+    ${(()=>{
+      const _arrow=(v)=>v>0?'▲':v<0?'▼':'·';
+      const _cls=(v)=>{ if(v===0||v==null)return 'flat'; return v>0?'up':'down'; };
+      const _dlt=(label,v,isMoney,suffix)=>{ if(v==null) return '';
+        const cls=_cls(v); const sign=v>0?'+':(v<0?'−':'');
+        const val=isMoney?money(Math.abs(v)):(Math.abs(v)+(suffix||''));
+        return `<div class="fc-card"><div class="fc-l">${label}</div><div class="fc-v ${cls}"><span class="fc-ar">${_arrow(v)}</span>${sign}${val}</div><div class="fc-s">vs прошлый месяц</div></div>`; };
+      const hasSnaps=(F.snapshots&&F.snapshots.length)>0;
+      const cmp=F.deltas?`
+        ${_dlt('MRR', F.deltas.mrr, true,'')}
+        ${_dlt('Прибыль', F.deltas.profit, true,'')}
+        ${_dlt('Клиенты', F.deltas.clients, false,'')}
+        ${_dlt('Маржа', F.deltas.margin, false,'%')}
+      `:`<div class="fc-empty">Появится сравнение с прошлым месяцем, как только будет зафиксирован хотя бы один прошлый снимок.</div>`;
+      return `<div class="fin-compare">
+        <div class="fc-head"><div class="fc-title">Динамика <span>${hasSnaps?F.snapshots.length+' мес. в истории':'история пуста'}</span></div>
+          <button class="fc-snap" onclick="tFinSnapshot()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M19 21H5a2 2 0 01-2-2V8a2 2 0 012-2h3l2-3h4l2 3h3a2 2 0 012 2v11a2 2 0 01-2 2z"/><circle cx="12" cy="13" r="3.2"/></svg>Зафиксировать снимок</button></div>
+        <div class="fc-grid">
+          <div class="fc-card fc-new"><div class="fc-l">Приход за месяц</div><div class="fc-v up">${F.newMrr>0?'+'+money(F.newMrr):money(0)}</div><div class="fc-s">${F.newCount} ${F.newCount===1?'новый клиент':'нов. клиентов'}</div></div>
+          ${cmp}
+        </div>
+      </div>`;
+    })()}
+
     ${(F.services&&F.services.length)||(F.tariffs&&F.tariffs.length)?`<div class="fin-2eq">
       ${finBreakdown('Доход по услугам', F.totalMrr, F.services)}
       ${finBreakdown('Доход по тарифам', F.totalMrr, F.tariffs)}
@@ -7000,9 +7039,10 @@ window.tLoadTeam = async () => {
 /* ===== FINANCE · live P&L from projects.mrr / projects.cost ===== */
 window.tLoadFinance = async () => {
   if (!SB) return;
-  const [res, tt] = await Promise.all([
-    SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance,tariff'),
-    SB.from('project_tasks').select('project_id,time_spent,timer_started') ]);
+  const [res, tt, snapsRes] = await Promise.all([
+    SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance,tariff,created_at,start_date'),
+    SB.from('project_tasks').select('project_id,time_spent,timer_started'),
+    SB.from('fin_snapshots').select('*').order('period') ]);
   if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost/finance ещё не добавлены
   const trk = {};   // отслеженное время по проекту (сек), включая идущие таймеры
   (tt && !tt.error && tt.data ? tt.data : []).forEach(t => { let s=t.time_spent||0;
@@ -7011,7 +7051,8 @@ window.tLoadFinance = async () => {
     return { id:p.id, name:p.name, service:p.service||'Прочее', status:p.status, cat:p.category||'—',
       tariff: p.tariff || (_mrr>=20000000?'Platinum':_mrr>=10000000?'Gold':_mrr>0?'Silver':'—'),
       logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(), logoUrl:p.logo_url||'',
-      mrr: _mrr, cost: Number(p.cost)||0, trackedSec:tsec, hours: tsec>0 ? tsec/3600 : (Number(f.hours)||0), finance:f }; });
+      mrr: _mrr, cost: Number(p.cost)||0, trackedSec:tsec, hours: tsec>0 ? tsec/3600 : (Number(f.hours)||0), finance:f,
+      _start: p.start_date||p.created_at||null, _created: p.created_at||null }; });
 
   const totalMrr  = rows.reduce((s,p)=>s+p.mrr,0);
   const totalCost = rows.reduce((s,p)=>s+p.cost,0);
@@ -7071,9 +7112,45 @@ window.tLoadFinance = async () => {
   const MIN_H = 1;   // меньше часа трекинга — почасовая ставка не показательна (делитель → 0)
   const revPerHour = totalHours>=MIN_H ? Math.round(totalMrr/totalHours) : 0;
   const profitPerHour = totalHours>=MIN_H ? Math.round(profit/totalHours) : 0;
+  // —— снапшоты и сравнение периодов ——
+  const snaps = (snapsRes && !snapsRes.error && snapsRes.data) ? snapsRes.data : [];
+  const _now = new Date();
+  const _ymStart = new Date(_now.getFullYear(), _now.getMonth(), 1);
+  const _prevPeriod = new Date(_now.getFullYear(), _now.getMonth()-1, 1).toISOString().slice(0,10);
+  const prevSnap = snaps.find(x => String(x.period).slice(0,10) === _prevPeriod) || null;
+  // Путь A — приход за текущий месяц (новые клиенты по дате старта)
+  const newRows = rows.filter(p => p.mrr>0 && p._start && new Date(p._start) >= _ymStart);
+  const newMrr = newRows.reduce((s,p)=>s+p.mrr,0);
+  const newCount = newRows.length;
+  // дельты к прошлому снимку
+  const d = (cur, prev) => (prev==null ? null : cur - prev);
+  const deltas = prevSnap ? {
+    mrr: d(totalMrr, Number(prevSnap.mrr)),
+    profit: d(profit, Number(prevSnap.profit)),
+    clients: d(paying, Number(prevSnap.clients)),
+    margin: d(marginPct, Number(prevSnap.margin_pct)),
+  } : null;
+
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
     paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop,
-    totalHours, avgHours, revPerHour, profitPerHour, services, tariffs, projects, breakdown };
+    totalHours, avgHours, revPerHour, profitPerHour, services, tariffs, projects, breakdown,
+    snapshots:snaps, prevSnap, deltas, newMrr, newCount };
+};
+/* ===== Фиксация месячного снимка финансов ===== */
+window.tFinSnapshot = async () => {
+  if (!SB || !FINANCE.ready) { toast('Финансы ещё не загружены'); return; }
+  const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
+  const now=new Date(); const period=new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  try{
+    const { error } = await SB.from('fin_snapshots').upsert({
+      agency_id:me.agency_id, period,
+      mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit,
+      margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours,
+      updated_at:new Date().toISOString()
+    }, { onConflict:'agency_id,period' });
+    if(error) throw error;
+    toast('Снимок месяца зафиксирован'); await window.tLoadFinance(); if(typeof renderFinance==='function') renderFinance();
+  }catch(e){ toast('Ошибка: '+(e.message||e)); }
 };
 
 window.tLoadAll = async (role) => {
