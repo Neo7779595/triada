@@ -1604,6 +1604,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .finm-dlt.up{color:var(--pos);background:var(--pos-dim)}
 .finm-dlt.down{color:var(--neg);background:var(--neg-dim)}
 .finm-card svg{margin:0 -14px;width:calc(100% + 28px)}
+.finm-flat{height:46px;margin:0 -14px;border-top:1px solid var(--line);position:relative}
+.finm-flat::after{content:'история копится';position:absolute;top:8px;left:14px;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);opacity:.45}
 .fc-sel{padding:8px 11px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:9px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer}
 .fc-chart{margin-top:14px;padding:14px 12px 6px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
 .fc-chart-h{display:flex;gap:16px;justify-content:flex-end;margin-bottom:6px;padding:0 4px}
@@ -5355,14 +5357,10 @@ function finRing(pct, color, label){
     <text x="45" y="50" text-anchor="middle" font-size="17" font-weight="600" fill="var(--txt)" style="font-family:var(--mono);letter-spacing:-.03em">${pct==null?'—':pct+'%'}</text></svg>`;
 }
 // мини-спарклайн по метрике из снимков
-function finSpark(key, color, curVal){
-  let snaps=(FINANCE.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1).slice(-8);
-  let vals=snaps.map(s=>Number(s[key])||0);
-  // если истории мало — строим из текущего значения мягкую восходящую линию, чтобы карточка не пустовала
-  if(vals.length<2){
-    const v=Number(curVal)||vals[0]||0;
-    vals=[v*0.62, v*0.7, v*0.66, v*0.78, v*0.85, v*0.92, v];
-  }
+function finSpark(key, color){
+  const snaps=(FINANCE.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1).slice(-8);
+  const vals=snaps.map(s=>Number(s[key])||0);
+  if(vals.length<2) return ''; // нет реальной истории — ничего не выдумываем
   const W=260,H=46,pad=3;
   const hi=Math.max(...vals), lo=Math.min(...vals), rng=(hi-lo)||Math.abs(hi)||1;
   const X=i=>(i/(vals.length-1))*W;
@@ -5502,7 +5500,7 @@ function renderFinance(){
       `:`<div class="fc-empty">Мост MRR появится со следующего периода — система копит историю автоматически.</div>`;
       const profDlt=(F.deltas&&F.prevSnap&&Number(F.prevSnap.profit))?Math.round(100*F.deltas.profit/Math.abs(Number(F.prevSnap.profit))):null;
       const mrrDlt=(F.deltas&&F.prevSnap&&Number(F.prevSnap.mrr))?Math.round(100*F.deltas.mrr/Number(F.prevSnap.mrr)):null;
-      const mCard=(label,val,cls,sparkKey,sparkCol,curVal,dlt)=>`<div class="finm-card"><div class="finm-l">${label}</div><div class="finm-top"><div class="finm-v ${cls||''}">${val}</div>${dlt!=null?`<span class="finm-dlt ${dlt>=0?'up':'down'}">${dlt>=0?'↑':'↓'} ${dlt>=0?'+':''}${dlt}%</span>`:''}</div>${finSpark(sparkKey,sparkCol,curVal)}</div>`;
+      const mCard=(label,val,cls,sparkKey,sparkCol,curVal,dlt)=>`<div class="finm-card"><div class="finm-l">${label}</div><div class="finm-top"><div class="finm-v ${cls||''}">${val}</div>${dlt!=null?`<span class="finm-dlt ${dlt>=0?'up':'down'}">${dlt>=0?'↑':'↓'} ${dlt>=0?'+':''}${dlt}%</span>`:''}</div>${finSpark(sparkKey,sparkCol)||'<div class="finm-flat"></div>'}</div>`;
       return `<div class="fin-compare findyn">
         <div class="findyn-head"><div class="fc-title">Динамика <span>движение MRR · авто</span></div>
           <div class="finp-segs">${seg}</div></div>
