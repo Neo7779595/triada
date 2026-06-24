@@ -1560,6 +1560,35 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .fc-v.up{color:var(--pos)} .fc-v.down{color:var(--neg)} .fc-v.flat{color:var(--txt-2)}
 .fc-s{font-size:10.5px;color:var(--txt-3);margin-top:6px}
 .fc-empty{grid-column:1/-1;padding:16px;text-align:center;font-size:12px;color:var(--txt-3);border:1px dashed var(--line-2);border-radius:11px;background:var(--bg-2)}
+.findyn{padding:18px}
+.findyn-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.finp-segs{display:inline-flex;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:3px;gap:2px}
+.finp-seg{padding:7px 16px;border:none;background:transparent;color:var(--txt-3);font-family:var(--font);font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;transition:.15s}
+.finp-seg.on{background:var(--accent);color:var(--bg-0)}
+.findyn-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:14px;align-items:stretch}
+@media(max-width:900px){.findyn-grid{grid-template-columns:1fr}}
+.finw-card{border:1px solid var(--line);border-radius:14px;background:var(--bg-2);padding:16px 16px 6px}
+.finw-h{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);margin-bottom:8px}
+.finw-big{font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--accent);margin-bottom:6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.finw-big span{font-size:13px;color:var(--txt-3);font-weight:600}
+.finw-big b{font-size:13px;color:var(--txt-2);font-weight:600}
+.finw-big em{font-size:12px;color:var(--txt-3);font-style:normal;font-weight:500}
+.finw-dlt{font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px}
+.finw-dlt.up{color:var(--pos);background:var(--pos-dim,rgba(52,199,123,.12))}
+.finw-dlt.down{color:var(--neg);background:rgba(255,99,99,.12)}
+.finw-note{font-size:10.5px;color:var(--txt-3);padding:4px 2px 8px}
+.finr-col{display:flex;flex-direction:column;gap:14px}
+.finr-card{flex:1;border:1px solid var(--line);border-radius:14px;background:var(--bg-2);padding:16px;display:flex;align-items:center;gap:14px}
+.finr-txt{min-width:0}
+.finr-l{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-2);margin-bottom:5px}
+.finr-d{font-size:11.5px;color:var(--txt-3);line-height:1.4}
+.finm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+@media(max-width:760px){.finm-row{grid-template-columns:repeat(2,1fr)}}
+.finm-card{border:1px solid var(--line);border-radius:13px;background:var(--bg-2);padding:13px 14px 8px}
+.finm-l{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt-3);margin-bottom:7px}
+.finm-v{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--txt);margin-bottom:6px}
+.finm-v.up{color:var(--pos)} .finm-v.down{color:var(--neg)}
+.finm-soon{font-size:10px;color:var(--txt-3);padding:8px 0}
 .fc-sel{padding:8px 11px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:9px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer}
 .fc-chart{margin-top:14px;padding:14px 12px 6px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
 .fc-chart-h{display:flex;gap:16px;justify-content:flex-end;margin-bottom:6px;padding:0 4px}
@@ -5239,32 +5268,83 @@ function finMarginChart(projs){
   const xl=projs.map(p=>`<span title="${(p.name||'').replace(/"/g,'&quot;')}">${p.name.length>16?p.name.slice(0,15)+'…':p.name}</span>`).join('');
   return `<div class="fin-chart"><div class="fin-bars">${gl}${bars}</div><div class="fin-xl">${xl}</div></div>`;
 }
-let finCmpPeriod=null; // период снимка для сравнения (null = прошлый месяц)
-function setFinCmp(p){ finCmpPeriod=(p==='auto'?null:p); renderFinance(); }
-window.setFinCmp=setFinCmp;
+let finPeriodMode='month'; // month | quarter | year
+function setFinPeriod(m){ finPeriodMode=m; renderFinance(); }
+window.setFinPeriod=setFinPeriod;
 function _finMonLabel(period){ const d=new Date(String(period).slice(0,10)+'T00:00:00'); return ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]+' '+String(d.getFullYear()).slice(2); }
-function finTrendChart(snaps){
-  if(!snaps||snaps.length<2) return '';
-  const data=snaps.slice(-12);
-  const W=640,H=150,padX=10,padT=14,padB=22;
-  const mrrs=data.map(s=>Number(s.mrr)||0), profs=data.map(s=>Number(s.profit)||0);
-  const hi=Math.max(...mrrs,...profs,1), lo=Math.min(...profs,0), rng=(hi-lo)||1;
-  const X=i=>padX+(data.length===1?0:(i/(data.length-1))*(W-2*padX));
-  const Y=v=>padT+(1-(v-lo)/rng)*(H-padT-padB);
-  const path=arr=>arr.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
-  const area=arr=>`${path(arr)} L${X(arr.length-1).toFixed(1)} ${(H-padB).toFixed(1)} L${X(0).toFixed(1)} ${(H-padB).toFixed(1)} Z`;
-  const dots=(arr,col)=>arr.map((v,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.6" fill="${col}"/>`).join('');
-  const labels=data.map((s,i)=>`<text x="${X(i).toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="9" fill="var(--txt-3)">${_finMonLabel(s.period)}</text>`).join('');
-  const zeroY=Y(0);
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="none" style="display:block">
-    <defs><linearGradient id="finGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
-    ${lo<0?`<line x1="${padX}" y1="${zeroY.toFixed(1)}" x2="${W-padX}" y2="${zeroY.toFixed(1)}" stroke="var(--line-2)" stroke-dasharray="3 3"/>`:''}
-    <path d="${area(mrrs)}" fill="url(#finGrad)"/>
-    <path d="${path(mrrs)}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round"/>
-    <path d="${path(profs)}" fill="none" stroke="var(--pos)" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round"/>
-    ${dots(mrrs,'var(--accent)')}${dots(profs,'var(--pos)')}
-    ${labels}
-  </svg>`;
+function _finM(v){ const a=Math.abs(v); if(a>=1e6) return (v/1e6).toFixed(a>=1e7?0:1).replace('.0','')+'M'; if(a>=1e3) return Math.round(v/1e3)+'K'; return String(Math.round(v)); }
+// выбрать снимок для сравнения по режиму периода (1 / 3 / 12 мес назад)
+function _finCmpSnap(){
+  const snaps=(FINANCE.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1);
+  if(!snaps.length) return null;
+  const back=finPeriodMode==='year'?12:finPeriodMode==='quarter'?3:1;
+  const now=new Date(); const target=new Date(now.getFullYear(), now.getMonth()-back, 1).toISOString().slice(0,10);
+  // ближайший снимок не новее target
+  let pick=null; for(const x of snaps){ if(String(x.period).slice(0,10)<=target) pick=x; }
+  return pick || snaps[0];
+}
+// пересчёт MRR-моста к выбранному снимку
+function _finBridge(){
+  const cmp=_finCmpSnap(); if(!cmp) return null;
+  const start=Number(cmp.mrr)||0; const end=FINANCE.totalMrr;
+  const cur=FINANCE.curByClient||{}; const prevBy=(cmp.meta&&cmp.meta.byClient)?cmp.meta.byClient:null;
+  let bNew=0,bChurn=0,bExp=0,bCon=0;
+  if(prevBy){
+    Object.keys(cur).forEach(id=>{ const cu=cur[id], wa=prevBy[id]; if(wa==null)bNew+=cu; else if(cu>wa)bExp+=cu-wa; });
+    Object.keys(prevBy).forEach(id=>{ const wa=prevBy[id], cu=cur[id]; if(cu==null)bChurn+=wa; else if(cu<wa)bCon+=wa-cu; });
+  } else { bNew=Math.max(0,end-start); }
+  const nrr=start>0?Math.round(100*(start-bChurn+bExp-bCon)/start):null;
+  const netPct=start>0?Math.round(100*(end-start)/start):null;
+  return { start,bNew,bExp,bChurn,bCon,end,nrr,netPct,cmpLabel:_finMonLabel(cmp.period),hasDetail:!!prevBy };
+}
+// SVG водопад MRR
+function finWaterfall(br){
+  if(!br) return '';
+  const W=620,H=300,padL=8,padR=8,padT=34,padB=30;
+  const steps=[
+    {l:'Старт', base:0, val:br.start, type:'base'},
+    {l:'Новые', base:br.start, val:br.bNew, type:'pos'},
+    {l:'Расш.', base:br.start+br.bNew, val:br.bExp, type:'pos'},
+    {l:'Отток', base:br.start+br.bNew+br.bExp-br.bChurn, val:br.bChurn, type:'neg'},
+    {l:'Сжатие', base:br.start+br.bNew+br.bExp-br.bChurn-br.bCon, val:br.bCon, type:'neg'},
+    {l:'Итог', base:0, val:br.end, type:'end'},
+  ];
+  const hi=Math.max(br.start, br.end, br.start+br.bNew+br.bExp, 1);
+  const n=steps.length, gap=14, bw=(W-padL-padR-gap*(n-1))/n;
+  const Y=v=>padT+(1-v/hi)*(H-padT-padB);
+  const col={base:'var(--txt-3)',pos:'var(--pos)',neg:'var(--neg)',end:'var(--accent)'};
+  let bars='',conns='',labels='',vals='';
+  steps.forEach((st,i)=>{
+    const x=padL+i*(bw+gap);
+    let top,bot;
+    if(st.type==='base'||st.type==='end'){ top=Y(st.val); bot=Y(0); }
+    else if(st.type==='pos'){ top=Y(st.base+st.val); bot=Y(st.base); }
+    else { top=Y(st.base+st.val); bot=Y(st.base); }
+    const h=Math.max(2,bot-top);
+    bars+=`<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${col[st.type]}" opacity="${st.type==='base'?0.55:1}"/>`;
+    const vtxt=st.type==='base'||st.type==='end'?_finM(st.val):(st.type==='neg'?'−'+_finM(st.val):'+'+_finM(st.val));
+    vals+=`<text x="${(x+bw/2).toFixed(1)}" y="${(top-7).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="${st.type==='neg'?'var(--neg)':st.type==='pos'?'var(--pos)':'var(--txt)'}">${vtxt}</text>`;
+    labels+=`<text x="${(x+bw/2).toFixed(1)}" y="${H-9}" text-anchor="middle" font-size="11" fill="var(--txt-3)">${st.l}</text>`;
+    if(i<n-1 && st.type!=='end'){ const nx=padL+(i+1)*(bw+gap); const cy=(st.type==='base'?Y(st.val):(st.type==='pos'?Y(st.base+st.val):Y(st.base+st.val)));
+      conns+=`<line x1="${(x+bw).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${nx.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="var(--line-2)" stroke-dasharray="3 3"/>`; }
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${conns}${bars}${vals}${labels}</svg>`;
+}
+// SVG кольцо
+function finRing(pct, color, label){
+  const r=34, c=2*Math.PI*r, p=Math.max(0,Math.min(100,pct||0)), off=c*(1-p/100);
+  return `<svg viewBox="0 0 84 84" width="84" height="84"><circle cx="42" cy="42" r="${r}" fill="none" stroke="var(--line-2)" stroke-width="7"/>
+    <circle cx="42" cy="42" r="${r}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 42 42)"/>
+    <text x="42" y="47" text-anchor="middle" font-size="17" font-weight="800" fill="var(--txt)">${pct==null?'—':pct+'%'}</text></svg>`;
+}
+// мини-спарклайн по метрике из снимков
+function finSpark(key, color){
+  const snaps=(FINANCE.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1).slice(-8);
+  if(snaps.length<2) return '';
+  const vals=snaps.map(s=>Number(s[key])||0); const hi=Math.max(...vals,1), lo=Math.min(...vals,0), rng=(hi-lo)||1;
+  const W=120,H=34; const X=i=>(i/(vals.length-1))*W; const Y=v=>H-2-((v-lo)/rng)*(H-4);
+  const path=vals.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="34" style="display:block"><path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`;
 }
 function renderFinance(){
   const F = (typeof FINANCE!=='undefined'?FINANCE:{ready:false});
@@ -5374,46 +5454,33 @@ function renderFinance(){
     </div>
 
     ${(()=>{
-      const _arrow=(v)=>v>0?'▲':v<0?'▼':'·';
-      const _cls=(v)=>{ if(v===0||v==null)return 'flat'; return v>0?'up':'down'; };
-      const snaps=(F.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1);
-      const hasSnaps=snaps.length>0;
-      // снимок для сравнения: выбранный или прошлый месяц по умолчанию
-      let cmpSnap=null;
-      if(finCmpPeriod) cmpSnap=snaps.find(x=>String(x.period).slice(0,10)===finCmpPeriod)||null;
-      else cmpSnap=F.prevSnap||(snaps.length?snaps[snaps.length-1]:null);
-      const D=(cur,prev)=> (prev==null?null:cur-Number(prev));
-      const deltas=cmpSnap?{ mrr:D(F.totalMrr,cmpSnap.mrr), profit:D(F.profit,cmpSnap.profit), clients:D(F.paying,cmpSnap.clients), margin:D(F.marginPct,cmpSnap.margin_pct) }:null;
-      const _dlt=(label,v,isMoney,suffix)=>{ if(v==null) return '';
-        const cls=_cls(v); const sign=v>0?'+':(v<0?'−':'');
-        const val=isMoney?money(Math.abs(v)):(Math.abs(v)+(suffix||''));
-        return `<div class="fc-card"><div class="fc-l">${label}</div><div class="fc-v ${cls}"><span class="fc-ar">${_arrow(v)}</span>${sign}${val}</div><div class="fc-s">vs ${cmpSnap?_finMonLabel(cmpSnap.period):'—'}</div></div>`; };
-      // селектор периода сравнения (если есть из чего выбирать)
-      const cmpOpts=snaps.length>1?`<select class="fc-sel" onchange="setFinCmp(this.value)">
-        <option value="auto" ${!finCmpPeriod?'selected':''}>vs прошлый месяц</option>
-        ${snaps.map(x=>{const p=String(x.period).slice(0,10); return `<option value="${p}" ${finCmpPeriod===p?'selected':''}>vs ${_finMonLabel(x.period)}</option>`;}).join('')}
-      </select>`:'';
-      const cmp=deltas?`
-        ${_dlt('MRR', deltas.mrr, true,'')}
-        ${_dlt('Прибыль', deltas.profit, true,'')}
-        ${_dlt('Клиенты', deltas.clients, false,'')}
-        ${_dlt('Маржа', deltas.margin, false,'%')}
-      `:`<div class="fc-empty">Сравнение появится со следующего месяца — система уже копит историю автоматически.</div>`;
-      const net=F.netNew;
-      const chart=snaps.length>=2?`<div class="fc-chart">
-        <div class="fc-chart-h"><span><i style="background:var(--accent)"></i>MRR</span><span><i style="background:var(--pos)"></i>Прибыль</span></div>
-        ${finTrendChart(snaps)}
-      </div>`:(hasSnaps?`<div class="fc-chart-soon">График тренда появится со следующего месяца — данные накапливаются автоматически.</div>`:'');
-      return `<div class="fin-compare">
-        <div class="fc-head"><div class="fc-title">Динамика <span>${hasSnaps?'обновляется автоматически':'данные копятся автоматически'}</span></div>
-          ${cmpOpts?`<div style="display:flex;gap:8px;align-items:center">${cmpOpts}</div>`:''}</div>
-        <div class="fc-grid">
-          <div class="fc-card fc-new"><div class="fc-l">Приход за месяц</div><div class="fc-v up">${F.newMrr>0?'+'+money(F.newMrr):money(0)}</div><div class="fc-s">${F.newCount} ${F.newCount===1?'новый клиент':'нов. клиентов'}</div></div>
-          <div class="fc-card"><div class="fc-l">Отток за месяц</div><div class="fc-v ${F.churnMrr>0?'down':'flat'}">${F.churnMrr>0?'−'+money(F.churnMrr):money(0)}</div><div class="fc-s">${F.churnCount} ${F.churnCount===1?'клиент ушёл':'ушло клиентов'}</div></div>
-          <div class="fc-card"><div class="fc-l">Чистый прирост</div><div class="fc-v ${net>0?'up':net<0?'down':'flat'}">${net>0?'+':net<0?'−':''}${money(Math.abs(net))}</div><div class="fc-s">приход − отток</div></div>
-          ${cmp}
+      const br=_finBridge();
+      const seg=['month','quarter','year'].map(m=>`<button class="finp-seg ${finPeriodMode===m?'on':''}" onclick="setFinPeriod('${m}')">${m==='month'?'Месяц':m==='quarter'?'Квартал':'Год'}</button>`).join('');
+      const nrr=br?br.nrr:null;
+      const nrrTxt = nrr==null?'Появится со следующего периода.':(nrr>=100?'Расширение перекрывает отток. Цель ≥ 100%.':'Отток превышает расширение. Зона риска.');
+      const marginTxt = F.marginPct>=25?'В здоровом коридоре 25–35%.':(F.marginPct>0?'Ниже коридора 25–35%. Точка роста.':'Операция убыточна.');
+      const bridgeCard = br?`
+        <div class="finw-big">${(br.end-br.start)>=0?'+':'−'}${_finM(Math.abs(br.end-br.start))}<span>сум</span> · <b>нетто</b>${br.netPct!=null?` <span class="finw-dlt ${br.netPct>=0?'up':'down'}">${br.netPct>=0?'▲':'▼'} ${br.netPct>=0?'+':''}${br.netPct}%</span>`:''} <em>vs ${br.cmpLabel}</em></div>
+        ${finWaterfall(br)}
+        ${!br.hasDetail?'<div class="finw-note">Расширение и сжатие появятся со следующего периода — состав клиентов уже фиксируется.</div>':''}
+      `:`<div class="fc-empty">Мост MRR появится со следующего периода — система копит историю автоматически.</div>`;
+      const mCard=(label,val,cls,sparkKey,sparkCol)=>`<div class="finm-card"><div class="finm-l">${label}</div><div class="finm-v ${cls||''}">${val}</div>${finSpark(sparkKey,sparkCol)||'<div class="finm-soon">копится</div>'}</div>`;
+      return `<div class="fin-compare findyn">
+        <div class="findyn-head"><div class="fc-title">Динамика <span>движение MRR · авто</span></div>
+          <div class="finp-segs">${seg}</div></div>
+        <div class="findyn-grid">
+          <div class="finw-card"><div class="finw-h">Мост MRR за период</div>${bridgeCard}</div>
+          <div class="finr-col">
+            <div class="finr-card">${finRing(nrr,'var(--pos)')}<div class="finr-txt"><div class="finr-l">NRR · удержание</div><div class="finr-d">${nrrTxt}</div></div></div>
+            <div class="finr-card">${finRing(F.marginPct,'var(--warn)')}<div class="finr-txt"><div class="finr-l">Маржа</div><div class="finr-d">${marginTxt}</div></div></div>
+          </div>
         </div>
-        ${chart}
+        <div class="finm-row">
+          ${mCard('Приход', (F.newMrr>0?'+':'')+_finM(F.newMrr), 'up','mrr','var(--pos)')}
+          ${mCard('Отток', F.churnMrr>0?'−'+_finM(F.churnMrr):_finM(0), F.churnMrr>0?'down':'', 'mrr','var(--neg)')}
+          ${mCard('Прибыль / мес', (F.profit>=0?'+':'−')+_finM(Math.abs(F.profit)), F.profit>=0?'up':'down','profit','var(--accent)')}
+          ${mCard('Средний чек', _finM(F.avgMrr||0),'','mrr','var(--accent)')}
+        </div>
       </div>`;
     })()}
 
@@ -7200,11 +7267,31 @@ window.tLoadFinance = async () => {
     clients: d(paying, Number(prevSnap.clients)),
     margin: d(marginPct, Number(prevSnap.margin_pct)),
   } : null;
+  // —— MRR-мост (waterfall): из чего сложился прирост ——
+  const curByClient = {}; projects.forEach(p=>{ if(p.mrr>0) curByClient[p.id]=p.mrr; });
+  let bridge = null;
+  if (prevSnap) {
+    const start = Number(prevSnap.mrr)||0;
+    const prevBy = (prevSnap.meta && prevSnap.meta.byClient) ? prevSnap.meta.byClient : null;
+    let bNew=0, bChurn=0, bExp=0, bCon=0;
+    if (prevBy) {
+      Object.keys(curByClient).forEach(id=>{ const cu=curByClient[id], wa=prevBy[id];
+        if (wa==null) bNew+=cu; else if (cu>wa) bExp+=cu-wa; });
+      Object.keys(prevBy).forEach(id=>{ const wa=prevBy[id], cu=curByClient[id];
+        if (cu==null) bChurn+=wa; else if (cu<wa) bCon+=wa-cu; });
+    } else {
+      // у старого снимка нет разбивки по клиентам — приход/отток берём из дат
+      bNew = newMrr; bChurn = churnMrr;
+    }
+    const end = totalMrr;
+    const nrr = start>0 ? Math.round(100*(start - bChurn + bExp - bCon)/start) : null;
+    bridge = { start, bNew, bExp, bChurn, bCon, end, nrr, hasDetail: !!prevBy };
+  }
 
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
     paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop, profConcPct, profConcTop, profConcAmt,
     totalHours, avgHours, revPerHour, profitPerHour, services, tariffs, projects, breakdown,
-    snapshots:snaps, prevSnap, deltas, newMrr, newCount, churnMrr, churnCount, netNew };
+    snapshots:snaps, prevSnap, deltas, newMrr, newCount, churnMrr, churnCount, netNew, bridge, curByClient };
 
   // авто-фиксация: тихо ведём историю снимков, без кнопок
   if (await tFinAutoSnapshot(snaps)) {
@@ -7229,14 +7316,16 @@ async function tFinAutoSnapshot(snaps){
   const curP = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
   const have = new Set((snaps||[]).map(x=>String(x.period).slice(0,10)));
   const cur = (snaps||[]).find(x=>String(x.period).slice(0,10)===curP);
+  const byClient = {}; (FINANCE.projects||[]).forEach(p=>{ if(p.mrr>0) byClient[p.id]=p.mrr; });
+  const meta = { byClient };
   const rows = [];
   // текущий месяц: записать/обновить, если цифры изменились
   const changed = !cur || Number(cur.mrr)!==FINANCE.totalMrr || Number(cur.cost)!==FINANCE.totalCost || Number(cur.clients)!==FINANCE.paying;
-  if (changed) rows.push({ agency_id:me.agency_id, period:curP, mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit, margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours, updated_at:new Date().toISOString() });
+  if (changed) rows.push({ agency_id:me.agency_id, period:curP, mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit, margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours, meta, updated_at:new Date().toISOString() });
   // прошлый месяц: если истории нет вовсе — поставить точку отсчёта текущими цифрами
   if (!snaps || !snaps.length){
     const prevP = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,10);
-    if (!have.has(prevP)) rows.push({ agency_id:me.agency_id, period:prevP, mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit, margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours, updated_at:new Date().toISOString() });
+    if (!have.has(prevP)) rows.push({ agency_id:me.agency_id, period:prevP, mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit, margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours, meta, updated_at:new Date().toISOString() });
   }
   if (!rows.length) return false;
   try{ const { error } = await SB.from('fin_snapshots').upsert(rows, { onConflict:'agency_id,period' }); if(error) throw error; return true; }
