@@ -1560,6 +1560,12 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .fc-v.up{color:var(--pos)} .fc-v.down{color:var(--neg)} .fc-v.flat{color:var(--txt-2)}
 .fc-s{font-size:10.5px;color:var(--txt-3);margin-top:6px}
 .fc-empty{grid-column:1/-1;padding:16px;text-align:center;font-size:12px;color:var(--txt-3);border:1px dashed var(--line-2);border-radius:11px;background:var(--bg-2)}
+.fc-sel{padding:8px 11px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:9px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer}
+.fc-chart{margin-top:14px;padding:14px 12px 6px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
+.fc-chart-h{display:flex;gap:16px;justify-content:flex-end;margin-bottom:6px;padding:0 4px}
+.fc-chart-h span{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;color:var(--txt-3)}
+.fc-chart-h i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.fc-chart-soon{margin-top:14px;padding:16px;text-align:center;font-size:11.5px;color:var(--txt-3);border:1px dashed var(--line-2);border-radius:11px;background:var(--bg-2)}
 .fin-b{display:grid;grid-template-columns:1.12fr 2fr;gap:13px;margin-top:16px}
 .fin-hero{border-radius:16px;padding:26px 26px 24px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--line);background:var(--bg-1);background-image:linear-gradient(180deg,rgba(255,255,255,.015),transparent 44%);box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 16px 40px -30px rgba(0,0,0,.85)}
 .fin-hero.pos{border-color:rgba(67,216,140,.22);background:linear-gradient(158deg,rgba(67,216,140,.10),var(--bg-1) 56%)}
@@ -5233,6 +5239,33 @@ function finMarginChart(projs){
   const xl=projs.map(p=>`<span title="${(p.name||'').replace(/"/g,'&quot;')}">${p.name.length>16?p.name.slice(0,15)+'…':p.name}</span>`).join('');
   return `<div class="fin-chart"><div class="fin-bars">${gl}${bars}</div><div class="fin-xl">${xl}</div></div>`;
 }
+let finCmpPeriod=null; // период снимка для сравнения (null = прошлый месяц)
+function setFinCmp(p){ finCmpPeriod=(p==='auto'?null:p); renderFinance(); }
+window.setFinCmp=setFinCmp;
+function _finMonLabel(period){ const d=new Date(String(period).slice(0,10)+'T00:00:00'); return ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]+' '+String(d.getFullYear()).slice(2); }
+function finTrendChart(snaps){
+  if(!snaps||snaps.length<2) return '';
+  const data=snaps.slice(-12);
+  const W=640,H=150,padX=10,padT=14,padB=22;
+  const mrrs=data.map(s=>Number(s.mrr)||0), profs=data.map(s=>Number(s.profit)||0);
+  const hi=Math.max(...mrrs,...profs,1), lo=Math.min(...profs,0), rng=(hi-lo)||1;
+  const X=i=>padX+(data.length===1?0:(i/(data.length-1))*(W-2*padX));
+  const Y=v=>padT+(1-(v-lo)/rng)*(H-padT-padB);
+  const path=arr=>arr.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  const area=arr=>`${path(arr)} L${X(arr.length-1).toFixed(1)} ${(H-padB).toFixed(1)} L${X(0).toFixed(1)} ${(H-padB).toFixed(1)} Z`;
+  const dots=(arr,col)=>arr.map((v,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.6" fill="${col}"/>`).join('');
+  const labels=data.map((s,i)=>`<text x="${X(i).toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="9" fill="var(--txt-3)">${_finMonLabel(s.period)}</text>`).join('');
+  const zeroY=Y(0);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="none" style="display:block">
+    <defs><linearGradient id="finGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${lo<0?`<line x1="${padX}" y1="${zeroY.toFixed(1)}" x2="${W-padX}" y2="${zeroY.toFixed(1)}" stroke="var(--line-2)" stroke-dasharray="3 3"/>`:''}
+    <path d="${area(mrrs)}" fill="url(#finGrad)"/>
+    <path d="${path(mrrs)}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="${path(profs)}" fill="none" stroke="var(--pos)" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round"/>
+    ${dots(mrrs,'var(--accent)')}${dots(profs,'var(--pos)')}
+    ${labels}
+  </svg>`;
+}
 function renderFinance(){
   const F = (typeof FINANCE!=='undefined'?FINANCE:{ready:false});
 
@@ -5343,24 +5376,45 @@ function renderFinance(){
     ${(()=>{
       const _arrow=(v)=>v>0?'▲':v<0?'▼':'·';
       const _cls=(v)=>{ if(v===0||v==null)return 'flat'; return v>0?'up':'down'; };
+      const snaps=(F.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1);
+      const hasSnaps=snaps.length>0;
+      // снимок для сравнения: выбранный или прошлый месяц по умолчанию
+      let cmpSnap=null;
+      if(finCmpPeriod) cmpSnap=snaps.find(x=>String(x.period).slice(0,10)===finCmpPeriod)||null;
+      else cmpSnap=F.prevSnap||(snaps.length?snaps[snaps.length-1]:null);
+      const D=(cur,prev)=> (prev==null?null:cur-Number(prev));
+      const deltas=cmpSnap?{ mrr:D(F.totalMrr,cmpSnap.mrr), profit:D(F.profit,cmpSnap.profit), clients:D(F.paying,cmpSnap.clients), margin:D(F.marginPct,cmpSnap.margin_pct) }:null;
       const _dlt=(label,v,isMoney,suffix)=>{ if(v==null) return '';
         const cls=_cls(v); const sign=v>0?'+':(v<0?'−':'');
         const val=isMoney?money(Math.abs(v)):(Math.abs(v)+(suffix||''));
-        return `<div class="fc-card"><div class="fc-l">${label}</div><div class="fc-v ${cls}"><span class="fc-ar">${_arrow(v)}</span>${sign}${val}</div><div class="fc-s">vs прошлый месяц</div></div>`; };
-      const hasSnaps=(F.snapshots&&F.snapshots.length)>0;
-      const cmp=F.deltas?`
-        ${_dlt('MRR', F.deltas.mrr, true,'')}
-        ${_dlt('Прибыль', F.deltas.profit, true,'')}
-        ${_dlt('Клиенты', F.deltas.clients, false,'')}
-        ${_dlt('Маржа', F.deltas.margin, false,'%')}
-      `:`<div class="fc-empty">Появится сравнение с прошлым месяцем, как только будет зафиксирован хотя бы один прошлый снимок.</div>`;
+        return `<div class="fc-card"><div class="fc-l">${label}</div><div class="fc-v ${cls}"><span class="fc-ar">${_arrow(v)}</span>${sign}${val}</div><div class="fc-s">vs ${cmpSnap?_finMonLabel(cmpSnap.period):'—'}</div></div>`; };
+      // селектор периода сравнения (если есть из чего выбирать)
+      const cmpOpts=snaps.length>1?`<select class="fc-sel" onchange="setFinCmp(this.value)">
+        <option value="auto" ${!finCmpPeriod?'selected':''}>vs прошлый месяц</option>
+        ${snaps.map(x=>{const p=String(x.period).slice(0,10); return `<option value="${p}" ${finCmpPeriod===p?'selected':''}>vs ${_finMonLabel(x.period)}</option>`;}).join('')}
+      </select>`:'';
+      const cmp=deltas?`
+        ${_dlt('MRR', deltas.mrr, true,'')}
+        ${_dlt('Прибыль', deltas.profit, true,'')}
+        ${_dlt('Клиенты', deltas.clients, false,'')}
+        ${_dlt('Маржа', deltas.margin, false,'%')}
+      `:`<div class="fc-empty">Сравнение появится, как только будет зафиксирован хотя бы один прошлый снимок. Нажмите «Зафиксировать снимок», чтобы начать.</div>`;
+      const net=F.netNew;
+      const chart=snaps.length>=2?`<div class="fc-chart">
+        <div class="fc-chart-h"><span><i style="background:var(--accent)"></i>MRR</span><span><i style="background:var(--pos)"></i>Прибыль</span></div>
+        ${finTrendChart(snaps)}
+      </div>`:(hasSnaps?`<div class="fc-chart-soon">График тренда появится со 2-го снимка — сейчас в истории ${snaps.length}.</div>`:'');
       return `<div class="fin-compare">
-        <div class="fc-head"><div class="fc-title">Динамика <span>${hasSnaps?F.snapshots.length+' мес. в истории':'история пуста'}</span></div>
-          <button class="fc-snap" onclick="tFinSnapshot()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M19 21H5a2 2 0 01-2-2V8a2 2 0 012-2h3l2-3h4l2 3h3a2 2 0 012 2v11a2 2 0 01-2 2z"/><circle cx="12" cy="13" r="3.2"/></svg>Зафиксировать снимок</button></div>
+        <div class="fc-head"><div class="fc-title">Динамика <span>${hasSnaps?snaps.length+' мес. в истории':'история пуста'}</span></div>
+          <div style="display:flex;gap:8px;align-items:center">${cmpOpts}
+          <button class="fc-snap" onclick="tFinSnapshot()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M19 21H5a2 2 0 01-2-2V8a2 2 0 012-2h3l2-3h4l2 3h3a2 2 0 012 2v11a2 2 0 01-2 2z"/><circle cx="12" cy="13" r="3.2"/></svg>Зафиксировать снимок</button></div></div>
         <div class="fc-grid">
           <div class="fc-card fc-new"><div class="fc-l">Приход за месяц</div><div class="fc-v up">${F.newMrr>0?'+'+money(F.newMrr):money(0)}</div><div class="fc-s">${F.newCount} ${F.newCount===1?'новый клиент':'нов. клиентов'}</div></div>
+          <div class="fc-card"><div class="fc-l">Отток за месяц</div><div class="fc-v ${F.churnMrr>0?'down':'flat'}">${F.churnMrr>0?'−'+money(F.churnMrr):money(0)}</div><div class="fc-s">${F.churnCount} ${F.churnCount===1?'клиент ушёл':'ушло клиентов'}</div></div>
+          <div class="fc-card"><div class="fc-l">Чистый прирост</div><div class="fc-v ${net>0?'up':net<0?'down':'flat'}">${net>0?'+':net<0?'−':''}${money(Math.abs(net))}</div><div class="fc-s">приход − отток</div></div>
           ${cmp}
         </div>
+        ${chart}
       </div>`;
     })()}
 
@@ -7040,7 +7094,7 @@ window.tLoadTeam = async () => {
 window.tLoadFinance = async () => {
   if (!SB) return;
   const [res, tt, snapsRes] = await Promise.all([
-    SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance,tariff,created_at,start_date'),
+    SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance,tariff,created_at,start_date,closed_at'),
     SB.from('project_tasks').select('project_id,time_spent,timer_started'),
     SB.from('fin_snapshots').select('*').order('period') ]);
   if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost/finance ещё не добавлены
@@ -7122,6 +7176,11 @@ window.tLoadFinance = async () => {
   const newRows = rows.filter(p => p.mrr>0 && p._start && new Date(p._start) >= _ymStart);
   const newMrr = newRows.reduce((s,p)=>s+p.mrr,0);
   const newCount = newRows.length;
+  // отток за текущий месяц (проекты, закрытые в этом месяце)
+  const churnRows = (res.data||[]).filter(p => p.status==='done' && p.closed_at && new Date(p.closed_at) >= _ymStart);
+  const churnMrr = churnRows.reduce((s,p)=>s+(Number(p.mrr)||0),0);
+  const churnCount = churnRows.length;
+  const netNew = newMrr - churnMrr;
   // дельты к прошлому снимку
   const d = (cur, prev) => (prev==null ? null : cur - prev);
   const deltas = prevSnap ? {
@@ -7134,7 +7193,7 @@ window.tLoadFinance = async () => {
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
     paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop,
     totalHours, avgHours, revPerHour, profitPerHour, services, tariffs, projects, breakdown,
-    snapshots:snaps, prevSnap, deltas, newMrr, newCount };
+    snapshots:snaps, prevSnap, deltas, newMrr, newCount, churnMrr, churnCount, netNew };
 };
 /* ===== Фиксация месячного снимка финансов ===== */
 window.tFinSnapshot = async () => {
