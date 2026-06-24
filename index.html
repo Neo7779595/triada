@@ -1947,6 +1947,45 @@ button:active{transform:translateY(.5px) scale(.99)}
 @media(max-width:520px){.dynx-gauges{grid-template-columns:1fr}.dynx-strip{grid-template-columns:1fr}.dynx-seg{margin-left:0;width:100%}.dynx-seg button{flex:1}}
 @media(prefers-reduced-motion:reduce){.dynx-spark-line{stroke-dashoffset:0!important}.dynx-wf-conn{opacity:1!important}}
 
+
+/* ============================================================
+   FINANCE · «Маржинальность по проектам» — фильтры внутри блока
+   премиальный тулбар + зоны здоровья маржи
+   ============================================================ */
+.finx{overflow:visible}                                   /* чтобы меню сортировки не обрезалось карточкой */
+.card.finx:hover{transform:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 16px 40px -30px rgba(0,0,0,.85)}
+.finx-toolbar{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--line)}
+.finx-tabs{display:flex;flex-wrap:wrap;gap:7px;flex:1 1 auto;min-width:0}
+.finx-tabs button{display:inline-flex;align-items:center;gap:7px;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--txt-2);cursor:pointer;transition:transform .15s var(--spring),border-color .15s var(--ease),background .15s var(--ease),color .15s var(--ease);white-space:nowrap}
+.finx-tabs button svg{width:13px;height:13px;opacity:.85;flex:none}
+.finx-tabs button b{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--txt-3);background:var(--bg-3);padding:1px 6px;border-radius:5px}
+.finx-tabs button:hover{border-color:var(--line-2);color:var(--txt);transform:translateY(-1px)}
+.finx-tabs button.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+.finx-tabs button.on b{background:rgba(55,230,200,.16);color:var(--accent)}
+.finx-tabs button.zero{opacity:.45}
+.finx-tabs button.zero b{background:transparent}
+.finx-tabs button:active{transform:scale(.96)}
+.finx-tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.finx-tools{flex:0 0 auto}
+.finx-sub{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 16px 2px}
+.finx-title{font-size:13px;font-weight:600;color:var(--txt);display:flex;align-items:center;gap:9px}
+.finx-count{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--txt-3);background:var(--bg-3);padding:1px 8px;border-radius:20px}
+.finx-zones{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.finx-zones .zk{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--txt-3);letter-spacing:.01em;white-space:nowrap}
+.finx-zones .zk::before{content:"";width:8px;height:8px;border-radius:2px;flex:none}
+.finx-zones .zk-lo::before{background:var(--neg)}
+.finx-zones .zk-mid::before{background:var(--warn)}
+.finx-zones .zk-hi::before{background:var(--pos)}
+.finx-avg{font-family:var(--mono);font-size:11px;color:var(--txt-2);border-left:1px solid var(--line);padding-left:13px}
+.finx-body{padding:2px 6px 8px}
+.finx-empty{padding:36px 18px;text-align:center;color:var(--txt-3);font-size:12.5px;line-height:1.55}
+/* зоны здоровья маржи за столбцами (риск/норма/сильно) */
+.mz{position:absolute;left:42px;right:12px;pointer-events:none;z-index:0}
+.mz-lo{background:linear-gradient(180deg,rgba(240,120,92,.075),rgba(240,120,92,.015));border-top:1px solid rgba(240,120,92,.14)}
+.mz-mid{background:linear-gradient(180deg,rgba(227,181,103,.05),rgba(227,181,103,.012));border-top:1px solid rgba(227,181,103,.12)}
+.mz-hi{background:linear-gradient(180deg,rgba(67,216,140,.06),transparent);border-top:1px solid rgba(67,216,140,.14)}
+@media(max-width:760px){.finx-toolbar{flex-direction:column;align-items:stretch}.finx-tools{align-self:flex-end}.finx-sub{flex-direction:column;align-items:flex-start;gap:9px}.finx-avg{border-left:0;padding-left:0}}
+
 </style>
 </head>
 <body>
@@ -5296,12 +5335,14 @@ function finMarginChart(projs){
   const gl=[0,20,40,60,80].map(v=>`<div class="gl ${v===0?'base':''}" style="bottom:${(v/max*100).toFixed(1)}%"><span>${v}%</span></div>`).join('');
   const bars=projs.map((p,i)=>{
     const m=Math.max(0,Math.min(p.margin||0,max)), h=(m/max*100);
-    const col=p.margin>=50?'#5BEBD2':p.margin>=25?'#37E6C8':'#E0566A';
-    const grad=p.margin>=50?'linear-gradient(180deg,#5BEBD2,#37E6C8)':p.margin>=25?'linear-gradient(180deg,#37E6C8,#2CBBA6)':'linear-gradient(180deg,#F0785C,#E0566A)';
+    const col=p.margin>=50?'#43D88C':p.margin>=25?'#E3B567':'#E0566A';
+    const grad=p.margin>=50?'linear-gradient(180deg,#5BE3A0,#43D88C)':p.margin>=25?'linear-gradient(180deg,#EEC579,#E3B567)':'linear-gradient(180deg,#F0785C,#E0566A)';
     return `<div class="bcol"><div class="ctip"><div class="tr"><span>Маржа</span><b style="color:${col}">${p.margin}%</b></div><div class="tr"><span>Доход</span><b>${money(p.mrr)}</b></div><div class="tr"><span>Прибыль</span><b style="color:${p.profit>=0?'var(--pos)':'var(--neg)'}">${p.profit>=0?'+':''}${money(p.profit)}</b></div></div><span class="val" style="color:${col}">${p.margin}%</span><div class="bar" style="--h:${h.toFixed(1)}%;animation-delay:${i*70}ms;background:${grad}"></div></div>`;
   }).join('');
   const xl=projs.map(p=>`<span title="${(p.name||'').replace(/"/g,'&quot;')}">${p.name.length>16?p.name.slice(0,15)+'…':p.name}</span>`).join('');
-  return `<div class="fin-chart"><div class="fin-bars">${gl}${bars}</div><div class="fin-xl">${xl}</div></div>`;
+  const zp=v=>(v/max*100).toFixed(1);
+  const zones=`<div class="mz mz-hi" style="top:0;bottom:${zp(50)}%"></div><div class="mz mz-mid" style="bottom:${zp(25)}%;height:${zp(25)}%"></div><div class="mz mz-lo" style="bottom:0;height:${zp(25)}%"></div>`;
+  return `<div class="fin-chart"><div class="fin-bars">${zones}${gl}${bars}</div><div class="fin-xl">${xl}</div></div>`;
 }
 let finCmpPeriod=null; // период снимка для сравнения (null = прошлый месяц)
 function setFinCmp(p){ finCmpPeriod=(p==='auto'?null:p); renderFinance(); }
@@ -5577,15 +5618,22 @@ function renderFinance(){
       ${finBreakdown('Доход по тарифам', F.totalMrr, F.tariffs)}
     </div>`:''}
 
-    <div class="tabs-row" style="margin-top:16px">
-      <div class="segm fin-tabs">${tabsDef.map(t=>tab(t[0],t[1])).join('')}</div>
-      ${_dd('finsort','Сортировка', FINSORT_LABEL[finSort]||'Маржа ↓', FINSORT_OPTS, finSort, 'setFinSort', true)}
+    <div class="card finx" style="margin-top:16px">
+      <div class="finx-toolbar">
+        <div class="finx-tabs">${tabsDef.map(t=>tab(t[0],t[1])).join('')}</div>
+        <div class="finx-tools">${_dd('finsort','Сортировка', FINSORT_LABEL[finSort]||'Маржа ↓', FINSORT_OPTS, finSort, 'setFinSort', true)}</div>
+      </div>
+      <div class="finx-sub">
+        <div class="finx-title">Маржинальность по проектам <span class="finx-count">${chartProjects.length} ${_plural(chartProjects.length,'проект','проекта','проектов')}</span></div>
+        <div class="finx-zones">
+          <span class="zk zk-lo">риск &lt; 25%</span>
+          <span class="zk zk-mid">норма 25–50%</span>
+          <span class="zk zk-hi">сильно ≥ 50%</span>
+          ${chartProjects.length?`<span class="finx-avg">ср. маржа ${Math.round(chartProjects.reduce((a,p)=>a+(p.margin||0),0)/chartProjects.length)}%</span>`:''}
+        </div>
+      </div>
+      <div class="finx-body">${chartProjects.length?finMarginChart(chartProjects):`<div class="finx-empty">В этом фильтре нет проектов с заданной маржой. Задайте доход и расходы на проекте — маржинальность появится здесь.</div>`}</div>
     </div>
-
-    ${chartProjects.length?`<div class="card" style="margin-top:14px">
-      <div class="card-h"><div class="t">Маржинальность по проектам <span class="c">%</span></div></div>
-      <div class="card-body">${finMarginChart(chartProjects)}</div>
-    </div>`:''}
 
     <div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">P&L по проектам <span class="c">⚙ задать доход и расходы</span></div></div>
