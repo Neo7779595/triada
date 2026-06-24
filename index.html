@@ -1757,7 +1757,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-ring-c i{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--txt-3);font-style:normal;line-height:1}
 .pt-ring-fg{animation:ringDraw 1s var(--ease-out) both}
 @keyframes ringDraw{from{stroke-dashoffset:var(--c)}to{stroke-dashoffset:var(--off)}}
-.pt-id{flex:1 1 auto;min-width:220px;display:flex;flex-direction:column;justify-content:center;gap:9px}
+.pt-id{flex:0 1 340px;min-width:240px;display:flex;flex-direction:column;justify-content:center;gap:11px}
 .pt-id-head{display:flex;align-items:center;gap:12px}
 .pt-id-htext{display:flex;flex-direction:column;gap:5px;min-width:0}
 .pt-av{width:44px;height:44px;flex:0 0 auto;border-radius:12px}
@@ -1789,12 +1789,23 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .pt-gauge-s{font-size:8.5px;font-family:var(--mono);color:var(--txt-3);margin-top:1px;text-align:center}
 .pt-gauge-l{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
 .pt-gauge-v{font-size:12.5px;font-weight:700}
-.pt-metrics{flex:0 0 auto;align-self:center;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:216px}
-.ptm{background:var(--bg-1);padding:10px 14px;display:flex;flex-direction:column;gap:3px;justify-content:center;min-height:52px}
+/* — зона статов: бенто из равных плиток, крупные числа + мини-графики — */
+.pt-stats{flex:1 1 auto;align-self:center;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0}
+.ptm{background:var(--bg-2);border:1px solid var(--line);border-radius:11px;padding:12px 13px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-height:98px;min-width:0;transition:border-color .15s var(--ease),background .15s var(--ease)}
+.ptm:hover{border-color:var(--line-2);background:var(--bg-3)}
 .ptm .l{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
-.ptm .v{font-size:14px;font-weight:700;font-family:var(--mono);color:var(--txt);line-height:1.1;white-space:nowrap;letter-spacing:-.01em}
-.ptm .v.t{font-family:var(--font);font-size:13px;font-weight:600;letter-spacing:0}
-.ptm .v .u{font-size:9px;color:var(--txt-3);font-weight:500;letter-spacing:0}
+.ptm-v{display:flex;align-items:baseline;gap:3px;line-height:1;min-height:26px}
+.ptm-v.ptm-pace{align-items:center;gap:8px}
+.ptm-v b{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--txt)}
+.ptm-v b.sm{font-size:17px;font-weight:700}
+.ptm-v i{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--txt-3);font-style:normal}
+.ptm-v .pill{font-family:var(--font);font-size:14px;font-weight:700;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptm-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.ptm-foot{display:flex;flex-direction:column;gap:5px}
+.ptm-bar{height:5px;border-radius:3px;background:var(--bg-3);overflow:hidden}
+.ptm-bar i{display:block;height:100%;border-radius:3px;transition:width .8s var(--ease-out)}
+.ptm-seg{display:flex;gap:3px}
+.ptm-seg i{flex:1;height:5px;border-radius:2px;transition:background .25s var(--ease)}
 .ptm .sub{font-size:9.5px;font-family:var(--mono);color:var(--txt-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
 .g-lvl{font-size:11px;font-weight:700;line-height:1}
@@ -1823,8 +1834,9 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .px-ov-6 .px-ov-ctx{padding-top:11px;font-size:10.5px}
 @media(max-width:1100px){.px-ov-6{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:640px){.px-ov-6{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:1120px){.pt-metrics{display:none}}
-@media(max-width:880px){.pt-pipe2,.pt-note{display:none}}
+@media(max-width:1240px){.pt-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.pt-stats{display:none}}
+@media(max-width:780px){.pt-pipe2,.pt-note{display:none}}
 
 /* ════════ PREMIUM POLISH LAYER ════════ */
 /* atmosphere — subtle depth instead of flat black */
@@ -3189,14 +3201,19 @@ const _projCard=(p)=>{
   const margin=p.mrr>0?Math.round(100*(p.mrr-(p.cost||0))/p.mrr):null;
   const mC=margin==null?'var(--txt-3)':margin>=40?'var(--pos)':margin>=20?'var(--warn)':'var(--neg)';
   const pp=p._pipeline||{wait:0,active:0,done:0,total:0};
-  let dueMain='—',dueSub='',dueC='var(--txt-3)';
-  if(p._nextDue){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(p._nextDue+'T00:00:00'); const diff=Math.round((d-t)/86400000); dueMain=_dDate(p._nextDue); dueSub=diff<0?('просрочен '+(-diff)+'д'):diff===0?'сегодня':diff===1?'завтра':('через '+diff+'д'); dueC=diff<0?'var(--neg)':diff<=3?'var(--warn)':'var(--txt-2)'; }
+  let dueMain='—',dueSub='',dueC='var(--txt-3)',dueDays=null;
+  if(p._nextDue){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(p._nextDue+'T00:00:00'); const diff=Math.round((d-t)/86400000); dueDays=diff; dueMain=_dDate(p._nextDue); dueSub=diff<0?('просрочен '+(-diff)+'д'):diff===0?'сегодня':diff===1?'завтра':('через '+diff+'д'); dueC=diff<0?'var(--neg)':diff<=3?'var(--warn)':'var(--txt-2)'; }
   let paceMain,paceSub,paceC;
   if(p.status==='done'){ paceMain='завершён'; paceSub='проект закрыт'; paceC='var(--txt-3)'; }
   else if((p._overdueN||0)>0){ paceMain='отстаёт'; paceSub=p._overdueN+' просрочено'; paceC='var(--neg)'; }
   else if(risk.lvl==='warn'&&risk.label==='Дедлайн близко'){ paceMain='впритык'; paceSub='дедлайн близко'; paceC='var(--warn)'; }
   else { paceMain='в графике'; paceSub='по плану'; paceC='var(--pos)'; }
   const noteEsc=(p.note||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const cxLvl=cx.label==='Высокая'?3:(cx.label==='Средняя'?2:1);
+  const _ptBig=s=>{const m=String(s).match(/^([0-9.,<]+)\s*(.*)$/);return m?`<b>${m[1]}</b>${m[2]?`<i>${m[2]}</i>`:''}`:`<b class="sm">${s}</b>`;};
+  const _tenW=lt.months>0?Math.max(6,Math.min(100,lt.months/12*100)).toFixed(0):0;
+  const _dlW=dueDays==null?0:(dueDays<0?100:Math.max(6,(100-Math.min(100,dueDays/30*100))).toFixed(0));
+  const _paceW=p.status==='done'?100:((p._overdueN||0)>0?28:(risk.lvl==='warn'?64:100));
   let L=p._lead; if(!L && p.lead_id){ const _x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===p.lead_id); if(_x) L={name:_x.name,color:_x.color||'var(--accent)',avatar:_x.avatar||null}; }
   const leadHTML = L
     ? `<span class="pt-lead-av" style="background:${L.color}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?')[0]||'?').toUpperCase()}</span><span class="pt-lead-txt"><span class="pt-lead-nm">${L.name}</span><span class="pt-lead-r">ответственный</span></span>`
@@ -3221,11 +3238,27 @@ const _projCard=(p)=>{
           <div class="pt-meta"><div class="pt-lead">${leadHTML}</div>${teamStripHTML(p)}${contractBadgeHTML(p)}</div>
           ${noteEsc?`<div class="pt-note" title="${noteEsc}">«${noteEsc}»</div>`:''}
         </div>
-        <div class="pt-metrics">
-          <div class="ptm"><div class="l">Сложность</div><div class="v t" style="color:${cx.color}">${cx.label}</div><div class="sub">${cx.hasData?('n='+cx.n+' цикл.'):'оценка'}</div></div>
-          <div class="ptm"><div class="l">Срок жизни</div><div class="v">${_lifeDur(lt.months)}</div><div class="sub">с запуска</div></div>
-          <div class="ptm"><div class="l">Дедлайн</div><div class="v t" style="color:${dueC}">${dueMain}</div><div class="sub" style="color:${dueC}">${dueSub||'—'}</div></div>
-          <div class="ptm"><div class="l">Темп</div><div class="v t" style="color:${paceC}">${paceMain}</div><div class="sub">${paceSub}</div></div>
+        <div class="pt-stats">
+          <div class="ptm">
+            <div class="l">Срок жизни</div>
+            <div class="ptm-v">${_ptBig(_lifeDur(lt.months))}</div>
+            <div class="ptm-foot"><div class="ptm-bar"><i style="width:${_tenW}%;background:var(--accent)"></i></div><div class="sub">с запуска</div></div>
+          </div>
+          <div class="ptm">
+            <div class="l">Дедлайн</div>
+            <div class="ptm-v" style="color:${dueC}">${dueDays==null?'<b class="sm">—</b>':`<b>${Math.abs(dueDays)}</b><i>дн</i>`}</div>
+            <div class="ptm-foot"><div class="ptm-bar"><i style="width:${_dlW}%;background:${dueC}"></i></div><div class="sub" style="color:${dueC}">${dueDays==null?'нет срока':dueMain}</div></div>
+          </div>
+          <div class="ptm">
+            <div class="l">Темп</div>
+            <div class="ptm-v ptm-pace"><span class="ptm-dot" style="background:${paceC}"></span><span class="pill" style="color:${paceC}">${paceMain}</span></div>
+            <div class="ptm-foot"><div class="ptm-bar"><i style="width:${_paceW}%;background:${paceC}"></i></div><div class="sub">${paceSub}</div></div>
+          </div>
+          <div class="ptm">
+            <div class="l">Сложность</div>
+            <div class="ptm-v"><span class="pill" style="color:${cx.color}">${cx.label}</span></div>
+            <div class="ptm-foot"><div class="ptm-seg">${[1,2,3].map(i=>`<i style="background:${i<=cxLvl?cx.color:'var(--bg-3)'}"></i>`).join('')}</div><div class="sub">${cx.hasData?('n='+cx.n+' цикл.'):'оценка'}</div></div>
+          </div>
         </div>
         <div class="pt-act">
           <button onclick="event.stopPropagation();projNote(${idx})" title="Заметка"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></button>
