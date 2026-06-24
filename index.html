@@ -5398,16 +5398,15 @@ function renderFinance(){
         ${_dlt('Прибыль', deltas.profit, true,'')}
         ${_dlt('Клиенты', deltas.clients, false,'')}
         ${_dlt('Маржа', deltas.margin, false,'%')}
-      `:`<div class="fc-empty">Сравнение появится, как только будет зафиксирован хотя бы один прошлый снимок. Нажмите «Зафиксировать снимок», чтобы начать.</div>`;
+      `:`<div class="fc-empty">Сравнение появится со следующего месяца — система уже копит историю автоматически.</div>`;
       const net=F.netNew;
       const chart=snaps.length>=2?`<div class="fc-chart">
         <div class="fc-chart-h"><span><i style="background:var(--accent)"></i>MRR</span><span><i style="background:var(--pos)"></i>Прибыль</span></div>
         ${finTrendChart(snaps)}
       </div>`:(hasSnaps?`<div class="fc-chart-soon">График тренда появится со 2-го снимка — сейчас в истории ${snaps.length}.</div>`:'');
       return `<div class="fin-compare">
-        <div class="fc-head"><div class="fc-title">Динамика <span>${hasSnaps?snaps.length+' мес. в истории':'история пуста'}</span></div>
-          <div style="display:flex;gap:8px;align-items:center">${cmpOpts}
-          <button class="fc-snap" onclick="tFinSnapshot()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M19 21H5a2 2 0 01-2-2V8a2 2 0 012-2h3l2-3h4l2 3h3a2 2 0 012 2v11a2 2 0 01-2 2z"/><circle cx="12" cy="13" r="3.2"/></svg>Зафиксировать снимок</button></div></div>
+        <div class="fc-head"><div class="fc-title">Динамика <span>${hasSnaps?snaps.length+' мес. в истории · обновляется автоматически':'копится автоматически'}</span></div>
+          ${cmpOpts?`<div style="display:flex;gap:8px;align-items:center">${cmpOpts}</div>`:''}</div>
         <div class="fc-grid">
           <div class="fc-card fc-new"><div class="fc-l">Приход за месяц</div><div class="fc-v up">${F.newMrr>0?'+'+money(F.newMrr):money(0)}</div><div class="fc-s">${F.newCount} ${F.newCount===1?'новый клиент':'нов. клиентов'}</div></div>
           <div class="fc-card"><div class="fc-l">Отток за месяц</div><div class="fc-v ${F.churnMrr>0?'down':'flat'}">${F.churnMrr>0?'−'+money(F.churnMrr):money(0)}</div><div class="fc-s">${F.churnCount} ${F.churnCount===1?'клиент ушёл':'ушло клиентов'}</div></div>
@@ -7206,23 +7205,43 @@ window.tLoadFinance = async () => {
     paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop, profConcPct, profConcTop, profConcAmt,
     totalHours, avgHours, revPerHour, profitPerHour, services, tariffs, projects, breakdown,
     snapshots:snaps, prevSnap, deltas, newMrr, newCount, churnMrr, churnCount, netNew };
+
+  // авто-фиксация: тихо ведём историю снимков, без кнопок
+  if (await tFinAutoSnapshot(snaps)) {
+    const fresh = await SB.from('fin_snapshots').select('*').order('period');
+    const ns = (fresh && !fresh.error && fresh.data) ? fresh.data : snaps;
+    FINANCE.snapshots = ns;
+    const _pp = new Date(_now.getFullYear(), _now.getMonth()-1, 1).toISOString().slice(0,10);
+    FINANCE.prevSnap = ns.find(x=>String(x.period).slice(0,10)===_pp) || null;
+    FINANCE.deltas = FINANCE.prevSnap ? {
+      mrr: totalMrr-Number(FINANCE.prevSnap.mrr), profit: profit-Number(FINANCE.prevSnap.profit),
+      clients: paying-Number(FINANCE.prevSnap.clients), margin: marginPct-Number(FINANCE.prevSnap.margin_pct)
+    } : null;
+  }
 };
-/* ===== Фиксация месячного снимка финансов ===== */
-window.tFinSnapshot = async () => {
-  if (!SB || !FINANCE.ready) { toast('Финансы ещё не загружены'); return; }
-  const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
-  const now=new Date(); const period=new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
-  try{
-    const { error } = await SB.from('fin_snapshots').upsert({
-      agency_id:me.agency_id, period,
-      mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit,
-      margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours,
-      updated_at:new Date().toISOString()
-    }, { onConflict:'agency_id,period' });
-    if(error) throw error;
-    toast('Снимок месяца зафиксирован'); await window.tLoadFinance(); if(typeof renderFinance==='function') renderFinance();
-  }catch(e){ toast('Ошибка: '+(e.message||e)); }
-};
+/* ===== Авто-фиксация месячного снимка (тихо, при заходе в финансы) ===== */
+// Текущий месяц обновляем «живым» снимком; прошлый месяц фиксируем как точку
+// отсчёта, если его ещё нет. Никаких кнопок — история ведётся сама.
+async function tFinAutoSnapshot(snaps){
+  if (!SB || !FINANCE.ready) return false;
+  const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id) return false;
+  const now=new Date();
+  const curP = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  const have = new Set((snaps||[]).map(x=>String(x.period).slice(0,10)));
+  const cur = (snaps||[]).find(x=>String(x.period).slice(0,10)===curP);
+  const rows = [];
+  // текущий месяц: записать/обновить, если цифры изменились
+  const changed = !cur || Number(cur.mrr)!==FINANCE.totalMrr || Number(cur.cost)!==FINANCE.totalCost || Number(cur.clients)!==FINANCE.paying;
+  if (changed) rows.push({ agency_id:me.agency_id, period:curP, mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit, margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours, updated_at:new Date().toISOString() });
+  // прошлый месяц: если истории нет вовсе — поставить точку отсчёта текущими цифрами
+  if (!snaps || !snaps.length){
+    const prevP = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,10);
+    if (!have.has(prevP)) rows.push({ agency_id:me.agency_id, period:prevP, mrr:FINANCE.totalMrr, cost:FINANCE.totalCost, profit:FINANCE.profit, margin_pct:FINANCE.marginPct, clients:FINANCE.paying, hours:FINANCE.totalHours, updated_at:new Date().toISOString() });
+  }
+  if (!rows.length) return false;
+  try{ const { error } = await SB.from('fin_snapshots').upsert(rows, { onConflict:'agency_id,period' }); if(error) throw error; return true; }
+  catch(e){ console.warn('fin autosnapshot', e); return false; }
+}
 
 window.tLoadAll = async (role) => {
   if (!SB) return;
