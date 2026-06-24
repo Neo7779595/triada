@@ -7094,10 +7094,16 @@ window.tLoadTeam = async () => {
 window.tLoadFinance = async () => {
   if (!SB) return;
   const [res, tt, snapsRes] = await Promise.all([
-    SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance,tariff,created_at,start_date,closed_at'),
+    SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance,tariff,created_at'),
     SB.from('project_tasks').select('project_id,time_spent,timer_started'),
     SB.from('fin_snapshots').select('*').order('period') ]);
   if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost/finance ещё не добавлены
+  // мягкая догрузка дат старта/закрытия — если колонок нет, финансы всё равно работают
+  let _datesById = {};
+  try {
+    const dres = await SB.from('projects').select('id,start_date,closed_at');
+    if (!dres.error && dres.data) dres.data.forEach(p => { _datesById[p.id] = { start: p.start_date||null, closed: p.closed_at||null }; });
+  } catch(_) {}
   const trk = {};   // отслеженное время по проекту (сек), включая идущие таймеры
   (tt && !tt.error && tt.data ? tt.data : []).forEach(t => { let s=t.time_spent||0;
     if(t.timer_started) s+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000)); trk[t.project_id]=(trk[t.project_id]||0)+s; });
@@ -7106,7 +7112,7 @@ window.tLoadFinance = async () => {
       tariff: p.tariff || (_mrr>=20000000?'Platinum':_mrr>=10000000?'Gold':_mrr>0?'Silver':'—'),
       logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(), logoUrl:p.logo_url||'',
       mrr: _mrr, cost: Number(p.cost)||0, trackedSec:tsec, hours: tsec>0 ? tsec/3600 : (Number(f.hours)||0), finance:f,
-      _start: p.start_date||p.created_at||null, _created: p.created_at||null }; });
+      _start: (_datesById[p.id]&&_datesById[p.id].start)||p.created_at||null, _created: p.created_at||null }; });
 
   const totalMrr  = rows.reduce((s,p)=>s+p.mrr,0);
   const totalCost = rows.reduce((s,p)=>s+p.cost,0);
@@ -7177,7 +7183,7 @@ window.tLoadFinance = async () => {
   const newMrr = newRows.reduce((s,p)=>s+p.mrr,0);
   const newCount = newRows.length;
   // отток за текущий месяц (проекты, закрытые в этом месяце)
-  const churnRows = (res.data||[]).filter(p => p.status==='done' && p.closed_at && new Date(p.closed_at) >= _ymStart);
+  const churnRows = (res.data||[]).filter(p => { const cl=_datesById[p.id]&&_datesById[p.id].closed; return p.status==='done' && cl && new Date(cl) >= _ymStart; });
   const churnMrr = churnRows.reduce((s,p)=>s+(Number(p.mrr)||0),0);
   const churnCount = churnRows.length;
   const netNew = newMrr - churnMrr;
