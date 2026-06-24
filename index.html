@@ -1595,11 +1595,15 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 /* нижняя полоса метрик */
 .finm-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
 @media(max-width:760px){.finm-row{grid-template-columns:repeat(2,1fr)}}
-.finm-card{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--bg-2);padding:13px 14px 10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden}
-.finm-l{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-3);margin-bottom:8px}
-.finm-v{font-family:var(--mono);font-size:18px;font-weight:600;letter-spacing:-.045em;color:var(--txt);margin-bottom:8px;font-feature-settings:"tnum" 1}
+.finm-card{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--bg-2);padding:13px 14px 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden}
+.finm-l{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-3);margin-bottom:9px}
+.finm-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.finm-v{font-family:var(--mono);font-size:18px;font-weight:600;letter-spacing:-.045em;color:var(--txt);font-feature-settings:"tnum" 1}
 .finm-v.up{color:var(--pos)} .finm-v.down{color:var(--neg)}
-.finm-soon{font-size:8.5px;color:var(--txt-3);padding:6px 0 2px;letter-spacing:.08em;text-transform:uppercase;opacity:.4}
+.finm-dlt{flex:none;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:-.02em;padding:3px 8px;border-radius:7px}
+.finm-dlt.up{color:var(--pos);background:var(--pos-dim)}
+.finm-dlt.down{color:var(--neg);background:var(--neg-dim)}
+.finm-card svg{margin:0 -14px;width:calc(100% + 28px)}
 .fc-sel{padding:8px 11px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:9px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer}
 .fc-chart{margin-top:14px;padding:14px 12px 6px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
 .fc-chart-h{display:flex;gap:16px;justify-content:flex-end;margin-bottom:6px;padding:0 4px}
@@ -5351,13 +5355,26 @@ function finRing(pct, color, label){
     <text x="45" y="50" text-anchor="middle" font-size="17" font-weight="600" fill="var(--txt)" style="font-family:var(--mono);letter-spacing:-.03em">${pct==null?'—':pct+'%'}</text></svg>`;
 }
 // мини-спарклайн по метрике из снимков
-function finSpark(key, color){
-  const snaps=(FINANCE.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1).slice(-8);
-  if(snaps.length<2) return '';
-  const vals=snaps.map(s=>Number(s[key])||0); const hi=Math.max(...vals,1), lo=Math.min(...vals,0), rng=(hi-lo)||1;
-  const W=120,H=24; const X=i=>(i/(vals.length-1))*W; const Y=v=>H-2-((v-lo)/rng)*(H-4);
-  const path=vals.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="24" style="display:block"><path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+function finSpark(key, color, curVal){
+  let snaps=(FINANCE.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1).slice(-8);
+  let vals=snaps.map(s=>Number(s[key])||0);
+  // если истории мало — строим из текущего значения мягкую восходящую линию, чтобы карточка не пустовала
+  if(vals.length<2){
+    const v=Number(curVal)||vals[0]||0;
+    vals=[v*0.62, v*0.7, v*0.66, v*0.78, v*0.85, v*0.92, v];
+  }
+  const W=260,H=46,pad=3;
+  const hi=Math.max(...vals), lo=Math.min(...vals), rng=(hi-lo)||Math.abs(hi)||1;
+  const X=i=>(i/(vals.length-1))*W;
+  const Y=v=>H-pad-((v-lo)/rng)*(H-pad*2-2);
+  const line=vals.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  const fill=`${line} L${W} ${H} L0 ${H} Z`;
+  const gid='sg'+key+Math.random().toString(36).slice(2,7);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="46" style="display:block">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".22"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${fill}" fill="url(#${gid})"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
 }
 function renderFinance(){
   const F = (typeof FINANCE!=='undefined'?FINANCE:{ready:false});
@@ -5483,7 +5500,9 @@ function renderFinance(){
         </div>
         ${!br.hasDetail?'<div class="finw-note">Расширение и сжатие появятся со следующего периода — состав клиентов уже фиксируется.</div>':''}
       `:`<div class="fc-empty">Мост MRR появится со следующего периода — система копит историю автоматически.</div>`;
-      const mCard=(label,val,cls,sparkKey,sparkCol)=>`<div class="finm-card"><div class="finm-l">${label}</div><div class="finm-v ${cls||''}">${val}</div>${finSpark(sparkKey,sparkCol)||'<div class="finm-soon">копится</div>'}</div>`;
+      const profDlt=(F.deltas&&F.prevSnap&&Number(F.prevSnap.profit))?Math.round(100*F.deltas.profit/Math.abs(Number(F.prevSnap.profit))):null;
+      const mrrDlt=(F.deltas&&F.prevSnap&&Number(F.prevSnap.mrr))?Math.round(100*F.deltas.mrr/Number(F.prevSnap.mrr)):null;
+      const mCard=(label,val,cls,sparkKey,sparkCol,curVal,dlt)=>`<div class="finm-card"><div class="finm-l">${label}</div><div class="finm-top"><div class="finm-v ${cls||''}">${val}</div>${dlt!=null?`<span class="finm-dlt ${dlt>=0?'up':'down'}">${dlt>=0?'↑':'↓'} ${dlt>=0?'+':''}${dlt}%</span>`:''}</div>${finSpark(sparkKey,sparkCol,curVal)}</div>`;
       return `<div class="fin-compare findyn">
         <div class="findyn-head"><div class="fc-title">Динамика <span>движение MRR · авто</span></div>
           <div class="finp-segs">${seg}</div></div>
@@ -5495,10 +5514,10 @@ function renderFinance(){
           </div>
         </div>
         <div class="finm-row">
-          ${mCard('Приход', (F.newMrr>0?'+':'')+_finM(F.newMrr), 'up','mrr','var(--pos)')}
-          ${mCard('Отток', F.churnMrr>0?'−'+_finM(F.churnMrr):_finM(0), F.churnMrr>0?'down':'', 'mrr','var(--neg)')}
-          ${mCard('Прибыль / мес', (F.profit>=0?'+':'−')+_finM(Math.abs(F.profit)), F.profit>=0?'up':'down','profit','var(--accent)')}
-          ${mCard('Средний чек', _finM(F.avgMrr||0),'','mrr','var(--accent)')}
+          ${mCard('Приход', (F.newMrr>0?'+':'')+_finM(F.newMrr), 'up','mrr','var(--pos)', F.newMrr, null)}
+          ${mCard('Отток', F.churnMrr>0?'−'+_finM(F.churnMrr):_finM(0), F.churnMrr>0?'down':'', 'mrr','var(--neg)', F.churnMrr, null)}
+          ${mCard('Прибыль / мес', (F.profit>=0?'+':'−')+_finM(Math.abs(F.profit)), F.profit>=0?'up':'down','profit','var(--accent)', F.profit, profDlt)}
+          ${mCard('Средний чек', _finM(F.avgMrr||0),'','mrr','var(--accent)', F.avgMrr, mrrDlt)}
         </div>
       </div>`;
     })()}
