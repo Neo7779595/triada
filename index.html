@@ -5367,7 +5367,7 @@ function renderFinance(){
         <div class="fg"><div class="l">MRR агентства</div><div class="gv">${money(F.totalMrr)}</div><div class="gs">${F.paying} ${F.paying===1?'клиент':'клиентов'} · /мес</div></div>
         <div class="fg"><div class="l">Расходы</div><div class="gv neg">${money(F.totalCost)}</div><div class="gs">${F.costPct}% от выручки</div></div>
         <div class="fg"><div class="l">Время</div><div class="gv acc">${fmtHours(F.totalHours)}</div><div class="gs">часов по таймеру</div></div>
-        <div class="fg"><div class="l">Выручка / час</div><div class="gv">${F.revPerHour?money(F.revPerHour):'—'}</div><div class="gs">${F.revPerHour?'сум за час работы':'нужно ≥ 1ч трекинга'}</div></div>
+        <div class="fg"><div class="l">Концентрация прибыли</div><div class="gv">${F.profConcPct?F.profConcPct+'%':'—'}</div><div class="gs">${F.profConcTop&&F.profConcTop!=='—'?'с проекта '+F.profConcTop:(F.profit>0?'—':'прибыли пока нет')}</div></div>
         <div class="fg"><div class="l">Прибыль / час</div><div class="gv ${F.profitPerHour>0?'pos':F.profitPerHour<0?'neg':''}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="gs">${F.profitPerHour?'чистыми за час':'логируйте часы'}</div></div>
         <div class="fg"><div class="l">Средний чек</div><div class="gv">${F.avgMrr?money(F.avgMrr):'—'}</div><div class="gs">конц. ${F.concentrationPct}% · ${F.concentrationTop}</div></div>
       </div>
@@ -7129,6 +7129,12 @@ window.tLoadFinance = async () => {
   let concentrationPct = 0, concentrationTop = '—';
   if (totalMrr > 0) { const top = [...rows].sort((a,b)=>b.mrr-a.mrr)[0];
     concentrationPct = Math.round(100*top.mrr/totalMrr); concentrationTop = top.name; }
+  // концентрация прибыли: проект с наибольшей чистой прибылью и его доля
+  let profConcPct = 0, profConcTop = '—', profConcAmt = 0;
+  if (profit > 0) {
+    const topP = rows.map(p=>({ name:p.name, prof:p.mrr-p.cost })).filter(x=>x.prof>0).sort((a,b)=>b.prof-a.prof)[0];
+    if (topP) { profConcPct = Math.round(100*topP.prof/profit); profConcTop = topP.name; profConcAmt = topP.prof; }
+  }
 
   const COLORS = ['#37E6C8','#8A8FFF','#F0785C','#E3B567','#43D88C','#5BC8F5'];
   const sm = {}, so = [];
@@ -7197,7 +7203,7 @@ window.tLoadFinance = async () => {
   } : null;
 
   FINANCE = { ready:true, totalMrr, totalCost, profit, marginPct, costPct,
-    paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop,
+    paying, total:rows.length, avgMrr, avgCost, avgProfit, concentrationPct, concentrationTop, profConcPct, profConcTop, profConcAmt,
     totalHours, avgHours, revPerHour, profitPerHour, services, tariffs, projects, breakdown,
     snapshots:snaps, prevSnap, deltas, newMrr, newCount, churnMrr, churnCount, netNew };
 };
