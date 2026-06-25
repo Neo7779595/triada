@@ -2298,6 +2298,37 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ue-row .k .d{width:8px;height:8px;border-radius:2px;flex:none}
 .ue-row .vv{font-family:var(--mono);font-size:13px;font-weight:600}
 
+
+/* === статья расходов: клик → drill-down по проектам === */
+.cost-row.clickable{cursor:pointer}
+.cost-row.clickable:hover{background:var(--bg-2)}
+.cost-row.top.clickable:hover{background:linear-gradient(90deg,rgba(227,181,103,.16),var(--bg-2) 70%)}
+.cost-row.clickable:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cost-go{display:inline-flex;align-items:center;color:var(--txt-3);opacity:0;transform:translateX(-5px);transition:.16s var(--ease);flex:none}
+.cost-row.clickable:hover .cost-go,.cost-row.clickable:focus-visible .cost-go{opacity:1;transform:translateX(0)}
+.drill-h{padding-bottom:15px;border-bottom:1px solid var(--line)}
+.drill-title{display:flex;align-items:center;gap:10px}
+.drill-title h3{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.drill-title .tagx{font-size:9.5px}
+.drill-dot{width:11px;height:11px;border-radius:3px;flex:none;background:#6C7488}
+.drill-h p{font-size:12.5px;color:var(--txt-3);margin-top:7px}
+.drill-h p b{color:var(--txt);font-family:var(--mono)}
+.drill-cols{display:flex;justify-content:space-between;padding:2px 12px 9px;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
+.drill-list{display:flex;flex-direction:column;gap:3px;max-height:54vh;overflow-y:auto;margin:0 -4px;padding:0 4px 2px}
+.drill-row{display:grid;grid-template-columns:minmax(0,1fr) 128px 134px;align-items:center;gap:16px;padding:11px 12px;border-radius:9px;transition:background .14s var(--ease)}
+.drill-row:hover{background:var(--bg-2)}
+.drill-row.top{background:linear-gradient(90deg,rgba(227,181,103,.09),transparent 72%);box-shadow:inset 3px 0 0 var(--warn)}
+.drill-nm{display:flex;align-items:center;gap:11px;font-size:13.5px;color:var(--txt);font-weight:500;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drill-rank{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--txt-3);background:var(--bg-3);width:21px;height:21px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.drill-row.top .drill-rank{color:var(--warn);background:rgba(227,181,103,.16)}
+.drill-bar{height:8px;background:var(--bg-3);border-radius:5px;overflow:hidden;min-width:0}
+.drill-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#5F6678,#4B5162);transform-origin:left;animation:costGrow .5s var(--ease-out) both}
+.drill-row.top .drill-bar i{background:linear-gradient(90deg,#9A8350,#7A663C)}
+.drill-val{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap}
+.drill-val b{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--txt)}
+.drill-val em{font-family:var(--mono);font-size:10.5px;font-style:normal;color:var(--txt-3)}
+@media(max-width:560px){.drill-row{grid-template-columns:1fr auto;gap:5px 12px}.drill-bar{display:none}}
+
 </style>
 </head>
 <body>
@@ -5471,7 +5502,7 @@ function cmdkInputKey(e){
 document.addEventListener('keydown',e=>{
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();if(cmdkCab())(document.getElementById('cmdk').classList.contains('on')?cmdkClose():cmdkOpen());return;}
   if(e.key==='Escape'){
-    const order=[['ov-pd2',pd2Close],['cmdk',cmdkClose],['ov-proj',closeProject],['ov-emp',closeEmp],['ov-agency',closeAgency],['ov-del',()=>document.getElementById('ov-del').classList.remove('on')],['drawer',()=>document.getElementById('drawer').classList.remove('on')]];
+    const order=[['ov-drill',closeDrill],['ov-pd2',pd2Close],['cmdk',cmdkClose],['ov-proj',closeProject],['ov-emp',closeEmp],['ov-agency',closeAgency],['ov-del',()=>document.getElementById('ov-del').classList.remove('on')],['drawer',()=>document.getElementById('drawer').classList.remove('on')]];
     for(const [id,fn] of order){const el=document.getElementById(id); if(el&&el.classList.contains('on')){fn();break;}}
     return;
   }
@@ -6759,11 +6790,11 @@ function renderFinance(){
           const RAMP=['#6C7488','#5F6678','#545B6C','#4B5162','#424857','#3A3F4C']; const sh=i=>RAMP[Math.min(i,RAMP.length-1)];
           const segs=bd.map((x,i)=>`<div class="alloc-seg" title="${x.name}: ${x.pct}%" style="width:${F.totalMrr>0?(x.amount/F.totalMrr*100).toFixed(2):0}%;background:${sh(i)}"></div>`).join('')
             + (F.profit>0?`<div class="alloc-seg" title="Прибыль: ${F.marginPct}%" style="width:${Math.max(0,F.marginPct).toFixed(2)}%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></div>`:'');
-          const rows=bd.length?bd.map((x,i)=>`<div class="cost-row${i===0?' top':''}">
-              <span class="cost-name"><span class="wf-dot" style="background:${sh(i)}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span>${i===0?'<span class="cost-flag">съедает больше всего</span>':''}</span>
+          const rows=bd.length?bd.map((x,i)=>{const clk=x.projects&&x.projects.length;return `<div class="cost-row${i===0?' top':''}${clk?' clickable':''}"${clk?` onclick="openCostDrill(${i})" onkeydown="if(event.key==='Enter')openCostDrill(${i})" tabindex="0" role="button"`:''}>
+              <span class="cost-name"><span class="wf-dot" style="background:${sh(i)}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span>${i===0?'<span class="cost-flag">съедает больше всего</span>':''}${clk?'<span class="cost-go" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>':''}</span>
               <div class="cost-bar"><i style="width:${maxCost>0?(x.amount/maxCost*100).toFixed(1):0}%;background:${sh(i)}"></i></div>
               <span class="cost-val"><span class="cost-pct">${x.pct}<span class="u">%</span></span><span class="cost-amt">${money(x.amount)}</span></span>
-            </div>`).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте.</div>';
+            </div>`;}).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте.</div>';
           return `
             <div class="alloc-bar">${segs}</div>
             <div class="alloc-legend"><span>Расходы <b>${F.costPct}%</b> · ${money(F.totalCost)}</span><span style="color:var(--pos)">Прибыль <b>${F.marginPct}%</b> · ${money(F.profit)}</span></div>
@@ -7155,6 +7186,32 @@ function openEmpEdit(i){
   document.getElementById('ov-emp').classList.add('on');
 }
 function closeEmp(){document.getElementById('ov-emp').classList.remove('on');empEditIdx=null;}
+function closeDrill(){ const ov=document.getElementById('ov-drill'); if(ov) ov.classList.remove('on'); }
+function openCostDrill(i){
+  const F=(typeof FINANCE!=='undefined'?FINANCE:null); if(!F||!F.breakdown) return;
+  const it=F.breakdown[i]; if(!it||!it.projects||!it.projects.length) return;
+  let ov=document.getElementById('ov-drill');
+  if(!ov){ ov=document.createElement('div'); ov.id='ov-drill'; ov.className='ov'; ov.addEventListener('click',e=>{ if(e.target===ov) closeDrill(); }); document.body.appendChild(ov); }
+  const esc=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const maxA=it.projects[0].amount||1, np=it.projects.length;
+  const rows=it.projects.map((pr,idx)=>`<div class="drill-row${idx===0?' top':''}">
+      <span class="drill-nm"><span class="drill-rank">${idx+1}</span>${esc(pr.name)}</span>
+      <div class="drill-bar"><i style="width:${maxA>0?(pr.amount/maxA*100).toFixed(1):0}%"></i></div>
+      <span class="drill-val"><b>${money(pr.amount)}</b><em>${pr.pct}% статьи</em></span>
+    </div>`).join('');
+  ov.innerHTML=`<div class="modal drill" style="max-width:600px">
+    <div class="modal-h drill-h">
+      <div class="drill-title"><span class="drill-dot"></span><h3>${esc(it.name)}</h3><span class="tagx">${esc(it.label)}</span></div>
+      <p>Всего <b>${money(it.amount)}</b> · ${it.pct}% выручки · ${np} ${_plural(np,'проект','проекта','проектов')}</p>
+    </div>
+    <div class="modal-b">
+      <div class="drill-cols"><span>Проект</span><span>Расход · доля статьи</span></div>
+      <div class="drill-list">${rows}</div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="closeDrill()">Закрыть</button></div>
+  </div>`;
+  requestAnimationFrame(()=>ov.classList.add('on'));
+}
 function _tgUrl(v){ v=(v||'').trim(); if(!v) return ''; if(/^https?:\/\//i.test(v)) return v; v=v.replace(/^@/,'').replace(/^(https?:\/\/)?t\.me\//i,''); return v?('https://t.me/'+v):''; }
 function _phoneUrl(v){ v=(v||'').trim(); if(!v) return ''; const c=v.replace(/[^\d+]/g,''); return c?('tel:'+c):''; }
 function empOpenTg(){ const u=_tgUrl(document.getElementById('e-tg').value); if(!u){ toast('Укажите телеграм сотрудника'); return; } window.open(u,'_blank','noopener'); }
@@ -8462,16 +8519,19 @@ window.tLoadFinance = async () => {
       const amt = Number(it.amount)||0; if (amt<=0) return;
       const nm = ((it.name||'—').trim())||'—';
       const key = cat+'|'+nm.toLowerCase();
-      if (!bd[key]) bd[key] = { name:nm, cat, label:CAT_LABEL[cat], color:CAT_COLOR[cat], amount:0 };
+      if (!bd[key]) bd[key] = { name:nm, cat, label:CAT_LABEL[cat], color:CAT_COLOR[cat], amount:0, _proj:{} };
       bd[key].amount += amt;
+      bd[key]._proj[p.name] = (bd[key]._proj[p.name]||0) + amt;
     }); });
   });
   let breakdown = Object.values(bd).sort((a,b)=> b.amount-a.amount)
-    .map(x => ({ ...x, pct: totalMrr>0 ? Math.round(100*x.amount/totalMrr) : 0 }));
+    .map(x => ({ name:x.name, cat:x.cat, label:x.label, color:x.color, amount:x.amount,
+      pct: totalMrr>0 ? Math.round(100*x.amount/totalMrr) : 0,
+      projects: Object.entries(x._proj||{}).map(([name,amount])=>({ name, amount, pct: x.amount>0?Math.round(100*amount/x.amount):0 })).sort((a,b)=> b.amount-a.amount) }));
   // если у проекта задан cost без детализации — добиваем «Прочее», чтобы отчёт сходился
   const shownCost = breakdown.reduce((s,x)=>s+x.amount,0);
   const other = totalCost - shownCost;
-  if (other > 0) breakdown.push({ name:'Прочие расходы', cat:'other', label:'Прочее', color:'#5B616B', amount:other, pct: totalMrr>0?Math.round(100*other/totalMrr):0 });
+  if (other > 0) breakdown.push({ name:'Прочие расходы', cat:'other', label:'Прочее', color:'#5B616B', amount:other, pct: totalMrr>0?Math.round(100*other/totalMrr):0, projects:[] });
 
   const totalHours = rows.reduce((s,p)=>s+(Number(p.hours)||0),0);
   const avgHours = paying ? Math.round(totalHours/paying) : 0;
