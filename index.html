@@ -986,6 +986,47 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .rl-m-v{font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums;color:var(--txt)}
 .rl-m.on .rl-m-l,.rl-m.on .rl-m-v{color:var(--accent)}
 @media(max-width:760px){.rl-card{flex-direction:column}.rl-grid{grid-template-columns:repeat(3,1fr);gap:1px}.rl-m{border-right:0}}
+/* ——— SMM рубрики-победители (Фаза 7) ——— */
+.rb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.rb-card{background:var(--bg-2);border:1px solid var(--line);border-left:2px solid var(--line);border-radius:0 10px 10px 0;padding:15px 17px;transition:.15s}
+.rb-card:hover{border-color:var(--line-2)}
+.rb-card.top{background:linear-gradient(135deg,var(--accent-dim),var(--bg-2));border-color:var(--accent-line);border-left-color:var(--accent)}
+.rb-h{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.rb-rank{font-family:var(--mono);font-size:10px;color:var(--txt-3);flex-shrink:0}
+.rb-card.top .rb-rank{color:var(--accent)}
+.rb-name{font-size:14px;font-weight:400;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-card.top .rb-name{font-weight:500}
+.rb-badge-wrap{margin-left:auto;flex-shrink:0}
+.rb-badge{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;border-radius:4px;padding:2px 6px}
+.rb-badge.lead{color:var(--accent)}
+.rb-badge.anom{color:var(--neg);border:1px solid rgba(240,120,92,.4)}
+.rb-dpp{font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums}
+.rb-dpp.pos{color:var(--pos)}
+.rb-dpp.neg{color:var(--neg)}
+.rb-hero{display:flex;align-items:baseline;gap:3px}
+.rb-er{font-family:var(--mono);font-size:32px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;color:var(--txt);letter-spacing:-.02em}
+.rb-card.top .rb-er{color:var(--accent)}
+.rb-er.anom{color:var(--neg)}
+.rb-pct{font-family:var(--mono);font-size:16px;color:var(--txt-3)}
+.rb-er-l{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-3);margin-left:6px}
+.rb-share{margin-top:13px}
+.rb-share-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.rb-share-l{font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-3)}
+.rb-share-l.on{color:var(--accent)}
+.rb-share-v{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--txt-2)}
+.rb-card.top .rb-share-v{color:var(--accent)}
+.rb-share-bar{height:5px;border-radius:3px;background:var(--bg-3)}
+.rb-share-fill{height:100%;border-radius:3px;background:var(--accent);opacity:.55;transition:width .8s var(--ease-out)}
+.rb-card.top .rb-share-fill{opacity:1}
+.rb-foot{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.rb-c{padding:0 10px}
+.rb-c:first-child{padding-left:0}
+.rb-c.br{border-right:1px solid var(--line)}
+.rb-c-l{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);margin-bottom:4px}
+.rb-c.on .rb-c-l{color:var(--accent)}
+.rb-c-v{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--txt-2)}
+.rb-c.on .rb-c-v{color:var(--txt)}
+
 
 
 
@@ -4911,6 +4952,43 @@ function smmReelsBlockHTML(){
     +'<div class="smm-sort">'+chips+'</div></div>'
     +'<div class="smm-sec-b"><div class="rl-list">'+cards+'</div></div></div>';
 }
+let _smmRubSort='er';
+function smmSetRubSort(f){ _smmRubSort=f; const el=document.getElementById('smm-rub-grid-sec'); if(el) el.outerHTML=smmRubricsBlockHTML(); }
+function smmRubricsBlockHTML(){
+  const sorts=[['er','ER'],['reach','Охват'],['views','Просмотры']];
+  const chips=sorts.map(s=>'<button class="smm-sort-chip'+(_smmRubSort===s[0]?' on':'')+'" onclick="smmSetRubSort(\''+s[0]+'\')">'+s[1]+'</button>').join('');
+  const rubs=_smmCur.rubrics.slice().sort((a,b)=>(+b[_smmRubSort]||0)-(+a[_smmRubSort]||0));
+  if(!rubs.length){
+    return '<div class="smm-sec" id="smm-rub-grid-sec"><div class="smm-sec-h"><div class="t">Рубрики</div></div>'
+      +'<div class="smm-sec-b"><div style="text-align:center;color:var(--txt-3);padding:36px 0;font-size:12px;font-family:var(--mono)">Заполните рубрики во вкладке «Данные»</div></div></div>';
+  }
+  const fmt=v=>(v==null||v===0)?'—':Number(v).toLocaleString('ru-RU');
+  const totalReach=rubs.reduce((s,r)=>s+(+r.reach||0),0)||1;
+  const erVals=rubs.map(r=>+r.er||0).slice().sort((a,b)=>a-b);
+  const medER=erVals.length%2?erVals[(erVals.length-1)/2]:(erVals[erVals.length/2-1]+erVals[erVals.length/2])/2;
+  const reActive=_smmRubSort==='reach', viActive=_smmRubSort==='views';
+  const cards=rubs.map((r,i)=>{
+    const top=i===0, er=+r.er||0, anomaly=er>100;
+    const share=(+r.reach||0)/totalReach*100;
+    const dER=er-medER, up=dER>=0;
+    let badge;
+    if(anomaly) badge='<span class="rb-badge anom">аномалия</span>';
+    else if(top) badge='<span class="rb-badge lead">лидер</span>';
+    else badge='<span class="rb-dpp '+(up?'pos':'neg')+'">'+(up?'▲ +':'▼ ')+dER.toFixed(2)+' п.п.</span>';
+    const cells=[['Охват',fmt(r.reach),reActive],['Просмотры',fmt(r.views),viActive],['Постов',(r.posts?r.posts:'—'),false]];
+    const cellsHTML=cells.map((c,ci)=>'<div class="rb-c'+(c[2]?' on':'')+(ci<2?' br':'')+'"><div class="rb-c-l">'+c[0]+'</div><div class="rb-c-v">'+c[1]+'</div></div>').join('');
+    return '<div class="rb-card'+(top?' top':'')+'">'
+      +'<div class="rb-h"><span class="rb-rank">'+(i+1<10?'0':'')+(i+1)+'</span>'
+      +'<span class="rb-name">'+_ddH(r.name)+'</span><span class="rb-badge-wrap">'+badge+'</span></div>'
+      +'<div class="rb-hero"><span class="rb-er'+(anomaly?' anom':'')+'">'+(er?er.toFixed(2):'—')+'</span><span class="rb-pct">%</span><span class="rb-er-l">ER</span></div>'
+      +'<div class="rb-share"><div class="rb-share-h"><span class="rb-share-l'+(reActive?' on':'')+'">доля охвата портфеля</span><span class="rb-share-v">'+share.toFixed(0)+'%</span></div>'
+      +'<div class="rb-share-bar"><div class="rb-share-fill" style="width:'+Math.min(share,100).toFixed(1)+'%"></div></div></div>'
+      +'<div class="rb-foot">'+cellsHTML+'</div></div>';
+  }).join('');
+  return '<div class="smm-sec" id="smm-rub-grid-sec"><div class="smm-sec-h"><div class="t">Рубрики · '+rubs.length+'</div>'
+    +'<div style="display:flex;align-items:center;gap:12px"><span style="font-size:11px;color:var(--txt-3);font-family:var(--mono)">медиана ER '+medER.toFixed(2)+'%</span><div class="smm-sort">'+chips+'</div></div></div>'
+    +'<div class="smm-sec-b"><div class="rb-grid">'+cards+'</div></div></div>';
+}
 function smmRenderPresentation(){
   const m=_smmCur.metrics, p=_smmCur.prev, go=_smmCur.goals;
   const totalReach=(m.reels_reach||0)+(m.stories_reach||0);
@@ -4962,7 +5040,7 @@ function smmRenderPresentation(){
     +'</div></div></div>'
     +smmMetricsBlockHTML()
     +smmReelsBlockHTML()
-    +'<div id="smm-slot-rubrics" class="smm-slot">Рубрики-победители — Фаза 7</div>'
+    +smmRubricsBlockHTML()
     +'<div id="smm-slot-conclusions" class="smm-slot">Авто-выводы — Фаза 8</div>'
     +'</div>';
 }
