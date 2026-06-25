@@ -910,6 +910,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-tabs button.on{color:var(--txt);border-bottom-color:var(--accent)}
 .smm-body{flex:1;overflow-y:auto;padding:26px 28px 70px}
 .smm-wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.smm-pres{max-width:none;padding:24px 40px 64px}
+@media(max-width:760px){.smm-pres{padding:8px 4px 40px}}
 .smm-sec{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r)}
 .smm-sec-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
 .smm-sec-h .t{font-size:13px;font-weight:600}
@@ -5478,6 +5480,47 @@ function smmReportCardHTML(x,p){
   return `<div class="smm-rep-card" onclick="openReportProj(${x.i})"><div class="smm-rep-top"><div class="smm-rep-left">${avatar}<div class="smm-rep-info"><div class="smm-rep-name">${_ddH(title)}</div><div class="smm-rep-per"><span class="smm-rep-badge">SMM</span>${period}</div><div class="smm-rep-date">${dateSvg}${_dDateFull(r.published_at)}</div></div></div><div class="smm-rep-right"><button class="smm-rep-copy" title="Дублировать" onclick="event.stopPropagation();pdReportCopy(${x.i})"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button><button class="smm-rep-open" onclick="event.stopPropagation();openReportProj(${x.i})">Открыть <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></button><button class="smm-rep-del" title="Удалить" onclick="event.stopPropagation();pdReportDel('${r.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button></div></div>${strip}</div>`;
 }
 function pdReportCopy(idx){ const r=(PROJECTS[pdIdx]._reports||[])[idx]; if(!r) return; const payload=JSON.parse(JSON.stringify(r.payload||{})); if(window.tReportAdd) window.tReportAdd(PROJECTS[pdIdx].id,{title:(r.title||'SMM-отчёт')+' · копия',kind:r.kind||'SMM',payload}); else toast('Нужен бэкенд'); }
+function smmSection01HTML(){
+  const m=_smmCur.metrics;
+  const f=v=>(v==null||isNaN(v))?'—':Number(v).toLocaleString('ru-RU');
+  const totalReach=(m.reels_reach||0)+(m.stories_reach||0);
+  const rv=m.reels_views||0, sv=(m.stories_views!=null?m.stories_views:(m.stories_reach||0)), tv=rv+sv;
+  const reelsP=tv>0?Math.round(rv/tv*100):0, storiesP=tv>0?100-reelsP:0;
+  const erVal=m.er==null?'—':(+m.er).toFixed(2)+'%';
+  const fol=m.followers, folStr=fol==null?'—':((fol>0?'+':'')+f(fol));
+  const folDelta=(fol!=null&&m.subscribers_current)?((fol>0?'+':'')+(fol/m.subscribers_current*100).toFixed(1)+'% базы за период'):'';
+  const freq=m.frequency==null?'—':(+m.frequency).toFixed(1)+'x';
+  const H=(num,title)=>`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:${num==='01'?'0':'72px'}"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">${num}</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">${title}</span></div>`;
+  const SUB=t=>`<div style="padding:12px 0 10px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.2em;text-transform:uppercase">${t}</span></div>`;
+  const cell=(lab,val,sub,accent,pad)=>`<div style="padding:${pad}">`
+    +`<div style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.18em;text-transform:uppercase;margin-bottom:16px">${lab}</div>`
+    +`<div style="font-size:52px;font-weight:700;color:${accent?'var(--accent)':'var(--txt)'};letter-spacing:-.055em;line-height:1;font-variant-numeric:tabular-nums">${val}</div>`
+    +(sub?`<div style="font-family:var(--mono);font-size:9px;color:var(--txt-3);margin-top:10px;letter-spacing:.06em">${sub}</div>`:'')+`</div>`;
+  const row=(c1,c2,c3)=>`<div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)">`
+    +cell(c1[0],c1[1],c1[2],true,'28px 32px 28px 0').replace('padding:28px 32px 28px 0"','padding:28px 32px 28px 0;border-right:1px solid var(--line)"')
+    +cell(c2[0],c2[1],c2[2],false,'28px 32px').replace('padding:28px 32px"','padding:28px 32px;border-right:1px solid var(--line)"')
+    +cell(c3[0],c3[1],c3[2],false,'28px 0 28px 32px')+`</div>`;
+  return '<div class="smm-rep01">'
+    +H('01','Ключевые показатели')
+    +SUB('Объём контента')
+    +row(['Reels',f(m.reels_count),'опубликовано'],['Stories',f(m.stories_count),'за период'],['Креативы',f(m.ad_creatives),'рекламных'])
+    +SUB('Охват и просмотры')
+    +row(['Охват',f(totalReach),'уникальных аккаунтов'],['Просмотры',f(tv),'суммарно'],['Частота',freq,'просмотров на человека'])
+    +SUB('Аудитория')
+    +row(['Подписчики сейчас',f(m.subscribers_current),''],['Прирост',folStr,folDelta],['ER %',erVal,'вовлечённость'])
+    +SUB('Просмотры по форматам')
+    +'<div style="padding:8px 0 0">'
+      +'<div style="display:flex;height:34px;border-radius:6px;overflow:hidden;background:var(--bg-3)">'
+        +`<div style="width:${reelsP}%;background:var(--accent);height:100%;display:flex;align-items:center;padding-left:14px;box-sizing:border-box;transition:width 1.4s cubic-bezier(.16,1,.3,1)"><span style="font-size:15px;font-weight:700;color:var(--accent-ink);letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap">${tv>0?reelsP+'%':'—'}</span></div>`
+        +`<div style="width:${storiesP}%;background:rgba(55,230,200,.42);height:100%;border-left:1.5px solid var(--bg)"></div>`
+      +'</div>'
+      +'<div style="display:flex;gap:28px;margin-top:14px;flex-wrap:wrap">'
+        +`<div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent);flex-shrink:0"></span><span style="font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-2)">Reels</span><span style="font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums">${tv>0?reelsP+'%':'—'}</span><span style="font-family:var(--mono);font-size:11px;color:var(--txt-3);font-variant-numeric:tabular-nums">${f(rv)}</span></div>`
+        +`<div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(55,230,200,.42);flex-shrink:0"></span><span style="font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-3)">Сторис</span><span style="font-size:13px;font-weight:700;color:var(--txt-2);font-variant-numeric:tabular-nums">${tv>0?storiesP+'%':'—'}</span><span style="font-family:var(--mono);font-size:11px;color:var(--txt-3);font-variant-numeric:tabular-nums">${f(sv)}</span></div>`
+      +'</div>'
+      +`<div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--line);display:flex;align-items:baseline;gap:10px"><div style="font-size:28px;font-weight:700;color:var(--txt-2);letter-spacing:-.04em;font-variant-numeric:tabular-nums">${tv>0?f(tv):'—'}</div><div style="font-family:var(--mono);font-size:8px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.12em">просмотров итого</div></div>`
+    +'</div></div>';
+}
 function smmRenderPresentation(){
   const m=_smmCur.metrics, p=_smmCur.prev, go=_smmCur.goals;
   const totalReach=(m.reels_reach||0)+(m.stories_reach||0);
@@ -5507,26 +5550,7 @@ function smmRenderPresentation(){
   ];
 
   return '<div class="smm-wrap smm-pres">'
-    +'<div class="smm-hero"><div class="hero-er"><div class="eyebrow">Вовлечённость периода (ER)</div>'
-    +'<div class="er-val" style="color:'+(m.er==null?'var(--txt-3)':ezCol)+'">'+erVal+'</div>'
-    +(ez.zone!=='none'
-      ?'<div class="er-zone" style="color:'+ezCol+'">'+ez.label+(ez.basis==='goal'&&go.er?(' · цель '+(+go.er).toFixed(2)+'%'):'')+'</div>'
-      :'<div class="er-zone" style="color:var(--txt-3)">нет цели и прошлого периода</div>')
-    +'</div><div class="hero-stats">'
-    +heroStats.map(s=>'<div class="hs"><div class="l">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>').join('')
-    +'</div></div>'
-    +'<div class="smm-strip2">'
-    +strip.map(s=>'<div class="c"><div class="l">'+s[0]+'</div><div class="v'+(s[2]?' pos':'')+'">'+s[1]+'</div></div>').join('')
-    +'</div>'
-    +'<div class="smm-sec"><div class="smm-sec-h"><div class="t">Просмотры по форматам</div>'
-    +'<span style="font-size:11px;color:var(--txt-3);font-family:var(--mono)">'+(hasViews?smmFmtN(totalViews)+' всего':'нет данных')+'</span></div>'
-    +'<div class="smm-sec-b"><div class="smm-fmt-bar">'
-    +'<div class="seg" style="width:'+reelsP+'%;background:var(--accent)"></div>'
-    +'<div class="seg" style="width:'+storiesP+'%;background:var(--violet)"></div></div>'
-    +'<div class="smm-fmt-leg">'
-    +'<div class="it"><span class="dot" style="background:var(--accent)"></span>Reels · <span class="n">'+(hasViews?reelsP+'%':'—')+'</span> · '+smmFmtN(reelsViews)+'</div>'
-    +'<div class="it"><span class="dot" style="background:var(--violet)"></span>Сторис · <span class="n">'+(hasViews?storiesP+'%':'—')+'</span> · '+smmFmtN(storiesViews)+'</div>'
-    +'</div></div></div>'
+    +smmSection01HTML()
     +smmMetricsBlockHTML()
     +smmReelsBlockHTML()
     +smmRubricsBlockHTML()
