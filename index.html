@@ -2023,14 +2023,16 @@ button:active{transform:translateY(.5px) scale(.99)}
 .dynx-wf text{font-family:var(--font)}
 .dynx-wf text.m{font-family:var(--mono);font-feature-settings:"tnum" 1}
 .dynx-gauges{border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
-.dynx-gauge{flex:1;display:flex;align-items:center;gap:15px;padding:15px 18px;min-width:0}
+.dynx-gauge{flex:1;display:flex;align-items:center;gap:20px;padding:18px 20px;min-width:0}
 .dynx-gauge + .dynx-gauge{border-top:1px solid var(--line)}
-.dynx-ring{position:relative;width:62px;height:62px;flex:0 0 auto}
+.dynx-ring{position:relative;width:112px;height:112px;flex:0 0 auto}
 .dynx-ring svg{display:block}
-.dynx-ring-v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:15px;font-weight:600}
+.dynx-ring-v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:23px;font-weight:600;letter-spacing:-.02em;font-feature-settings:"tnum" 1}
 .dynx-gl{min-width:0}
 .dynx-gl .gll{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:500}
-.dynx-gl .gld{font-size:12px;color:var(--txt-2);margin-top:6px;line-height:1.4}
+.dynx-gl .gld{font-size:12.5px;color:var(--txt-2);margin-top:7px;line-height:1.45}
+.dynx-gtgt{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);margin-top:10px;letter-spacing:.02em;display:inline-flex;align-items:center;gap:6px}
+.dynx-gtgt::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--line-2)}
 .dynx-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line)}
 .dynx-cell{background:var(--bg-1);background-image:linear-gradient(180deg,rgba(255,255,255,.014),transparent 46%);padding:14px 16px;min-width:0}
 .dynx-cell .l{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:500}
@@ -5891,13 +5893,22 @@ function finWaterfallSVG(steps){
   });
   return svg+'</svg>';
 }
-function finRingMini(valTxt,color,pct,label,note,cap){
-  cap=cap||100; const r=26,c=2*Math.PI*r,frac=Math.min(Math.max(pct,0),cap)/cap,off=c*(1-frac);
+function finRingMini(valTxt,color,pct,label,note,cap,marks){
+  cap=cap||100; const R=42,CX=56,CY=56,c=2*Math.PI*R,frac=Math.min(Math.max(pct,0),cap)/cap,off=c*(1-frac);
+  const ang=v=>(-90+(Math.min(Math.max(v,0),cap)/cap)*360)*Math.PI/180;
+  const tick=(v,col,w)=>{const a=ang(v),x1=CX+Math.cos(a)*(R-7),y1=CY+Math.sin(a)*(R-7),x2=CX+Math.cos(a)*(R+7),y2=CY+Math.sin(a)*(R+7);
+    return '<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="'+col+'" stroke-width="'+(w||2)+'" stroke-linecap="round"/>';};
+  let mk='',tgt='';
+  if(marks&&marks.target!=null){ mk+=tick(marks.target,'var(--txt)',2.5); tgt='<div class="dynx-gtgt">цель '+marks.target+'%</div>'; }
+  else if(marks&&marks.zone){ mk+=tick(marks.zone[0],'var(--txt-2)',2)+tick(marks.zone[1],'var(--txt-2)',2); tgt='<div class="dynx-gtgt">коридор '+marks.zone[0]+'–'+marks.zone[1]+'%</div>'; }
   return '<div class="dynx-gauge"><div class="dynx-ring">'
-    +'<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="'+r+'" fill="none" stroke="var(--bg-3)" stroke-width="6"/>'
-    +'<circle class="dynx-ring-fg" cx="32" cy="32" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 32 32)" style="--c:'+c.toFixed(1)+';--off:'+off.toFixed(1)+'"/></svg>'
+    +'<svg viewBox="0 0 112 112" width="112" height="112">'
+    +'<circle cx="'+CX+'" cy="'+CY+'" r="'+R+'" fill="none" stroke="var(--bg-3)" stroke-width="9"/>'
+    +'<circle class="dynx-ring-fg" cx="'+CX+'" cy="'+CY+'" r="'+R+'" fill="none" stroke="'+color+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 '+CX+' '+CY+')" style="--c:'+c.toFixed(1)+';--off:'+off.toFixed(1)+'"/>'
+    +mk
+    +'</svg>'
     +'<span class="dynx-ring-v" style="color:'+color+'">'+valTxt+'</span></div>'
-    +'<div class="dynx-gl"><div class="gll">'+label+'</div><div class="gld">'+note+'</div></div></div>';
+    +'<div class="dynx-gl"><div class="gll">'+label+'</div><div class="gld">'+note+'</div>'+tgt+'</div></div>';
 }
 function finSparkSVG(series,color){
   const data=(series||[]).slice(-8); if(data.length<2) return '';
@@ -6061,10 +6072,10 @@ function renderFinance(){
       const wf=finWaterfallSVG(steps);
 
       const nrrRing=nrr==null
-        ? finRingMini('—','var(--txt-3)',0,'NRR · удержание','Появится со второго периода — копим историю.',120)
-        : finRingMini(nrr+'%', nrr>=100?'var(--pos)':nrr>=90?'var(--warn)':'var(--neg)', Math.min(nrr,120), 'NRR · удержание', nrr>=100?'Расширение перекрывает отток. Цель ≥ 100%.':'Отток обгоняет расширение — риск удержания.', 120);
+        ? finRingMini('—','var(--txt-3)',0,'NRR · удержание','Появится со второго периода — копим историю.',120,{target:100})
+        : finRingMini(nrr+'%', nrr>=100?'var(--pos)':nrr>=90?'var(--warn)':'var(--neg)', Math.min(nrr,120), 'NRR · удержание', nrr>=100?'Расширение перекрывает отток.':'Отток обгоняет расширение — риск.', 120, {target:100});
       const mColor=margin>=40?'var(--pos)':margin>=25?'var(--accent)':margin>=15?'var(--warn)':'var(--neg)';
-      const marRing=finRingMini(margin+'%', mColor, Math.min(margin,100), 'Маржа', margin>=25?'В здоровом коридоре 25–35%.':'Ниже здорового коридора 25–35%. Точка роста.', 100);
+      const marRing=finRingMini(margin+'%', mColor, Math.min(margin,100), 'Маржа', margin>35?'Выше коридора — отлично.':margin>=25?'В здоровом коридоре.':'Ниже коридора — точка роста.', 100, {zone:[25,35]});
 
       const profSeries=snaps.map(s=>Number(s.profit)||0);
       const avgSeries=snaps.map(s=>{const c=Number(s.clients)||0;return c?(Number(s.mrr)||0)/c:0;});
