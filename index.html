@@ -2124,7 +2124,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ue-hero .v .m{font-size:11px;font-weight:400;color:var(--txt-3);letter-spacing:0}
 .ue-split{height:16px;display:flex;border-radius:6px;overflow:hidden;background:var(--bg-3);margin:15px 0 6px;gap:2px}
 .ue-split>div{height:100%;border-radius:3px}
-.ue-split .cost{background:linear-gradient(90deg,#F0785C,#E0566A)}
+.ue-split .cost{background:linear-gradient(90deg,#5F6678,#4B5162)}
 .ue-split .prof{background:linear-gradient(90deg,#43D88C,#37E6C8)}
 .ue-rows{display:flex;flex-direction:column;flex:1;justify-content:space-between;margin-top:16px}
 .ue-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -6205,14 +6205,15 @@ function renderFinance(){
         <div class="card-body">
           ${(()=>{
             const bd=F.breakdown||[], maxCost=bd.length?bd[0].amount:1;
-            const segs=bd.map(x=>`<div class="alloc-seg" title="${x.name}: ${x.pct}%" style="width:${F.totalMrr>0?(x.amount/F.totalMrr*100).toFixed(2):0}%;background:${x.color}"></div>`).join('')
+            const RAMP=['#6C7488','#5F6678','#545B6C','#4B5162','#424857','#3A3F4C']; const sh=i=>RAMP[Math.min(i,RAMP.length-1)];
+            const segs=bd.map((x,i)=>`<div class="alloc-seg" title="${x.name}: ${x.pct}%" style="width:${F.totalMrr>0?(x.amount/F.totalMrr*100).toFixed(2):0}%;background:${sh(i)}"></div>`).join('')
               + (F.profit>0?`<div class="alloc-seg" title="Прибыль: ${F.marginPct}%" style="width:${Math.max(0,F.marginPct).toFixed(2)}%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></div>`:'');
             const rows=bd.length?bd.map((x,i)=>`<div class="cost-row${i===0?' top':''}">
                 <div class="cost-top">
-                  <span class="cost-name"><span class="wf-dot" style="background:${x.color}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span>${i===0?'<span class="cost-flag">съедает больше всего</span>':''}</span>
+                  <span class="cost-name"><span class="wf-dot" style="background:${sh(i)}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span>${i===0?'<span class="cost-flag">съедает больше всего</span>':''}</span>
                   <span style="white-space:nowrap;display:inline-flex;align-items:baseline"><span class="cost-pct">${x.pct}% выручки</span><span class="cost-big">${money(x.amount)}</span></span>
                 </div>
-                <div class="cost-bar"><i style="width:${maxCost>0?(x.amount/maxCost*100).toFixed(1):0}%;background:${x.color}"></i></div>
+                <div class="cost-bar"><i style="width:${maxCost>0?(x.amount/maxCost*100).toFixed(1):0}%;background:${sh(i)}"></i></div>
               </div>`).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте.</div>';
             return `
               <div class="alloc-bar">${segs}</div>
@@ -6240,7 +6241,7 @@ function renderFinance(){
               <div class="ue-split"><div class="cost" style="width:${cw.toFixed(1)}%"></div><div class="prof" style="width:${pw.toFixed(1)}%"></div></div>
               <div class="ue-rows">
                 <div class="ue-row"><span class="k"><span class="d" style="background:var(--txt-3)"></span>Выручка на клиента</span><span class="vv">${money(r)}</span></div>
-                <div class="ue-row"><span class="k"><span class="d" style="background:var(--neg)"></span>Расходы на клиента</span><span class="vv" style="color:var(--neg)">${money(c)}</span></div>
+                <div class="ue-row"><span class="k"><span class="d" style="background:#545B6C"></span>Расходы на клиента</span><span class="vv" style="color:var(--txt)">${money(c)}</span></div>
                 <div class="ue-row"><span class="k"><span class="d" style="background:var(--pos)"></span>Прибыль на клиента</span><span class="vv" style="color:${pr>=0?'var(--pos)':'var(--neg)'}">${(pr>=0?'+':'')+money(pr)}</span></div>
                 <div class="ue-row"><span class="k"><span class="d" style="background:var(--line-2)"></span>Часы на клиента</span><span class="vv" style="color:var(--txt-2)">${fmtHours(F.avgHours)}</span></div>
               </div>
