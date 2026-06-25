@@ -878,6 +878,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-paste:focus{outline:none;border-color:var(--accent-line)}
 .smm-mini-btn{appearance:none;display:inline-flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:8px;color:var(--txt-2);font-family:var(--font);font-size:12px;font-weight:500;padding:8px 13px;cursor:pointer;transition:.16s;white-space:nowrap}
 .smm-mini-btn:hover{border-color:var(--accent-line);color:var(--txt)}
+/* ——— SMM презентация · summary (Фаза 4) ——— */
+.smm-hero{display:flex;gap:28px;align-items:stretch;background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);padding:24px 26px}
+.smm-hero .hero-er{flex:0 0 auto;min-width:208px;border-right:1px solid var(--line);padding-right:28px;display:flex;flex-direction:column;justify-content:center}
+.smm-hero .er-val{font-size:54px;font-weight:700;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;margin-top:9px}
+.smm-hero .er-zone{font-size:11.5px;font-family:var(--mono);margin-top:11px;letter-spacing:.01em}
+.smm-hero .hero-stats{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.smm-hero .hs{background:var(--bg-1);padding:15px 17px;display:flex;flex-direction:column;justify-content:center}
+.smm-hero .hs .l{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
+.smm-hero .hs .v{font-size:22px;font-family:var(--mono);margin-top:7px;color:var(--txt);letter-spacing:-.02em}
+.smm-strip2{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.smm-strip2 .c{background:var(--bg-1);padding:16px 18px;transition:.16s}
+.smm-strip2 .c:hover{background:var(--bg-2)}
+.smm-strip2 .c .l{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)}
+.smm-strip2 .c .v{font-size:23px;font-family:var(--mono);margin-top:7px;color:var(--txt);letter-spacing:-.02em}
+.smm-strip2 .c .v.pos{color:var(--pos)}
+.smm-fmt-bar{height:10px;border-radius:6px;overflow:hidden;display:flex;background:var(--bg-3)}
+.smm-fmt-bar .seg{height:100%;transition:width .55s var(--ease-out)}
+.smm-fmt-leg{display:flex;gap:26px;margin-top:15px;flex-wrap:wrap}
+.smm-fmt-leg .it{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt-2)}
+.smm-fmt-leg .dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+.smm-fmt-leg .n{font-family:var(--mono);color:var(--txt)}
+.smm-slot{border:1px dashed var(--line-2);border-radius:var(--r);padding:28px;text-align:center;color:var(--txt-3);font-size:12px;font-family:var(--mono);letter-spacing:.02em;background:repeating-linear-gradient(135deg,transparent,transparent 11px,rgba(255,255,255,.012) 11px,rgba(255,255,255,.012) 22px)}
+
 
 .pd-top{display:flex;align-items:center;gap:14px;padding:17px 44px;border-bottom:1px solid var(--line);background:var(--bg-1);flex:0 0 auto}
 .pd-back{width:36px;height:36px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;transition:.16s var(--ease)}
@@ -4467,7 +4490,7 @@ function aggregateRubricsFromReels(payload){
 function openSMM(report){
   _smmCur=smmNormalize(report.payload);
   _smmMeta={id:report.id, title:report.title||'SMM-отчёт', date:_dDateFull(report.published_at)};
-  _smmTab='data'; _smmDirty=false;
+  _smmTab=smmHasData(report)?'preview':'data'; _smmDirty=false;
   document.getElementById('ov-smm').classList.add('on');
   smmRender();
 }
@@ -4489,7 +4512,7 @@ function smmRender(){
     +'<button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmSave(true)">Сохранить</button>'
     +'<button class="smm-mini-btn" onclick="smmClose()">Закрыть</button></div>'
     +'<div class="smm-tabs">'+tabs.map(t=>'<button class="'+(_smmTab===t[0]?'on':'')+'" onclick="smmTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</div>'
-    +'<div class="smm-body">'+(_smmTab==='data'?smmRenderData():smmRenderPreview())+'</div>'
+    +'<div class="smm-body">'+(_smmTab==='data'?smmRenderData():smmRenderPresentation())+'</div>'
     +'</div>';
 }
 
@@ -4631,15 +4654,65 @@ async function smmSave(viaButton){
   else if(viaButton){ toast('Нужен бэкенд (Supabase не подключён)'); }
 }
 
-function smmRenderPreview(){
-  const m=_smmCur.metrics;
-  const f=v=>v==null?'—':Number(v).toLocaleString('ru-RU'); const pc=v=>v==null?'—':(+v).toFixed(2)+'%';
-  const tiles=[['Охват Reels',f(m.reels_reach)],['Просмотры Reels',f(m.reels_views)],['ER',pc(m.er)],['Подписчики Δ',m.followers==null?'—':((m.followers>0?'+':'')+f(m.followers))],['Reels',_smmCur.reels.length||'—'],['Рубрик',_smmCur.rubrics.length||'—']];
-  return '<div class="smm-wrap"><div class="smm-sec"><div class="smm-sec-b">'
-    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden">'
-    +tiles.map(t=>'<div style="background:var(--bg-1);padding:18px 20px"><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3)">'+t[0]+'</div><div class="num" style="font-size:28px;margin-top:8px;color:var(--accent)">'+t[1]+'</div></div>').join('')
-    +'</div><div style="text-align:center;color:var(--txt-3);font-size:12px;margin-top:22px;font-family:var(--mono)">Полная презентация — зоны, сетка рилсов, рубрики-победители, выводы — Фаза 4–8</div>'
-    +'</div></div></div>';
+function smmFmtN(v){ return v==null?'—':Number(v).toLocaleString('ru-RU'); }
+function smmHasData(rep){
+  const pl=smmNormalize(rep&&rep.payload); const m=pl.metrics;
+  return !!((pl.reels&&pl.reels.length)||(pl.rubrics&&pl.rubrics.length)||Object.keys(m).some(k=>m[k]!=null));
+}
+function smmRenderPresentation(){
+  const m=_smmCur.metrics, p=_smmCur.prev, go=_smmCur.goals;
+  const totalReach=(m.reels_reach||0)+(m.stories_reach||0);
+  const reelsViews=m.reels_views||0;
+  const storiesViews=(m.stories_views!=null?m.stories_views:(m.stories_reach||0));
+  const totalViews=reelsViews+storiesViews;
+  const totalPubs=(m.reels_count||0)+(m.posts_count||0);
+  const hasReach=totalReach>0, hasViews=(reelsViews+storiesViews)>0;
+  const ez=smmZoneEval(m.er, go.er, p.er);
+  const ezCol=getSMMZoneColor(ez.zone);
+  const erVal=m.er==null?'—':(+m.er).toFixed(2)+'%';
+  const fol=m.followers, folStr=fol==null?'—':((fol>0?'+':'')+smmFmtN(fol));
+  const vTot=(reelsViews+storiesViews)||1;
+  const reelsP=hasViews?Math.round(reelsViews/vTot*100):0;
+  const storiesP=hasViews?100-reelsP:0;
+
+  const heroStats=[['Охват',hasReach?smmFmtN(totalReach):'—'],['Просмотры',hasViews?smmFmtN(totalViews):'—'],['Публикаций',totalPubs||'—']];
+  const strip=[
+    ['Reels', m.reels_count==null?'—':smmFmtN(m.reels_count)],
+    ['Сторис', m.stories_count==null?'—':smmFmtN(m.stories_count)],
+    ['Креативы', m.ad_creatives==null?'—':smmFmtN(m.ad_creatives)],
+    ['Частота', m.frequency==null?'—':(+m.frequency).toFixed(1)+'x'],
+    ['Подписчиков', m.subscribers_current==null?'—':smmFmtN(m.subscribers_current)],
+    ['Прирост', folStr, fol!=null&&fol>0],
+    ['Охват Reels', m.reels_reach==null?'—':smmFmtN(m.reels_reach)],
+    ['Охват Сторис', m.stories_reach==null?'—':smmFmtN(m.stories_reach)]
+  ];
+
+  return '<div class="smm-wrap smm-pres">'
+    +'<div class="smm-hero"><div class="hero-er"><div class="eyebrow">Вовлечённость периода (ER)</div>'
+    +'<div class="er-val" style="color:'+(m.er==null?'var(--txt-3)':ezCol)+'">'+erVal+'</div>'
+    +(ez.zone!=='none'
+      ?'<div class="er-zone" style="color:'+ezCol+'">'+ez.label+(ez.basis==='goal'&&go.er?(' · цель '+(+go.er).toFixed(2)+'%'):'')+'</div>'
+      :'<div class="er-zone" style="color:var(--txt-3)">нет цели и прошлого периода</div>')
+    +'</div><div class="hero-stats">'
+    +heroStats.map(s=>'<div class="hs"><div class="l">'+s[0]+'</div><div class="v">'+s[1]+'</div></div>').join('')
+    +'</div></div>'
+    +'<div class="smm-strip2">'
+    +strip.map(s=>'<div class="c"><div class="l">'+s[0]+'</div><div class="v'+(s[2]?' pos':'')+'">'+s[1]+'</div></div>').join('')
+    +'</div>'
+    +'<div class="smm-sec"><div class="smm-sec-h"><div class="t">Просмотры по форматам</div>'
+    +'<span style="font-size:11px;color:var(--txt-3);font-family:var(--mono)">'+(hasViews?smmFmtN(totalViews)+' всего':'нет данных')+'</span></div>'
+    +'<div class="smm-sec-b"><div class="smm-fmt-bar">'
+    +'<div class="seg" style="width:'+reelsP+'%;background:var(--accent)"></div>'
+    +'<div class="seg" style="width:'+storiesP+'%;background:var(--violet)"></div></div>'
+    +'<div class="smm-fmt-leg">'
+    +'<div class="it"><span class="dot" style="background:var(--accent)"></span>Reels · <span class="n">'+(hasViews?reelsP+'%':'—')+'</span> · '+smmFmtN(reelsViews)+'</div>'
+    +'<div class="it"><span class="dot" style="background:var(--violet)"></span>Сторис · <span class="n">'+(hasViews?storiesP+'%':'—')+'</span> · '+smmFmtN(storiesViews)+'</div>'
+    +'</div></div></div>'
+    +'<div id="smm-slot-metrics" class="smm-slot">Метрики с зонами (ER · LR · C/R · SH/R · SR) — Фаза 5</div>'
+    +'<div id="smm-slot-reels" class="smm-slot">Сетка рилсов — Фаза 6</div>'
+    +'<div id="smm-slot-rubrics" class="smm-slot">Рубрики-победители — Фаза 7</div>'
+    +'<div id="smm-slot-conclusions" class="smm-slot">Авто-выводы — Фаза 8</div>'
+    +'</div>';
 }
 function openReport(ty,d){
   d=d||{}; const isP=ty==='PERF'; const col=isP?'#37E6C8':'#8A8FFF';
