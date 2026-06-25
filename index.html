@@ -2096,6 +2096,43 @@ button:active{transform:translateY(.5px) scale(.99)}
 .mz-hi{background:linear-gradient(180deg,rgba(67,216,140,.06),transparent);border-top:1px solid rgba(67,216,140,.14)}
 @media(max-width:760px){.finx-toolbar{flex-direction:column;align-items:stretch}.finx-tools{align-self:flex-end}.finx-sub{flex-direction:column;align-items:flex-start;gap:9px}.finx-avg{border-left:0;padding-left:0}}
 
+
+/* === finance · «Куда уходит выручка» + Unit Economics — премиальная разбивка === */
+.alloc-bar{display:flex;height:18px;border-radius:7px;overflow:hidden;background:var(--bg-3);gap:2px}
+.alloc-seg{height:100%;min-width:3px;border-radius:3px;transition:filter .15s var(--ease)}
+.alloc-seg:hover{filter:brightness(1.2)}
+.alloc-legend{display:flex;gap:18px;margin-top:11px;font-size:11.5px;color:var(--txt-3);flex-wrap:wrap}
+.alloc-legend b{font-family:var(--mono);color:var(--txt-2);font-weight:600}
+.costlist{display:flex;flex-direction:column;gap:2px}
+.cost-row{padding:11px 12px;border-radius:9px;transition:background .14s var(--ease)}
+.cost-row:hover{background:var(--bg)}
+.cost-row.top{background:linear-gradient(90deg,rgba(227,181,103,.1),transparent 72%);box-shadow:inset 3px 0 0 var(--warn)}
+.cost-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.cost-name{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--txt);font-weight:500;min-width:0}
+.cost-name .wf-dot{width:8px;height:8px}
+.cost-pct{font-family:var(--mono);font-size:11px;color:var(--txt-3);margin-right:10px}
+.cost-big{font-family:var(--mono);font-size:13px;font-weight:600;white-space:nowrap}
+.cost-flag{font-size:8.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--warn);background:rgba(227,181,103,.14);padding:2px 7px;border-radius:5px;white-space:nowrap}
+.cost-bar{height:9px;background:var(--bg-3);border-radius:5px;overflow:hidden}
+.cost-bar i{display:block;height:100%;border-radius:5px;transform-origin:left;animation:costGrow .6s var(--ease-out) both}
+@keyframes costGrow{from{transform:scaleX(0)}}
+.cost-profit{margin-top:13px;padding-top:14px;border-top:1px solid var(--line)}
+/* Unit Economics */
+.ue{display:flex;flex-direction:column;height:100%}
+.ue-hero .l{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3);font-weight:500}
+.ue-hero .v{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1;margin-top:7px;display:flex;align-items:baseline;flex-wrap:wrap;gap:9px;font-feature-settings:"tnum" 1}
+.ue-hero .v .m{font-size:11px;font-weight:400;color:var(--txt-3);letter-spacing:0}
+.ue-split{height:16px;display:flex;border-radius:6px;overflow:hidden;background:var(--bg-3);margin:15px 0 6px;gap:2px}
+.ue-split>div{height:100%;border-radius:3px}
+.ue-split .cost{background:linear-gradient(90deg,#F0785C,#E0566A)}
+.ue-split .prof{background:linear-gradient(90deg,#43D88C,#37E6C8)}
+.ue-rows{display:flex;flex-direction:column;flex:1;justify-content:space-between;margin-top:16px}
+.ue-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.ue-row:last-child{border-bottom:0}
+.ue-row .k{font-size:13px;color:var(--txt-2);display:flex;align-items:center;gap:9px}
+.ue-row .k .d{width:8px;height:8px;border-radius:2px;flex:none}
+.ue-row .vv{font-family:var(--mono);font-size:13px;font-weight:600}
+
 </style>
 </head>
 <body>
@@ -6166,20 +6203,49 @@ function renderFinance(){
       <div class="card">
         <div class="card-h"><div class="t">Куда уходит выручка <span class="c">% от выручки</span></div></div>
         <div class="card-body">
-          <div class="wf-row"><div class="wf-top"><span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Выручка (MRR)</span><span class="num" style="color:var(--pos);font-size:13px">${money(F.totalMrr)}</span></div><div class="wf-bar"><i style="width:100%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></i></div></div>
-          <div class="eyebrow" style="margin:17px 0 9px">Расходы по статьям</div>
-          ${F.breakdown.length?F.breakdown.map(x=>`<div class="wf-row">
-            <div class="wf-top"><span class="wf-name"><span class="wf-dot" style="background:${x.color}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span></span>
-              <span style="white-space:nowrap"><span class="num" style="color:var(--neg);font-size:11.5px">${x.pct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="font-size:12.5px">${money(x.amount)}</span></span></div>
-            <div class="wf-bar"><i style="width:${F.totalMrr>0?Math.min(100,x.amount/F.totalMrr*100).toFixed(2):0}%;background:${x.color}"></i></div>
-          </div>`).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 0 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте.</div>'}
-          <div class="wf-row" style="margin-top:17px;padding-top:14px;border-top:1px solid var(--line)"><div class="wf-top"><span style="text-transform:uppercase;letter-spacing:.07em;font-size:11px;color:var(--txt-3)">Остаток (прибыль)</span><span style="white-space:nowrap"><span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:11.5px">${F.marginPct}%</span> <span style="color:var(--txt-3);margin:0 3px">|</span> <span class="num" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-size:13px;font-weight:700">${money(F.profit)}</span></span></div><div class="wf-bar"><i style="width:${Math.max(0,Math.min(100,F.marginPct)).toFixed(2)}%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></i></div></div>
+          ${(()=>{
+            const bd=F.breakdown||[], maxCost=bd.length?bd[0].amount:1;
+            const segs=bd.map(x=>`<div class="alloc-seg" title="${x.name}: ${x.pct}%" style="width:${F.totalMrr>0?(x.amount/F.totalMrr*100).toFixed(2):0}%;background:${x.color}"></div>`).join('')
+              + (F.profit>0?`<div class="alloc-seg" title="Прибыль: ${F.marginPct}%" style="width:${Math.max(0,F.marginPct).toFixed(2)}%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></div>`:'');
+            const rows=bd.length?bd.map((x,i)=>`<div class="cost-row${i===0?' top':''}">
+                <div class="cost-top">
+                  <span class="cost-name"><span class="wf-dot" style="background:${x.color}"></span>${x.name} <span class="tagx" style="font-size:9px;padding:1px 6px">${x.label}</span>${i===0?'<span class="cost-flag">съедает больше всего</span>':''}</span>
+                  <span style="white-space:nowrap;display:inline-flex;align-items:baseline"><span class="cost-pct">${x.pct}% выручки</span><span class="cost-big">${money(x.amount)}</span></span>
+                </div>
+                <div class="cost-bar"><i style="width:${maxCost>0?(x.amount/maxCost*100).toFixed(1):0}%;background:${x.color}"></i></div>
+              </div>`).join(''):'<div style="font-size:13px;color:var(--txt-3);padding:6px 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте.</div>';
+            return `
+              <div class="alloc-bar">${segs}</div>
+              <div class="alloc-legend"><span>Расходы <b>${F.costPct}%</b> · ${money(F.totalCost)}</span><span style="color:var(--pos)">Прибыль <b>${F.marginPct}%</b> · ${money(F.profit)}</span></div>
+              <div class="eyebrow" style="margin:18px 0 8px">Статьи расходов · кто съедает больше</div>
+              <div class="costlist">${rows}</div>
+              <div class="cost-profit">
+                <div class="cost-top" style="margin-bottom:9px">
+                  <span class="cost-name"><span class="wf-dot" style="background:#37E6C8"></span>Остаток · прибыль</span>
+                  <span style="white-space:nowrap;display:inline-flex;align-items:baseline"><span class="cost-pct">${F.marginPct}% выручки</span><span class="cost-big" style="color:${F.profit>=0?'var(--pos)':'var(--neg)'};font-weight:700">${money(F.profit)}</span></span>
+                </div>
+                <div class="cost-bar"><i style="width:${Math.max(0,Math.min(100,F.marginPct)).toFixed(1)}%;background:${F.profit>=0?'linear-gradient(90deg,#43D88C,#37E6C8)':'var(--neg)'}"></i></div>
+              </div>`;
+          })()}
         </div>
       </div>
       <div class="card" style="display:flex;flex-direction:column">
         <div class="card-h"><div class="t">Unit Economics <span class="c">на клиента</span></div></div>
-        <div class="card-body" style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
-          ${[['Выручка на клиента', money(F.avgMrr),'var(--txt)'],['Расходы на клиента', money(F.avgCost),'var(--neg)'],['Прибыль на клиента', (F.avgProfit>=0?'+':'')+money(F.avgProfit), F.avgProfit>=0?'var(--pos)':'var(--neg)'],['Часы на клиента', fmtHours(F.avgHours),'var(--txt-2)']].map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)"><span style="font-size:13px;color:var(--txt-2)">${u[0]}</span><span class="num" style="color:${u[2]};font-size:13px">${u[1]}</span></div>`).join('')}
+        <div class="card-body" style="flex:1;display:flex;flex-direction:column">
+          ${(()=>{
+            const r=Number(F.avgMrr)||0,c=Number(F.avgCost)||0,pr=Number(F.avgProfit)||0;
+            const cw=r>0?Math.max(0,Math.min(100,c/r*100)):0, pw=r>0?Math.max(0,Math.min(100,pr/r*100)):0, m=r>0?Math.round(pr/r*100):0;
+            return `<div class="ue">
+              <div class="ue-hero"><div class="l">Прибыль на клиента</div><div class="v" style="color:${pr>=0?'var(--pos)':'var(--neg)'}">${(pr>=0?'+':'')+money(pr)}<span class="m">маржа ${m}%</span></div></div>
+              <div class="ue-split"><div class="cost" style="width:${cw.toFixed(1)}%"></div><div class="prof" style="width:${pw.toFixed(1)}%"></div></div>
+              <div class="ue-rows">
+                <div class="ue-row"><span class="k"><span class="d" style="background:var(--txt-3)"></span>Выручка на клиента</span><span class="vv">${money(r)}</span></div>
+                <div class="ue-row"><span class="k"><span class="d" style="background:var(--neg)"></span>Расходы на клиента</span><span class="vv" style="color:var(--neg)">${money(c)}</span></div>
+                <div class="ue-row"><span class="k"><span class="d" style="background:var(--pos)"></span>Прибыль на клиента</span><span class="vv" style="color:${pr>=0?'var(--pos)':'var(--neg)'}">${(pr>=0?'+':'')+money(pr)}</span></div>
+                <div class="ue-row"><span class="k"><span class="d" style="background:var(--line-2)"></span>Часы на клиента</span><span class="vv" style="color:var(--txt-2)">${fmtHours(F.avgHours)}</span></div>
+              </div>
+            </div>`;
+          })()}
         </div>
       </div>
     </div>
