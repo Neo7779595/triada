@@ -181,6 +181,16 @@ tbody tr:hover td{background:var(--bg-2)}
 .fld-go{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:none;background:var(--accent-dim);color:var(--accent);border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
 .fld-go:hover{background:var(--accent);color:var(--accent-ink)}
 .fld-go:active{transform:translateY(-50%) scale(.94)}
+.pm-row{margin:2px 0}
+.pm-toggle{display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border:1px solid var(--line-2);border-radius:10px;background:var(--bg);cursor:pointer;transition:.15s}
+.pm-toggle:hover{border-color:var(--accent-line)}
+.pm-toggle input{position:absolute;opacity:0;pointer-events:none}
+.pm-tg-box{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--line-2);background:var(--bg-2);display:flex;align-items:center;justify-content:center;color:transparent;transition:.15s;margin-top:1px}
+.pm-tg-box svg{width:14px;height:14px}
+.pm-toggle input:checked~.pm-tg-box{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pm-tg-txt{display:flex;flex-direction:column;gap:3px}
+.pm-tg-txt b{font-size:13px;font-weight:600;color:var(--txt)}
+.pm-tg-txt em{font-size:11px;font-style:normal;color:var(--txt-3);line-height:1.4}
 .modal-f{padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--line);margin-top:8px}
 .modal-f .btn-ghost,.modal-f .btn-add{height:42px;min-width:126px;display:inline-flex;align-items:center;justify-content:center;padding:0 18px;font-size:13px;border-radius:9px}
 .btn-ghost{background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-2);border-radius:8px;padding:10px 18px;font-weight:600;font-size:13px;cursor:pointer}
@@ -2284,6 +2294,13 @@ button:active{transform:translateY(.5px) scale(.99)}
           </div>
         </div>
       </div>
+      <div class="fld pm-row">
+        <label class="pm-toggle">
+          <input type="checkbox" id="e-pm" onchange="empPM=this.checked">
+          <span class="pm-tg-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+          <span class="pm-tg-txt"><b>Проектный менеджер (PM)</b><em>Создаёт, редактирует и удаляет проекты, управляет этапами, назначает любого исполнителя</em></span>
+        </label>
+      </div>
       <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
       <div class="fld2">
         <div class="fld"><label>Логин</label><input id="e-login" placeholder="ivan"><div class="hint" id="e-email">ivan@detroyd.triada.app</div></div>
@@ -2836,6 +2853,12 @@ function agIsOwner(){
   const me=(window.tMe&&window.tMe())||null;
   return !me || me.role!=='member';                   // управлять командой может только владелец/админ
 }
+function agIsPM(){
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me || me.role!=='member') return true;          // владелец/админ — всегда PM по правам
+  return !!me.is_pm;                                   // сотрудник — только с отметкой PM
+}
+function agMyId(){ const me=(window.tMe&&window.tMe())||null; return me?me.id:null; }
 function _syncUchip(){
   const me=(window.tMe&&window.tMe())||null; if(!me) return;
   const nm=document.getElementById('ag-uchip-nm');
@@ -2981,7 +3004,7 @@ function pjDoReactivate(){
   })();
 }
 function pjDeleteProject(i){ const p=PROJECTS[i];
-  if(!agIsOwner()){ toast('Удаление проекта доступно только владельцу'); return; }
+  if(!agIsPM()){ toast('Удаление проектов доступно только PM'); return; }
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Удалить проект?</h3><p>${p.name} · вместе с этапами, задачами, отчётами</p></div>
     <div class="modal-b"><div style="font-size:13px;color:var(--txt-2);line-height:1.55">Действие необратимо: удалятся все этапы, задачи, отчёты и история проекта. Клиентский аккаунт сохранится.</div></div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" style="background:var(--neg);color:#fff" onclick="${window.LIVE?`window.tProjectDelete('${p.id}')`:`pd2Close()`}">Удалить</button></div></div>`);
@@ -3036,6 +3059,7 @@ function setAgFilter(f){agFilter=f;renderProjects();}
 
 /* ——— create project (mirrors projSettings shape) ——— */
 function openNewProject(){
+  if(!agIsPM()){ toast('Создавать проекты могут только PM'); return; }
   const cats=_tagList('category',[],'');
   const svcs=_tagList('service',['SMM','PROD','DESIGN'],'');
   const tariffs=_tagList('tariff',['Platinum','Gold','Silver'],'');
@@ -3075,6 +3099,7 @@ function openNewProject(){
   setTimeout(()=>{npStagesReload();npTeamReset();npContractInit();const n=document.getElementById('np-name');if(n)n.focus();},30);
 }
 function npSaveProject(){
+  if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } 
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
   const svc=_v('np-svc')||'SMM';
   const tariff=_v('np-tariff')||null;
@@ -3852,11 +3877,11 @@ function pdNewStage(){
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddStage()">Создать</button></div></div>`);
 }
-function pdAddStage(){ const name=_v('pd2-name'); if(!name){toast('Введи название этапа');return;}
+function pdAddStage(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const name=_v('pd2-name'); if(!name){toast('Введи название этапа');return;}
   const S=PROJECTS[pdIdx]._stages||[]; const idx=S.length?Math.max(...S.map(s=>s.idx||0))+1:0;
   if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,idx}); }
-function pdStageDel(id){ if(window.tStageDel) window.tStageDel(id); }
-function pdSeedStages(){ const names=stageSetFor(PROJECTS[pdIdx].svc); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
+function pdStageDel(id){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } if(window.tStageDel) window.tStageDel(id); }
+function pdSeedStages(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const names=stageSetFor(PROJECTS[pdIdx].svc); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
 let pdNewSt='wait';
 async function pdNewTask(st){
   pdNewSt=st||'wait';
@@ -3870,7 +3895,7 @@ async function pdNewTask(st){
     return;
   }
   const stArr=active.map(s=>[s.id, s.name]);
-  const teamArr=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]);
+  const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
@@ -3893,7 +3918,7 @@ async function pdTaskEdit(id){
   const t=(p._tasks||[]).find(x=>x.id===id); if(!t){toast('Задача не найдена');return;}
   let stArr=(p._stages||[]).filter(s=>s.status==='active').map(s=>[s.id,s.name]);
   if(t.stage_id && !stArr.some(x=>x[0]===t.stage_id)){ const cur=(p._stages||[]).find(s=>s.id===t.stage_id); if(cur) stArr.unshift([cur.id,cur.name+' · завершён']); }
-  const teamArr=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]);
+  const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Редактировать задачу</h3><p>${p.name} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" value="${_attr(t.title)}" placeholder="напр. Смонтировать ролик"></div>
@@ -4323,6 +4348,7 @@ function pdEditStage(id){
   </div>`);
 }
 function pdSaveStage(id){
+  if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } 
   const patch={ name:_v('pd2-name')||'Этап', status:pd2St, due_date:_v('pd2-date')||null, link:_v('pd2-link')||null, note:_v('pd2-note')||null };
   if(window.tStageSave) window.tStageSave(id,patch);
 }
@@ -6138,7 +6164,7 @@ function renderFinance(){
 }
 
 /* ——— TEAM module ——— */
-let teamTab='employees', empColor=ACCENTS[0], empPerms={}, empEditIdx=null;
+let teamTab='employees', empColor=ACCENTS[0], empPerms={}, empEditIdx=null, empPM=false;
 let TEAM=[
   {name:'Абдурауф',role:'Дизайнер',dept:'Продакшн',color:'#37E6C8',cycle:'2,3 д',inwork:'4ч 49м',d7:'1',d30:'6',rework:16,eff:87},
   {name:'Шожахон',role:'SMM-менеджер',dept:'Продакшн',color:'#8A8FFF',cycle:'< 1 ч',inwork:'1 мин',d7:'—',d30:'2',rework:38,eff:79},
@@ -6475,7 +6501,7 @@ function openEmp(){
   empEditIdx=null;
   empPerms={};
   ['projects','deadlines','overview','cycles','finance','team','kb','tools'].forEach(k=>empPerms[k]={view:false,edit:false});
-  empColor=ACCENTS[0];
+  empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; }
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass','phone','tg'].forEach(id=>document.getElementById('e-'+id).value='');
   document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Отдел',_tagList('dept',['Продакшн','Администрация','Руководство'],'Продакшн'),'Продакшн','Выбери или создай','dept');
@@ -6498,6 +6524,7 @@ function openEmpEdit(i){
   document.getElementById('e-pass').value='';
   document.getElementById('e-phone').value=e.phone||'';
   document.getElementById('e-tg').value=e.tg||e.tg_username||'';
+  empPM=!!e.is_pm; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=empPM; }
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Редактировать сотрудника';
   document.getElementById('emp-save').textContent='Сохранить изменения';
@@ -6518,10 +6545,10 @@ function saveEmp(){
   const phone=document.getElementById('e-phone').value.trim();
   const tg=document.getElementById('e-tg').value.trim();
   const mods=Object.keys(empPerms).filter(k=>empPerms[k].view).length;
-  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
+  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
   if(empEditIdx!=null){
     const e=TEAM[empEditIdx];
-    Object.assign(e,{name,role,dept,color:empColor,phone,tg,perms:JSON.parse(JSON.stringify(empPerms))});
+    Object.assign(e,{name,role,dept,color:empColor,phone,tg,is_pm:empPM,perms:JSON.parse(JSON.stringify(empPerms))});
     if(login)e.login=login;
     closeEmp(); teamTab='employees'; renderTeam();
     toast(`${name} обновлён · доступ к ${mods} модулям`);
@@ -7086,7 +7113,7 @@ const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]|
   dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
-  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', perms:m.permissions||{}, _id:m.id });
+  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, perms:m.permissions||{}, _id:m.id });
 
 async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
@@ -8034,7 +8061,7 @@ window.tProvisionClient = async (c) => {
 window.tProvisionMember = async (m) => {
   try { await SB.functions.invoke('provision-member', { body:{
       email:(m.login||'user')+'@'+(m.slug||'agency')+'.triada.app', password:m.pass, login:m.login,
-      full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, phone:m.phone||null, tg_username:m.tg_username||null, permissions:m.permissions }});
+      full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, phone:m.phone||null, tg_username:m.tg_username||null, is_pm:!!m.is_pm, permissions:m.permissions }});
     toast('Сотрудник создан'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
@@ -8050,6 +8077,7 @@ window.tUpdateMember = async (id, perms, contact={}) => {
     if (contact.tg_username!==undefined) upd.tg_username = contact.tg_username||null;
     if (contact.color!==undefined) upd.color = contact.color;
     if (contact.role_title!==undefined) upd.role_title = contact.role_title;
+    if (contact.is_pm!==undefined) upd.is_pm = !!contact.is_pm;
     await SB.from('profiles').update(upd).eq('id', id);
     toast('Сотрудник обновлён'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
