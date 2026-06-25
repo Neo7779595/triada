@@ -173,9 +173,14 @@ tbody tr:hover td{background:var(--bg-2)}
 .fld input:focus,.fld select:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .fld .hint{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);margin-top:6px}
 .fld2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.swatches{display:flex;gap:9px;margin-top:2px}
-.sw{width:26px;height:26px;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:.14s}
+.swatches{display:flex;gap:7px;align-items:center;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:0 12px;height:43px}
+.sw{width:18px;height:18px;border-radius:5px;cursor:pointer;border:2px solid transparent;transition:.14s;flex:none}
 .sw.on{border-color:#fff;transform:scale(1.08)}
+.fld-act{position:relative}
+.fld-act input{padding-right:42px!important}
+.fld-go{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:none;background:var(--accent-dim);color:var(--accent);border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.fld-go:hover{background:var(--accent);color:var(--accent-ink)}
+.fld-go:active{transform:translateY(-50%) scale(.94)}
 .modal-f{padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--line);margin-top:8px}
 .modal-f .btn-ghost,.modal-f .btn-add{height:42px;min-width:126px;display:inline-flex;align-items:center;justify-content:center;padding:0 18px;font-size:13px;border-radius:9px}
 .btn-ghost{background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-2);border-radius:8px;padding:10px 18px;font-weight:600;font-size:13px;cursor:pointer}
@@ -2266,6 +2271,18 @@ button:active{transform:translateY(.5px) scale(.99)}
       <div class="fld2">
         <div id="e-dept-host"></div>
         <div class="fld"><label>Цвет</label><div class="swatches" id="e-sw"></div></div>
+      </div>
+      <div class="fld2">
+        <div class="fld"><label>Номер телефона</label>
+          <div class="fld-act"><input id="e-phone" placeholder="+998 90 123 45 67">
+            <button type="button" class="fld-go" onclick="empOpenPhone()" title="Позвонить"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z"/></svg></button>
+          </div>
+        </div>
+        <div class="fld"><label>Телеграм</label>
+          <div class="fld-act"><input id="e-tg" placeholder="@username или ссылка">
+            <button type="button" class="fld-go" onclick="empOpenTg()" title="Открыть Telegram"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg></button>
+          </div>
+        </div>
       </div>
       <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
       <div class="fld2">
@@ -6460,7 +6477,7 @@ function openEmp(){
   ['projects','deadlines','overview','cycles','finance','team','kb','tools'].forEach(k=>empPerms[k]={view:false,edit:false});
   empColor=ACCENTS[0];
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
-  ['name','role','login','pass'].forEach(id=>document.getElementById('e-'+id).value='');
+  ['name','role','login','pass','phone','tg'].forEach(id=>document.getElementById('e-'+id).value='');
   document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Отдел',_tagList('dept',['Продакшн','Администрация','Руководство'],'Продакшн'),'Продакшн','Выбери или создай','dept');
   document.getElementById('e-email').textContent='ivan@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Новый сотрудник';
@@ -6479,6 +6496,8 @@ function openEmpEdit(i){
   var _ed=e.dept||'Продакшн'; document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Отдел',_tagList('dept',['Продакшн','Администрация','Руководство'],_ed),_ed,'Выбери или создай','dept');
   document.getElementById('e-login').value=e.login||'';
   document.getElementById('e-pass').value='';
+  document.getElementById('e-phone').value=e.phone||'';
+  document.getElementById('e-tg').value=e.tg||e.tg_username||'';
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Редактировать сотрудника';
   document.getElementById('emp-save').textContent='Сохранить изменения';
@@ -6486,23 +6505,30 @@ function openEmpEdit(i){
   document.getElementById('ov-emp').classList.add('on');
 }
 function closeEmp(){document.getElementById('ov-emp').classList.remove('on');empEditIdx=null;}
+function _tgUrl(v){ v=(v||'').trim(); if(!v) return ''; if(/^https?:\/\//i.test(v)) return v; v=v.replace(/^@/,'').replace(/^(https?:\/\/)?t\.me\//i,''); return v?('https://t.me/'+v):''; }
+function _phoneUrl(v){ v=(v||'').trim(); if(!v) return ''; const c=v.replace(/[^\d+]/g,''); return c?('tel:'+c):''; }
+function empOpenTg(){ const u=_tgUrl(document.getElementById('e-tg').value); if(!u){ toast('Укажите телеграм сотрудника'); return; } window.open(u,'_blank','noopener'); }
+function empOpenPhone(){ const u=_phoneUrl(document.getElementById('e-phone').value); if(!u){ toast('Укажите номер телефона'); return; } window.location.href=u; }
+window.empOpenTg=empOpenTg; window.empOpenPhone=empOpenPhone;
 function saveEmp(){
   const name=document.getElementById('e-name').value.trim(); if(!name){toast('Введи имя сотрудника');return;}
   const role=document.getElementById('e-role').value.trim()||'Сотрудник';
   const dept=document.getElementById('e-dept').value;
   const login=document.getElementById('e-login').value.trim();
+  const phone=document.getElementById('e-phone').value.trim();
+  const tg=document.getElementById('e-tg').value.trim();
   const mods=Object.keys(empPerms).filter(k=>empPerms[k].view).length;
-  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMemberPerms(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms))); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
+  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
   if(empEditIdx!=null){
     const e=TEAM[empEditIdx];
-    Object.assign(e,{name,role,dept,color:empColor,perms:JSON.parse(JSON.stringify(empPerms))});
+    Object.assign(e,{name,role,dept,color:empColor,phone,tg,perms:JSON.parse(JSON.stringify(empPerms))});
     if(login)e.login=login;
     closeEmp(); teamTab='employees'; renderTeam();
     toast(`${name} обновлён · доступ к ${mods} модулям`);
     return;
   }
   if(!login){toast('Задай логин сотруднику');return;}
-  TEAM.push({name,role,dept,color:empColor,cycle:'—',inwork:'—',d7:'—',d30:'—',rework:0,eff:null,login,perms:JSON.parse(JSON.stringify(empPerms))});
+  TEAM.push({name,role,dept,color:empColor,phone,tg,cycle:'—',inwork:'—',d7:'—',d30:'—',rework:0,eff:null,login,perms:JSON.parse(JSON.stringify(empPerms))});
   closeEmp(); teamTab='employees'; renderTeam();
   toast(`${name} создан · доступ к ${mods} модулям · логин ${login} выдан`);
 }
@@ -7060,7 +7086,7 @@ const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]|
   dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
-  login:m.login||'', perms:m.permissions||{}, _id:m.id });
+  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', perms:m.permissions||{}, _id:m.id });
 
 async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
@@ -8008,13 +8034,24 @@ window.tProvisionClient = async (c) => {
 window.tProvisionMember = async (m) => {
   try { await SB.functions.invoke('provision-member', { body:{
       email:(m.login||'user')+'@'+(m.slug||'agency')+'.triada.app', password:m.pass, login:m.login,
-      full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, permissions:m.permissions }});
+      full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, phone:m.phone||null, tg_username:m.tg_username||null, permissions:m.permissions }});
     toast('Сотрудник создан'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tUpdateMemberPerms = async (id, perms) => {
   try { await SB.from('profiles').update({ permissions: perms }).eq('id', id);
     toast('Доступы обновлены'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tUpdateMember = async (id, perms, contact={}) => {
+  try {
+    const upd = { permissions: perms };
+    if (contact.phone!==undefined) upd.phone = contact.phone||null;
+    if (contact.tg_username!==undefined) upd.tg_username = contact.tg_username||null;
+    if (contact.color!==undefined) upd.color = contact.color;
+    if (contact.role_title!==undefined) upd.role_title = contact.role_title;
+    await SB.from('profiles').update(upd).eq('id', id);
+    toast('Сотрудник обновлён'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tKbAdd = async (cat, title, ty, url) => {
