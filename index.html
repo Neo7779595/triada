@@ -2359,8 +2359,10 @@ button:active{transform:translateY(.5px) scale(.99)}
 .es-id h3{font-size:18px;font-weight:700;letter-spacing:-.01em}
 .es-id p{font-size:12px;color:var(--txt-3);margin-top:4px;font-family:var(--mono)}
 .es-eyebrow{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin:6px 0 14px}
-.es-chart{display:flex;flex-direction:column;gap:11px;max-height:46vh;overflow-y:auto;margin:0 -4px;padding:0 4px 2px}
-.es-row{display:grid;grid-template-columns:minmax(0,1fr) 1.15fr auto;align-items:center;gap:16px}
+.es-chart{display:flex;flex-direction:column;gap:0;max-height:500px;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.es-chart::-webkit-scrollbar{width:6px}.es-chart::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+.es-row{display:grid;grid-template-columns:minmax(0,1fr) 1.15fr auto;align-items:center;gap:16px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.es-row:last-child{border-bottom:0}
 .es-tk{min-width:0}
 .es-tnm{font-size:13px;color:var(--txt);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .es-tpr{font-size:10px;color:var(--txt-3);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
@@ -2371,7 +2373,8 @@ button:active{transform:translateY(.5px) scale(.99)}
 .es-cols>div:first-child{padding-right:22px}
 .es-cols>div:last-child{border-left:1px solid var(--line);padding-left:22px}
 .es-ch{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
-.es-ch.green{color:var(--pos)} .es-ch.amber{color:var(--warn)}
+.es-ch.green{color:var(--pos)} .es-ch.red{color:var(--neg)}
+.es-ch svg{flex:none}
 .es-cr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
 .es-cr:last-child{border-bottom:0}
 .es-crn{font-size:12.5px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -7248,15 +7251,18 @@ function openEmpStats(id){
   let ov=document.getElementById('ov-estats');
   if(!ov){ ov=document.createElement('div'); ov.id='ov-estats'; ov.className='ov'; ov.addEventListener('click',e=>{ if(e.target===ov) closeEmpStats(); }); document.body.appendChild(ov); }
   const av=(typeof logoFill==='function')?logoFill(m.avatar,((m.name||'?')[0]||'?').toUpperCase()):((m.name||'?')[0]||'?').toUpperCase();
-  const chart=timed.map(t=>{ const isMax=(t.sec===maxSec&&timed.length>1), isMin=(t.sec===minSec&&timed.length>1);
-    const col=isMax?'linear-gradient(90deg,#C9A24E,#E3B567)':(isMin?'linear-gradient(90deg,#43D88C,#37E6C8)':'linear-gradient(90deg,#37E6C8,#5BE9D0)');
-    const tc=isMax?'var(--warn)':(isMin?'var(--pos)':'var(--txt)');
-    return '<div class="es-row"><div class="es-tk"><div class="es-tnm">'+esc(t.title)+'</div>'+(t.project?'<div class="es-tpr">'+esc(t.project)+'</div>':'')+'</div><div class="es-bar"><i style="width:'+(t.sec/maxSec*100).toFixed(1)+'%;background:'+col+'"></i></div><div class="es-tm" style="color:'+tc+'">'+_cycDur(t.sec*1000)+'</div></div>'; }).join('');
-  const crow=t=>'<div class="es-cr"><span class="es-crn">'+esc(t.title)+'</span><span class="es-crv">'+_cycDur(t.sec*1000)+'</span></div>';
+  const _L=(a,b,t)=>Math.round(a+(b-a)*t);
+  const _heat=f=>{ const R=[224,86,106],A=[227,181,103],G=[67,216,140]; let c; if(f<0.5){const t=f/0.5;c=[_L(R[0],A[0],t),_L(R[1],A[1],t),_L(R[2],A[2],t)];}else{const t=(f-0.5)/0.5;c=[_L(A[0],G[0],t),_L(A[1],G[1],t),_L(A[2],G[2],t)];} return c; };
+  const _rgb=c=>'rgb('+c[0]+','+c[1]+','+c[2]+')', _rgbl=c=>'rgb('+Math.min(255,c[0]+34)+','+Math.min(255,c[1]+34)+','+Math.min(255,c[2]+34)+')';
+  const chart=timed.map((t,idx)=>{ const f=timed.length>1?(idx/(timed.length-1)):1; const c=_heat(f);
+    return '<div class="es-row"><div class="es-tk"><div class="es-tnm">'+esc(t.title)+'</div>'+(t.project?'<div class="es-tpr">'+esc(t.project)+'</div>':'')+'</div><div class="es-bar"><i style="width:'+(t.sec/maxSec*100).toFixed(1)+'%;background:linear-gradient(90deg,'+_rgb(c)+','+_rgbl(c)+')"></i></div><div class="es-tm" style="color:'+_rgb(c)+'">'+_cycDur(t.sec*1000)+'</div></div>'; }).join('');
+  const crow=(t,c)=>'<div class="es-cr"><span class="es-crn">'+esc(t.title)+'</span><span class="es-crv" style="color:'+c+'">'+_cycDur(t.sec*1000)+'</span></div>';
+  const _icoFast='<svg viewBox="0 0 24 24" width="12" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>';
+  const _icoSlow='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l3 2"></path></svg>';
   const body = !timed.length
     ? '<div class="es-empty">У сотрудника пока нет закрытых задач с замером времени.<br>Данные появятся, когда задачи с трекингом перейдут в «Готово».</div>'
     : '<div class="es-eyebrow">Время по закрытым задачам · '+timed.length+'</div><div class="es-chart">'+chart+'</div>'+
-      (timed.length>=2?'<div class="es-cols"><div><div class="es-ch green">⚡ Быстрее всего</div>'+fastest.map(crow).join('')+'</div><div><div class="es-ch amber">⏳ Дольше всего</div>'+slowest.map(crow).join('')+'</div></div>':'');
+      (timed.length>=2?'<div class="es-cols"><div><div class="es-ch green">'+_icoFast+' Быстрее всего</div>'+fastest.map(t=>crow(t,'var(--pos)')).join('')+'</div><div><div class="es-ch red">'+_icoSlow+' Дольше всего</div>'+slowest.map(t=>crow(t,'var(--neg)')).join('')+'</div></div>':'');
   ov.innerHTML='<div class="modal es" style="max-width:680px"><div class="modal-h es-h"><div class="es-id"><span class="es-av" style="background:'+(m.color||'var(--accent)')+'">'+av+'</span><div><h3>'+esc(m.name)+'</h3><p>'+(m.role_title?esc(m.role_title)+' · ':'')+done.length+' '+_plural(done.length,'задача','задачи','задач')+' закрыто'+(timed.length?' · всего '+_cycDur(totalSec*1000)+' · ср. '+_cycDur(avgSec*1000):'')+'</p></div></div></div><div class="modal-b">'+body+'</div><div class="modal-f"><button class="btn-ghost" onclick="closeEmpStats()">Закрыть</button></div></div>';
   requestAnimationFrame(()=>ov.classList.add('on'));
 }
