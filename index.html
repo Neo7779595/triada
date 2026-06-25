@@ -424,7 +424,8 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .wlx-kicker::before{content:"";width:18px;height:2px;background:var(--accent);border-radius:2px}
 .wlx-title{font-size:18px;font-weight:700;letter-spacing:-.02em;line-height:1.32;max-width:780px}
 .wlx-sub{font-size:12.5px;color:var(--txt-2);margin-top:7px}
-.wlx-sum{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.wlx-sum{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+@media(max-width:880px){.wlx-sum{grid-template-columns:1fr 1fr}}
 .wlx-s{background:var(--bg-1);padding:16px 18px;display:flex;flex-direction:column;gap:6px}
 .wlx-s .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:baseline;gap:8px;line-height:1}
 .wlx-s .v small{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--txt-3)}
@@ -2335,6 +2336,17 @@ button:active{transform:translateY(.5px) scale(.99)}
 .drill-val b{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--txt)}
 .drill-val em{font-family:var(--mono);font-size:10.5px;font-style:normal;color:var(--txt-3)}
 @media(max-width:560px){.drill-row{grid-template-columns:1fr auto;gap:5px 12px}.drill-bar{display:none}}
+
+
+/* === merge: «Время в работе» по сотруднику в таблице По сотрудникам === */
+.wlx-tcell{display:flex;align-items:center;gap:13px;justify-content:flex-end}
+.wlx-tbar{flex:1;max-width:140px;min-width:46px;height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden}
+.wlx-tbar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),#5BE9D0);transform-origin:left;animation:growBar .85s var(--ease-out) both}
+.wlx-tinfo{text-align:right;min-width:60px;line-height:1.25}
+.wlx-tval{display:block;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);font-feature-settings:"tnum" 1;white-space:nowrap}
+.wlx-tavg{font-family:var(--mono);font-size:10px;color:var(--txt-3);white-space:nowrap}
+.wlx-tbl th:last-child,.wlx-tbl td:last-child{text-align:right;padding-right:18px}
+@media(max-width:880px){.wlx-tbar{display:none}.wlx-tinfo{min-width:auto}}
 
 </style>
 </head>
@@ -6244,17 +6256,6 @@ function renderCycles(){
             </div>
           </div>
         </div>
-        <div style="margin-top:16px">
-          <div class="eyebrow" style="margin-bottom:10px">Нагрузка по исполнителям</div>
-          <div class="wk-team">
-            ${C.workByAsg.map((a,i)=>`<div class="wk-tcell" style="animation-delay:${i*40}ms">
-              <div class="rev-nm">${_ddH(a.name)}</div>
-              <div style="font-weight:800;font-size:16px;color:var(--accent);margin:5px 0;font-variant-numeric:tabular-nums">${_cycDur(a.total*1000)}</div>
-              <div class="rev-sub">${a.count} задач · ${a.share}% времени</div>
-              <div class="rev-sub">в среднем ${_cycDur(a.avg*1000)}</div>
-            </div>`).join('')}
-          </div>
-        </div>
       `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.6">Пока нет задач с отработанным временем.<br>Данные появятся, когда команда начнёт работать над задачами в колонке «В работе».</div>`}
       </div>
     </div>
@@ -7057,17 +7058,22 @@ function renderTeam(){
     const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
     const TOT=W+I+D, shareOf=v=>TOT?Math.round(100*v/TOT):0;
     const sorted=[...TEAM].sort((a,b)=>((b._wait||0)+(b._active||0)+(b._done||0))-((a._wait||0)+(a._active||0)+(a._done||0)));
+    const _wbn={}; (typeof CYCLES!=='undefined'&&CYCLES.workByAsg?CYCLES.workByAsg:[]).forEach(a=>{ _wbn[a.name]={sec:a.total,cnt:a.count}; });
+    const _wsec=e=>{ if(e._workSec!=null&&e._workSec>0) return {sec:e._workSec,cnt:e._workCnt||0}; const f=_wbn[e.name]; return f?{sec:f.sec,cnt:f.cnt}:{sec:0,cnt:0}; };
+    const _maxWork=Math.max(1,...sorted.map(e=>_wsec(e).sec)), _totWork=sorted.reduce((s,e)=>s+_wsec(e).sec,0);
+    const _wcell=e=>{ const wd=_wsec(e); if(wd.sec<=0) return '<span class="wlx-cell z">—</span>'; const wavg=wd.cnt?Math.round(wd.sec/wd.cnt):0; const w=(wd.sec/_maxWork*100).toFixed(1); return '<div class="wlx-tcell"><div class="wlx-tbar"><i style="width:'+w+'%"></i></div><div class="wlx-tinfo"><span class="wlx-tval">'+_cycDur(wd.sec*1000)+'</span><span class="wlx-tavg">ср. '+_cycDur(wavg*1000)+'</span></div></div>'; };
     const cell=(v,dim,col)=> v>0?`<span class="wlx-cell" style="background:${dim};color:${col}">${v}</span>`:'<span class="wlx-cell z">—</span>';
     body=`
       <div class="wlx-sum">
         <div class="wlx-s"><div class="v" style="color:var(--warn)">${W}<small>${shareOf(W)}%</small></div><div class="l"><span class="dt" style="background:var(--warn)"></span>В ожидании</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--accent)">${I}<small>${shareOf(I)}%</small></div><div class="l"><span class="dt" style="background:var(--accent)"></span>В работе</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--pos)">${D}<small>${shareOf(D)}%</small></div><div class="l"><span class="dt" style="background:var(--pos)"></span>Завершено</div></div>
+        <div class="wlx-s"><div class="v" style="color:var(--accent)">${_totWork>0?_cycDur(_totWork*1000):'—'}</div><div class="l"><span class="dt" style="background:var(--accent)"></span>Время в работе · всего</div></div>
       </div>
       <div class="card">
         <div class="wlx-cardh"><span>По сотрудникам</span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
         <table class="wlx-tbl">
-          <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th></tr></thead>
+          <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th><th>Время в работе</th></tr></thead>
           <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d,tt=t||1;
             const dist=[[w,'var(--warn)'],[a,'var(--accent)'],[d,'var(--pos)']].map(([v,c])=>v>0?`<i style="width:${(v/tt*100).toFixed(1)}%;background:${c}"></i>`:'').join('');
             return `<tr>
@@ -7077,7 +7083,8 @@ function renderTeam(){
               <td>${cell(a,'var(--accent-dim)','var(--accent)')}</td>
               <td>${cell(d,'var(--pos-dim)','var(--pos)')}</td>
               <td><span class="wlx-tot">${t}</span></td>
-            </tr>`;}).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--txt-3);padding:28px">Нет данных</td></tr>'}</tbody>
+              <td>${_wcell(e)}</td>
+            </tr>`;}).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--txt-3);padding:28px">Нет данных</td></tr>'}</tbody>
         </table>
       </div>`;
   } else {
@@ -8399,7 +8406,7 @@ window.tLoadTeam = async () => {
   const today = new Date(); today.setHours(0,0,0,0);
   const iso30 = new Date(now - 30*86400000).toISOString();
   const [tr, hr, thr, pr] = await Promise.all([
-    SB.from('project_tasks').select('id,assignee_id,project_id,status,due_date'),
+    SB.from('project_tasks').select('id,assignee_id,project_id,status,due_date,time_spent,timer_started'),
     SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at'),
     SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at'),
     SB.from('projects').select('id,status')
@@ -8411,9 +8418,10 @@ window.tLoadTeam = async () => {
   window._teamRaw = { tasks, hist, taskHist, taskDue, loadedAt: now };
   const rank = { wait:0, active:1, done:2 };
   const stat = {};
-  const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null });
+  const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 });
 
   tasks.forEach(t => { if (!t.assignee_id) return; const a = S(t.assignee_id); a.assigned++;
+    { const _ws=(t.time_spent||0)+((t.timer_started&&t.status==='active')?Math.max(0,Math.round((now-new Date(t.timer_started).getTime())/1000)):0); if(_ws>0){ a.worksec+=_ws; a.workcnt++; } }
     if (t.status==='done') a.done++;
     else { a.open++; if (t.status==='wait') a.wait++; if (t.status==='active') a.active++;
       if (t.due_date && new Date(t.due_date+'T00:00:00') < today) a.overdue++; } });
@@ -8445,8 +8453,9 @@ window.tLoadTeam = async () => {
 
   let tA=0, tO=0, tOv=0, tV=0;
   (typeof TEAM!=='undefined'?TEAM:[]).forEach(m => {
-    const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null };
+    const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 };
     m._assigned=a.assigned; m._done=a.done; m._open=a.open; m._wait=a.wait; m._active=a.active;
+    m._workSec=a.worksec; m._workCnt=a.workcnt;
     m._overdue=a.overdue; m._uniq30=a.uniq30; m._redo30=a.redo30; m._sUniq30=a.sUniq30; m._tUniq30=a.tUniq30;
     m._v30=a.uniq30; m._rework=a.rework;   // _v30 = объединённая уникальная выработка (для отделов/KPI)
     m._lastDays = a.last!=null ? Math.floor((now - a.last)/86400000) : null;
