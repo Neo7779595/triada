@@ -1227,7 +1227,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-task .tmr{font-family:var(--mono);font-size:11px;color:var(--txt-3);display:flex;align-items:center;gap:4px}
 .pd-task .tmr svg{width:12px;height:12px}
 /* kanban */
-.rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.rev-grid>div{min-width:0}
+.rev-grid>div:first-child{padding-right:26px}
+.rev-grid>div:last-child{padding-left:26px;border-left:1px solid var(--line)}
 .cyc-filters{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:16px 0 14px;position:relative;z-index:6}
 .cyc-filters .cyc-search-wrap{flex:0 1 250px;min-width:160px;display:flex;align-items:center;gap:8px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px;padding:0 12px;height:38px}
 .cyc-filters .cyc-search-wrap svg{position:static;transform:none;flex-shrink:0;width:15px;height:15px;color:var(--txt-3)}
@@ -1248,11 +1251,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .wk-team{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
 .wk-tcell{padding:12px 14px;background:var(--bg-1);border:1px solid var(--line);border-radius:11px;animation:cycRow .4s var(--ease-out) both}
 
-@media(max-width:760px){.rev-grid{grid-template-columns:1fr}}
-.rev-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;animation:cycRow .4s var(--ease-out) both}
-.rev-nm{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rev-sub{font-size:10.5px;color:var(--txt-3);font-family:var(--mono);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rev-val{font-weight:800;font-size:14px;color:#8A8FFF;flex-shrink:0;font-variant-numeric:tabular-nums}
+@media(max-width:760px){.rev-grid{grid-template-columns:1fr}.rev-grid>div:first-child{padding-right:0}.rev-grid>div:last-child{padding-left:0;border-left:0;border-top:1px solid var(--line);margin-top:18px;padding-top:6px}}
+.rev-row{display:grid;grid-template-columns:minmax(0,1fr) 84px auto;align-items:center;gap:14px;padding:11px 4px;border-bottom:1px solid var(--line);animation:cycRow .4s var(--ease-out) both}
+.rev-row:last-child{border-bottom:0}
+.rev-main{min-width:0}
+.rev-nm{font-weight:600;font-size:13px;color:var(--txt);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev-sub{font-size:10.5px;color:var(--txt-3);font-family:var(--mono);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev-bar{height:6px;background:var(--bg-3);border-radius:4px;overflow:hidden}
+.rev-bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#8A8FFF,#A8ACFF);transform-origin:left;animation:costGrow .55s var(--ease-out) both}
+.rev-val{font-family:var(--mono);font-weight:600;font-size:13.5px;color:#8A8FFF;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rev-empty{font-size:12px;color:var(--txt-3);padding:6px 2px}
 .pk-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0;position:relative;z-index:50}
 .pk-filters .pk-search-wrap{flex:0 1 300px;min-width:200px}
@@ -6178,19 +6185,21 @@ function renderCycles(){
           <div>
             <div class="eyebrow" style="margin-bottom:10px">Этапы дольше всего на утверждении <span class="cyc-cnt">${_revStagesF.length}</span></div>
             <div class="cyc-scroll">
-            ${_revStagesF.length?_revStagesF.map((st,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
-              <div style="min-width:0"><div class="rev-nm">${_ddH(st.name)}</div><div class="rev-sub">${st.count} задач · в среднем ${_cycDur(st.avg*1000)}</div></div>
+            ${_revStagesF.length?(()=>{const mx=Math.max(1,..._revStagesF.map(s=>s.total));return _revStagesF.map((st,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
+              <div class="rev-main"><div class="rev-nm">${_ddH(st.name)}</div><div class="rev-sub">${st.count} задач · в среднем ${_cycDur(st.avg*1000)}</div></div>
+              <div class="rev-bar"><i style="width:${(st.total/mx*100).toFixed(1)}%"></i></div>
               <div class="rev-val">${_cycDur(st.total*1000)}</div>
-            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
+            </div>`).join('')})():'<div class="rev-empty">Ничего не найдено</div>'}
             </div>
           </div>
           <div>
             <div class="eyebrow" style="margin-bottom:10px">Задачи дольше всего на утверждении <span class="cyc-cnt">${_revTasksF.length}</span></div>
             <div class="cyc-scroll">
-            ${_revTasksF.length?_revTasksF.map((t,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
-              <div style="min-width:0"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.project?' · '+_ddH(t.project):''}${t.onReview?' · <span style=\"color:#8A8FFF\">сейчас</span>':''}</div></div>
+            ${_revTasksF.length?(()=>{const mx=Math.max(1,..._revTasksF.map(t=>t.sec));return _revTasksF.map((t,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
+              <div class="rev-main"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.project?' · '+_ddH(t.project):''}${t.onReview?' · <span style=\"color:#8A8FFF\">сейчас</span>':''}</div></div>
+              <div class="rev-bar"><i style="width:${(t.sec/mx*100).toFixed(1)}%"></i></div>
               <div class="rev-val">${_cycDur(t.sec*1000)}</div>
-            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
+            </div>`).join('')})():'<div class="rev-empty">Ничего не найдено</div>'}
             </div>
           </div>
         </div>
