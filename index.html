@@ -2348,6 +2348,37 @@ button:active{transform:translateY(.5px) scale(.99)}
 .wlx-tbl th:last-child,.wlx-tbl td:last-child{text-align:right;padding-right:18px}
 @media(max-width:880px){.wlx-tbar{display:none}.wlx-tinfo{min-width:auto}}
 
+
+/* === модалка статистики сотрудника (клик по строке нагрузки) === */
+.wlx-tbl tbody tr.wlx-click{cursor:pointer}
+.wlx-tbl tbody tr.wlx-click:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.wlx-tbl tbody tr.wlx-click:hover .nm{color:var(--accent)}
+.es-h{padding-bottom:16px;border-bottom:1px solid var(--line)}
+.es-id{display:flex;align-items:center;gap:14px}
+.es-av{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#06140f;font-weight:700;font-size:18px;flex:none;overflow:hidden;position:relative}
+.es-id h3{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.es-id p{font-size:12px;color:var(--txt-3);margin-top:4px;font-family:var(--mono)}
+.es-eyebrow{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin:6px 0 14px}
+.es-chart{display:flex;flex-direction:column;gap:11px;max-height:46vh;overflow-y:auto;margin:0 -4px;padding:0 4px 2px}
+.es-row{display:grid;grid-template-columns:minmax(0,1fr) 1.15fr auto;align-items:center;gap:16px}
+.es-tk{min-width:0}
+.es-tnm{font-size:13px;color:var(--txt);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.es-tpr{font-size:10px;color:var(--txt-3);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.es-bar{height:9px;background:var(--bg-3);border-radius:5px;overflow:hidden;min-width:0}
+.es-bar i{display:block;height:100%;border-radius:5px;transform-origin:left;animation:costGrow .55s var(--ease-out) both}
+.es-tm{font-family:var(--mono);font-size:13px;font-weight:600;text-align:right;white-space:nowrap;min-width:54px}
+.es-cols{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:20px;border-top:1px solid var(--line);padding-top:18px}
+.es-cols>div:first-child{padding-right:22px}
+.es-cols>div:last-child{border-left:1px solid var(--line);padding-left:22px}
+.es-ch{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.es-ch.green{color:var(--pos)} .es-ch.amber{color:var(--warn)}
+.es-cr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.es-cr:last-child{border-bottom:0}
+.es-crn{font-size:12.5px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.es-crv{font-family:var(--mono);font-size:12.5px;font-weight:600;white-space:nowrap;color:var(--txt)}
+.es-empty{padding:32px 6px;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.65}
+@media(max-width:600px){.es-cols{grid-template-columns:1fr}.es-cols>div:first-child{padding-right:0}.es-cols>div:last-child{border-left:0;padding-left:0;border-top:1px solid var(--line);margin-top:14px;padding-top:14px}.es-row{grid-template-columns:minmax(0,1fr) auto}.es-bar{display:none}}
+
 </style>
 </head>
 <body>
@@ -5521,7 +5552,7 @@ function cmdkInputKey(e){
 document.addEventListener('keydown',e=>{
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();if(cmdkCab())(document.getElementById('cmdk').classList.contains('on')?cmdkClose():cmdkOpen());return;}
   if(e.key==='Escape'){
-    const order=[['ov-drill',closeDrill],['ov-pd2',pd2Close],['cmdk',cmdkClose],['ov-proj',closeProject],['ov-emp',closeEmp],['ov-agency',closeAgency],['ov-del',()=>document.getElementById('ov-del').classList.remove('on')],['drawer',()=>document.getElementById('drawer').classList.remove('on')]];
+    const order=[['ov-estats',closeEmpStats],['ov-drill',closeDrill],['ov-pd2',pd2Close],['cmdk',cmdkClose],['ov-proj',closeProject],['ov-emp',closeEmp],['ov-agency',closeAgency],['ov-del',()=>document.getElementById('ov-del').classList.remove('on')],['drawer',()=>document.getElementById('drawer').classList.remove('on')]];
     for(const [id,fn] of order){const el=document.getElementById(id); if(el&&el.classList.contains('on')){fn();break;}}
     return;
   }
@@ -7076,7 +7107,7 @@ function renderTeam(){
           <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th><th>Время в работе</th></tr></thead>
           <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d,tt=t||1;
             const dist=[[w,'var(--warn)'],[a,'var(--accent)'],[d,'var(--pos)']].map(([v,c])=>v>0?`<i style="width:${(v/tt*100).toFixed(1)}%;background:${c}"></i>`:'').join('');
-            return `<tr>
+            return `<tr class="wlx-click" onclick="openEmpStats('${e._id}')" onkeydown="if(event.key==='Enter')openEmpStats('${e._id}')" tabindex="0" role="button">
               <td><div class="wlx-id"><span class="wlx-av" style="background:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span><div><div class="nm">${e.name}</div><div class="sl">${t} ${_plural(t,'задача','задачи','задач')}</div></div></div></td>
               <td><div class="wlx-dist">${dist||'<i style="width:100%;background:var(--bg-3)"></i>'}</div></td>
               <td>${cell(w,'var(--warn-dim)','var(--warn)')}</td>
@@ -7203,6 +7234,32 @@ function openEmpEdit(i){
 }
 function closeEmp(){document.getElementById('ov-emp').classList.remove('on');empEditIdx=null;}
 function closeDrill(){ const ov=document.getElementById('ov-drill'); if(ov) ov.classList.remove('on'); }
+function closeEmpStats(){ const ov=document.getElementById('ov-estats'); if(ov) ov.classList.remove('on'); }
+function openEmpStats(id){
+  const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>String(x._id)===String(id)); if(!m) return;
+  const esc=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const all=m._taskStat||[];
+  const done=all.filter(t=>t.done);
+  const timed=done.filter(t=>t.sec>0).sort((a,b)=>b.sec-a.sec);            // медленные → быстрые
+  const totalSec=timed.reduce((s,t)=>s+t.sec,0), avgSec=timed.length?Math.round(totalSec/timed.length):0;
+  const maxSec=timed.length?timed[0].sec:1, minSec=timed.length?timed[timed.length-1].sec:0;
+  const fastest=[...timed].sort((a,b)=>a.sec-b.sec).slice(0,3);
+  const slowest=timed.slice(0,3);
+  let ov=document.getElementById('ov-estats');
+  if(!ov){ ov=document.createElement('div'); ov.id='ov-estats'; ov.className='ov'; ov.addEventListener('click',e=>{ if(e.target===ov) closeEmpStats(); }); document.body.appendChild(ov); }
+  const av=(typeof logoFill==='function')?logoFill(m.avatar,((m.name||'?')[0]||'?').toUpperCase()):((m.name||'?')[0]||'?').toUpperCase();
+  const chart=timed.map(t=>{ const isMax=(t.sec===maxSec&&timed.length>1), isMin=(t.sec===minSec&&timed.length>1);
+    const col=isMax?'linear-gradient(90deg,#C9A24E,#E3B567)':(isMin?'linear-gradient(90deg,#43D88C,#37E6C8)':'linear-gradient(90deg,#37E6C8,#5BE9D0)');
+    const tc=isMax?'var(--warn)':(isMin?'var(--pos)':'var(--txt)');
+    return '<div class="es-row"><div class="es-tk"><div class="es-tnm">'+esc(t.title)+'</div>'+(t.project?'<div class="es-tpr">'+esc(t.project)+'</div>':'')+'</div><div class="es-bar"><i style="width:'+(t.sec/maxSec*100).toFixed(1)+'%;background:'+col+'"></i></div><div class="es-tm" style="color:'+tc+'">'+_cycDur(t.sec*1000)+'</div></div>'; }).join('');
+  const crow=t=>'<div class="es-cr"><span class="es-crn">'+esc(t.title)+'</span><span class="es-crv">'+_cycDur(t.sec*1000)+'</span></div>';
+  const body = !timed.length
+    ? '<div class="es-empty">У сотрудника пока нет закрытых задач с замером времени.<br>Данные появятся, когда задачи с трекингом перейдут в «Готово».</div>'
+    : '<div class="es-eyebrow">Время по закрытым задачам · '+timed.length+'</div><div class="es-chart">'+chart+'</div>'+
+      (timed.length>=2?'<div class="es-cols"><div><div class="es-ch green">⚡ Быстрее всего</div>'+fastest.map(crow).join('')+'</div><div><div class="es-ch amber">⏳ Дольше всего</div>'+slowest.map(crow).join('')+'</div></div>':'');
+  ov.innerHTML='<div class="modal es" style="max-width:680px"><div class="modal-h es-h"><div class="es-id"><span class="es-av" style="background:'+(m.color||'var(--accent)')+'">'+av+'</span><div><h3>'+esc(m.name)+'</h3><p>'+(m.role_title?esc(m.role_title)+' · ':'')+done.length+' '+_plural(done.length,'задача','задачи','задач')+' закрыто'+(timed.length?' · всего '+_cycDur(totalSec*1000)+' · ср. '+_cycDur(avgSec*1000):'')+'</p></div></div></div><div class="modal-b">'+body+'</div><div class="modal-f"><button class="btn-ghost" onclick="closeEmpStats()">Закрыть</button></div></div>';
+  requestAnimationFrame(()=>ov.classList.add('on'));
+}
 function openCostDrill(i){
   const F=(typeof FINANCE!=='undefined'?FINANCE:null); if(!F||!F.breakdown) return;
   const it=F.breakdown[i]; if(!it||!it.projects||!it.projects.length) return;
@@ -8406,12 +8463,14 @@ window.tLoadTeam = async () => {
   const today = new Date(); today.setHours(0,0,0,0);
   const iso30 = new Date(now - 30*86400000).toISOString();
   const [tr, hr, thr, pr] = await Promise.all([
-    SB.from('project_tasks').select('id,assignee_id,project_id,status,due_date,time_spent,timer_started'),
+    SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started'),
     SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at'),
     SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at'),
-    SB.from('projects').select('id,status')
+    SB.from('projects').select('id,status,name')
   ]);
   const _doneProj = new Set(((pr&&pr.data)||[]).filter(x=>x.status==='done').map(x=>x.id));
+  const _projName={}; ((pr&&pr.data)||[]).forEach(x=>{ _projName[x.id]=x.name||''; });
+  const _td={};   // детальная статистика задач по исполнителю (реальные данные)
   const tasks = (tr.data||[]).filter(t=>!_doneProj.has(t.project_id)), hist = hr.data||[];
   const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];   // task_history может ещё не существовать
   const taskDue = {}; tasks.forEach(t=>{ if(t.id!=null) taskDue[t.id]=t.due_date||null; });
@@ -8421,7 +8480,9 @@ window.tLoadTeam = async () => {
   const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 });
 
   tasks.forEach(t => { if (!t.assignee_id) return; const a = S(t.assignee_id); a.assigned++;
-    { const _ws=(t.time_spent||0)+((t.timer_started&&t.status==='active')?Math.max(0,Math.round((now-new Date(t.timer_started).getTime())/1000)):0); if(_ws>0){ a.worksec+=_ws; a.workcnt++; } }
+    const _ws=(t.time_spent||0)+((t.timer_started&&t.status==='active')?Math.max(0,Math.round((now-new Date(t.timer_started).getTime())/1000)):0);
+    if(_ws>0){ a.worksec+=_ws; a.workcnt++; }
+    (_td[t.assignee_id]||(_td[t.assignee_id]=[])).push({ title:(t.title||'Задача'), sec:_ws, done:(t.status==='done'), status:t.status, project:(_projName[t.project_id]||'') });
     if (t.status==='done') a.done++;
     else { a.open++; if (t.status==='wait') a.wait++; if (t.status==='active') a.active++;
       if (t.due_date && new Date(t.due_date+'T00:00:00') < today) a.overdue++; } });
@@ -8456,6 +8517,7 @@ window.tLoadTeam = async () => {
     const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 };
     m._assigned=a.assigned; m._done=a.done; m._open=a.open; m._wait=a.wait; m._active=a.active;
     m._workSec=a.worksec; m._workCnt=a.workcnt;
+    m._taskStat=_td[m._id]||[];
     m._overdue=a.overdue; m._uniq30=a.uniq30; m._redo30=a.redo30; m._sUniq30=a.sUniq30; m._tUniq30=a.tUniq30;
     m._v30=a.uniq30; m._rework=a.rework;   // _v30 = объединённая уникальная выработка (для отделов/KPI)
     m._lastDays = a.last!=null ? Math.floor((now - a.last)/86400000) : null;
