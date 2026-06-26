@@ -1773,6 +1773,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .np-chip-x{border:none;background:transparent;color:var(--txt-3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
 .np-chip-x:hover{color:#F0785C}
 .np-team-dept{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin:6px 2px 1px}
+.np-team-deptbtn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:6px 10px;margin:9px 0 3px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2);cursor:pointer;font:inherit;text-align:left;transition:.14s}
+.np-team-deptbtn .np-team-deptn{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-2);font-weight:600}
+.np-team-deptbtn .np-team-deptc{font-size:10.5px;color:var(--txt-3);white-space:nowrap}
+.np-team-deptbtn:hover{border-color:var(--accent-line);background:var(--accent-dim)}
+.np-team-deptbtn:hover .np-team-deptn,.np-team-deptbtn:hover .np-team-deptc{color:var(--accent)}
+.np-team-deptbtn.all{border-color:var(--accent-line);background:var(--accent-dim)}
+.np-team-deptbtn.all .np-team-deptn,.np-team-deptbtn.all .np-team-deptc{color:var(--accent)}
+.np-team-deptbtn.some{border-color:var(--line-2)}
 .np-tm{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--txt-2);cursor:pointer;width:100%;text-align:left;font:inherit}
 .np-tm:hover{border-color:var(--line-2)}
 .np-tm.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--txt)}
@@ -3824,12 +3832,13 @@ function npTeamPickerRender(){
   const rows=team.filter(m=>{ if(dept!=='all' && (m.dept||'Без команды')!==dept) return false; if(q && !((m.name||'').toLowerCase().includes(q)||(m.role||'').toLowerCase().includes(q))) return false; return true; });
   if(!rows.length){ list.innerHTML='<div class="np-team-empty">Никого не найдено</div>'; npPickCount(); return; }
   const groups={}; rows.forEach(m=>{ const d=m.dept||'Без команды'; (groups[d]=groups[d]||[]).push(m); });
-  let html=''; Object.keys(groups).forEach(d=>{ html+='<div class="np-team-dept">'+_ddH(d)+'</div>';
+  let html=''; Object.keys(groups).forEach(d=>{ const _tm=team.filter(x=>(x.dept||'Без команды')===d); const _on=_tm.filter(x=>work.has(x._id)).length; const _all=_tm.length>0&&_on===_tm.length; html+='<button type="button" class="np-team-deptbtn'+(_all?' all':(_on?' some':''))+'" data-team="'+_attr(d)+'" onclick="npPickTeam(this)" title="'+(_all?'Убрать всю команду из проекта':'Добавить всю команду в проект')+'"><span class="np-team-deptn">'+_ddH(d)+'</span><span class="np-team-deptc">'+_on+'/'+_tm.length+' · '+(_all?'убрать всех':'добавить всех')+'</span></button>';
     groups[d].forEach(m=>{ const on=work.has(m._id); const c=m.color||'#37E6C8'; const ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase());
       html+='<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="npPickToggle(\''+m._id+'\')"><span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+(m.avatar?('<img src="'+String(m.avatar).replace(/"/g,'')+'" alt="">'):ltr)+'</span><span class="np-tm-n">'+_ddH(m.name||'—')+'</span><span class="np-tm-r">'+_ddH(m.role||'')+'</span><span class="np-tm-ck">'+ck+'</span></button>'; }); });
   list.innerHTML=html; npPickCount();
 }
-function npPickToggle(id){ const s=window._npPickWork||(window._npPickWork=new Set()); const add=!s.has(id); if(add)s.add(id); else s.delete(id); const b=document.querySelector('#np-pick-list .np-tm[data-id="'+id+'"]'); if(b)b.classList.toggle('on',add); npPickCount(); }
+function npPickToggle(id){ const s=window._npPickWork||(window._npPickWork=new Set()); if(s.has(id))s.delete(id); else s.add(id); npTeamPickerRender(); }
+function npPickTeam(el){ const d=el&&el.dataset?el.dataset.team:el; const team=(typeof TEAM!=='undefined'?TEAM:[]); const work=window._npPickWork||(window._npPickWork=new Set()); const members=team.filter(x=>(x.dept||'Без команды')===d); if(!members.length) return; const allOn=members.every(x=>work.has(x._id)); members.forEach(x=>{ if(allOn) work.delete(x._id); else work.add(x._id); }); npTeamPickerRender(); }
 function npPickCount(){ const c=document.getElementById('np-pick-cnt'); if(c){ const n=(window._npPickWork||new Set()).size; c.textContent=n?(' · '+n):''; } }
 function npTeamPickerClose(){ const ov=document.getElementById('ov-npteam'); if(ov)ov.classList.remove('on'); }
 function npTeamPickerDone(){ window.NP_TEAM=new Set(window._npPickWork||[]); npTeamPickerClose(); npRenderTeam(); }
