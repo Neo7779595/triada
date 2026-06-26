@@ -4463,9 +4463,9 @@ function _relDue(due){
 function _pdDeadlinesHTML(p){
   const stMap={}; (p._stages||[]).forEach(s=>{ stMap[s.id]=s.name; });
   const MONS=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
-  const enrich=o=>{ const d=new Date(o.due+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status); o.day=d.getDate(); o.mon=MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; return o; };
-  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,dueTime:_dTime(t.due_time),status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||''}));
-  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,dueTime:_dTime(s.due_time),status:s.status,asg:null,parent:''}));
+  const enrich=o=>{ const d=new Date(o.due+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status); o.day=d.getDate(); o.mon=MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; o.done_at=o.done_at||null; return o; };
+  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,dueTime:_dTime(t.due_time),status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||'',done_at:t.completed_at||null}));
+  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,dueTime:_dTime(s.due_time),status:s.status,asg:null,parent:'',done_at:s.completed_at||null}));
   const all=tasks.concat(stages).map(enrich);
   if(!all.length) return '<div class="pk-empty" style="padding:48px 0">У проекта пока нет задач и этапов с дедлайнами.<br><span style="font-size:12px;color:var(--txt-3)">Назначь срок задаче или этапу — они появятся здесь.</span></div>';
   const flt=all.filter(_pdlMatch);
@@ -6161,8 +6161,28 @@ function _loadPills(c){ const o=c('overdue'),t=c('today'),w=c('week')+c('future'
   if(w)h+=`<span class="dl-pill a">${w} впереди</span>`;
   if(dn)h+=`<span class="dl-pill g">${dn} готово</span>`;
   return h||`<span class="dl-pill">— нет</span>`; }
+function _dhLabel(ms){
+  const totH=Math.floor(Math.abs(ms)/3600000); const d=Math.floor(totH/24), h=totH%24;
+  if(d>0&&h>0) return d+' '+_plural(d,'день','дня','дней')+' '+h+' '+_plural(h,'час','часа','часов');
+  if(d>0) return d+' '+_plural(d,'день','дня','дней');
+  if(h>0) return h+' '+_plural(h,'час','часа','часов');
+  return 'меньше часа';
+}
+// статус выполненной задачи относительно срока: вовремя / раньше / позже
+function _dlDoneStatus(it){
+  if(!it.done_at || !it.due) return {label:'Выполнен', color:'var(--pos)', dim:'var(--pos-dim)'};
+  const comp=new Date(it.done_at);
+  if(isNaN(comp.getTime())) return {label:'Выполнен', color:'var(--pos)', dim:'var(--pos-dim)'};
+  const dueStart=new Date(it.due+'T00:00:00');
+  const compDay=new Date(comp); compDay.setHours(0,0,0,0);
+  const dayDiff=Math.round((compDay-dueStart)/86400000);
+  if(dayDiff===0) return {label:'В срок', color:'var(--pos)', dim:'var(--pos-dim)'};
+  if(dayDiff<0){ const ms=new Date(it.due+'T23:59:59')-comp; return {label:'Раньше на '+_dhLabel(ms), color:'var(--violet)', dim:'rgba(138,143,255,.14)'}; }
+  const ms=comp-new Date(it.due+'T23:59:59'); return {label:'Позже на '+_dhLabel(ms), color:'var(--neg)', dim:'var(--neg-dim)'};
+}
 function _dlRow(it){
   const m=_dlMeta(it.bucket), o=_dlOwner(it), dist=_dlDist(it);
+  const dn = it.bucket==='done' ? _dlDoneStatus(it) : null;
   const ownerTag = o.key==='__none'
     ? `<span class="dlx-otag none"><span class="otag-q">?</span>Не назначен</span>`
     : `<span class="dlx-otag">${_avInit(o.n,o.c,o.avatar,20)}${o.n}</span>`;
@@ -6173,7 +6193,7 @@ function _dlRow(it){
       <div class="dlx-meta"><span class="dlx-proj">${_avInit(it.project,'var(--bg-3)',it.plogoUrl,18,true)}${it.project}</span><span class="badge ${it.type==='task'?'b-mut':'b-cyan'}" style="font-size:9px;padding:1px 6px">${it.type==='task'?'задача':'этап'}</span></div>
     </div>
     <div class="dlx-owner">${ownerTag}</div>
-    <div class="dlx-st"><span class="badge ${m.sc}"><span class="bd"></span>${m.st}${mag}</span></div>
+    <div class="dlx-st">${dn?`<span class="badge" style="background:${dn.dim};color:${dn.color};border-color:transparent"><span class="bd" style="background:${dn.color}"></span>${dn.label}</span>`:`<span class="badge ${m.sc}"><span class="bd"></span>${m.st}${mag}</span>`}</div>
   </div>`;
 }
 function _dlByUrgency(FILT){
@@ -8440,20 +8460,23 @@ window.tLoadDeadlines = async () => {
   if (!SB) return;
   const [st, tk, hist] = await Promise.all([
     SB.from('project_stages').select('id,name,status,due_date,due_time, projects(name,logo,logo_url)').not('due_date','is',null),
-    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id, projects(name,logo,logo_url)').not('due_date','is',null),
+    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,completed_at, projects(name,logo,logo_url)').not('due_date','is',null),
     SB.from('stage_history').select('stage_name,new_status,created_at, projects(name)').order('created_at',{ascending:false}).limit(30)
   ]);
-  const _push = (label, status, due, projObj, id, type, assignee, dueTime) => {
+  const _push = (label, status, due, projObj, id, type, assignee, dueTime, doneAt) => {
     const d = due ? new Date(due+'T00:00:00') : null;
     DEADLINES.push({ stage:label, project:(projObj&&projObj.name)||'—',
       plogo:(projObj&&(projObj.logo||((projObj.name||'?')[0])))||'?', plogoUrl:(projObj&&projObj.logo_url)||'',
       day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'', dueTime: _dTime(dueTime),
-      due: due, bucket: dlBucket(due, status), status, type, _id:id, assignee: assignee||null });
+      due: due, bucket: dlBucket(due, status), status, type, _id:id, assignee: assignee||null, done_at: doneAt||null });
   };
   if (typeof DEADLINES !== 'undefined'){
     DEADLINES.length = 0;
-    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time));
-    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time));
+    // мягкая догрузка даты завершения этапов (если колонка есть) — не ломает, если миграции ещё нет
+    let _stDone = {};
+    try { const sd = await SB.from('project_stages').select('id,completed_at'); if(!sd.error && sd.data) sd.data.forEach(r=>{ if(r.completed_at) _stDone[r.id]=r.completed_at; }); } catch(_){}
+    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id]));
+    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, r.completed_at));
   }
   if (typeof DL_ACT !== 'undefined'){
     DL_ACT.length = 0;
