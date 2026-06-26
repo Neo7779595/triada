@@ -5300,78 +5300,87 @@ function smmMetricsBlockHTML(){
 let _smmReelSort='er';
 function smmSetReelSort(f){ _smmReelSort=f; const el=document.getElementById('smm-reels-sec'); if(el) el.outerHTML=smmReelsBlockHTML(); }
 function smmReelsBlockHTML(){
-  const sorts=[['er','ER'],['views','Просмотры'],['reach','Охват'],['tr','Комм.'],['sr','Сохр.'],['shr','Репосты'],['lr','Лайки']];
-  const chips=sorts.map(s=>'<button class="smm-sort-chip'+(_smmReelSort===s[0]?' on':'')+'" onclick="smmSetReelSort(\''+s[0]+'\')">'+s[1]+'</button>').join('');
-  const reels=_smmCur.reels.slice().sort((a,b)=>(+b[_smmReelSort]||0)-(+a[_smmReelSort]||0));
-  if(!reels.length){
-    return '<div class="smm-sec" id="smm-reels-sec"><div class="smm-sec-h"><div class="t">Reels</div></div>'
-      +'<div class="smm-sec-b"><div style="text-align:center;color:var(--txt-3);padding:36px 0;font-size:12px;font-family:var(--mono)">Добавьте Reels во вкладке «Данные»</div></div></div>';
-  }
   const isPct=f=>['er','lr','tr','shr','sr'].includes(f);
-  const fmtM=(f,r)=>{ const v=r[f]; if(v==null) return '—'; return isPct(f)?(+v).toFixed(2)+'%':Number(v).toLocaleString('ru-RU'); };
-  const headLbl={er:'ER',views:'Просмотры',reach:'Охват',tr:'Комм.',shr:'Репосты',sr:'Сохр.',lr:'Лайки'}[_smmReelSort]||'ER';
+  const fmtM=(f,r)=>{ const v=r[f]; if(v==null||v==='') return '—'; return isPct(f)?(+v).toFixed(2)+'%':Number(v).toLocaleString('ru-RU'); };
+  const OPTS=[['er','ER %'],['views','Просмотры'],['reach','Охват'],['tr','C/R %'],['shr','SH/R %'],['sr','SR %'],['lr','LR %']];
+  const sel=`<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span><select onchange="smmSetReelSort(this.value)" style="background:transparent;border:none;border-bottom:1px solid var(--line-2);border-radius:0;padding:2px 8px 2px 0;color:var(--txt-2);font-family:var(--mono);font-size:9px;outline:none;cursor:pointer;letter-spacing:.04em">`+OPTS.map(o=>`<option value="${o[0]}"${_smmReelSort===o[0]?' selected':''}>${o[1]}</option>`).join('')+`</select></div>`;
+  const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">03</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Опубликованный контент</span><div style="flex:1"></div>${sel}</div>`;
+  const reels=(_smmCur.reels||[]).slice().sort((a,b)=>(+b[_smmReelSort]||0)-(+a[_smmReelSort]||0));
+  if(!reels.length){
+    return `<div id="smm-reels-sec">${head}<div style="padding:56px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em">Добавьте Reels во вкладке «Данные»</div></div>`;
+  }
+  const headLbl={er:'ER',views:'Просмотры',reach:'Охват',tr:'C/R',shr:'SH/R',sr:'SR',lr:'LR'}[_smmReelSort]||'ER';
+  const headIsPct=isPct(_smmReelSort);
   const ENG=[['views','Просмотры'],['reach','Охват'],['likes','Лайки'],['comments','Комм.'],['saves','Сохр.'],['shares','Репост.']];
   const cards=reels.slice(0,30).map((r,i)=>{
     const isTop=i===0;
     const title=r.title||('Reel #'+(i+1));
     const linkHref=(r.link&&/^https?:\/\//i.test(r.link))?r.link.replace(/"/g,'%22'):null;
-    const cover=(r.cover&&r.cover.trim())?r.cover.replace(/"/g,'%22').replace(/'/g,'%27'):null;
-    const headVal=fmtM(_smmReelSort,r);
-    const coverHTML=cover
-      ? '<div class="rl-cover" style="background-image:url(\''+cover+'\')"></div>'
-      : '<div class="rl-cover rl-cover-ph"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>';
-    const ext=linkHref?' <svg class="rl-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>':'';
-    const sub=isTop?'Лидер':(r.rubric?_ddH(r.rubric):'Reel');
-    const engGrid=ENG.map(c=>{ const active=c[0]===_smmReelSort;
-      return '<div class="rl-m'+(active?' on':'')+'"><div class="rl-m-l">'+c[1]+'</div><div class="rl-m-v">'+fmtM(c[0],r)+'</div></div>'; }).join('');
-    const inner='<div class="rl-card'+(isTop?' top':'')+'">'
-      +'<div class="rl-cover-wrap">'+coverHTML+'<div class="rl-rank'+(isTop?' top':'')+'">'+(i+1)+'</div></div>'
-      +'<div class="rl-body"><div class="rl-top">'
-      +'<div class="rl-tt"><div class="rl-title">'+_ddH(title)+ext+'</div><div class="rl-sub">'+sub+'</div></div>'
-      +'<div class="rl-head"><div class="rl-head-l">'+headLbl+'</div><div class="rl-head-v">'+headVal+'</div></div>'
-      +'</div><div class="rl-grid">'+engGrid+'</div></div></div>';
-    return linkHref?'<a class="rl-link" href="'+linkHref+'" target="_blank" rel="noopener">'+inner+'</a>':inner;
+    const cover=(r.cover&&String(r.cover).trim())?String(r.cover).replace(/"/g,'%22').replace(/'/g,'%27'):null;
+    const cardBg=isTop?'linear-gradient(135deg,rgba(55,230,200,.07),var(--bg-1))':'var(--bg-1)';
+    const cardBd=isTop?'var(--accent-line)':'var(--line)';
+    const coverBd=isTop?'var(--accent-line)':'var(--line-2)';
+    const coverInner=cover
+      ? `background:var(--bg-3)"><div style="position:absolute;inset:0;background:url('${cover}') center/cover no-repeat"></div></div>`
+      : `background:linear-gradient(160deg,${isTop?'rgba(55,230,200,.08)':'var(--bg-3)'},var(--bg))"><svg width="24" height="24" viewBox="0 0 24 24" fill="${isTop?'rgba(55,230,200,.5)':'var(--txt-3)'}"><path d="M8 5v14l11-7z"/></svg></div>`;
+    const rankStyle=isTop?'background:var(--accent);color:var(--accent-ink)':'background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-3)';
+    const ext=linkHref?` <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt-3)" stroke-width="2.5" stroke-linecap="round" style="vertical-align:baseline;margin-left:3px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`:'';
+    let headHTML;
+    if(headIsPct&&r[_smmReelSort]){ const ps=(+r[_smmReelSort]).toFixed(2).split('.'); headHTML=`<div style="font-family:var(--mono);font-size:38px;font-weight:600;line-height:.85;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:${isTop?'var(--accent)':'var(--txt)'}">${ps[0]}.${ps[1]}<span style="font-size:21px;color:${isTop?'rgba(55,230,200,.6)':'var(--txt-3)'}">%</span></div>`; }
+    else { headHTML=`<div style="font-family:var(--mono);font-size:34px;font-weight:600;line-height:.85;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:${isTop?'var(--accent)':'var(--txt)'}">${fmtM(_smmReelSort,r)}</div>`; }
+    const engGrid=ENG.map((c,ci)=>{ const active=c[0]===_smmReelSort, last=ci===ENG.length-1;
+      const pad=ci===0?'16px 18px 0 0':(last?'16px 0 0 18px':'16px 18px 0');
+      return `<div style="padding:${pad};${last?'':'border-right:1px solid var(--line)'}"><div style="font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:7px;color:${active?'var(--accent)':'var(--txt-3)'}">${c[1]}</div><div style="font-family:var(--mono);font-size:18px;font-variant-numeric:tabular-nums;color:${active?'var(--accent)':'var(--txt)'}">${fmtM(c[0],r)}</div></div>`;
+    }).join('');
+    const inner=`<div style="position:relative;display:flex;gap:24px;padding:26px 28px;margin-bottom:14px;border-radius:16px;background:${cardBg};border:1px solid ${cardBd}">`
+      +(isTop?`<div style="position:absolute;left:0;top:26px;bottom:26px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7BF0DC,var(--accent))"></div>`:'')
+      +`<div style="position:relative;width:96px;height:128px;flex-shrink:0"><div style="position:absolute;inset:0;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid ${coverBd};${coverInner}<div style="position:absolute;top:-9px;left:-9px;width:26px;height:26px;border-radius:8px;font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px var(--bg-1);${rankStyle}">${i+1}</div></div>`
+      +`<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center">`
+        +`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:20px"><div style="min-width:0"><div style="font-size:20px;font-weight:600;letter-spacing:-.015em;color:${isTop?'var(--txt)':'var(--txt)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_ddH(title)}${ext}</div><div style="font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;margin-top:7px;color:${isTop?'var(--accent)':'var(--txt-3)'}">${isTop?'Топ по вовлечённости':'Опубликован'}</div></div>`
+        +`<div style="text-align:right;flex-shrink:0"><div style="font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;margin-bottom:5px;color:${isTop?'var(--accent)':'var(--txt-3)'}">${headLbl}</div>${headHTML}</div></div>`
+        +`<div style="display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--line)">${engGrid}</div>`
+      +`</div></div>`;
+    return linkHref?`<a href="${linkHref}" target="_blank" rel="noopener" style="text-decoration:none">${inner}</a>`:inner;
   }).join('');
-  return '<div class="smm-sec" id="smm-reels-sec"><div class="smm-sec-h"><div class="t">Reels · '+reels.length+'</div>'
-    +'<div class="smm-sort">'+chips+'</div></div>'
-    +'<div class="smm-sec-b"><div class="rl-list">'+cards+'</div></div></div>';
+  return `<div id="smm-reels-sec">${head}<div style="padding-top:4px;overflow:hidden">${cards}</div></div>`;
 }
 let _smmRubSort='er';
 function smmSetRubSort(f){ _smmRubSort=f; const el=document.getElementById('smm-rub-grid-sec'); if(el) el.outerHTML=smmRubricsBlockHTML(); }
 function smmRubricsBlockHTML(){
-  const sorts=[['er','ER'],['reach','Охват'],['views','Просмотры']];
-  const chips=sorts.map(s=>'<button class="smm-sort-chip'+(_smmRubSort===s[0]?' on':'')+'" onclick="smmSetRubSort(\''+s[0]+'\')">'+s[1]+'</button>').join('');
-  const rubs=_smmCur.rubrics.slice().sort((a,b)=>(+b[_smmRubSort]||0)-(+a[_smmRubSort]||0));
-  if(!rubs.length){
-    return '<div class="smm-sec" id="smm-rub-grid-sec"><div class="smm-sec-h"><div class="t">Рубрики</div></div>'
-      +'<div class="smm-sec-b"><div style="text-align:center;color:var(--txt-3);padding:36px 0;font-size:12px;font-family:var(--mono)">Заполните рубрики во вкладке «Данные»</div></div></div>';
-  }
   const fmt=v=>(v==null||v===0)?'—':Number(v).toLocaleString('ru-RU');
+  const OPTS=[['er','ER %'],['reach','Охват'],['views','Просмотры']];
+  const sel=`<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span><select onchange="smmSetRubSort(this.value)" style="background:transparent;border:none;border-bottom:1px solid var(--line-2);border-radius:0;padding:2px 8px 2px 0;color:var(--txt-2);font-family:var(--mono);font-size:9px;outline:none;cursor:pointer;letter-spacing:.04em">`+OPTS.map(o=>`<option value="${o[0]}"${_smmRubSort===o[0]?' selected':''}>${o[1]}</option>`).join('')+`</select></div>`;
+  const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">04</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Рубрики контента</span><div style="flex:1"></div>${sel}</div>`;
+  const rubs=(_smmCur.rubrics||[]).slice().sort((a,b)=>(+b[_smmRubSort]||0)-(+a[_smmRubSort]||0));
+  if(!rubs.length){
+    return `<div id="smm-rub-grid-sec">${head}<div style="padding:56px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em">Заполните рубрики во вкладке «Данные»</div></div>`;
+  }
   const totalReach=rubs.reduce((s,r)=>s+(+r.reach||0),0)||1;
   const erVals=rubs.map(r=>+r.er||0).slice().sort((a,b)=>a-b);
   const medER=erVals.length%2?erVals[(erVals.length-1)/2]:(erVals[erVals.length/2-1]+erVals[erVals.length/2])/2;
   const reActive=_smmRubSort==='reach', viActive=_smmRubSort==='views';
+  const EB='font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase';
   const cards=rubs.map((r,i)=>{
     const top=i===0, er=+r.er||0, anomaly=er>100;
     const share=(+r.reach||0)/totalReach*100;
     const dER=er-medER, up=dER>=0;
     let badge;
-    if(anomaly) badge='<span class="rb-badge anom">аномалия</span>';
-    else if(top) badge='<span class="rb-badge lead">лидер</span>';
-    else badge='<span class="rb-dpp '+(up?'pos':'neg')+'">'+(up?'▲ +':'▼ ')+dER.toFixed(2)+' п.п.</span>';
+    if(anomaly) badge=`<span style="${EB};color:var(--neg);border:1px solid rgba(240,120,92,.4);border-radius:4px;padding:2px 6px">аномалия</span>`;
+    else if(top) badge=`<span style="${EB};color:var(--accent)">лидер</span>`;
+    else badge=`<span style="font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums;color:${up?'var(--pos)':'var(--neg)'}">${up?'▲ +':'▼ '}${dER.toFixed(2)} п.п.</span>`;
+    const rowBg=top?'rgba(55,230,200,.05)':'var(--bg-1)';
+    const brd=top?'var(--accent-line)':'var(--line)';
+    const lb=top?'var(--accent)':'var(--line)';
     const cells=[['Охват',fmt(r.reach),reActive],['Просмотры',fmt(r.views),viActive],['Постов',(r.posts?r.posts:'—'),false]];
-    const cellsHTML=cells.map((c,ci)=>'<div class="rb-c'+(c[2]?' on':'')+(ci<2?' br':'')+'"><div class="rb-c-l">'+c[0]+'</div><div class="rb-c-v">'+c[1]+'</div></div>').join('');
-    return '<div class="rb-card'+(top?' top':'')+'">'
-      +'<div class="rb-h"><span class="rb-rank">'+(i+1<10?'0':'')+(i+1)+'</span>'
-      +'<span class="rb-name">'+_ddH(r.name)+'</span><span class="rb-badge-wrap">'+badge+'</span></div>'
-      +'<div class="rb-hero"><span class="rb-er'+(anomaly?' anom':'')+'">'+(er?er.toFixed(2):'—')+'</span><span class="rb-pct">%</span><span class="rb-er-l">ER</span></div>'
-      +'<div class="rb-share"><div class="rb-share-h"><span class="rb-share-l'+(reActive?' on':'')+'">доля охвата портфеля</span><span class="rb-share-v">'+share.toFixed(0)+'%</span></div>'
-      +'<div class="rb-share-bar"><div class="rb-share-fill" style="width:'+Math.min(share,100).toFixed(1)+'%"></div></div></div>'
-      +'<div class="rb-foot">'+cellsHTML+'</div></div>';
+    const cellsHTML=cells.map((c,ci)=>`<div style="${ci<2?'border-right:1px solid var(--line);':''}padding:0 10px 0 ${ci?10:0}px"><div style="${EB};color:${c[2]?'var(--accent)':'var(--txt-3)'};margin-bottom:4px">${c[0]}</div><div style="font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:${c[2]?'var(--txt)':'var(--txt-2)'}">${c[1]}</div></div>`).join('');
+    return `<div style="background:${rowBg};border:1px solid ${brd};border-left:2px solid ${lb};border-radius:0 8px 8px 0;padding:15px 17px;transition:background .15s,border-color .15s" onmouseover="this.style.background='rgba(255,255,255,.025)'" onmouseout="this.style.background='${rowBg}'">`
+      +`<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px"><span style="font-family:var(--mono);font-size:10px;color:${top?'var(--accent)':'var(--txt-3)'};flex-shrink:0">${i+1<10?'0':''}${i+1}</span><span style="font-size:14px;font-weight:${top?'500':'400'};color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_ddH(r.name)}</span><span style="margin-left:auto;flex-shrink:0">${badge}</span></div>`
+      +`<div style="display:flex;align-items:baseline;gap:3px"><span style="font-family:var(--mono);font-size:32px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1;color:${anomaly?'var(--neg)':(top?'#7BF0DC':'var(--txt)')}">${er?er.toFixed(2):'—'}</span><span style="font-family:var(--mono);font-size:16px;color:var(--txt-2)">%</span><span style="${EB};color:var(--txt-3);margin-left:6px">ER</span></div>`
+      +`<div style="margin-top:13px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px"><span style="${EB};color:${reActive?'var(--accent)':'var(--txt-3)'}">доля охвата портфеля</span><span style="font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:${top?'#7BF0DC':'var(--txt-2)'}">${share.toFixed(0)}%</span></div><div style="height:5px;border-radius:3px;background:var(--line)"><div style="height:100%;border-radius:3px;width:${Math.min(share,100).toFixed(1)}%;background:${top?'var(--accent)':'rgba(55,230,200,.45)'};transition:width .8s"></div></div></div>`
+      +`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">${cellsHTML}</div>`
+      +`</div>`;
   }).join('');
-  return '<div class="smm-sec" id="smm-rub-grid-sec"><div class="smm-sec-h"><div class="t">Рубрики · '+rubs.length+'</div>'
-    +'<div style="display:flex;align-items:center;gap:12px"><span style="font-size:11px;color:var(--txt-3);font-family:var(--mono)">медиана ER '+medER.toFixed(2)+'%</span><div class="smm-sort">'+chips+'</div></div></div>'
-    +'<div class="smm-sec-b"><div class="rb-grid">'+cards+'</div></div></div>';
+  return `<div id="smm-rub-grid-sec">${head}<div style="padding-top:4px;overflow:hidden"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${cards}</div></div></div>`;
 }
 function smmConclusionsBlockHTML(){
   const m=_smmCur.metrics, p=_smmCur.prev, go=_smmCur.goals, reels=_smmCur.reels||[], rubrics=_smmCur.rubrics||[];
