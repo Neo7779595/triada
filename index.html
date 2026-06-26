@@ -911,6 +911,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-body{flex:1;overflow-y:auto;padding:26px 28px 70px}
 .smm-wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
 .smm-pres{max-width:none;padding:24px 40px 64px}
+.smm-m02-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media(max-width:1100px){.smm-m02-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:680px){.smm-m02-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:760px){.smm-pres{padding:8px 4px 40px}}
 .smm-sec{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r)}
 .smm-sec-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
@@ -5717,6 +5720,66 @@ function smmSection01HTML(){
       +`<div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--line);display:flex;align-items:baseline;gap:10px"><div style="font-size:28px;font-weight:700;color:var(--txt-2);letter-spacing:-.04em;font-variant-numeric:tabular-nums">${tv>0?f(tv):'—'}</div><div style="font-family:var(--mono);font-size:8px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.12em">просмотров итого</div></div>`
     +'</div></div>';
 }
+function smmBands(val, goal, prev){
+  const z=smmZoneEval(val,goal,prev);
+  if(z.basis==='goal'){ const max=goal*1.6; return {max,redEnd:goal*SMM_ZONE_CFG.goalYellow/max*100,yelEnd:goal/max*100,ref:'цель '+(+goal).toFixed(2)+'%',low:(goal*SMM_ZONE_CFG.goalYellow).toFixed(2),mid:(+goal).toFixed(2),hi:(goal*1.6).toFixed(2),zone:z.zone,basis:'goal'}; }
+  if(z.basis==='dyn'){ const max=prev*2||1; return {max,redEnd:prev*(1-SMM_ZONE_CFG.dynDown)/max*100,yelEnd:prev*(1+SMM_ZONE_CFG.dynUp)/max*100,ref:'пред. '+(+prev).toFixed(2)+'%',low:(prev*(1-SMM_ZONE_CFG.dynDown)).toFixed(2),mid:(+prev).toFixed(2),hi:(prev*2).toFixed(2),zone:z.zone,basis:'dyn'}; }
+  return {max:(val||1)*1.6,redEnd:0,yelEnd:0,ref:'',low:'',mid:'',hi:'',zone:'none',basis:'none'};
+}
+function smmSection02HTML(){
+  const m=_smmCur.metrics, p=_smmCur.prev, go=_smmCur.goals;
+  const RZ='rgba(240,120,92,.28)', YZ='rgba(227,181,103,.28)', GZ='rgba(67,216,140,.24)';
+  const mets=[
+    {code:'ER',label:'Вовлечённость',k:'er'},{code:'LR',label:'Лайки',k:'lr'},
+    {code:'C/R',label:'Комментарии',k:'tr'},{code:'SH/R',label:'Репосты',k:'shr'},{code:'SR',label:'Сохранения',k:'sr'}
+  ];
+  const H=(num,title,right)=>`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">${num}</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">${title}</span><div style="flex:1"></div>${right||''}</div>`;
+  // ── карточки
+  const cards=mets.map(met=>{
+    const val=m[met.k], z=smmZoneEval(val,go[met.k],p[met.k]), zc=getSMMZoneColor(z.zone);
+    const pd=(val!=null&&p[met.k]!=null&&p[met.k]!==0)?((val-p[met.k])/p[met.k]*100).toFixed(1):null;
+    const b=smmBands(val,go[met.k],p[met.k]);
+    const valPct=val!=null?Math.min(val/b.max*100,99).toFixed(1):null;
+    const slider= b.basis==='none'
+      ? `<div style="position:relative;height:2px;background:var(--line)">${valPct!=null?`<div style="position:absolute;top:50%;left:${valPct}%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:var(--txt-3)"></div>`:''}</div><div style="font-family:var(--mono);font-size:8px;color:var(--txt-3);margin-top:7px;letter-spacing:.05em">нет цели и прошлого периода</div>`
+      : `<div style="position:relative;height:2px;background:var(--line);overflow:visible"><div style="position:absolute;inset:0;overflow:hidden"><div style="height:100%;width:${b.redEnd.toFixed(1)}%;background:${RZ}"></div></div><div style="position:absolute;top:0;left:${b.redEnd.toFixed(1)}%;height:100%;width:${(b.yelEnd-b.redEnd).toFixed(1)}%;background:${YZ}"></div><div style="position:absolute;top:0;left:${b.yelEnd.toFixed(1)}%;height:100%;right:0;background:${GZ}"></div>${valPct!=null?`<div style="position:absolute;top:50%;left:${valPct}%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:${zc};box-shadow:0 0 6px ${zc}"></div>`:''}</div><div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:8px;color:var(--txt-3);margin-top:7px;letter-spacing:.05em"><span>${b.low}%</span><span style="color:${zc}">${b.ref}</span></div>`;
+    return `<div style="background:var(--bg-1);border:1px solid var(--line);border-top:1px solid ${z.zone==='none'?'var(--line)':zc};padding:24px 20px 20px;position:relative;overflow:hidden">`
+      +`<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px"><div><div style="font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.18em;color:var(--txt-3);text-transform:uppercase">${met.code}</div><div style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.06em;margin-top:3px;text-transform:uppercase">${met.label}</div></div>`
+      +(z.zone!=='none'?`<div style="font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:${zc};padding:3px 7px;border:1px solid ${zc};border-radius:2px;opacity:.9;white-space:nowrap">${z.label}</div>`:'')
+      +`</div>`
+      +`<div style="font-size:40px;font-weight:700;letter-spacing:-.04em;line-height:1;color:${val!=null?'var(--txt)':'var(--txt-3)'};font-variant-numeric:tabular-nums">${val!=null?(+val).toFixed(2)+'%':'—'}</div>`
+      +(pd!==null?`<div style="margin-top:8px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:${+pd>=0?'var(--pos)':'var(--neg)'}">${+pd>=0?'+':''}${pd}% <span style="color:var(--txt-3)">к пред.</span></div>`:'<div style="margin-top:8px;height:16px"></div>')
+      +`<div style="margin-top:20px">${slider}</div></div>`;
+  }).join('');
+  // ── балл достижения целей
+  const zs=mets.map(met=>({...met, z:smmZoneEval(m[met.k],go[met.k],p[met.k])})).filter(x=>x.z.zone!=='none');
+  const green=zs.filter(x=>x.z.zone==='green').length, yellow=zs.filter(x=>x.z.zone==='yellow').length, red=zs.filter(x=>x.z.zone==='red').length, total=zs.length;
+  let scoreBlock='';
+  if(total){
+    const score=Math.round((green*100+yellow*50)/(total*100)*100);
+    const sLabel=score>=80?'Отличный результат':score>=50?'Хороший результат':score>=30?'Есть точки роста':'Требует внимания';
+    const sCol=score>=80?'var(--pos)':score>=50?'var(--accent)':score>=30?'var(--warn)':'var(--neg)';
+    const bars=zs.map(x=>{
+      const val=m[x.k], zc=getSMMZoneColor(x.z.zone), b=smmBands(val,go[x.k],p[x.k]);
+      const pd=(val!=null&&p[x.k]!=null&&p[x.k]!==0)?((val-p[x.k])/p[x.k]*100).toFixed(1):null;
+      const valPct=val!=null?Math.min(val/b.max*100,98).toFixed(1):null;
+      return `<div style="display:flex;align-items:center;padding:16px 0;border-bottom:1px solid var(--line)">`
+        +`<div style="width:3px;height:32px;background:${zc};margin-right:20px;flex-shrink:0;opacity:.7"></div>`
+        +`<div style="width:130px;flex-shrink:0;padding-right:16px;box-sizing:border-box"><div style="font-size:12px;font-weight:600;color:var(--txt-2);letter-spacing:.02em">${x.code}</div><div style="font-family:var(--mono);font-size:8px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px">${x.label}</div></div>`
+        +`<div style="flex:1;padding:0 24px;min-width:0"><div style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">ориентир: ${b.ref}</div>`
+        +`<div style="position:relative;height:2px;background:var(--line)"><div style="position:absolute;top:0;left:0;height:100%;width:${b.redEnd.toFixed(1)}%;background:${RZ}"></div><div style="position:absolute;top:0;left:${b.redEnd.toFixed(1)}%;height:100%;width:${(b.yelEnd-b.redEnd).toFixed(1)}%;background:${YZ}"></div><div style="position:absolute;top:0;left:${b.yelEnd.toFixed(1)}%;height:100%;right:0;background:${GZ}"></div>${valPct!=null?`<div style="position:absolute;top:50%;left:${valPct}%;transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:${zc};box-shadow:0 0 4px ${zc};z-index:2"></div>`:''}<div style="position:absolute;top:-3px;left:${b.redEnd.toFixed(1)}%;width:1px;height:8px;background:var(--line-2)"></div><div style="position:absolute;top:-3px;left:${b.yelEnd.toFixed(1)}%;width:1px;height:8px;background:var(--line-2)"></div></div>`
+        +`<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:7px;color:var(--txt-3);margin-top:5px;letter-spacing:.05em"><span>0</span><span>${b.low}%</span><span>${b.mid}%</span><span>${b.hi}%</span></div></div>`
+        +`<div style="text-align:right;flex-shrink:0;min-width:90px"><div style="font-size:24px;font-weight:700;letter-spacing:-.03em;color:var(--txt);font-variant-numeric:tabular-nums">${val!=null?(+val).toFixed(2)+'%':'—'}</div>${pd!==null?`<div style="font-family:var(--mono);font-size:9px;color:${+pd>=0?'var(--pos)':'var(--neg)'};margin-top:2px;letter-spacing:.04em">${+pd>=0?'+':''}${pd}%</div>`:''}</div></div>`;
+    }).join('');
+    scoreBlock=`<div style="padding:12px 0 10px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.2em;text-transform:uppercase">Позиция относительно целей</span></div>`
+      +`<div style="padding:20px 0"><div style="border-top:1px solid var(--line);padding-top:32px;margin-bottom:32px"><div style="display:flex;align-items:flex-end;gap:32px;margin-bottom:8px;flex-wrap:wrap"><div><div style="font-size:72px;font-weight:700;line-height:1;letter-spacing:-.05em;color:${sCol};font-variant-numeric:tabular-nums">${score}</div><div style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase;margin-top:4px">/ 100 · позиция относительно целей</div></div><div style="padding-bottom:10px"><div style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.01em">${sLabel}</div><div style="display:flex;gap:20px;margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;flex-wrap:wrap"><span style="color:var(--pos)">${green} в цели/выше</span><span style="color:var(--txt-3)">·</span><span style="color:var(--warn)">${yellow} близко</span><span style="color:var(--txt-3)">·</span><span style="color:var(--neg)">${red} ниже</span></div></div></div></div><div style="display:flex;flex-direction:column;border-top:1px solid var(--line)">${bars}</div></div>`;
+  } else {
+    scoreBlock=`<div style="padding:12px 0 10px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.2em;text-transform:uppercase">Позиция относительно целей</span></div><div style="padding:36px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3)">Установите цели метрик во вкладке «Данные» — появится балл и сравнение</div>`;
+  }
+  return '<div class="smm-rep02">'+H('02','Метрики эффективности')
+    +`<div style="padding-top:4px"><div class="smm-m02-grid">${cards}</div></div>`
+    +scoreBlock+'</div>';
+}
 function smmRenderPresentation(){
   const m=_smmCur.metrics, p=_smmCur.prev, go=_smmCur.goals;
   const totalReach=(m.reels_reach||0)+(m.stories_reach||0);
@@ -5747,7 +5810,7 @@ function smmRenderPresentation(){
 
   return '<div class="smm-wrap smm-pres">'
     +smmSection01HTML()
-    +smmMetricsBlockHTML()
+    +smmSection02HTML()
     +smmReelsBlockHTML()
     +smmRubricsBlockHTML()
     +smmConclusionsBlockHTML()
