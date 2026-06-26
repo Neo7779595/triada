@@ -914,6 +914,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-m02-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 @media(max-width:1100px){.smm-m02-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:680px){.smm-m02-grid{grid-template-columns:repeat(2,1fr)}}
+/* кастомный дропдаун сортировки (стиль TRIADA) */
+.smm-dd{position:relative;display:inline-block}
+.smm-dd-btn{display:flex;align-items:center;gap:9px;justify-content:space-between;background:var(--bg-2);border:1px solid var(--line-2);border-radius:8px;padding:7px 11px;color:var(--txt-2);font-family:var(--mono);font-size:10px;letter-spacing:.04em;cursor:pointer;transition:border-color .15s,color .15s;min-width:128px}
+.smm-dd-btn:hover{border-color:var(--accent-line);color:var(--txt)}
+.smm-dd-btn svg{width:10px;height:10px;opacity:.55;transition:transform .22s var(--ease-out);flex-shrink:0}
+.smm-dd.open .smm-dd-btn{border-color:var(--accent-line);color:var(--accent)}
+.smm-dd.open .smm-dd-btn svg{transform:rotate(180deg);opacity:.9}
+.smm-dd-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:100%;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;z-index:60;opacity:0;visibility:hidden;transform:translateY(-7px) scale(.98);transform-origin:top right;transition:opacity .18s var(--ease-out),transform .18s var(--ease-out),visibility .18s;box-shadow:0 16px 44px rgba(0,0,0,.55);backdrop-filter:blur(16px)}
+.smm-dd.open .smm-dd-menu{opacity:1;visibility:visible;transform:translateY(0) scale(1)}
+.smm-dd-opt{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;color:var(--txt-2);font-family:var(--mono);font-size:10px;letter-spacing:.04em;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap}
+.smm-dd-opt:hover{background:var(--bg-3);color:var(--txt)}
+.smm-dd-opt.on{color:var(--accent);background:rgba(55,230,200,.09)}
+.smm-dd-opt .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0;transition:opacity .12s;flex-shrink:0}
+.smm-dd-opt.on .dot{opacity:1}
+/* премиальная анимация появления секций отчёта */
+@keyframes smmRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.smm-rep01,.smm-rep02,.smm-rep05{animation:smmRise .6s var(--ease-out) both}
+.smm-rep02{animation-delay:.06s}
+.smm-m02-grid>div{animation:smmRise .5s var(--ease-out) both}
+.smm-m02-grid>div:nth-child(2){animation-delay:.05s}.smm-m02-grid>div:nth-child(3){animation-delay:.1s}.smm-m02-grid>div:nth-child(4){animation-delay:.15s}.smm-m02-grid>div:nth-child(5){animation-delay:.2s}
+@media(prefers-reduced-motion:reduce){.smm-rep01,.smm-rep02,.smm-rep05,.smm-m02-grid>div{animation:none}}
 @media(max-width:760px){.smm-pres{padding:8px 4px 40px}}
 .smm-sec{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r)}
 .smm-sec-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
@@ -5164,7 +5185,7 @@ function aggregateRubricsFromReels(payload){
     e.likes+=(+r.likes||0); e.comments+=(+r.comments||0); e.saves+=(+r.saves||0); e.shares+=(+r.shares||0);
   });
   const autoNames=Object.keys(map);
-  const manual=(payload.rubrics||[]).filter(r=>!autoNames.includes(r.name));
+  const manual=(payload.rubrics||[]).filter(r=>!autoNames.includes(r.name) && (r._manual===true || +r.reach>0 || +r.views>0));
   const auto=autoNames.map(name=>{
     const e=map[name];
     const er=e.reach>0?+(((e.likes+e.comments+e.saves+e.shares)/e.reach)*100).toFixed(2):0;
@@ -5249,7 +5270,7 @@ function smmReelRow(r,i){
   const cell=f=>'<input type="text" inputmode="decimal" value="'+iv(r[f])+'" oninput="smmReelEdit('+i+',\''+f+'\',this.value)">';
   return '<tr>'
     +'<td><input class="title-in" value="'+smmAttr(r.title)+'" placeholder="Reel #'+(i+1)+'" oninput="smmReelEdit('+i+',\'title\',this.value)"></td>'
-    +'<td><input class="rub-in" value="'+smmAttr(r.rubric)+'" placeholder="—" oninput="smmReelEdit('+i+',\'rubric\',this.value)"></td>'
+    +'<td><input class="rub-in" value="'+smmAttr(r.rubric)+'" placeholder="—" onchange="smmReelEdit('+i+',\'rubric\',this.value)"></td>'
     +'<td>'+cell('views')+'</td><td>'+cell('reach')+'</td><td>'+cell('likes')+'</td><td>'+cell('comments')+'</td><td>'+cell('saves')+'</td><td>'+cell('shares')+'</td>'
     +'<td class="er-cell" id="smm-er-'+i+'">'+(r.er||0).toFixed(2)+'%</td>'
     +'<td><button class="del" onclick="smmReelDel('+i+')" title="Удалить">×</button></td></tr>';
@@ -5308,7 +5329,7 @@ function smmRubricConfirm(){
   const n=id=>{ const v=smmNumOf(gv(id)); return v==null?0:v; };
   const reach=n('srb-reach'),likes=n('srb-likes'),comments=n('srb-comments'),saves=n('srb-saves'),shares=n('srb-shares');
   const er=reach>0?+(((likes+comments+saves+shares)/reach)*100).toFixed(2):0;
-  _smmCur.rubrics.push({name,posts:n('srb-posts'),reach,views:n('srb-views'),likes,comments,saves,shares,er});
+  _smmCur.rubrics.push({name,posts:n('srb-posts'),reach,views:n('srb-views'),likes,comments,saves,shares,er,_manual:true});
   smmMark(); smmRefreshRubrics();
 }
 function smmRubricDel(i){ _smmCur.rubrics.splice(i,1); smmMark(); smmRefreshRubrics(); }
@@ -5395,13 +5416,26 @@ function smmMetricsBlockHTML(){
     +'<span style="font-size:11px;color:var(--txt-3);font-family:var(--mono)">зона: цель → динамика</span></div>'
     +'<div class="smm-sec-b"><div class="smm-mgrid">'+cards+'</div></div></div>';
 }
+function smmDropdownHTML(cur,opts,fn){
+  const curLbl=(opts.find(o=>o[0]===cur)||opts[0])[1];
+  const chev='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>';
+  return '<div class="smm-dd"><button class="smm-dd-btn" onclick="smmDDToggle(this)">'+curLbl+chev+'</button>'
+    +'<div class="smm-dd-menu">'+opts.map(o=>'<div class="smm-dd-opt'+(o[0]===cur?' on':'')+'" onclick="'+fn+'(\''+o[0]+'\')"><span class="dot"></span>'+o[1]+'</div>').join('')+'</div></div>';
+}
+function smmDDToggle(btn){
+  const dd=btn.closest('.smm-dd'); if(!dd) return;
+  const wasOpen=dd.classList.contains('open');
+  document.querySelectorAll('.smm-dd.open').forEach(d=>d.classList.remove('open'));
+  if(!wasOpen) dd.classList.add('open');
+}
+if(typeof document!=='undefined' && !window._smmDDInit){ window._smmDDInit=true; document.addEventListener('click',function(e){ if(!e.target.closest('.smm-dd')) document.querySelectorAll('.smm-dd.open').forEach(d=>d.classList.remove('open')); }); }
 let _smmReelSort='er';
 function smmSetReelSort(f){ _smmReelSort=f; const el=document.getElementById('smm-reels-sec'); if(el) el.outerHTML=smmReelsBlockHTML(); }
 function smmReelsBlockHTML(){
   const isPct=f=>['er','lr','tr','shr','sr'].includes(f);
   const fmtM=(f,r)=>{ const v=r[f]; if(v==null||v==='') return '—'; return isPct(f)?(+v).toFixed(2)+'%':Number(v).toLocaleString('ru-RU'); };
   const OPTS=[['er','ER %'],['views','Просмотры'],['reach','Охват'],['tr','C/R %'],['shr','SH/R %'],['sr','SR %'],['lr','LR %']];
-  const sel=`<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span><select onchange="smmSetReelSort(this.value)" style="background:transparent;border:none;border-bottom:1px solid var(--line-2);border-radius:0;padding:2px 8px 2px 0;color:var(--txt-2);font-family:var(--mono);font-size:9px;outline:none;cursor:pointer;letter-spacing:.04em">`+OPTS.map(o=>`<option value="${o[0]}"${_smmReelSort===o[0]?' selected':''}>${o[1]}</option>`).join('')+`</select></div>`;
+  const sel=`<div style="display:flex;align-items:center;gap:9px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span>`+smmDropdownHTML(_smmReelSort,OPTS,'smmSetReelSort')+`</div>`;
   const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">03</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Опубликованный контент</span><div style="flex:1"></div>${sel}</div>`;
   const reels=(_smmCur.reels||[]).slice().sort((a,b)=>(+b[_smmReelSort]||0)-(+a[_smmReelSort]||0));
   if(!reels.length){
@@ -5430,7 +5464,7 @@ function smmReelsBlockHTML(){
       const pad=ci===0?'16px 18px 0 0':(last?'16px 0 0 18px':'16px 18px 0');
       return `<div style="padding:${pad};${last?'':'border-right:1px solid var(--line)'}"><div style="font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:7px;color:${active?'var(--accent)':'var(--txt-3)'}">${c[1]}</div><div style="font-family:var(--mono);font-size:18px;font-variant-numeric:tabular-nums;color:${active?'var(--accent)':'var(--txt)'}">${fmtM(c[0],r)}</div></div>`;
     }).join('');
-    const inner=`<div style="position:relative;display:flex;gap:24px;padding:26px 28px;margin-bottom:14px;border-radius:16px;background:${cardBg};border:1px solid ${cardBd}">`
+    const inner=`<div style="position:relative;display:flex;gap:24px;padding:26px 28px;margin-bottom:14px;border-radius:16px;background:${cardBg};border:1px solid ${cardBd};animation:smmRise .5s var(--ease-out) both;animation-delay:${(i*0.04).toFixed(2)}s">`
       +(isTop?`<div style="position:absolute;left:0;top:26px;bottom:26px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#7BF0DC,var(--accent))"></div>`:'')
       +`<div style="position:relative;width:96px;height:128px;flex-shrink:0"><div style="position:absolute;inset:0;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid ${coverBd};${coverInner}<div style="position:absolute;top:-9px;left:-9px;width:26px;height:26px;border-radius:8px;font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px var(--bg-1);${rankStyle}">${i+1}</div></div>`
       +`<div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center">`
@@ -5447,7 +5481,7 @@ function smmSetRubSort(f){ _smmRubSort=f; const el=document.getElementById('smm-
 function smmRubricsBlockHTML(){
   const fmt=v=>(v==null||v===0)?'—':Number(v).toLocaleString('ru-RU');
   const OPTS=[['er','ER %'],['reach','Охват'],['views','Просмотры']];
-  const sel=`<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span><select onchange="smmSetRubSort(this.value)" style="background:transparent;border:none;border-bottom:1px solid var(--line-2);border-radius:0;padding:2px 8px 2px 0;color:var(--txt-2);font-family:var(--mono);font-size:9px;outline:none;cursor:pointer;letter-spacing:.04em">`+OPTS.map(o=>`<option value="${o[0]}"${_smmRubSort===o[0]?' selected':''}>${o[1]}</option>`).join('')+`</select></div>`;
+  const sel=`<div style="display:flex;align-items:center;gap:9px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span>`+smmDropdownHTML(_smmRubSort,OPTS,'smmSetRubSort')+`</div>`;
   const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">04</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Рубрики контента</span><div style="flex:1"></div>${sel}</div>`;
   const rubs=(_smmCur.rubrics||[]).slice().sort((a,b)=>(+b[_smmRubSort]||0)-(+a[_smmRubSort]||0));
   if(!rubs.length){
@@ -5471,7 +5505,7 @@ function smmRubricsBlockHTML(){
     const lb=top?'var(--accent)':'var(--line)';
     const cells=[['Охват',fmt(r.reach),reActive],['Просмотры',fmt(r.views),viActive],['Постов',(r.posts?r.posts:'—'),false]];
     const cellsHTML=cells.map((c,ci)=>`<div style="${ci<2?'border-right:1px solid var(--line);':''}padding:0 10px 0 ${ci?10:0}px"><div style="${EB};color:${c[2]?'var(--accent)':'var(--txt-3)'};margin-bottom:4px">${c[0]}</div><div style="font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:${c[2]?'var(--txt)':'var(--txt-2)'}">${c[1]}</div></div>`).join('');
-    return `<div style="background:${rowBg};border:1px solid ${brd};border-left:2px solid ${lb};border-radius:0 8px 8px 0;padding:15px 17px;transition:background .15s,border-color .15s" onmouseover="this.style.background='rgba(255,255,255,.025)'" onmouseout="this.style.background='${rowBg}'">`
+    return `<div style="background:${rowBg};border:1px solid ${brd};border-left:2px solid ${lb};border-radius:0 8px 8px 0;padding:15px 17px;transition:background .15s,border-color .15s;animation:smmRise .45s var(--ease-out) both;animation-delay:${(i*0.04).toFixed(2)}s" onmouseover="this.style.background='rgba(255,255,255,.025)'" onmouseout="this.style.background='${rowBg}'">`
       +`<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px"><span style="font-family:var(--mono);font-size:10px;color:${top?'var(--accent)':'var(--txt-3)'};flex-shrink:0">${i+1<10?'0':''}${i+1}</span><span style="font-size:14px;font-weight:${top?'500':'400'};color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_ddH(r.name)}</span><span style="margin-left:auto;flex-shrink:0">${badge}</span></div>`
       +`<div style="display:flex;align-items:baseline;gap:3px"><span style="font-family:var(--mono);font-size:32px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1;color:${anomaly?'var(--neg)':(top?'#7BF0DC':'var(--txt)')}">${er?er.toFixed(2):'—'}</span><span style="font-family:var(--mono);font-size:16px;color:var(--txt-2)">%</span><span style="${EB};color:var(--txt-3);margin-left:6px">ER</span></div>`
       +`<div style="margin-top:13px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px"><span style="${EB};color:${reActive?'var(--accent)':'var(--txt-3)'}">доля охвата портфеля</span><span style="font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:${top?'#7BF0DC':'var(--txt-2)'}">${share.toFixed(0)}%</span></div><div style="height:5px;border-radius:3px;background:var(--line)"><div style="height:100%;border-radius:3px;width:${Math.min(share,100).toFixed(1)}%;background:${top?'var(--accent)':'rgba(55,230,200,.45)'};transition:width .8s"></div></div></div>`
@@ -5667,11 +5701,11 @@ function smmConclusionsBlockHTML(){
     return '<div class="smm-rep05"><div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">05</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Выводы и рекомендации</span></div><div style="padding:56px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em">Заполните метрики во вкладке «Данные» — выводы построятся автоматически</div></div>';
   }
   const body=C.map((c,i)=>{ const col=TC[c.tone]||TC.neutral; const nn=(i+1<10?'0':'')+(i+1);
-    return '<div style="display:flex;gap:18px;padding:24px 0;border-bottom:1px solid var(--line);animation:fadeUp .5s both;animation-delay:'+(i*0.05).toFixed(2)+'s">'
-      +'<div style="display:flex;gap:14px;flex-shrink:0"><div style="font-family:var(--mono);font-size:11px;color:var(--txt-3);width:22px;padding-top:4px;font-variant-numeric:tabular-nums;letter-spacing:.05em">'+nn+'</div><div style="width:2px;background:'+col+';opacity:.8;border-radius:2px"></div></div>'
-      +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;flex-wrap:wrap"><span style="font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:'+col+';border:1px solid '+col+';border-radius:2px;padding:3px 7px;opacity:.9">'+(TG[c.tone]||'')+'</span><span style="font-size:15px;font-weight:600;color:var(--txt);letter-spacing:-.015em;line-height:1.35">'+c.title+'</span></div>'
+    return '<div style="background:var(--bg-1);border:1px solid var(--line);border-left:2px solid '+col+';border-radius:0 10px 10px 0;padding:20px 24px;margin-bottom:10px;display:flex;gap:16px;animation:smmRise .5s var(--ease-out) both;animation-delay:'+(i*0.05).toFixed(2)+'s">'
+      +'<div style="font-family:var(--mono);font-size:11px;color:var(--txt-3);width:20px;flex-shrink:0;padding-top:3px;font-variant-numeric:tabular-nums;letter-spacing:.05em">'+nn+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;flex-wrap:wrap"><span style="font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:'+col+';border:1px solid '+col+';border-radius:3px;padding:3px 7px;opacity:.9">'+(TG[c.tone]||'')+'</span><span style="font-size:15px;font-weight:600;color:var(--txt);letter-spacing:-.015em;line-height:1.35">'+c.title+'</span></div>'
       +'<div style="font-size:13.5px;line-height:1.68;color:var(--txt-2);letter-spacing:.005em">'+c.body+'</div>'
-      +'<div style="margin-top:12px;display:flex;gap:8px;align-items:baseline"><span style="font-family:var(--mono);font-size:11px;color:var(--accent);flex-shrink:0">→</span><span style="font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--txt-2);letter-spacing:.01em">'+c.rec+'</span></div></div></div>';
+      +'<div style="margin-top:13px;padding-top:13px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:baseline"><span style="font-family:var(--mono);font-size:11px;color:'+col+';flex-shrink:0">\u2192</span><span style="font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--txt-2);letter-spacing:.01em">'+c.rec+'</span></div></div></div>';
   }).join('');
   const secHead='<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">05</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Выводы и рекомендации</span><div style="flex:1"></div><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Стратегический разбор</span></div>';
   const head='<div style="display:flex;align-items:baseline;justify-content:space-between;padding:16px 0 20px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.16em;text-transform:uppercase">Принцип разбора&nbsp;&nbsp;·&nbsp;&nbsp;вывод&nbsp;→&nbsp;аргумент&nbsp;→&nbsp;рекомендация</span><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;text-transform:uppercase">'+C.length+' '+pl(C.length,'вывод','вывода','выводов')+'</span></div>';
