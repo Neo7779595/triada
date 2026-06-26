@@ -838,6 +838,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .crep:hover{transform:translateY(-2px);border-color:var(--line-2)}
 .dept-card{transition:transform .34s var(--ease-out),border-color .3s,box-shadow .32s}
 .dept-card:hover{transform:translateY(-3px);border-color:var(--accent-line);box-shadow:0 28px 58px -36px rgba(0,0,0,.9)}
+.dept-clic{cursor:pointer}
+.dept-clic:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px}
+.tc-modal{max-width:480px}
+#tc-body{max-height:58vh;overflow-y:auto;margin:-2px -4px 0;padding:2px 4px}
+.tc-sec{margin-bottom:16px}
+.tc-sec-h{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);margin-bottom:9px;font-weight:600}
+.tc-ct{background:var(--bg-3);border-radius:20px;padding:1px 9px;font-size:11px;color:var(--txt-2);letter-spacing:0}
+.tc-row{display:flex;align-items:center;gap:11px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--bg);transition:.14s}
+.tc-row:hover{border-color:var(--line-2)}
+.tc-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#06140f;flex:none;overflow:hidden;position:relative}
+.tc-id{flex:1;min-width:0}
+.tc-id .nm{font-size:13.5px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-id .rl{font-size:11px;color:var(--txt-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tc-btn{display:flex;align-items:center;gap:5px;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);transition:.15s;flex:none}
+.tc-btn.add{background:var(--accent-dim);color:var(--accent)}
+.tc-btn.add:hover{background:var(--accent);color:var(--accent-ink)}
+.tc-btn.rem{background:var(--bg-3);color:var(--txt-3)}
+.tc-btn.rem:hover{background:var(--neg-dim);color:var(--neg)}
+.tc-empty{font-size:12px;color:var(--txt-3);padding:14px;text-align:center;border:1px dashed var(--line-2);border-radius:10px}
 .price-card{transition:transform .36s var(--spring),border-color .3s,box-shadow .3s}
 .price-card:hover{transform:translateY(-6px);box-shadow:0 34px 70px -40px rgba(0,0,0,.95)}
 .price-card.pop:hover{transform:translateY(-9px)}
@@ -3439,7 +3458,7 @@ function myProfileOpen(){
         <div style="min-width:0">
           <div style="font-size:16px;font-weight:700">${(me.full_name||'—')}</div>
           <div style="font-size:12.5px;color:var(--txt-2);margin-top:3px">${me.role_title||roleNames[me.role]||'Сотрудник'}${me.dept?(' · '+me.dept):''}</div>
-          <div style="font-size:11px;color:var(--txt-3);margin-top:8px;line-height:1.5">Имя, логин, отдел и доступы изменяет только владелец агентства.</div>
+          <div style="font-size:11px;color:var(--txt-3);margin-top:8px;line-height:1.5">Имя, логин, команда и доступы изменяет только владелец агентства.</div>
         </div>
       </div>
       ${(()=>{ const linked=!!me.tg_user_id; const code=me.tg_link_code||''; const uname=window.TG_BOT_USERNAME||''; const ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>';
@@ -3709,9 +3728,9 @@ function npTeamPickerOpen(){
   const team=(typeof TEAM!=='undefined'?TEAM:[]);
   window._npPickWork=new Set(window.NP_TEAM||[]);
   window._npPickDept='all';
-  const depts=[...new Set(team.map(m=>m.dept||'Без отдела'))];
+  const depts=[...new Set(team.map(m=>m.dept||'Без команды'))];
   const chips='<button type="button" class="np-pick-dept on" data-d="all" onclick="npPickDept(this)">Все</button>'+depts.map(d=>'<button type="button" class="np-pick-dept" data-d="'+_attr(d)+'" onclick="npPickDept(this)">'+_ddH(d)+'</button>').join('');
-  ov.innerHTML='<div class="modal"><div class="modal-h"><h3>Команда проекта</h3><p>Выбери участников · поиск и отделы</p></div>'
+  ov.innerHTML='<div class="modal"><div class="modal-h"><h3>Команда проекта</h3><p>Выбери участников · поиск и команды</p></div>'
     +'<div class="modal-b"><input id="np-pick-q" class="np-pick-q" placeholder="Поиск по имени или роли" oninput="npTeamPickerRender()">'
     +'<div class="np-pick-depts">'+chips+'</div><div id="np-pick-list" class="np-pick-list"></div></div>'
     +'<div class="modal-f"><button class="btn-ghost" onclick="npTeamPickerClose()">Отмена</button><button class="btn-add" onclick="npTeamPickerDone()">Готово<span id="np-pick-cnt"></span></button></div></div>';
@@ -3724,9 +3743,9 @@ function npTeamPickerRender(){
   const team=(typeof TEAM!=='undefined'?TEAM:[]); const work=window._npPickWork||(window._npPickWork=new Set());
   const q=((document.getElementById('np-pick-q')||{}).value||'').trim().toLowerCase(); const dept=window._npPickDept||'all';
   const ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
-  const rows=team.filter(m=>{ if(dept!=='all' && (m.dept||'Без отдела')!==dept) return false; if(q && !((m.name||'').toLowerCase().includes(q)||(m.role||'').toLowerCase().includes(q))) return false; return true; });
+  const rows=team.filter(m=>{ if(dept!=='all' && (m.dept||'Без команды')!==dept) return false; if(q && !((m.name||'').toLowerCase().includes(q)||(m.role||'').toLowerCase().includes(q))) return false; return true; });
   if(!rows.length){ list.innerHTML='<div class="np-team-empty">Никого не найдено</div>'; npPickCount(); return; }
-  const groups={}; rows.forEach(m=>{ const d=m.dept||'Без отдела'; (groups[d]=groups[d]||[]).push(m); });
+  const groups={}; rows.forEach(m=>{ const d=m.dept||'Без команды'; (groups[d]=groups[d]||[]).push(m); });
   let html=''; Object.keys(groups).forEach(d=>{ html+='<div class="np-team-dept">'+_ddH(d)+'</div>';
     groups[d].forEach(m=>{ const on=work.has(m._id); const c=m.color||'#37E6C8'; const ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase());
       html+='<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="npPickToggle(\''+m._id+'\')"><span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+(m.avatar?('<img src="'+String(m.avatar).replace(/"/g,'')+'" alt="">'):ltr)+'</span><span class="np-tm-n">'+_ddH(m.name||'—')+'</span><span class="np-tm-r">'+_ddH(m.role||'')+'</span><span class="np-tm-ck">'+ck+'</span></button>'; }); });
@@ -7798,7 +7817,7 @@ function renderTeam(){
       const comp=d.assigned?Math.round(100*d.done/d.assigned):null;
       const conc=d.open?Math.round(100*d.maxOpen/d.open):0;
       const reworkHigh=d.done && Math.round(100*d.rework/Math.max(d.done,1))>=20;
-      return `<div class="dept-card">
+      return `<div class="dept-card dept-clic" onclick="openTeamCompose('${_attr(d.name)}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openTeamCompose('${_attr(d.name)}')">
         <div class="dept-h"><div><div class="dept-cy">${d.v30}<span class="u"> закр.</span></div><div style="font-size:11px;color:var(--txt-3);margin-top:5px">закрыто за 30 дн · ${d.emps.length} сотр.</div></div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px"><div class="dept-name">${d.name}</div>${reworkHigh?'<span class="badge b-susp" style="font-size:9.5px"><span class="bd"></span>Возвраты высокие</span>':''}</div></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><span style="font-size:11px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em">Выполнение задач</span><span class="num" style="font-size:18px;color:${comp!=null?effColor(comp):'var(--txt-3)'}">${comp!=null?comp+'%':'—'}</span></div>
@@ -7806,7 +7825,7 @@ function renderTeam(){
         <div class="dept-stats"><div class="st"><div class="v">${d.open}</div><div class="l">В работе</div></div><div class="st"><div class="v" style="color:${d.rework?'var(--neg)':'var(--txt)'}">${d.rework}</div><div class="l">Возвратов</div></div><div class="st"><div class="v">${d.done}</div><div class="l">Выполнено</div></div></div>
         ${conc>=70&&d.emps.length>1?`<div class="dept-warn">⚠ ${conc}% открытых задач на одном исполнителе</div>`:''}
         <div style="display:flex;margin-top:13px">${d.emps.slice(0,5).map((e,i)=>`<span style="position:relative;overflow:hidden;width:28px;height:28px;border-radius:50%;background:${e.color};color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid var(--bg-1);margin-left:${i?'-6px':'0'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>`).join('')}</div>
-      </div>`;}).join(''):'<div class="empty-mini">Нет отделов</div>'}</div>`;
+      </div>`;}).join(''):'<div class="empty-mini">Нет команд</div>'}</div>`;
   }
   const _today=new Date().toISOString().slice(0,10);
   const _dirty=(_teamFilter.dept!=='all'||_teamFilter.q||_teamFilter.sort!=='tpi'||_teamPeriod.key!=='30d');
@@ -7823,7 +7842,7 @@ function renderTeam(){
       <div class="ti-cal">${teamRangeField()}</div>
       <span class="vr"></span>
       <div class="ti-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="ti-search" placeholder="Поиск сотрудника" value="${(_teamFilter.q||'').replace(/"/g,'&quot;')}" oninput="teamSearch(this.value)" onfocus="window._tiFocus=1" onblur="window._tiFocus=0"></div>
-      ${_dd('tmdept','Отдел', _teamFilter.dept==='all'?'Все':_teamFilter.dept, [['all','Все отделы']].concat(depts.map(d=>[d,d])), _teamFilter.dept, 'setTeamDept')}
+      ${_dd('tmdept','Команда', _teamFilter.dept==='all'?'Все':_teamFilter.dept, [['all','Все команды']].concat(depts.map(d=>[d,d])), _teamFilter.dept, 'setTeamDept')}
       ${_dd('tmsort','Сортировка', (TM_SORT_OPTS.find(o=>o[0]===_teamFilter.sort)||['','—'])[1], TM_SORT_OPTS, _teamFilter.sort, 'setTeamSort')}
       ${_dirty?`<button class="pk-fclear" onclick="resetTeamFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
     </div>`:''}
@@ -7839,13 +7858,68 @@ function renderTeam(){
       <div class="segm">
         <button class="${teamTab==='employees'?'on':''}" onclick="setTeamTab('employees')">Рейтинг</button>
         <button class="${teamTab==='workload'?'on':''}" onclick="setTeamTab('workload')">Нагрузка</button>
-        <button class="${teamTab==='depts'?'on':''}" onclick="setTeamTab('depts')">Отделы</button>
+        <button class="${teamTab==='depts'?'on':''}" onclick="setTeamTab('depts')">Команды</button>
       </div>
       ${agIsOwner()?`<button class="btn-add" onclick="openEmp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить сотрудника</button>`:''}
     </div>
     ${body}`;
   _tiCountUp();
   if(window._tiFocus){ const si=document.getElementById('ti-search'); if(si){ si.focus(); const L=si.value.length; try{si.setSelectionRange(L,L);}catch(e){} } }
+}
+
+/* ── СОСТАВ КОМАНДЫ: просмотр участников, добавление, удаление ── */
+let _tcDept=null;
+function openTeamCompose(dept){
+  _tcDept=dept;
+  pd2Open(`<div class="modal tc-modal">
+    <div class="modal-h"><h3>Команда · ${_ddH(dept)}</h3><p>Состав команды — добавляйте и убирайте сотрудников</p></div>
+    <div id="tc-body">${teamComposeBody(dept)}</div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Готово</button></div>
+  </div>`);
+}
+function teamComposeBody(dept){
+  const inTeam=TEAM.filter(e=>(e.dept||'—')===dept);
+  const others=TEAM.filter(e=>(e.dept||'—')!==dept);
+  const owner=agIsOwner();
+  const row=(e,inside)=>`<div class="tc-row">
+    <span class="tc-av" style="background:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>
+    <div class="tc-id"><div class="nm">${_ddH(e.name||'—')}</div><div class="rl">${_ddH(e.role||'Сотрудник')}${e.dept&&!inside?` · ${_ddH(e.dept)}`:''}</div></div>
+    ${owner?(inside
+      ? `<button class="tc-btn rem" onclick="teamRemoveFromTeam('${e._id}')" title="Убрать из команды"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>Убрать</button>`
+      : `<button class="tc-btn add" onclick="teamAddToTeam('${e._id}')" title="Добавить в команду"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить</button>`)
+      :''}
+  </div>`;
+  return `<div class="tc-sec">
+      <div class="tc-sec-h"><span>Участники</span><span class="tc-ct">${inTeam.length}</span></div>
+      ${inTeam.length?inTeam.map(e=>row(e,true)).join(''):'<div class="tc-empty">В команде пока никого нет</div>'}
+    </div>
+    ${owner?`<div class="tc-sec">
+      <div class="tc-sec-h"><span>Добавить в команду</span><span class="tc-ct">${others.length}</span></div>
+      ${others.length?others.map(e=>row(e,false)).join(''):'<div class="tc-empty">Все сотрудники уже в этой команде</div>'}
+    </div>
+    <button class="btn-add" style="width:100%;justify-content:center;margin-top:4px" onclick="openEmpInTeam('${_attr(dept)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Создать нового сотрудника в команде</button>`:''}`;
+}
+function _tcRefresh(){ const b=document.getElementById('tc-body'); if(b&&_tcDept!=null) b.innerHTML=teamComposeBody(_tcDept); }
+function teamAddToTeam(id){
+  if(!agIsOwner()){ toast('Управление командой доступно только владельцу'); return; }
+  const e=TEAM.find(x=>String(x._id)===String(id)); if(!e) return;
+  e.dept=_tcDept;
+  if(window.LIVE && window.tSetMemberDept){ window.tSetMemberDept(id,_tcDept); }
+  _tcRefresh(); renderTeam();
+  toast(`${e.name} добавлен в команду «${_tcDept}»`);
+}
+function teamRemoveFromTeam(id){
+  if(!agIsOwner()){ toast('Управление командой доступно только владельцу'); return; }
+  const e=TEAM.find(x=>String(x._id)===String(id)); if(!e) return;
+  e.dept='Без команды';
+  if(window.LIVE && window.tSetMemberDept){ window.tSetMemberDept(id,'Без команды'); }
+  _tcRefresh(); renderTeam();
+  toast(`${e.name} убран из команды`);
+}
+function openEmpInTeam(dept){
+  pd2Close();
+  openEmp();
+  setTimeout(()=>{ const inp=document.getElementById('e-dept'); if(inp){ inp.value=dept; } }, 30);
 }
 
 /* employee creation with permission grid + login */
@@ -7876,7 +7950,7 @@ function openEmp(){
   empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.remove('on'); }
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass','phone','tg'].forEach(id=>document.getElementById('e-'+id).value='');
-  document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Отдел',_tagList('dept',['Продакшн','Администрация','Руководство'],'Продакшн'),'Продакшн','Выбери или создай','dept');
+  document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Команда',_tagList('dept',['Продакшн','Администрация','Руководство'],'Продакшн'),'Продакшн','Выбери или создай','dept');
   document.getElementById('e-email').textContent='ivan@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Новый сотрудник';
   document.getElementById('emp-save').textContent='Создать сотрудника';
@@ -7891,7 +7965,7 @@ function openEmpEdit(i){
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   document.getElementById('e-name').value=e.name||'';
   document.getElementById('e-role').value=e.role||'';
-  var _ed=e.dept||'Продакшн'; document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Отдел',_tagList('dept',['Продакшн','Администрация','Руководство'],_ed),_ed,'Выбери или создай','dept');
+  var _ed=e.dept||'Продакшн'; document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Команда',_tagList('dept',['Продакшн','Администрация','Руководство'],_ed),_ed,'Выбери или создай','dept');
   document.getElementById('e-login').value=e.login||'';
   document.getElementById('e-pass').value='';
   document.getElementById('e-phone').value=e.phone||'';
@@ -8286,7 +8360,7 @@ const MOD_INFO={
   overview:{t:'Сводка',d:'Индекс здоровья, on-time delivery, velocity, выручка на час, rework, churn, портфель проектов и загрузка по этапам.'},
   cycles:{t:'Циклы',d:'Cycle Time Intelligence: медиана и p90 по этапам, узкое место, % возвратов, тренд по месяцам, бенчмарк по клиентам. Доменно-нейтрально.'},
   finance:{t:'Финансы',d:'P&L агентства и по проектам: MRR, расходы по статьям, маржинальность, runway, break-even, распределение прибыли между партнёрами.'},
-  team:{t:'Команда',d:'Сотрудники, нагрузка, эффективность отделов и орг-структура. Здесь же — создание сотрудника с галочками прав (видит / редактирует) и выдачей логина.'},
+  team:{t:'Команда',d:'Сотрудники, нагрузка, эффективность команд и орг-структура. Здесь же — создание сотрудника с галочками прав (видит / редактирует) и выдачей логина.'},
   kb:{t:'База знаний',d:'Категории и материалы по проектам: ссылки, Google Docs, Figma, Miro, Notion, Telegram — кастомные категории агентства.'},
   tools:{t:'Инструменты',d:'Агентское пространство: закладки на инструменты и продукты команды, сгруппированные по категориям.'},
 };
@@ -9207,7 +9281,7 @@ window.tLoadTeam = async () => {
     m._workSec=a.worksec; m._workCnt=a.workcnt;
     m._taskStat=_td[m._id]||[];
     m._overdue=a.overdue; m._uniq30=a.uniq30; m._redo30=a.redo30; m._sUniq30=a.sUniq30; m._tUniq30=a.tUniq30;
-    m._v30=a.uniq30; m._rework=a.rework;   // _v30 = объединённая уникальная выработка (для отделов/KPI)
+    m._v30=a.uniq30; m._rework=a.rework;   // _v30 = объединённая уникальная выработка (для команд/KPI)
     m._lastDays = a.last!=null ? Math.floor((now - a.last)/86400000) : null;
     m._compPct = a.assigned ? Math.round(100*a.done/a.assigned) : null;
     tA+=a.assigned; tO+=a.open; tOv+=a.overdue; tV+=a.uniq30;
@@ -9524,6 +9598,11 @@ window.tProvisionMember = async (m) => {
 window.tUpdateMemberPerms = async (id, perms) => {
   try { await SB.from('profiles').update({ permissions: perms }).eq('id', id);
     toast('Доступы обновлены'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tSetMemberDept = async (id, dept) => {
+  try { await SB.from('profiles').update({ dept }).eq('id', id);
+    await window.tLoadAll(ME.role); teamTab='depts'; renderTeam(); if(typeof _tcRefresh==='function') _tcRefresh();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tUpdateMember = async (id, perms, contact={}) => {
