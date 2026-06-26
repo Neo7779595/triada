@@ -4797,7 +4797,7 @@ function _drBounds(){
   return [null,null];
 }
 function _drCalBtn(cls,which,has,label,clearFn){
-  return `<div class="dpick dr-wrap${cls}" id="dr-wrap">`
+  return `<div class="dpick dr-wrap${cls}" id="dr-wrap-${which}">`
     +`<button type="button" class="dp-trigger ${has?'':'empty'}" onclick="event.stopPropagation();drToggle('${which}')"><span class="dp-val">${label}</span>`
     +(has?`<span class="dr-clear" onclick="event.stopPropagation();${clearFn}" title="Сбросить период">✕</span>`
         :`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`)
@@ -4817,7 +4817,8 @@ function dlClearRange(){ agDlFrom=''; agDlTo=''; renderDeadlines(); }
 function teamClearRange(){ _teamPeriod.from=null; _teamPeriod.to=null; _teamPeriod.key='30d'; _teamPeriod.days=30; renderTeam(); }
 function drToggle(which){
   _drCtx = which==='team' ? DRCTX_TEAM : DRCTX_DL;
-  const w=document.getElementById('dr-wrap'); if(!w) return;
+  window._drWhich = which;
+  const w=document.getElementById('dr-wrap-'+which); if(!w) return;
   if(w.querySelector('.dr-pop')){ drClose(); return; }
   _closePops();
   const base=_drCtx.from()||_drCtx.to()||_iso(new Date()), a=base.split('-').map(Number);
@@ -4826,8 +4827,8 @@ function drToggle(which){
   pop.addEventListener('click',ev=>ev.stopPropagation());
   pop.innerHTML=_drGrid(); w.appendChild(pop);
 }
-function drClose(){ const w=document.getElementById('dr-wrap'), p=w&&w.querySelector('.dr-pop'); if(p)p.remove(); _dr.anchor=null; _dr.hover=null; }
-function _drRefresh(){ const w=document.getElementById('dr-wrap'), p=w&&w.querySelector('.dr-pop'); if(p)p.innerHTML=_drGrid(); }
+function drClose(){ const w=document.getElementById('dr-wrap-'+(window._drWhich||'team')), p=w&&w.querySelector('.dr-pop'); if(p)p.remove(); _dr.anchor=null; _dr.hover=null; }
+function _drRefresh(){ const w=document.getElementById('dr-wrap-'+(window._drWhich||'team')), p=w&&w.querySelector('.dr-pop'); if(p)p.innerHTML=_drGrid(); }
 function drNav(delta){ let m=_dr.m+delta,y=_dr.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} _dr.y=y;_dr.m=m; _drRefresh(); }
 function drDay(iso){
   if(_dr.anchor===null){ _dr.anchor=iso; _dr.hover=iso; _drRefresh(); }
