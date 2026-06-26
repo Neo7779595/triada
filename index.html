@@ -8460,7 +8460,7 @@ window.tLoadDeadlines = async () => {
   if (!SB) return;
   const [st, tk, hist] = await Promise.all([
     SB.from('project_stages').select('id,name,status,due_date,due_time, projects(name,logo,logo_url)').not('due_date','is',null),
-    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,completed_at, projects(name,logo,logo_url)').not('due_date','is',null),
+    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id, projects(name,logo,logo_url)').not('due_date','is',null),
     SB.from('stage_history').select('stage_name,new_status,created_at, projects(name)').order('created_at',{ascending:false}).limit(30)
   ]);
   const _push = (label, status, due, projObj, id, type, assignee, dueTime, doneAt) => {
@@ -8472,11 +8472,12 @@ window.tLoadDeadlines = async () => {
   };
   if (typeof DEADLINES !== 'undefined'){
     DEADLINES.length = 0;
-    // мягкая догрузка даты завершения этапов (если колонка есть) — не ломает, если миграции ещё нет
-    let _stDone = {};
+    // мягкая догрузка даты завершения (если колонок ещё нет — задачи/этапы всё равно грузятся)
+    let _stDone = {}, _tkDone = {};
     try { const sd = await SB.from('project_stages').select('id,completed_at'); if(!sd.error && sd.data) sd.data.forEach(r=>{ if(r.completed_at) _stDone[r.id]=r.completed_at; }); } catch(_){}
+    try { const td = await SB.from('project_tasks').select('id,completed_at'); if(!td.error && td.data) td.data.forEach(r=>{ if(r.completed_at) _tkDone[r.id]=r.completed_at; }); } catch(_){}
     (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id]));
-    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, r.completed_at));
+    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, _tkDone[r.id]));
   }
   if (typeof DL_ACT !== 'undefined'){
     DL_ACT.length = 0;
