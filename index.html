@@ -7603,8 +7603,9 @@ function renderTeam(){
     const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
     const TOT=W+I+D, shareOf=v=>TOT?Math.round(100*v/TOT):0;
     const sorted=[...TEAM].sort((a,b)=>((b._wait||0)+(b._active||0)+(b._done||0))-((a._wait||0)+(a._active||0)+(a._done||0)));
-    const _wbn={}; (typeof CYCLES!=='undefined'&&CYCLES.workByAsg?CYCLES.workByAsg:[]).forEach(a=>{ _wbn[a.name]={sec:a.total,cnt:a.count}; });
-    const _wsec=e=>{ if(e._workSec!=null&&e._workSec>0) return {sec:e._workSec,cnt:e._workCnt||0}; const f=_wbn[e.name]; return f?{sec:f.sec,cnt:f.cnt}:{sec:0,cnt:0}; };
+    const {t0:_pwT0,t1:_pwT1}=_tWindow();
+    const _pWork={}; (window._timeLogs||[]).forEach(l=>{ if(!l||(l.kind&&l.kind!=='work')) return; const ts=l.started_at?new Date(l.started_at).getTime():0; if(ts>=_pwT0&&ts<=_pwT1){ const a=_pWork[l.member_id]||(_pWork[l.member_id]={sec:0,cnt:0}); a.sec+=(l.seconds||0); a.cnt++; } });
+    const _wsec=e=>{ const a=_pWork[e._id]; return a?{sec:a.sec,cnt:a.cnt}:{sec:0,cnt:0}; };
     const _maxWork=Math.max(1,...sorted.map(e=>_wsec(e).sec)), _totWork=sorted.reduce((s,e)=>s+_wsec(e).sec,0);
     const _wcell=e=>{ const wd=_wsec(e); if(wd.sec<=0) return '<span class="wlx-cell z">—</span>'; const wavg=wd.cnt?Math.round(wd.sec/wd.cnt):0; const w=(wd.sec/_maxWork*100).toFixed(1); return '<div class="wlx-tcell"><div class="wlx-tbar"><i style="width:'+w+'%"></i></div><div class="wlx-tinfo"><span class="wlx-tval">'+_cycDur(wd.sec*1000)+'</span><span class="wlx-tavg">ср. '+_cycDur(wavg*1000)+'</span></div></div>'; };
     const cell=(v,dim,col)=> v>0?`<span class="wlx-cell" style="background:${dim};color:${col}">${v}</span>`:'<span class="wlx-cell z">—</span>';
@@ -7613,10 +7614,11 @@ function renderTeam(){
         <div class="wlx-s"><div class="v" style="color:var(--warn)">${W}<small>${shareOf(W)}%</small></div><div class="l"><span class="dt" style="background:var(--warn)"></span>В ожидании</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--accent)">${I}<small>${shareOf(I)}%</small></div><div class="l"><span class="dt" style="background:var(--accent)"></span>В работе</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--pos)">${D}<small>${shareOf(D)}%</small></div><div class="l"><span class="dt" style="background:var(--pos)"></span>Завершено</div></div>
-        <div class="wlx-s"><div class="v" style="color:var(--accent)">${_totWork>0?_cycDur(_totWork*1000):'—'}</div><div class="l"><span class="dt" style="background:var(--accent)"></span>Время в работе · всего</div></div>
+        <div class="wlx-s"><div class="v" style="color:var(--accent)">${_totWork>0?_cycDur(_totWork*1000):'—'}</div><div class="l"><span class="dt" style="background:var(--accent)"></span>Время в работе · за ${_periodLbl()}</div></div>
       </div>
       <div class="card">
-        <div class="wlx-cardh"><span>По сотрудникам</span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
+        <div class="wlx-cardh"><span>По сотрудникам <span style="color:var(--txt-3);font-weight:400;font-size:11px">· время за ${_periodLbl()}</span></span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
+        ${_totWork<=0?`<div style="padding:9px 14px;font-size:11.5px;color:var(--txt-3);border-bottom:1px solid var(--line);line-height:1.5">За выбранный период учтённого времени нет. Журнал заполняется по мере работы команды — время копится с момента включения учёта (паузы и переносы из «В работе»).</div>`:''}
         <table class="wlx-tbl">
           <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th><th>Время в работе</th></tr></thead>
           <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d,tt=t||1;
@@ -8577,8 +8579,9 @@ window.tTaskAdd = async (projectId,row) => { try {
 let _pkRaf=0;
 function _pkRerender(){ if(_pkRaf) return; _pkRaf=requestAnimationFrame(()=>{ _pkRaf=0; try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }); }
 window.tTaskMove = async (id,status) => { const t=_findTask(id); try {
-    const patch={status}; const now=new Date().toISOString();
+    const patch={status}; const now=new Date().toISOString(); let _wlog=null;
     if(t){ const nowMs=Date.now();
+      if(t.timer_started && t.status==='active'){ const _s=Math.max(0,Math.round((nowMs-new Date(t.timer_started).getTime())/1000)); if(_s>0) _wlog={project_id:t.project_id,task_id:t.id,member_id:t.assignee_id,started_at:t.timer_started,sec:_s}; }
       let spent=t.time_spent||0; if(t.timer_started && t.status==='active') spent+=Math.max(0,Math.round((nowMs-new Date(t.timer_started).getTime())/1000));
       let rspent=t.review_spent||0; if(t.review_started && t.status==='review') rspent+=Math.max(0,Math.round((nowMs-new Date(t.review_started).getTime())/1000));
       patch.time_spent=spent; patch.review_spent=rspent;
@@ -8591,6 +8594,7 @@ window.tTaskMove = async (id,status) => { const t=_findTask(id); try {
       if(e2) throw e2; error=null; toast('Перенос выполнен. Таймер утверждения отключён — примените SQL-миграцию 08');
     }
     if(error)throw error;
+    if(_wlog) _logWork(_wlog);
     if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); }   // запись подтверждена — держим локальное состояние; реалтайм-эхо не перезагружаем (без гонки)
   } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
 window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
@@ -8601,9 +8605,14 @@ window.tTaskUpdate = async (id,patch) => { try {
   if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
   if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
-window.tTimerPause = async (id) => { const t=_findTask(id); try { let spent=(t&&t.time_spent)||0; if(t&&t.timer_started) spent+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000));
+function _logWork(o){
+  if(!o || !o.member_id || !(o.sec>0) || typeof SB==='undefined' || !SB) return;
+  try{ SB.from('time_logs').insert({ project_id:o.project_id||null, task_id:o.task_id||null, member_id:o.member_id, kind:'work', seconds:Math.round(o.sec), started_at:o.started_at||null }).then(r=>{ if(r&&r.error) console.warn('time_log',r.error.message); }); }catch(_e){}
+}
+window.tTimerPause = async (id) => { const t=_findTask(id); try { const _wst=(t&&t.timer_started)||null; const _wsecLog=_wst?Math.max(0,Math.round((Date.now()-new Date(_wst).getTime())/1000)):0; let spent=(t&&t.time_spent)||0; if(_wst) spent+=_wsecLog;
   if(t){ t.time_spent=spent; t.timer_started=null; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }  // мгновенная пауза
   const {error}=await SB.from('project_tasks').update({time_spent:spent,timer_started:null}).eq('id',id); if(error)throw error;
+  if(t && _wsecLog>0) _logWork({project_id:t.project_id,task_id:t.id,member_id:t.assignee_id,started_at:_wst,sec:_wsecLog});
   if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); } } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
 window.tTimerResume = async (id) => { const t=_findTask(id); try { const now=new Date().toISOString(); if(t){ t.timer_started=now; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }  // мгновенное продолжение
   const {error}=await SB.from('project_tasks').update({timer_started:now}).eq('id',id); if(error)throw error;
@@ -8979,12 +8988,15 @@ window.tLoadTeam = async () => {
   const now = Date.now();
   const today = new Date(); today.setHours(0,0,0,0);
   const iso30 = new Date(now - 30*86400000).toISOString();
-  const [tr, hr, thr, pr] = await Promise.all([
+  const iso365 = new Date(now - 365*86400000).toISOString();
+  const [tr, hr, thr, pr, tl] = await Promise.all([
     SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started'),
     SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at'),
     SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at'),
-    SB.from('projects').select('id,status,name')
+    SB.from('projects').select('id,status,name'),
+    SB.from('time_logs').select('member_id,seconds,started_at,kind').gte('started_at',iso365)
   ]);
+  window._timeLogs = (tl && !tl.error && tl.data) ? tl.data : [];   // журнал может ещё не существовать (до миграции)
   const _doneProj = new Set(((pr&&pr.data)||[]).filter(x=>x.status==='done').map(x=>x.id));
   const _projName={}; ((pr&&pr.data)||[]).forEach(x=>{ _projName[x.id]=x.name||''; });
   const _td={};   // детальная статистика задач по исполнителю (реальные данные)
