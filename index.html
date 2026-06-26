@@ -1704,6 +1704,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .dp-grid button.oth{color:var(--txt-3);opacity:.4;cursor:default}
 .dp-grid button.today{box-shadow:inset 0 0 0 1px var(--accent-line)}
 .dp-grid button.sel{background:var(--accent);color:#06231e;font-weight:700}
+.tp-pop{width:188px;padding:10px}
+.tp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;padding:0 2px}
+.tp-now{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--txt)}
+.tp-clear{background:none;border:0;color:var(--txt-3);font-size:11px;cursor:pointer;font-family:inherit;padding:2px 5px;border-radius:5px;transition:.14s}
+.tp-clear:hover{color:var(--neg)}
+.tp-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tp-col{display:flex;flex-direction:column;min-width:0}
+.tp-coll{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);text-align:center;margin-bottom:6px;font-weight:600}
+.tp-scroll{max-height:172px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.tp-scroll button{border:0;background:transparent;color:var(--txt-2);font-family:var(--mono);font-size:13px;padding:7px 0;border-radius:7px;cursor:pointer;transition:.12s;text-align:center}
+.tp-scroll button:hover{background:var(--bg-3);color:var(--txt)}
+.tp-scroll button.sel{background:var(--accent);color:#06231e;font-weight:700}
+.dl-dt{display:flex;gap:8px}
+.dl-dt .dpick:not(.tpick){flex:1 1 auto;min-width:0}
+.dl-dt .tpick{flex:0 0 116px}
+.pd-st-time{font-family:var(--mono);color:var(--accent);font-weight:600;margin-left:6px;font-size:.92em}
+.dlx-time{font-family:var(--mono);font-size:9.5px;color:var(--accent);font-weight:600;margin-top:2px;letter-spacing:.02em}
 .dp-foot{display:flex;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
 .dp-foot button{background:transparent;border:0;color:var(--txt-2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;padding:5px 8px;border-radius:6px;transition:.12s}
 .dp-foot button:hover{color:var(--accent)}
@@ -4294,13 +4311,13 @@ function pdNewStage(){
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" placeholder="напр. Контент-план"></div>
       <div class="fld"><label>Статус</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
-      <div class="fld"><label>Срок (дедлайн)</label>${dateField('pd2-date','')}</div>
+      <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-date','')}${timeField('pd2-time','')}</div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddStage()">Создать</button></div></div>`);
 }
 function pdAddStage(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const name=_v('pd2-name'); if(!name){toast('Введи название этапа');return;}
   const S=PROJECTS[pdIdx]._stages||[]; const idx=S.length?Math.max(...S.map(s=>s.idx||0))+1:0;
-  if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,idx}); }
+  if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,due_time:_v('pd2-time')||null,idx}); }
 function pdStageDel(id){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } if(window.tStageDel) window.tStageDel(id); }
 function pdSeedStages(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const names=stageSetFor(PROJECTS[pdIdx].svc); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
 let pdNewSt='wait';
@@ -4321,17 +4338,15 @@ async function pdNewTask(st){
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
       <div class="fld"><label>Этап <span style="color:var(--neg)">*</span> · только активные</label>${selField('pd2-stg', stArr, stArr.length?stArr[0][0]:'')}</div>
-      <div class="fld2">
-        <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
-        <div class="fld"><label>Срок</label>${dateField('pd2-tdate','')}</div>
-      </div>
+      <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
+      <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate','')}${timeField('pd2-ttime','')}</div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddTask()">Создать</button></div></div>`);
 }
 function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи задачу');return;}
   const stage_id=_v('pd2-stg'); if(!stage_id){toast('Выбери этап');return;}
   const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
-  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,status:pdNewSt,idx}); }
+  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx}); }
 function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
 async function pdTaskEdit(id){
   const p=PROJECTS[pdIdx];
@@ -4344,18 +4359,17 @@ async function pdTaskEdit(id){
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" value="${_attr(t.title)}" placeholder="напр. Смонтировать ролик"></div>
       <div class="fld"><label>Этап</label>${selField('pd2-stg', stArr, t.stage_id||'')}</div>
-      <div class="fld2">
-        <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
-        <div class="fld"><label>Срок</label>${dateField('pd2-tdate', t.due_date||'')}</div>
-      </div>
+      <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
+      <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate', t.due_date||'')}${timeField('pd2-ttime', t.due_time||'')}</div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveTask('${id}')">Сохранить</button></div></div>`);
 }
 function pdSaveTask(id){ const title=_v('pd2-ttl'); if(!title){toast('Введи название');return;}
-  if(window.tTaskUpdate) window.tTaskUpdate(id,{title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null}); }
+  if(window.tTaskUpdate) window.tTaskUpdate(id,{title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null}); }
 const PD_MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 function _dDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+PD_MON[d.getMonth()]; }
 function _dDateFull(iso){ if(!iso) return '—'; const d=new Date(iso); return d.getDate()+' '+PD_MON[d.getMonth()]+' '+d.getFullYear(); }
+function _dTime(t){ if(!t) return ''; const m=String(t).match(/^(\d{1,2}):(\d{2})/); return m?(m[1].padStart(2,'0')+':'+m[2]):''; }
 function avPreview(id,letter){ const inp=document.getElementById(id), pv=document.getElementById(id+'-pv'); if(!inp||!pv)return; const v=(inp.value||'').trim(); pv.innerHTML = v?`<img src="${v.replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover">`:(letter||'?'); }
 function avatarField(id,url,letter){
   letter=letter||'?';
@@ -4408,8 +4422,8 @@ function _pdDeadlinesHTML(p){
   const stMap={}; (p._stages||[]).forEach(s=>{ stMap[s.id]=s.name; });
   const MONS=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
   const enrich=o=>{ const d=new Date(o.due+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status); o.day=d.getDate(); o.mon=MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; return o; };
-  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||''}));
-  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,status:s.status,asg:null,parent:''}));
+  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,dueTime:_dTime(t.due_time),status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||''}));
+  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,dueTime:_dTime(s.due_time),status:s.status,asg:null,parent:''}));
   const all=tasks.concat(stages).map(enrich);
   if(!all.length) return '<div class="pk-empty" style="padding:48px 0">У проекта пока нет задач и этапов с дедлайнами.<br><span style="font-size:12px;color:var(--txt-3)">Назначь срок задаче или этапу — они появятся здесь.</span></div>';
   const flt=all.filter(_pdlMatch);
@@ -4478,7 +4492,7 @@ function renderPd(){
           const ic=PD_ST_IC[i%PD_ST_IC.length];
           const node=s.status==='done'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':s.status==='active'?'<span class="pulse"></span>':'';
           const status=s.status==='done'?'Завершён':s.status==='active'?'В работе':'Ожидает';
-          const dd=s.due_date?`<span class="pd-st-date">${_dDate(s.due_date)}</span>`:'';
+          const dd=s.due_date?`<span class="pd-st-date">${_dDate(s.due_date)}${s.due_time?`<span class="pd-st-time">${_dTime(s.due_time)}</span>`:''}</span>`:'';
           const tk=(p._tasks||[]).filter(t=>t.stage_id===s.id);
           const tkd=tk.filter(t=>t.status==='done').length;
           const tcount=`<span class="pd-tc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Задачи <b>${tk.length?(tkd+' / '+tk.length):'0'}</b></span>`;
@@ -4509,7 +4523,7 @@ function renderPd(){
         const cards=_collapsed?`<button class="pk-showbtn" onclick="event.stopPropagation();pkDoneSet('recent')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Показать последние ${PK_DONE_LIMIT} задач${_total>PK_DONE_LIMIT?' · '+_total:''}</button>`:(arr.length?arr.map((c,i)=>{
           const w=_who(c.assignee_id), stg=(p._stages||[]).find(x=>x.id===c.stage_id);
           const over=c.due_date && c.status!=='done' && new Date(c.due_date) < new Date(new Date().toDateString());
-          const due=c.due_date?`<span class="pk-due ${over?'over':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${_dDate(c.due_date)}</span>`:'';
+          const due=c.due_date?`<span class="pk-due ${over?'over':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${_dDate(c.due_date)}${c.due_time?' · '+_dTime(c.due_time):''}</span>`:'';
           const adv=st!=='done'?`<button class="pk-adv" title="Продвинуть дальше" onclick="event.stopPropagation();pkAdvance('${c.id}','${c.status}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 18l6-6-6-6"/></svg></button>`:`<span class="pk-done-ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg></span>`;
           const el=_taskElapsed(c), running=!!c.timer_started;
           const rel=_taskReviewElapsed(c);
@@ -4655,6 +4669,47 @@ function dpPick(id,iso){
   const cb=e&&e.getAttribute('data-onpick'); if(cb){ try{ new Function('v',cb)(iso); }catch(err){ console.warn(err); } }
 }
 document.addEventListener('click',e=>{ if(!e.target.closest('.dpick')){ _dpClose(); _dr.anchor=null; _dr.hover=null; } });
+
+/* ===== кастомный таймпикер (в фирменном стиле календаря) ===== */
+function timeField(id, val, onpick){
+  val=(val&&String(val).slice(0,5))||'';
+  return `<div class="dpick tpick" id="tpw-${id}">`
+    +`<input type="hidden" id="${id}" value="${val}" data-onpick="${(onpick||'').replace(/"/g,'&quot;')}">`
+    +`<button type="button" class="dp-trigger ${val?'':'empty'}" onclick="tpOpen('${id}')"><span class="dp-val">${val||'--:--'}</span>`
+    +`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button></div>`;
+}
+function _tpGrid(id){
+  const cur=dpVal(id), p=cur&&cur.includes(':')?cur.split(':'):['',''], ch=p[0], cm=p[1];
+  let hrs=''; for(let h=0;h<24;h++){ const hh=String(h).padStart(2,'0'); hrs+=`<button type="button" class="${hh===ch?'sel':''}" onclick="tpPick('${id}','${hh}',null)">${hh}</button>`; }
+  let mins=''; for(let m=0;m<60;m+=5){ const mm=String(m).padStart(2,'0'); mins+=`<button type="button" class="${mm===cm?'sel':''}" onclick="tpPick('${id}',null,'${mm}')">${mm}</button>`; }
+  return `<div class="tp-head"><span class="tp-now">${cur||'Время'}</span><button type="button" class="tp-clear" onclick="tpClear('${id}')"${cur?'':' style="visibility:hidden"'}>Сбросить</button></div>`
+    +`<div class="tp-cols"><div class="tp-col"><div class="tp-coll">Час</div><div class="tp-scroll" id="tph-${id}">${hrs}</div></div>`
+    +`<div class="tp-col"><div class="tp-coll">Мин</div><div class="tp-scroll" id="tpm-${id}">${mins}</div></div></div>`;
+}
+function tpOpen(id){
+  const wrap=document.getElementById('tpw-'+id); if(!wrap) return;
+  const open=wrap.querySelector('.dp-pop'); _closePops(); if(open) return;
+  const pop=document.createElement('div'); pop.className='dp-pop tp-pop'; pop.addEventListener('click',ev=>ev.stopPropagation()); pop.innerHTML=_tpGrid(id); wrap.appendChild(pop);
+  setTimeout(()=>{ ['tph','tpm'].forEach(pfx=>{ const c=document.getElementById(pfx+'-'+id), s=c&&c.querySelector('.sel'); if(s&&s.scrollIntoView)s.scrollIntoView({block:'center'}); }); },0);
+}
+function _tpSet(id,v){
+  const e=document.getElementById(id); if(e) e.value=v||'';
+  const wrap=document.getElementById('tpw-'+id), trig=wrap&&wrap.querySelector('.dp-trigger'), val=trig&&trig.querySelector('.dp-val');
+  if(val){ val.textContent=v||'--:--'; trig.classList.toggle('empty',!v); }
+  const cb=e&&e.getAttribute('data-onpick'); if(cb){ try{ new Function('v',cb)(v); }catch(err){} }
+}
+function tpPick(id,hh,mm){
+  const cur=dpVal(id), pr=cur&&cur.includes(':')?cur.split(':'):['00','00']; let h=pr[0]||'00', m=pr[1]||'00';
+  if(hh!=null) h=hh; if(mm!=null) m=mm;
+  const v=h+':'+m; _tpSet(id,v);
+  const wrap=document.getElementById('tpw-'+id); if(!wrap) return;
+  const hc=document.getElementById('tph-'+id), mc=document.getElementById('tpm-'+id);
+  if(hc) hc.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.textContent===h));
+  if(mc) mc.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.textContent===m));
+  const now=wrap.querySelector('.tp-now'); if(now) now.textContent=v;
+  const clr=wrap.querySelector('.tp-clear'); if(clr) clr.style.visibility='visible';
+}
+function tpClear(id){ _tpSet(id,''); const wrap=document.getElementById('tpw-'+id), pop=wrap&&wrap.querySelector('.dp-pop'); if(pop) pop.innerHTML=_tpGrid(id); }
 
 /* ——— single range date picker (deadlines) — выбор периода в одном календаре ——— */
 let _dr={y:0,m:0,anchor:null,hover:null};
@@ -4889,7 +4944,7 @@ function pdEditStage(id){
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" value="${(s.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Статус этапа</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
-      <div class="fld"><label>Срок (дедлайн)</label>${dateField('pd2-date', s.due_date||'')}</div>
+      <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-date', s.due_date||'')}${timeField('pd2-time', s.due_time||'')}</div></div>
       <div class="fld"><label>Ссылка на материал</label><input id="pd2-link" value="${(s.link||'').replace(/"/g,'&quot;')}" placeholder="https://… (Drive, Figma, Notion)"></div>
       <div class="fld"><label>Комментарий</label><textarea id="pd2-note" placeholder="Заметка по этапу…">${s.note||''}</textarea></div>
     </div>
@@ -4898,7 +4953,7 @@ function pdEditStage(id){
 }
 function pdSaveStage(id){
   if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } 
-  const patch={ name:_v('pd2-name')||'Этап', status:pd2St, due_date:_v('pd2-date')||null, link:_v('pd2-link')||null, note:_v('pd2-note')||null };
+  const patch={ name:_v('pd2-name')||'Этап', status:pd2St, due_date:_v('pd2-date')||null, due_time:_v('pd2-time')||null, link:_v('pd2-link')||null, note:_v('pd2-note')||null };
   if(window.tStageSave) window.tStageSave(id,patch);
 }
 
@@ -6033,7 +6088,7 @@ function _dlRow(it){
     : `<span class="dlx-otag">${_avInit(o.n,o.c,o.avatar,20)}${o.n}</span>`;
   const mag = it.bucket==='overdue' && dist.t ? ` <b>${dist.t.replace('−','')}</b>` : '';
   return `<div class="dlx ${m.c}">
-    <div class="dlx-date"><div class="d">${it.day}</div><div class="m">${it.mon}</div></div>
+    <div class="dlx-date"><div class="d">${it.day}</div><div class="m">${it.mon}</div>${it.dueTime?`<div class="dlx-time">${it.dueTime}</div>`:''}</div>
     <div class="dlx-main"><div class="dlx-title">${it.stage}</div>
       <div class="dlx-meta"><span class="dlx-proj">${_avInit(it.project,'var(--bg-3)',it.plogoUrl,18,true)}${it.project}</span><span class="badge ${it.type==='task'?'b-mut':'b-cyan'}" style="font-size:9px;padding:1px 6px">${it.type==='task'?'задача':'этап'}</span></div>
     </div>
@@ -8302,21 +8357,21 @@ function dlBucket(due, status){
 window.tLoadDeadlines = async () => {
   if (!SB) return;
   const [st, tk, hist] = await Promise.all([
-    SB.from('project_stages').select('id,name,status,due_date, projects(name,logo,logo_url)').not('due_date','is',null),
-    SB.from('project_tasks').select('id,title,status,due_date,assignee_id, projects(name,logo,logo_url)').not('due_date','is',null),
+    SB.from('project_stages').select('id,name,status,due_date,due_time, projects(name,logo,logo_url)').not('due_date','is',null),
+    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id, projects(name,logo,logo_url)').not('due_date','is',null),
     SB.from('stage_history').select('stage_name,new_status,created_at, projects(name)').order('created_at',{ascending:false}).limit(30)
   ]);
-  const _push = (label, status, due, projObj, id, type, assignee) => {
+  const _push = (label, status, due, projObj, id, type, assignee, dueTime) => {
     const d = due ? new Date(due+'T00:00:00') : null;
     DEADLINES.push({ stage:label, project:(projObj&&projObj.name)||'—',
       plogo:(projObj&&(projObj.logo||((projObj.name||'?')[0])))||'?', plogoUrl:(projObj&&projObj.logo_url)||'',
-      day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'',
+      day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'', dueTime: _dTime(dueTime),
       due: due, bucket: dlBucket(due, status), status, type, _id:id, assignee: assignee||null });
   };
   if (typeof DEADLINES !== 'undefined'){
     DEADLINES.length = 0;
-    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null));
-    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id));
+    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time));
+    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time));
   }
   if (typeof DL_ACT !== 'undefined'){
     DL_ACT.length = 0;
