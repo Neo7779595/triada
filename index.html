@@ -1773,14 +1773,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .np-chip-x{border:none;background:transparent;color:var(--txt-3);cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
 .np-chip-x:hover{color:#F0785C}
 .np-team-dept{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin:6px 2px 1px}
-.np-team-deptbtn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:6px 10px;margin:9px 0 3px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2);cursor:pointer;font:inherit;text-align:left;transition:.14s}
-.np-team-deptbtn .np-team-deptn{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-2);font-weight:600}
-.np-team-deptbtn .np-team-deptc{font-size:10.5px;color:var(--txt-3);white-space:nowrap}
-.np-team-deptbtn:hover{border-color:var(--accent-line);background:var(--accent-dim)}
-.np-team-deptbtn:hover .np-team-deptn,.np-team-deptbtn:hover .np-team-deptc{color:var(--accent)}
+.np-team-deptbtn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:8px 10px 8px 11px;margin:11px 0 4px;border:1px solid var(--line-2);border-radius:9px;background:var(--bg-2);cursor:pointer;font:inherit;text-align:left;transition:.14s}
+.np-team-deptbtn:hover{border-color:var(--accent-line);background:var(--bg-3)}
+.np-team-deptL{display:flex;align-items:center;gap:8px;min-width:0}
+.np-team-depti{width:15px;height:15px;flex:none;color:var(--txt-3)}
+.np-team-deptn{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--txt);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-team-deptc{font-size:10.5px;color:var(--txt-3);white-space:nowrap}
+.np-team-deptcta{display:inline-flex;align-items:center;gap:5px;flex:none;padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;border:1px solid var(--accent-line);background:var(--accent-dim);color:var(--accent);transition:.14s}
+.np-team-deptcta svg{width:13px;height:13px;flex:none}
+.np-team-deptbtn:hover .np-team-deptcta{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .np-team-deptbtn.all{border-color:var(--accent-line);background:var(--accent-dim)}
-.np-team-deptbtn.all .np-team-deptn,.np-team-deptbtn.all .np-team-deptc{color:var(--accent)}
-.np-team-deptbtn.some{border-color:var(--line-2)}
+.np-team-deptbtn.all .np-team-depti{color:var(--accent)}
+.np-team-deptbtn.all .np-team-deptcta{background:transparent;border-color:var(--line-2);color:var(--txt-2)}
+.np-team-deptbtn.all:hover .np-team-deptcta{border-color:var(--neg);background:var(--neg-dim);color:var(--neg)}
 .np-tm{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:transparent;color:var(--txt-2);cursor:pointer;width:100%;text-align:left;font:inherit}
 .np-tm:hover{border-color:var(--line-2)}
 .np-tm.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--txt)}
@@ -3832,7 +3837,10 @@ function npTeamPickerRender(){
   const rows=team.filter(m=>{ if(dept!=='all' && (m.dept||'Без команды')!==dept) return false; if(q && !((m.name||'').toLowerCase().includes(q)||(m.role||'').toLowerCase().includes(q))) return false; return true; });
   if(!rows.length){ list.innerHTML='<div class="np-team-empty">Никого не найдено</div>'; npPickCount(); return; }
   const groups={}; rows.forEach(m=>{ const d=m.dept||'Без команды'; (groups[d]=groups[d]||[]).push(m); });
-  let html=''; Object.keys(groups).forEach(d=>{ const _tm=team.filter(x=>(x.dept||'Без команды')===d); const _on=_tm.filter(x=>work.has(x._id)).length; const _all=_tm.length>0&&_on===_tm.length; html+='<button type="button" class="np-team-deptbtn'+(_all?' all':(_on?' some':''))+'" data-team="'+_attr(d)+'" onclick="npPickTeam(this)" title="'+(_all?'Убрать всю команду из проекта':'Добавить всю команду в проект')+'"><span class="np-team-deptn">'+_ddH(d)+'</span><span class="np-team-deptc">'+_on+'/'+_tm.length+' · '+(_all?'убрать всех':'добавить всех')+'</span></button>';
+  const _ic_ppl='<svg class="np-team-depti" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>';
+  const _ic_plus='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+  const _ic_chk='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  let html=''; Object.keys(groups).forEach(d=>{ const _tm=team.filter(x=>(x.dept||'Без команды')===d); const _on=_tm.filter(x=>work.has(x._id)).length; const _tot=_tm.length; const _all=_tot>0&&_on===_tot; const _some=_on>0&&!_all; const _cnt=_all?'в проекте':(_some?(_on+'/'+_tot):(_tot+' '+_plural(_tot,'человек','человека','человек'))); const _cta=_all?(_ic_chk+'<span>Убрать всех</span>'):(_ic_plus+'<span>'+(_some?'Добавить остальных':'Добавить всех')+'</span>'); html+='<button type="button" class="np-team-deptbtn'+(_all?' all':(_some?' some':''))+'" data-team="'+_attr(d)+'" onclick="npPickTeam(this)" title="'+(_all?'Убрать весь отдел из проекта':'Добавить весь отдел в проект')+'"><span class="np-team-deptL">'+_ic_ppl+'<span class="np-team-deptn">'+_ddH(d)+'</span><span class="np-team-deptc">'+_cnt+'</span></span><span class="np-team-deptcta">'+_cta+'</span></button>';
     groups[d].forEach(m=>{ const on=work.has(m._id); const c=m.color||'#37E6C8'; const ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase());
       html+='<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="npPickToggle(\''+m._id+'\')"><span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+(m.avatar?('<img src="'+String(m.avatar).replace(/"/g,'')+'" alt="">'):ltr)+'</span><span class="np-tm-n">'+_ddH(m.name||'—')+'</span><span class="np-tm-r">'+_ddH(m.role||'')+'</span><span class="np-tm-ck">'+ck+'</span></button>'; }); });
   list.innerHTML=html; npPickCount();
