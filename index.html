@@ -895,7 +895,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 #ov-proj{padding:0;align-items:stretch;justify-content:stretch;background:var(--bg)}
 #ov-proj .modal{max-width:100%;width:100%;height:100vh;border:0;border-radius:0;box-shadow:none;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;animation:ovFade .28s var(--ease) both}
 /* ——— SMM report overlay · редактор (Фаза 3) ——— */
-#ov-smm{padding:0;align-items:stretch;justify-content:stretch;background:var(--bg);z-index:75}
+#ov-smm{padding:0;align-items:stretch;justify-content:stretch;background:var(--bg);z-index:75;overflow:hidden}
 .smm-shell{max-width:100%;width:100%;height:100vh;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;animation:ovFade .28s var(--ease) both}
 .smm-top{display:flex;align-items:center;gap:14px;padding:17px 28px;border-bottom:1px solid var(--line);flex:0 0 auto}
 .smm-top .ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(138,143,255,.14);color:var(--violet);flex:0 0 auto}
@@ -911,6 +911,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-body{flex:1;overflow-y:auto;padding:26px 28px 70px}
 .smm-wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
 .smm-pres{max-width:none;padding:24px 40px 64px}
+.smm-rep-card{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:26px 30px 30px;margin-bottom:16px;animation:smmRise .6s var(--ease-out) both}
+.smm-rep-card:nth-child(2){animation-delay:.05s}.smm-rep-card:nth-child(3){animation-delay:.1s}.smm-rep-card:nth-child(4){animation-delay:.15s}.smm-rep-card:nth-child(5){animation-delay:.2s}
+@media(max-width:760px){.smm-rep-card{padding:18px 16px 22px;border-radius:12px}}
 .smm-m02-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 @media(max-width:1100px){.smm-m02-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:680px){.smm-m02-grid{grid-template-columns:repeat(2,1fr)}}
@@ -930,8 +933,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-dd-opt.on .dot{opacity:1}
 /* премиальная анимация появления секций отчёта */
 @keyframes smmRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-.smm-rep01,.smm-rep02,.smm-rep05{animation:smmRise .6s var(--ease-out) both}
-.smm-rep02{animation-delay:.06s}
 .smm-m02-grid>div{animation:smmRise .5s var(--ease-out) both}
 .smm-m02-grid>div:nth-child(2){animation-delay:.05s}.smm-m02-grid>div:nth-child(3){animation-delay:.1s}.smm-m02-grid>div:nth-child(4){animation-delay:.15s}.smm-m02-grid>div:nth-child(5){animation-delay:.2s}
 @media(prefers-reduced-motion:reduce){.smm-rep01,.smm-rep02,.smm-rep05,.smm-m02-grid>div{animation:none}}
@@ -5436,7 +5437,7 @@ function smmReelsBlockHTML(){
   const fmtM=(f,r)=>{ const v=r[f]; if(v==null||v==='') return '—'; return isPct(f)?(+v).toFixed(2)+'%':Number(v).toLocaleString('ru-RU'); };
   const OPTS=[['er','ER %'],['views','Просмотры'],['reach','Охват'],['tr','C/R %'],['shr','SH/R %'],['sr','SR %'],['lr','LR %']];
   const sel=`<div style="display:flex;align-items:center;gap:9px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span>`+smmDropdownHTML(_smmReelSort,OPTS,'smmSetReelSort')+`</div>`;
-  const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">03</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Опубликованный контент</span><div style="flex:1"></div>${sel}</div>`;
+  const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:0"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">03</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Опубликованный контент</span><div style="flex:1"></div>${sel}</div>`;
   const reels=(_smmCur.reels||[]).slice().sort((a,b)=>(+b[_smmReelSort]||0)-(+a[_smmReelSort]||0));
   if(!reels.length){
     return `<div id="smm-reels-sec">${head}<div style="padding:56px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em">Добавьте Reels во вкладке «Данные»</div></div>`;
@@ -5482,7 +5483,7 @@ function smmRubricsBlockHTML(){
   const fmt=v=>(v==null||v===0)?'—':Number(v).toLocaleString('ru-RU');
   const OPTS=[['er','ER %'],['reach','Охват'],['views','Просмотры']];
   const sel=`<div style="display:flex;align-items:center;gap:9px"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Сортировка</span>`+smmDropdownHTML(_smmRubSort,OPTS,'smmSetRubSort')+`</div>`;
-  const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">04</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Рубрики контента</span><div style="flex:1"></div>${sel}</div>`;
+  const head=`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:0"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">04</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Рубрики контента</span><div style="flex:1"></div>${sel}</div>`;
   const rubs=(_smmCur.rubrics||[]).slice().sort((a,b)=>(+b[_smmRubSort]||0)-(+a[_smmRubSort]||0));
   if(!rubs.length){
     return `<div id="smm-rub-grid-sec">${head}<div style="padding:56px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em">Заполните рубрики во вкладке «Данные»</div></div>`;
@@ -5698,7 +5699,7 @@ function smmConclusionsBlockHTML(){
   }
 
   if(!C.length){
-    return '<div class="smm-rep05"><div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">05</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Выводы и рекомендации</span></div><div style="padding:56px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em">Заполните метрики во вкладке «Данные» — выводы построятся автоматически</div></div>';
+    return '<div class="smm-rep05"><div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:0"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">05</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Выводы и рекомендации</span></div><div style="padding:56px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em">Заполните метрики во вкладке «Данные» — выводы построятся автоматически</div></div>';
   }
   const body=C.map((c,i)=>{ const col=TC[c.tone]||TC.neutral; const nn=(i+1<10?'0':'')+(i+1);
     return '<div style="background:var(--bg-1);border:1px solid var(--line);border-left:2px solid '+col+';border-radius:0 10px 10px 0;padding:20px 24px;margin-bottom:10px;display:flex;gap:16px;animation:smmRise .5s var(--ease-out) both;animation-delay:'+(i*0.05).toFixed(2)+'s">'
@@ -5707,7 +5708,7 @@ function smmConclusionsBlockHTML(){
       +'<div style="font-size:13.5px;line-height:1.68;color:var(--txt-2);letter-spacing:.005em">'+c.body+'</div>'
       +'<div style="margin-top:13px;padding-top:13px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:baseline"><span style="font-family:var(--mono);font-size:11px;color:'+col+';flex-shrink:0">\u2192</span><span style="font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--txt-2);letter-spacing:.01em">'+c.rec+'</span></div></div></div>';
   }).join('');
-  const secHead='<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">05</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Выводы и рекомендации</span><div style="flex:1"></div><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Стратегический разбор</span></div>';
+  const secHead='<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:0"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">05</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">Выводы и рекомендации</span><div style="flex:1"></div><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase">Стратегический разбор</span></div>';
   const head='<div style="display:flex;align-items:baseline;justify-content:space-between;padding:16px 0 20px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.16em;text-transform:uppercase">Принцип разбора&nbsp;&nbsp;·&nbsp;&nbsp;вывод&nbsp;→&nbsp;аргумент&nbsp;→&nbsp;рекомендация</span><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;text-transform:uppercase">'+C.length+' '+pl(C.length,'вывод','вывода','выводов')+'</span></div>';
   return '<div class="smm-rep05">'+secHead+head+reactionLead+body+'</div>';
 }
@@ -5876,7 +5877,7 @@ function smmSection02HTML(){
     {code:'ER',label:'Вовлечённость',k:'er'},{code:'LR',label:'Лайки',k:'lr'},
     {code:'C/R',label:'Комментарии',k:'tr'},{code:'SH/R',label:'Репосты',k:'shr'},{code:'SR',label:'Сохранения',k:'sr'}
   ];
-  const H=(num,title,right)=>`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:72px"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">${num}</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">${title}</span><div style="flex:1"></div>${right||''}</div>`;
+  const H=(num,title,right)=>`<div style="display:flex;align-items:baseline;gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-top:0"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;flex-shrink:0">${num}</span><span style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.025em;line-height:1">${title}</span><div style="flex:1"></div>${right||''}</div>`;
   // ── карточки
   const cards=mets.map(met=>{
     const val=m[met.k], z=smmZoneEval(val,go[met.k],p[met.k]), zc=getSMMZoneColor(z.zone);
@@ -5915,7 +5916,7 @@ function smmSection02HTML(){
         +`<div style="text-align:right;flex-shrink:0;min-width:90px"><div style="font-size:24px;font-weight:700;letter-spacing:-.03em;color:var(--txt);font-variant-numeric:tabular-nums">${val!=null?(+val).toFixed(2)+'%':'—'}</div>${pd!==null?`<div style="font-family:var(--mono);font-size:9px;color:${+pd>=0?'var(--pos)':'var(--neg)'};margin-top:2px;letter-spacing:.04em">${+pd>=0?'+':''}${pd}%</div>`:''}</div></div>`;
     }).join('');
     scoreBlock=`<div style="padding:12px 0 10px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.2em;text-transform:uppercase">Позиция относительно целей</span></div>`
-      +`<div style="padding:20px 0"><div style="border-top:1px solid var(--line);padding-top:32px;margin-bottom:32px"><div style="display:flex;align-items:flex-end;gap:32px;margin-bottom:8px;flex-wrap:wrap"><div><div style="font-size:72px;font-weight:700;line-height:1;letter-spacing:-.05em;color:${sCol};font-variant-numeric:tabular-nums">${score}</div><div style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase;margin-top:4px">/ 100 · позиция относительно целей</div></div><div style="padding-bottom:10px"><div style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.01em">${sLabel}</div><div style="display:flex;gap:20px;margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;flex-wrap:wrap"><span style="color:var(--pos)">${green} в цели/выше</span><span style="color:var(--txt-3)">·</span><span style="color:var(--warn)">${yellow} близко</span><span style="color:var(--txt-3)">·</span><span style="color:var(--neg)">${red} ниже</span></div></div></div></div><div style="display:flex;flex-direction:column;border-top:1px solid var(--line)">${bars}</div></div>`;
+      +`<div style="padding:20px 0"><div style="border-top:1px solid var(--line);padding-top:32px;margin-bottom:32px"><div style="display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap"><div style="display:flex;align-items:baseline;gap:9px;flex-shrink:0"><span style="font-size:72px;font-weight:700;line-height:1;letter-spacing:-.05em;color:${sCol};font-variant-numeric:tabular-nums">${score}</span><span style="font-family:var(--mono);font-size:14px;color:var(--txt-3);letter-spacing:.04em">/ 100</span></div><div style="padding-bottom:8px"><div style="font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.01em">${sLabel}</div><div style="display:flex;gap:16px;margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;flex-wrap:wrap"><span style="color:var(--pos)">${green} в цели/выше</span><span style="color:var(--txt-3)">·</span><span style="color:var(--warn)">${yellow} близко</span><span style="color:var(--txt-3)">·</span><span style="color:var(--neg)">${red} ниже</span></div></div></div><div style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.14em;text-transform:uppercase;margin-top:12px">позиция относительно целей</div></div><div style="display:flex;flex-direction:column;border-top:1px solid var(--line)">${bars}</div></div>`;
   } else {
     scoreBlock=`<div style="padding:12px 0 10px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:8px;color:var(--txt-3);letter-spacing:.2em;text-transform:uppercase">Позиция относительно целей</span></div><div style="padding:36px 0;text-align:center;font-family:var(--mono);font-size:11px;color:var(--txt-3)">Установите цели метрик во вкладке «Данные» — появится балл и сравнение</div>`;
   }
@@ -5925,11 +5926,11 @@ function smmSection02HTML(){
 }
 function smmRenderPresentation(){
   return '<div class="smm-wrap smm-pres">'
-    +smmSection01HTML()
-    +smmSection02HTML()
-    +smmReelsBlockHTML()
-    +smmRubricsBlockHTML()
-    +smmConclusionsBlockHTML()
+    +'<div class="smm-rep-card">'+smmSection01HTML()+'</div>'
+    +'<div class="smm-rep-card">'+smmSection02HTML()+'</div>'
+    +'<div class="smm-rep-card">'+smmReelsBlockHTML()+'</div>'
+    +'<div class="smm-rep-card">'+smmRubricsBlockHTML()+'</div>'
+    +'<div class="smm-rep-card">'+smmConclusionsBlockHTML()+'</div>'
     +'</div>';
 }
 function openReport(ty,d){
