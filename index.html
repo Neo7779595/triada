@@ -714,19 +714,27 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .cls-date{font-family:var(--mono);font-size:11px;color:var(--txt-3)}
 /* client report cards (reports module) */
 .crep{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
-.crep-h{display:flex;align-items:center;gap:14px;padding:16px 18px}
+.crep-h{display:flex;align-items:flex-start;gap:14px;padding:16px 18px}
 .crep-ic{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 .crep-ic svg{width:20px;height:20px}
-.crep-t{font-weight:700;font-size:15px}
+.crep-body{flex:1;min-width:0}
+.crep-t{font-weight:700;font-size:15px;letter-spacing:-.01em}
 .crep-meta{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:3px}
-.crep-open{margin-left:auto;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:12px;border:0;border-radius:8px;padding:9px 15px;cursor:pointer;flex:0 0 auto}
+.crep-tags{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.crep-badge{font-size:8.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:5px;line-height:1.55}
+.crep-per{font-size:11px;color:var(--txt-3);font-family:var(--mono)}
+.crep-date{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:8px}
+.crep-date svg{width:13px;height:13px;opacity:.6;flex:0 0 auto}
+.crep-open{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;background:var(--warn);color:#231803;font-weight:700;font-size:12px;border:0;border-radius:8px;padding:9px 15px;cursor:pointer;flex:0 0 auto}
+.crep-open svg{width:13px;height:13px}
 .crep-stats{display:flex;border-top:1px solid var(--line);flex-wrap:wrap}
 .crep-stats .st{flex:1;min-width:120px;padding:13px 16px;border-right:1px solid var(--line)}
 .crep-stats .st:last-child{border-right:0}
 .crep-stats .st .l{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3)}
 .crep-stats .st .v{font-family:var(--mono);font-size:13px;margin-top:5px}
-.rep-group-h{display:flex;align-items:center;gap:11px;margin:20px 0 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
-.rep-group-h .ct{font-family:var(--mono);background:var(--bg-3);color:var(--txt-2);padding:1px 8px;border-radius:20px}
+.rep-group-h{display:flex;align-items:center;gap:11px;margin:22px 0 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-2);font-weight:700}
+.rep-group-h .gbar{width:3px;height:14px;border-radius:2px;flex:0 0 auto}
+.rep-group-h .ct{font-family:var(--mono);font-size:10px;color:var(--txt-3);letter-spacing:.04em;font-weight:600;flex:0 0 auto;text-transform:none}
 .rep-group-h .ln{flex:1;height:1px;background:var(--line)}
 .cl-footer{text-align:center;padding:28px 0 14px;margin-top:26px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--txt-3);text-transform:uppercase}
 @media(max-width:900px){.cl-node{width:84px}.cl-node .nl{width:78px}}
@@ -817,7 +825,7 @@ body{text-rendering:optimizeLegibility;-moz-osx-font-smoothing:grayscale;font-fe
 .btn-ghost:hover{background:var(--bg-3);transform:translateY(-1px)}
 .pl-btn:hover{transform:translateY(-1px);border-color:var(--accent-line)}
 .icon-btn:hover{background:var(--bg-2);transform:translateY(-1px)}
-.crep-open:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 12px 26px -12px var(--accent)}
+.crep-open:hover{filter:brightness(1.05);transform:translateY(-1px);box-shadow:0 12px 26px -12px var(--warn)}
 .u-chip:hover{background:var(--bg-2);border-color:var(--line-2)}
 .demo-btn:hover{transform:translateY(-2px)}
 .fchip:active,.icon-btn:active,.segm button:active{transform:scale(.95)}
@@ -8804,33 +8812,38 @@ function renderClReports(){
   const perf=reports.filter(r=>r.kind!=='SMM'), smm=reports.filter(r=>r.kind==='SMM');
   const fnum=v=>(v==null||v==='')?'—':Number(v).toLocaleString('ru-RU');
   const fpc=v=>(v==null||v==='')?'—':(+v).toFixed(2)+'%';
+  const pl=(n,a,b,c)=>typeof _plural==='function'?_plural(n,a,b,c):c;
+  const fdt=ts=>{ if(!ts) return '—'; const d=new Date(ts); if(isNaN(d)) return _ddH(String(ts)); const hh=String(d.getHours()).padStart(2,'0'), mi=String(d.getMinutes()).padStart(2,'0'); return d.getDate()+' '+(PD_MON[d.getMonth()]||'')+' '+d.getFullYear()+' г. · '+hh+':'+mi; };
+  const cal='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="17" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>';
+  const arrow='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>';
+  const PERF_IC='<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/>';
+  const SMM_IC='<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>';
+  const card=(r,col,icon,statsHtml,per)=>`<div class="crep" style="border-left:3px solid ${col}">
+      <div class="crep-h"><div class="crep-ic" style="background:${col}22;color:${col}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg></div>
+        <div class="crep-body">
+          <div class="crep-t">${_ddH(r.title||'Отчёт')}</div>
+          <div class="crep-tags"><span class="crep-badge" style="background:${col}1f;color:${col}">Опубликован</span>${per?`<span class="crep-per">${_ddH(per)}</span>`:''}</div>
+          <div class="crep-date">${cal}${fdt(r.published_at)}</div>
+        </div>
+        <button class="crep-open" onclick="clOpenReport('${r.id}')">Открыть ${arrow}</button></div>
+      <div class="crep-stats">${statsHtml}</div></div>`;
   const perfCard=r=>{ const p=r.payload||{};
-    return `<div class="crep">
-      <div class="crep-h"><div class="crep-ic" style="background:#37E6C822;color:#37E6C8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div>
-        <div><div class="crep-t">${_ddH(r.title||'Performance-отчёт')}</div><div class="crep-meta">Опубликован · ${_dDateFull(r.published_at)}</div></div>
-        <button class="crep-open" onclick="clOpenReport('${r.id}')">Открыть →</button></div>
-      <div class="crep-stats">
-        <div class="st"><div class="l">Рост выручки</div><div class="v" style="color:var(--pos)">${_ddH(p.rost||'—')}</div></div>
-        <div class="st"><div class="l">Трафик Δ</div><div class="v" style="color:var(--pos)">${_ddH(p.traf||'—')}</div></div>
-        <div class="st"><div class="l">Ср. чек Δ</div><div class="v" style="color:${p.chek&&String(p.chek).includes('↓')?'var(--neg)':'var(--pos)'}">${_ddH(p.chek||'—')}</div></div>
-        <div class="st"><div class="l">Выручка факт</div><div class="v">${_ddH(p.fakt||'—')}</div></div>
-        <div class="st"><div class="l">База</div><div class="v" style="color:var(--txt-3)">${_ddH(p.baza||'—')}</div></div>
-      </div></div>`;
+    const stats=`<div class="st"><div class="l">Рост выручки</div><div class="v" style="color:var(--pos)">${_ddH(p.rost||'—')}</div></div>`
+      +`<div class="st"><div class="l">Трафик Δ</div><div class="v" style="color:var(--pos)">${_ddH(p.traf||'—')}</div></div>`
+      +`<div class="st"><div class="l">Ср. чек Δ</div><div class="v" style="color:${p.chek&&String(p.chek).includes('↓')?'var(--neg)':'var(--pos)'}">${_ddH(p.chek||'—')}</div></div>`
+      +`<div class="st"><div class="l">Выручка факт</div><div class="v">${_ddH(p.fakt||'—')}</div></div>`
+      +`<div class="st"><div class="l">База</div><div class="v" style="color:var(--txt-3)">${_ddH(p.baza||'—')}</div></div>`;
+    return card(r,'#37E6C8',PERF_IC,stats,p.period||'');
   };
-  const smmCard=r=>{ const m=((typeof smmNormalize==='function'?smmNormalize(r.payload||{}):{metrics:{}}).metrics)||{};
-    return `<div class="crep">
-      <div class="crep-h"><div class="crep-ic" style="background:#8A8FFF22;color:#8A8FFF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>
-        <div><div class="crep-t">${_ddH(r.title||'SMM-отчёт')}</div><div class="crep-meta">Опубликован · ${_dDateFull(r.published_at)}</div></div>
-        <button class="crep-open" style="background:#8A8FFF" onclick="clOpenReport('${r.id}')">Открыть →</button></div>
-      <div class="crep-stats">
-        <div class="st"><div class="l">Охват</div><div class="v">${fnum(m.reels_reach)}</div></div>
-        <div class="st"><div class="l">Вовлечённость</div><div class="v">${fpc(m.er)}</div></div>
-        <div class="st"><div class="l">Подписчики Δ</div><div class="v" style="color:var(--pos)">${m.followers==null?'—':(m.followers>0?'+':'')+fnum(m.followers)}</div></div>
-        <div class="st"><div class="l">Публикаций</div><div class="v">${fnum(m.reels_count)}</div></div>
-      </div></div>`;
+  const smmCard=r=>{ const sm=(typeof smmNormalize==='function'?smmNormalize(r.payload||{}):{metrics:{},period:''}); const m=sm.metrics||{};
+    const stats=`<div class="st"><div class="l">Охват</div><div class="v">${fnum(m.reels_reach)}</div></div>`
+      +`<div class="st"><div class="l">Вовлечённость</div><div class="v">${fpc(m.er)}</div></div>`
+      +`<div class="st"><div class="l">Подписчики Δ</div><div class="v" style="color:var(--pos)">${m.followers==null?'—':(m.followers>0?'+':'')+fnum(m.followers)}</div></div>`
+      +`<div class="st"><div class="l">Публикаций</div><div class="v">${fnum(m.reels_count)}</div></div>`;
+    return card(r,'#8A8FFF',SMM_IC,stats,sm.period||'');
   };
-  const perfBlock = perf.length ? `<div class="rep-group-h">Performance — анализ эффективности <span class="ct">${perf.length}</span><span class="ln"></span></div>${perf.map(perfCard).join('')}` : '';
-  const smmBlock = smm.length ? `<div class="rep-group-h">SMM — социальные медиа <span class="ct">${smm.length}</span><span class="ln"></span></div>${smm.map(smmCard).join('')}` : '';
+  const perfBlock = perf.length ? `<div class="rep-group-h"><span class="gbar" style="background:#37E6C8"></span>Performance — анализ эффективности<span class="ln"></span><span class="ct">${perf.length} ${pl(perf.length,'отчёт','отчёта','отчётов')}</span></div>${perf.map(perfCard).join('')}` : '';
+  const smmBlock = smm.length ? `<div class="rep-group-h"><span class="gbar" style="background:#8A8FFF"></span>SMM — социальные медиа<span class="ln"></span><span class="ct">${smm.length} ${pl(smm.length,'отчёт','отчёта','отчётов')}</span></div>${smm.map(smmCard).join('')}` : '';
   document.getElementById('content-cl').innerHTML=`
     <div class="ph"><div><div class="eyebrow">Документация</div><h1>Отчёты</h1><div class="s">Опубликованные отчёты по проекту · ${reports.length} готово</div></div></div>
     ${perfBlock}
