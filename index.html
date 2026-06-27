@@ -8284,7 +8284,7 @@ function saveEmp(){
   const phone=document.getElementById('e-phone').value.trim();
   const tg=document.getElementById('e-tg').value.trim();
   const mods=Object.keys(empPerms).filter(k=>empPerms[k].view).length;
-  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
+  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM,dept}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
   if(empEditIdx!=null){
     const e=TEAM[empEditIdx];
     Object.assign(e,{name,role,dept,color:empColor,phone,tg,is_pm:empPM,perms:JSON.parse(JSON.stringify(empPerms))});
@@ -9872,7 +9872,8 @@ window.tUpdateMemberPerms = async (id, perms) => {
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tSetMemberDept = async (id, dept) => {
-  try { await SB.from('profiles').update({ dept }).eq('id', id);
+  try { const { error } = await SB.from('profiles').update({ dept }).eq('id', id);
+    if (error) { toast('Не удалось изменить команду: ' + error.message); return; }
     await window.tLoadAll(ME.role); teamTab='depts'; renderTeam(); if(typeof _tcRefresh==='function') _tcRefresh();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
@@ -9884,7 +9885,9 @@ window.tUpdateMember = async (id, perms, contact={}) => {
     if (contact.color!==undefined) upd.color = contact.color;
     if (contact.role_title!==undefined) upd.role_title = contact.role_title;
     if (contact.is_pm!==undefined) upd.is_pm = !!contact.is_pm;
-    await SB.from('profiles').update(upd).eq('id', id);
+    if (contact.dept!==undefined) upd.dept = contact.dept;
+    const { error } = await SB.from('profiles').update(upd).eq('id', id);
+    if (error) { toast('Не удалось сохранить: ' + error.message); return; }
     toast('Сотрудник обновлён'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
