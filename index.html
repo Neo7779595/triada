@@ -8550,17 +8550,33 @@ function renderClOverview(){
     <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
 }
 function renderClStages(){
+  const P=window.CLP, stages=(P&&P.stages)||[];
+  if(!P || !stages.length){
+    document.getElementById('content-cl').innerHTML=`
+      <div style="text-align:center;padding:64px 24px;color:var(--txt-3)">
+        <div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Этапов пока нет</div>
+        <div style="font-size:12.5px;margin-top:5px">Появятся, когда команда агентства добавит их в проект.</div>
+      </div>
+      <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
+    return;
+  }
+  const total=stages.length, done=stages.filter(s=>s.status==='done').length, pct=total?Math.round(done/total*100):0;
+  const rows=stages.map((s,i)=>{
+    const cls=s.status==='done'?'done':s.status==='active'?'active':'';
+    const badge=s.status==='done'?'<span class="badge b-active"><span class="bd"></span>Завершён</span>':s.status==='active'?'<span class="badge b-trial"><span class="bd"></span>В работе</span>':'<span class="badge b-mut">Ожидает</span>';
+    const dt=s.status==='done'
+      ? (s.completed_at?_dDate(String(s.completed_at).slice(0,10)):(s.due_date?_dDate(s.due_date):''))
+      : (s.due_date?_dDate(s.due_date):'');
+    return `<div class="cls-row ${cls}"><div class="cls-num">${i+1}</div><div class="cls-name">${_ddH(s.name||'Без названия')}</div>${dt?`<div class="cls-date">${dt}</div>`:''}${badge}</div>`;
+  }).join('');
   document.getElementById('content-cl').innerHTML=`
     <div class="card"><div style="padding:20px 22px">
-      <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:18px;font-weight:700">Все этапы проекта</div><div class="cl-track-pct">33%</div></div>
-      <div class="bar" style="height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:16px"><i style="display:block;width:33%;height:100%;background:var(--accent);border-radius:4px;box-shadow:0 0 8px var(--accent)"></i></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:18px;font-weight:700">Все этапы проекта</div><div class="cl-track-pct">${pct}%</div></div>
+      <div class="bar" style="height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:16px"><i style="display:block;width:${pct}%;height:100%;background:var(--accent);border-radius:4px;box-shadow:0 0 8px var(--accent)"></i></div>
       <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--txt-3);margin-top:7px"><span>0%</span><span>50%</span><span>100%</span></div>
     </div></div>
-    <div style="margin-top:16px">${CL.stages.map((s,i)=>{
-      const cls=s.st==='done'?'done':s.st==='active'?'active':'';
-      const badge=s.st==='done'?'<span class="badge b-active"><span class="bd"></span>Завершён</span>':s.st==='active'?'<span class="badge b-trial"><span class="bd"></span>В работе</span>':'<span class="badge b-mut">Ожидает</span>';
-      return `<div class="cls-row ${cls}"><div class="cls-num">${i+1}</div><div class="cls-name">${s.n}</div>${s.date?`<div class="cls-date">${s.date}</div>`:''}${badge}</div>`;
-    }).join('')}</div>
+    <div style="margin-top:16px">${rows}</div>
     <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
 }
 function renderClReports(){
