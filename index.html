@@ -1761,6 +1761,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pt-avs .pt-tm-av:first-child{margin-left:0}
 .pt-tm-av.lead{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .pt-tm-av img{width:100%;height:100%;object-fit:cover}
+.pt-team-names{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.pt-team-name{display:inline-flex;align-items:center;padding:4px 10px;border-radius:7px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line);white-space:nowrap}
+.pt-team-name.none{color:var(--txt-3);background:var(--bg-2);border-color:var(--line-2);font-weight:500;text-transform:none;letter-spacing:0}
 .pt-tm-more{font-size:11px;color:var(--txt-3);margin-left:7px}
 .np-team{display:flex;flex-direction:column;gap:8px;margin-top:2px}
 .np-team-btn{display:flex;align-items:center;gap:9px;width:100%;padding:9px 12px;border:1px dashed var(--line-2);border-radius:10px;background:transparent;color:var(--txt-2);cursor:pointer;font:inherit;text-align:left}
@@ -3697,10 +3700,10 @@ function freezeTrials(){
 
 function teamStripHTML(p){
   const TM=(p&&p._team)||[]; if(!TM.length) return '';
-  const av=TM.slice(0,6).map(t=>{ const isL=t._id===p.lead_id; const c=t.color||'var(--accent)'; const nm=(t.name||'?'); const safe=nm.replace(/"/g,'');
-    return '<span class="pt-tm-av'+(isL?' lead':'')+'" style="background:'+c+'22;color:'+c+'" title="'+safe+(isL?' · ответственный':'')+'">'+(t.avatar?('<img src="'+String(t.avatar).replace(/"/g,'')+'" alt="">'):((nm[0]||'?').toUpperCase()))+'</span>';
-  }).join('');
-  return '<div class="pt-team"><span class="pt-team-lbl">команда</span><span class="pt-avs">'+av+(TM.length>6?('<span class="pt-tm-more">+'+(TM.length-6)+'</span>'):'')+'</span></div>';
+  const _tg=(typeof TEAM!=='undefined'?TEAM:[]);
+  const depts=[...new Set(TM.map(t=>{ const m=_tg.find(x=>String(x._id)===String(t._id)); return (m&&m.dept)?m.dept:'Без команды'; }))];
+  const pills=depts.map(d=>'<span class="pt-team-name'+(d==='Без команды'?' none':'')+'">'+_ddH(d)+'</span>').join('');
+  return '<div class="pt-team"><span class="pt-team-lbl">команда</span><span class="pt-team-names">'+pills+'</span></div>';
 }
 function contractBadgeHTML(p){
   const c=p&&p._contract; if(!c||!c.end) return '';
