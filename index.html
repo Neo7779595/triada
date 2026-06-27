@@ -8689,35 +8689,79 @@ function actFeed(items){
   return `<div class="act-feed">${items.map(a=>`<div class="act-row"><div class="act-ic ${a.k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ACT_IC[a.k]}</svg></div><div style="flex:1;min-width:0"><div class="act-txt">${a.txt}</div><div class="act-tag">${a.tag}</div></div><div class="act-t">${a.t}</div></div>`).join('')}</div>`;
 }
 function renderClOverview(){
-  const nodes=CL.stages.map((s,i)=>{
-    const cls=s.st==='done'?'done':s.st==='active'?'active':'';
-    const node=`<div class="cl-node ${cls}"><div class="nn">0${i+1}</div><div class="nc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${CL_STAGE_ICONS[i]}</svg></div><div class="nl">${s.n.split(' ').slice(0,2).join(' ')}</div></div>`;
-    const seg=i<CL.stages.length-1?`<div class="cl-seg ${CL.stages[i].st==='done'?'on':''}"></div>`:'';
+  const P=window.CLP;
+  if(!P){
+    document.getElementById('content-cl').innerHTML=`
+      <div style="text-align:center;padding:64px 24px;color:var(--txt-3)">
+        <div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Проект ещё не подключён</div>
+        <div style="font-size:12.5px;margin-top:5px">Как только агентство привяжет проект к вашему доступу, здесь появится сводка.</div>
+      </div>
+      <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
+    return;
+  }
+  const stages=P.stages||[], reports=P.reports||[], feed=P.feed||[];
+  const total=stages.length, done=stages.filter(s=>s.status==='done').length, pct=total?Math.round(done/total*100):0;
+  const activeIdx=stages.findIndex(s=>s.status==='active'), active=activeIdx>=0?stages[activeIdx]:null;
+  const pl=(n,a,b,c)=>typeof _plural==='function'?_plural(n,a,b,c):c;
+  const kpis=[
+    {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)'},
+    {l:'Завершено', v:String(done), s:'этапов закрыто', c:'var(--txt)'},
+    {l:'Отчётов', v:String(reports.length), s:'опубликовано', c:'var(--txt)'},
+    {l:'Обновлений', v:String(feed.length), s:'событий по проекту', c:'var(--txt)'},
+  ];
+  const nodes=stages.map((s,i)=>{
+    const cls=s.status==='done'?'done':s.status==='active'?'active':'';
+    const ic=CL_STAGE_ICONS[i%CL_STAGE_ICONS.length];
+    const nm=(s.name||'—').split(' ').slice(0,2).join(' ');
+    const node=`<div class="cl-node ${cls}"><div class="nn">${String(i+1).padStart(2,'0')}</div><div class="nc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></div><div class="nl">${_ddH(nm)}</div></div>`;
+    const seg=i<stages.length-1?`<div class="cl-seg ${s.status==='done'?'on':''}"></div>`:'';
     return node+seg;
   }).join('');
+  const activeLine = active
+    ? `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px var(--accent)"></span>Активный этап: <b>${_ddH(active.name||'—')}</b> · ${activeIdx+1} / ${total}`
+    : (total&&done===total
+        ? `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--pos)"></span>Все этапы завершены`
+        : `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--txt-3)"></span>Нет этапа в работе`);
+  const curStage = active || stages.find(s=>s.status==='wait') || null;
+  let curBlock='';
+  if(curStage){
+    const ci=stages.indexOf(curStage), isA=curStage.status==='active';
+    curBlock=`<div class="cl-cur">
+      <div class="ic">${String(ci+1).padStart(2,'0')}</div>
+      <div style="flex:1"><div class="t">${_ddH(curStage.name||'—')}</div><div class="d">${isA?'Сейчас в работе · команда занимается этим этапом':'Следующий этап · ожидает начала работы'}</div></div>
+      ${isA?'<span class="badge b-trial"><span class="bd"></span>В работе</span>':'<span class="badge b-mut">Ожидает</span>'}
+    </div>`;
+  } else if(total&&done===total){
+    curBlock=`<div class="cl-cur">
+      <div class="ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div style="flex:1"><div class="t">Все этапы завершены</div><div class="d">Проект полностью выполнен</div></div>
+      <span class="badge b-active"><span class="bd"></span>Завершён</span>
+    </div>`;
+  }
+  const repBody = reports.length
+    ? reports.slice(0,4).map(r=>{ const col=r.kind==='SMM'?'#8A8FFF':'#37E6C8';
+        return `<div class="cl-rep-row" onclick="clNav('reports')"><div class="crep-ic" style="width:30px;height:30px;border-radius:7px;background:${col}22;color:${col}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M6 2h9l5 5v15H6z"/></svg></div><div class="rt">${_ddH(r.title||'Отчёт')}</div><div class="rd">${_dDateFull(r.published_at)}</div><span class="badge" style="background:${col}22;color:${col}">${_ddH(r.kind||'')}</span></div>`;
+      }).join('')
+    : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Пока нет опубликованных отчётов.</div>`;
+  const actBody = feed.length
+    ? actFeed(feed.slice(0,5).map(a=>({k:a.k,txt:a.txt,t:a.t,tag:_ddH(a.tag||'—')})))
+    : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Пока нет событий по проекту.</div>`;
   document.getElementById('content-cl').innerHTML=`
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      ${CL.kpis.map((k,i)=>`<div class="kpi"><div class="l">${k.l}</div><div class="v num" style="color:${i<3?'var(--pos)':'var(--accent)'}">${k.v}</div><div class="sub">${k.s}</div></div>`).join('')}
+      ${kpis.map(k=>`<div class="kpi"><div class="l">${k.l}</div><div class="v num" style="color:${k.c}">${k.v}</div><div class="sub">${k.s}</div></div>`).join('')}
     </div>
     <div class="card" style="margin-top:16px"><div style="padding:18px 20px 6px">
-      <div class="cl-track-h"><div><div class="eyebrow">Ход проекта</div><div style="font-size:18px;font-weight:700;margin-top:4px">Производственный цикл</div></div><div style="text-align:right"><div class="cl-track-pct">33%</div><div style="font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px">завершено</div></div></div>
+      <div class="cl-track-h"><div><div class="eyebrow">Ход проекта</div><div style="font-size:18px;font-weight:700;margin-top:4px">Производственный цикл</div></div><div style="text-align:right"><div class="cl-track-pct">${pct}%</div><div style="font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em;margin-top:2px">завершено</div></div></div>
       <div class="cl-nodes">${nodes}</div>
-      <div class="cl-active-line"><span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px var(--accent)"></span>Активный этап: <b>Подготовка контент-плана</b> · 3 / 6</div>
+      <div class="cl-active-line">${activeLine}</div>
     </div></div>
-    <div class="cl-cur">
-      <div class="ic">03</div>
-      <div style="flex:1"><div class="t">Подготовка контент-плана на Июнь</div><div class="d">Сейчас в работе · команда занимается этим этапом</div></div>
-      <span class="badge b-trial"><span class="bd"></span>В работе</span>
-    </div>
+    ${curBlock}
     <div class="row2" style="margin-top:16px">
-      <div class="card"><div class="card-h"><div class="t">Отчёты <span class="c">${CL.reports.length} готово</span></div></div><div class="card-body">
-        ${CL.reports.map(r=>`<div class="cl-rep-row" onclick="clNav('reports')"><div class="crep-ic" style="width:30px;height:30px;border-radius:7px;background:${r.color}22;color:${r.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M6 2h9l5 5v15H6z"/></svg></div><div class="rt">${r.t}</div><div class="rd">${r.date}</div><span class="badge" style="background:${r.color}22;color:${r.color}">${r.ty}</span></div>`).join('')}
+      <div class="card"><div class="card-h"><div class="t">Отчёты <span class="c">${reports.length} готово</span></div></div><div class="card-body">
+        ${repBody}
       </div></div>
-      <div class="card"><div class="card-h"><div class="t">Активность команды</div><div class="m" style="color:var(--pos)">● LIVE</div></div><div class="card-body">${actFeed(CL.activity.slice(0,5))}</div></div>
-    </div>
-    <div style="margin-top:18px"><div class="eyebrow" style="margin-bottom:2px">SMM показатели · Май</div>
-      <div class="smm-strip">${CL.smm.map(m=>`<div class="m"><div class="l">${m.l}</div><div class="v">${m.v}</div></div>`).join('')}</div>
-      <div style="margin-top:10px"><span class="badge b-cyan">ER 2,00% · ↑ Потенциал роста</span></div>
+      <div class="card"><div class="card-h"><div class="t">Активность команды</div>${feed.length?'<div class="m" style="color:var(--pos)">● LIVE</div>':''}</div><div class="card-body">${actBody}</div></div>
     </div>
     <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
 }
@@ -8752,33 +8796,59 @@ function renderClStages(){
     <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
 }
 function renderClReports(){
-  document.getElementById('content-cl').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Документация</div><h1>Отчёты</h1><div class="s">Опубликованные отчёты по проекту · 3 готово</div></div></div>
-    <div class="rep-group-h">Performance — анализ эффективности <span class="ct">2</span><span class="ln"></span></div>
-    ${CL_PERF.map((r,ri)=>`<div class="crep">
+  const P=window.CLP, reports=(P&&P.reports)||[];
+  if(!P || !reports.length){
+    document.getElementById('content-cl').innerHTML=`
+      <div class="ph"><div><div class="eyebrow">Документация</div><h1>Отчёты</h1><div class="s">Опубликованные отчёты по проекту</div></div></div>
+      <div style="text-align:center;padding:56px 24px;color:var(--txt-3)">
+        <div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Отчётов пока нет</div>
+        <div style="font-size:12.5px;margin-top:5px">Здесь появятся Performance- и SMM-отчёты, как только агентство их опубликует.</div>
+      </div>
+      <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
+    return;
+  }
+  const perf=reports.filter(r=>r.kind!=='SMM'), smm=reports.filter(r=>r.kind==='SMM');
+  const fnum=v=>(v==null||v==='')?'—':Number(v).toLocaleString('ru-RU');
+  const fpc=v=>(v==null||v==='')?'—':(+v).toFixed(2)+'%';
+  const perfCard=r=>{ const p=r.payload||{};
+    return `<div class="crep">
       <div class="crep-h"><div class="crep-ic" style="background:#37E6C822;color:#37E6C8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div>
-        <div><div class="crep-t">${r.t}</div><div class="crep-meta">Опубликован · ${r.date}</div></div>
-        <button class="crep-open" onclick="openReport('PERF',CL_PERF[${ri}])">Открыть →</button></div>
+        <div><div class="crep-t">${_ddH(r.title||'Performance-отчёт')}</div><div class="crep-meta">Опубликован · ${_dDateFull(r.published_at)}</div></div>
+        <button class="crep-open" onclick="clOpenReport('${r.id}')">Открыть →</button></div>
       <div class="crep-stats">
-        <div class="st"><div class="l">Рост выручки</div><div class="v" style="color:var(--pos)">${r.rost}</div></div>
-        <div class="st"><div class="l">Трафик Δ</div><div class="v" style="color:var(--pos)">${r.traf}</div></div>
-        <div class="st"><div class="l">Ср. чек Δ</div><div class="v" style="color:${r.chek.includes('↓')?'var(--neg)':'var(--pos)'}">${r.chek}</div></div>
-        <div class="st"><div class="l">Выручка факт</div><div class="v">${r.fakt}</div></div>
-        <div class="st"><div class="l">База</div><div class="v" style="color:var(--txt-3)">${r.baza}</div></div>
-      </div></div>`).join('')}
-    <div class="rep-group-h">SMM — социальные медиа <span class="ct">1</span><span class="ln"></span></div>
-    <div class="crep">
+        <div class="st"><div class="l">Рост выручки</div><div class="v" style="color:var(--pos)">${_ddH(p.rost||'—')}</div></div>
+        <div class="st"><div class="l">Трафик Δ</div><div class="v" style="color:var(--pos)">${_ddH(p.traf||'—')}</div></div>
+        <div class="st"><div class="l">Ср. чек Δ</div><div class="v" style="color:${p.chek&&String(p.chek).includes('↓')?'var(--neg)':'var(--pos)'}">${_ddH(p.chek||'—')}</div></div>
+        <div class="st"><div class="l">Выручка факт</div><div class="v">${_ddH(p.fakt||'—')}</div></div>
+        <div class="st"><div class="l">База</div><div class="v" style="color:var(--txt-3)">${_ddH(p.baza||'—')}</div></div>
+      </div></div>`;
+  };
+  const smmCard=r=>{ const m=((typeof smmNormalize==='function'?smmNormalize(r.payload||{}):{metrics:{}}).metrics)||{};
+    return `<div class="crep">
       <div class="crep-h"><div class="crep-ic" style="background:#8A8FFF22;color:#8A8FFF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>
-        <div><div class="crep-t">${CL_SMMREP.t}</div><div class="crep-meta">Опубликован · ${CL_SMMREP.date}</div></div>
-        <button class="crep-open" style="background:#8A8FFF" onclick="openReport('SMM',CL_SMMREP)">Открыть →</button></div>
+        <div><div class="crep-t">${_ddH(r.title||'SMM-отчёт')}</div><div class="crep-meta">Опубликован · ${_dDateFull(r.published_at)}</div></div>
+        <button class="crep-open" style="background:#8A8FFF" onclick="clOpenReport('${r.id}')">Открыть →</button></div>
       <div class="crep-stats">
-        <div class="st"><div class="l">Охват</div><div class="v">${CL_SMMREP.ohvat}</div></div>
-        <div class="st"><div class="l">Вовлечённость</div><div class="v">${CL_SMMREP.vov}</div></div>
-        <div class="st"><div class="l">Подписчики Δ</div><div class="v" style="color:var(--pos)">${CL_SMMREP.pod}</div></div>
-        <div class="st"><div class="l">Публикаций</div><div class="v">${CL_SMMREP.pub}</div></div>
-      </div></div>
+        <div class="st"><div class="l">Охват</div><div class="v">${fnum(m.reels_reach)}</div></div>
+        <div class="st"><div class="l">Вовлечённость</div><div class="v">${fpc(m.er)}</div></div>
+        <div class="st"><div class="l">Подписчики Δ</div><div class="v" style="color:var(--pos)">${m.followers==null?'—':(m.followers>0?'+':'')+fnum(m.followers)}</div></div>
+        <div class="st"><div class="l">Публикаций</div><div class="v">${fnum(m.reels_count)}</div></div>
+      </div></div>`;
+  };
+  const perfBlock = perf.length ? `<div class="rep-group-h">Performance — анализ эффективности <span class="ct">${perf.length}</span><span class="ln"></span></div>${perf.map(perfCard).join('')}` : '';
+  const smmBlock = smm.length ? `<div class="rep-group-h">SMM — социальные медиа <span class="ct">${smm.length}</span><span class="ln"></span></div>${smm.map(smmCard).join('')}` : '';
+  document.getElementById('content-cl').innerHTML=`
+    <div class="ph"><div><div class="eyebrow">Документация</div><h1>Отчёты</h1><div class="s">Опубликованные отчёты по проекту · ${reports.length} готово</div></div></div>
+    ${perfBlock}
+    ${smmBlock}
     <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
 }
+window.clOpenReport=function(id){
+  const P=window.CLP; if(!P) return;
+  const r=(P.reports||[]).find(x=>String(x.id)===String(id)); if(!r) return;
+  openReport(r.kind, Object.assign({t:r.title, date:_dDateFull(r.published_at), _real:true}, r.payload||{}));
+};
 function renderClUpdates(){
   document.getElementById('content-cl').innerHTML=`
     <div class="card"><div class="card-h"><div class="t">Вся активность</div><div class="m" style="color:var(--pos)">● LIVE</div></div><div class="card-body">${actFeed(CL.activity)}</div></div>
@@ -9993,9 +10063,13 @@ window.tLoadClient = async () => {
       .eq('project_id', pid).order('created_at',{ascending:false}).limit(50);
     history = data || [];
   } catch(_e){}
+  // лента активности из истории (тот же трансформ, что в карточке проекта; tAgo доступен здесь, в block1)
+  const feed = history.map(h => { const k = h.new_status==='done'?'done':h.new_status==='active'?'start':'back';
+    const txt = k==='done'?'Команда завершила этап':k==='start'?'Команда начала работу над этапом':'Команда вернула этап в ожидание';
+    return { k, txt, tag:(h.stage_name||'—'), t:tAgo(h.created_at) }; });
   window.CLP = { id:pid, name:p.name||'', logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
     logoUrl:p.logo_url||'', svc:p.service||'', cat:p.category||'', status:p.status||'active',
-    mrr:p.mrr||0, createdAt:p.created_at||null, allProjects:rows, stages, reports, history };
+    mrr:p.mrr||0, createdAt:p.created_at||null, allProjects:rows, stages, reports, history, feed };
 };
 
 window.tLoadAll = async (role) => {
