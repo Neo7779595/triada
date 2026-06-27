@@ -5464,7 +5464,7 @@ function openReportProj(i){
 }
 
 /* ═══════ SMM-отчёт · редактор данных (Фаза 3) ═══════ */
-let _smmCur=null, _smmMeta=null, _smmTab='data', _smmDirty=false;
+let _smmCur=null, _smmMeta=null, _smmTab='data', _smmDirty=false, _smmRO=false;
 
 function smmAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
 function smmMark(){ _smmDirty=true; }
@@ -5497,17 +5497,18 @@ function aggregateRubricsFromReels(payload){
   payload.rubrics=[...auto,...manual];
 }
 
-function openSMM(report){
+function openSMM(report, ro){
+  _smmRO=!!ro;
   _smmCur=smmNormalize(report.payload);
   _smmMeta={id:report.id, projectId:report.project_id, title:report.title||'SMM-отчёт', date:_dDateFull(report.published_at)};
-  _smmTab=smmHasData(report)?'preview':'data'; _smmDirty=false; _smmLbData=null;
+  _smmTab=_smmRO?'preview':(smmHasData(report)?'preview':'data'); _smmDirty=false; _smmLbData=null;
   document.getElementById('ov-smm').classList.add('on');
   smmRender();
 }
 async function smmClose(){
-  if(_smmDirty) await smmSave(false);
+  if(!_smmRO && _smmDirty) await smmSave(false);
   document.getElementById('ov-smm').classList.remove('on');
-  _smmCur=null; _smmMeta=null; _smmDirty=false;
+  _smmCur=null; _smmMeta=null; _smmDirty=false; _smmRO=false;
 }
 async function smmTab(t){
   if(t==='lb')_smmLbAnim=true; _smmTab=t; smmRender();
@@ -5543,9 +5544,9 @@ function smmRender(){
     +'<div class="ic"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>'
     +'<div><h2>'+_ddH(_smmMeta.title)+'</h2><p>'+(_smmCur.period?_ddH(_smmCur.period):'период не указан')+' · опубликован '+_smmMeta.date+'</p></div>'
     +'<div class="sp"></div><span class="smm-badge">SMM</span>'
-    +'<button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmSave(true)">Сохранить</button>'
+    +(_smmRO?'':'<button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmSave(true)">Сохранить</button>')
     +'<button class="smm-mini-btn" onclick="smmClose()">Закрыть</button></div>'
-    +'<div class="smm-tabs">'+tabs.map(t=>'<button class="'+(_smmTab===t[0]?'on':'')+'" onclick="smmTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</div>'
+    +(_smmRO?'':'<div class="smm-tabs">'+tabs.map(t=>'<button class="'+(_smmTab===t[0]?'on':'')+'" onclick="smmTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</div>')
     +'<div class="smm-body">'+(_smmTab==='data'?smmRenderData():_smmTab==='lb'?smmRenderLb():smmRenderPresentation())+'</div>'
     +'</div>';
   if(_smmTab==='preview') requestAnimationFrame(smmInitReveal);
@@ -8839,6 +8840,7 @@ function renderClReports(){
 window.clOpenReport=function(id){
   const P=window.CLP; if(!P) return;
   const r=(P.reports||[]).find(x=>String(x.id)===String(id)); if(!r) return;
+  if(r.kind==='SMM'){ openSMM(Object.assign({project_id:P.id}, r), true); return; }
   openReport(r.kind, Object.assign({t:r.title, date:_dDateFull(r.published_at), _real:true}, r.payload||{}));
 };
 function renderClUpdates(){
