@@ -8634,43 +8634,6 @@ function toolSaveCat(){
 }
 
 /* ======== CLIENT CABINET ======== */
-const CL={
-  pct:33, done:2, total:6,
-  kpis:[
-    {l:'Выручка Δ',v:'+4,3%',s:'рост выручки'},
-    {l:'Трафик Δ',v:'+51,8',s:'гостей / день'},
-    {l:'Ср. чек Δ',v:'+1 442,9',s:'сум / чек'},
-    {l:'Прогресс проекта',v:'33%',s:'2 из 6 этапов'},
-  ],
-  stages:[
-    {n:'Добавление филиала ТТЗ на карты',st:'done',date:'9 июня 2026'},
-    {n:'Продвижение филиала Беруни',st:'done',date:'11 июня 2026'},
-    {n:'Подготовка контент-плана на Июнь',st:'active',date:'12 июня 2026'},
-    {n:'Дизайн нового меню',st:'wait',date:''},
-    {n:'Видео для мониторов · 3x',st:'wait',date:''},
-    {n:'Финальный отчёт',st:'wait',date:''},
-  ],
-  reports:[
-    {t:'МАЙ',ty:'SMM',date:'5 июня 2026',color:'#8A8FFF'},
-    {t:'АПРЕЛЬ – МАЙ',ty:'PERF',date:'3 июня 2026',color:'#37E6C8'},
-    {t:'ОТЧЁТ – МАЙ',ty:'PERF',date:'29 мая 2026',color:'#37E6C8'},
-  ],
-  smm:[{l:'ER',v:'2,00%'},{l:'LR',v:'1,00%'},{l:'C/R',v:'0,90%'},{l:'SH/R',v:'0,50%'},{l:'SR',v:'0,30%'}],
-  activity:[
-    {txt:'Команда начала работу над этапом',tag:'03 · Подготовка контент-плана',t:'13 ч назад',k:'start'},
-    {txt:'Команда завершила этап',tag:'02 · Продвижение филиала Беруни',t:'Вчера, 15:18',k:'done'},
-    {txt:'Команда начала работу над этапом',tag:'02 · Продвижение филиала Беруни',t:'2 дн назад',k:'start'},
-    {txt:'Команда завершила этап',tag:'02 · Продвижение филиала Беруни',t:'3 дн назад',k:'done'},
-    {txt:'Команда завершила этап',tag:'01 · Добавление филиала ТТЗ',t:'3 дн назад',k:'done'},
-    {txt:'Команда начала работу над этапом',tag:'01 · Добавление филиала ТТЗ',t:'3 дн назад',k:'start'},
-    {txt:'Команда вернула в ожидание',tag:'01 · Добавление филиала ТТЗ',t:'3 дн назад',k:'back'},
-  ],
-};
-const CL_PERF=[
-  {t:'АПРЕЛЬ – МАЙ',date:'03 июня 2026 · 06:02',rost:'↑ 4%',traf:'↑ 52 чек.',chek:'↑ 1 443 сум',fakt:'5 715 550 500 сум',baza:'5 305 585 500 сум'},
-  {t:'ОТЧЁТ – МАЙ',date:'29 мая 2026 · 06:26',rost:'↑ 9%',traf:'↑ 5 835 чек.',chek:'↓ 1 085 сум',fakt:'5 305 585 500 сум',baza:'4 855 471 400 сум'},
-];
-const CL_SMMREP={t:'SMM · июнь 2026',date:'05 июня 2026 · 10:52',ohvat:'833 222',vov:'2,00%',pod:'↑ 205',pub:'11'};
 const CL_STAGE_ICONS=['<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>','<path d="M12 2l2.4 6.9H22l-5.8 4.3 2.2 6.8L12 16l-6.4 4 2.2-6.8L2 8.9h7.6z"/>','<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/>','<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>','<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 2v4M16 2v4"/>','<path d="M12 20h9M3 20l9-16 9 16"/>'];
 const ACT_IC={start:'<path d="M5 3l14 9-14 9z"/>',done:'<path d="M20 6L9 17l-5-5"/>',back:'<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>'};
 
@@ -8704,12 +8667,28 @@ function renderClOverview(){
   const total=stages.length, done=stages.filter(s=>s.status==='done').length, pct=total?Math.round(done/total*100):0;
   const activeIdx=stages.findIndex(s=>s.status==='active'), active=activeIdx>=0?stages[activeIdx]:null;
   const pl=(n,a,b,c)=>typeof _plural==='function'?_plural(n,a,b,c):c;
-  const kpis=[
-    {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)'},
-    {l:'Завершено', v:String(done), s:'этапов закрыто', c:'var(--txt)'},
-    {l:'Отчётов', v:String(reports.length), s:'опубликовано', c:'var(--txt)'},
-    {l:'Обновлений', v:String(feed.length), s:'событий по проекту', c:'var(--txt)'},
-  ];
+  // последние отчёты по типам (reports уже отсортированы по published_at ↓)
+  const latestPerf=reports.find(r=>r.kind!=='SMM')||null;
+  const latestSmm=reports.find(r=>r.kind==='SMM')||null;
+  const dCol=s=>{ s=String(s||''); return (s.includes('↓')||/^\s*-/.test(s))?'var(--neg)':'var(--pos)'; };
+  // верхний ряд KPI: есть PERF-отчёт → финансовые Δ + прогресс; иначе честный проектный ряд
+  let kpis;
+  if(latestPerf && latestPerf.payload){
+    const pp=latestPerf.payload;
+    kpis=[
+      {l:'Выручка Δ', v:_ddH(pp.rost||'—'), s:'рост выручки', c:dCol(pp.rost)},
+      {l:'Трафик Δ', v:_ddH(pp.traf||'—'), s:'за период', c:dCol(pp.traf)},
+      {l:'Ср. чек Δ', v:_ddH(pp.chek||'—'), s:'средний чек', c:dCol(pp.chek)},
+      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)'},
+    ];
+  } else {
+    kpis=[
+      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)'},
+      {l:'Завершено', v:String(done), s:'этапов закрыто', c:'var(--txt)'},
+      {l:'Отчётов', v:String(reports.length), s:'опубликовано', c:'var(--txt)'},
+      {l:'Обновлений', v:String(feed.length), s:'событий по проекту', c:'var(--txt)'},
+    ];
+  }
   const nodes=stages.map((s,i)=>{
     const cls=s.status==='done'?'done':s.status==='active'?'active':'';
     const ic=CL_STAGE_ICONS[i%CL_STAGE_ICONS.length];
@@ -8747,6 +8726,18 @@ function renderClOverview(){
   const actBody = feed.length
     ? actFeed(feed.slice(0,5).map(a=>({k:a.k,txt:a.txt,t:a.t,tag:_ddH(a.tag||'—')})))
     : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Пока нет событий по проекту.</div>`;
+  // SMM-полоса показателей из последнего SMM-отчёта (только если есть реальные ставки)
+  let smmStrip='';
+  if(latestSmm){
+    const sm=(typeof smmNormalize==='function'?smmNormalize(latestSmm.payload||{}):{metrics:{},period:''});
+    const mm=sm.metrics||{};
+    const fp=v=>v==null?'—':(+v).toFixed(2).replace('.',',')+'%';
+    const cells=[['ER',mm.er],['LR',mm.lr],['C/R',mm.tr],['SH/R',mm.shr],['SR',mm.sr]].filter(c=>c[1]!=null);
+    if(cells.length){
+      const per=sm.period||_dDateFull(latestSmm.published_at);
+      smmStrip=`<div style="margin-top:18px"><div class="eyebrow" style="margin-bottom:2px">SMM показатели${per?' · '+_ddH(per):''}</div><div class="smm-strip">${cells.map(c=>`<div class="m"><div class="l">${c[0]}</div><div class="v">${fp(c[1])}</div></div>`).join('')}</div></div>`;
+    }
+  }
   document.getElementById('content-cl').innerHTML=`
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       ${kpis.map(k=>`<div class="kpi"><div class="l">${k.l}</div><div class="v num" style="color:${k.c}">${k.v}</div><div class="sub">${k.s}</div></div>`).join('')}
@@ -8763,6 +8754,7 @@ function renderClOverview(){
       </div></div>
       <div class="card"><div class="card-h"><div class="t">Активность команды</div>${feed.length?'<div class="m" style="color:var(--pos)">● LIVE</div>':''}</div><div class="card-body">${actBody}</div></div>
     </div>
+    ${smmStrip}
     <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
 }
 function renderClStages(){
@@ -8850,8 +8842,19 @@ window.clOpenReport=function(id){
   openReport(r.kind, Object.assign({t:r.title, date:_dDateFull(r.published_at), _real:true}, r.payload||{}));
 };
 function renderClUpdates(){
+  const P=window.CLP, feed=(P&&P.feed)||[];
+  if(!P || !feed.length){
+    document.getElementById('content-cl').innerHTML=`
+      <div style="text-align:center;padding:64px 24px;color:var(--txt-3)">
+        <div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Пока нет обновлений</div>
+        <div style="font-size:12.5px;margin-top:5px">Здесь будут появляться события по проекту: старт, завершение и возврат этапов.</div>
+      </div>
+      <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
+    return;
+  }
   document.getElementById('content-cl').innerHTML=`
-    <div class="card"><div class="card-h"><div class="t">Вся активность</div><div class="m" style="color:var(--pos)">● LIVE</div></div><div class="card-body">${actFeed(CL.activity)}</div></div>
+    <div class="card"><div class="card-h"><div class="t">Вся активность</div><div class="m" style="color:var(--pos)">● LIVE</div></div><div class="card-body">${actFeed(feed.map(a=>({k:a.k,txt:a.txt,t:a.t,tag:_ddH(a.tag||'—')})))}</div></div>
     <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
 }
 
