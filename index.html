@@ -1694,6 +1694,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-clsum{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;margin-left:2px}
 .cp-clsum .ok{color:var(--pos)}
 .cp-clsum .ch{color:var(--warn)}
+.cp-apwrap{display:flex;align-items:center;gap:7px;width:100%;overflow:hidden}
+.cp-apct{font-size:11px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;background:rgba(255,255,255,.04);padding:2px 7px;border-radius:6px}
+.cp-h{cursor:crosshair}
+.cp-fillprev{box-shadow:inset 0 0 0 1px var(--accent-line);background:rgba(55,230,200,.09)}
+.cp-filling, .cp-filling *{cursor:crosshair !important;user-select:none !important}
 
 .pd-act-div{width:1px;height:22px;background:linear-gradient(180deg,transparent,var(--line-2),transparent);margin:0 3px;flex:0 0 auto}
 .pdl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
@@ -5539,11 +5544,11 @@ function cpRender(p){
     +cpSendStatusHTML(p,sh)
     +'<button class="cp-mini cp-send" onclick="cpSendSheet()">'+CP_IC.send+'Отправить на согласование</button>'
     +'</div></div>';
-  const gw=40+cols.reduce((s,c)=>s+c.w,0)+44+(showClient?180:0);
+  const gw=40+cols.reduce((s,c)=>s+c.w,0)+44+(showClient?240:0);
   html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px">';
   html+='<div class="cp-hr"><div class="cp-gut cp-hgut"></div>';
   cols.forEach((col,ci)=>{ html+=cpHeadCell(col,ci); });
-  if(showClient) html+='<div class="cp-head cp-claphead" style="width:180px"><span class="nm">Клиент</span></div>';
+  if(showClient) html+='<div class="cp-head cp-claphead" style="width:240px"><span class="nm">Клиент</span></div>';
   html+='<div class="cp-addcol" onclick="cpAddCol()">'+CP_IC.plus+'</div></div>';
   if(!disp.length){
     html+='<div class="cp-empty">'+(cpQ?'Ничего не найдено':'Пусто — добавь первую строку ниже')+'</div>';
@@ -5555,9 +5560,9 @@ function cpRender(p){
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
       const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'');
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
-      html+='<div class="'+cls+'" style="width:'+col.w+'px" data-r="'+ri+'" data-c="'+ci+'" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((sel&&!editing)?'<span class="cp-h"></span>':'')+'</div>';
+      html+='<div class="'+cls+'" style="width:'+col.w+'px" data-r="'+ri+'" data-c="'+ci+'" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
     });
-    if(showClient){ const a=ap[sid+'/'+row.id]; html+='<div class="cp-cell cp-clapcell" style="width:180px">'+cpApprCellHTML(a)+'</div>'; }
+    if(showClient){ const a=ap[sid+'/'+row.id]; html+='<div class="cp-cell cp-clapcell" style="width:240px">'+cpApprCellHTML(a)+'</div>'; }
     html+='<div class="cp-pad"></div></div>';
   });
   html+='<div class="cp-add" onclick="cpAddRow()">'+CP_IC.plus+'Добавить строку</div>';
@@ -6004,13 +6009,7 @@ async function clCpSave(rowId,patch){
 }
 
 /* ===================== КОНТЕНТ-ПЛАН · решения клиента в редакторе ===================== */
-function cpApprCellHTML(a){
-  if(!a||!a.status||a.status==='pending') return '<span class="cp-apc none">—</span>';
-  const ok=a.status==='approved';
-  const chip='<span class="cp-apc '+(ok?'ok':'ch')+'">'+(ok?'✓ Одобрено':'✎ Правки')+'</span>';
-  const cm=a.comment?('<span class="cp-apcm" title="'+_ddA(a.comment)+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>'):'';
-  return chip+cm;
-}
+function cpApprCellHTML(a){ if(!a||!a.status||a.status==='pending') return '<span class="cp-apc none">—</span>'; const ok=a.status==='approved'; const chip='<span class="cp-apc '+(ok?'ok':'ch')+'">'+(ok?'✓ Одобрено':'✎ Правки')+'</span>'; const cm=a.comment?('<span class="cp-apct" title="'+_ddA(a.comment)+'">'+_ddH(a.comment)+'</span>'):''; return '<span class="cp-apwrap">'+chip+cm+'</span>'; }
 function cpSheetApprHTML(p,sh){
   const a=(p._cpAppr||{})[sh.id+'/__sheet__']; if(!a||!a.status||a.status==='pending')return '';
   if(a.status==='approved')return '<span class="cp-fchip cp-clappr ok">Клиент одобрил лист</span>';
@@ -6040,6 +6039,24 @@ document.addEventListener('paste',cpOnPaste);
 
 function cpClientSummaryHTML(p,sh){ const ap=p._cpAppr||{}, pre=sh.id+'/'; let ok=0,ch=0; Object.keys(ap).forEach(function(k){ if(k.indexOf(pre)===0&&k!==pre+'__sheet__'){ if(ap[k].status==='approved')ok++; else if(ap[k].status==='changes')ch++; } }); if(!ok&&!ch)return ''; let h='<span class="cp-clsum" title="Решения клиента по строкам">'; if(ok)h+='<span class="ok">✓ '+ok+'</span>'; if(ch)h+='<span class="ch">✎ '+ch+'</span>'; h+='</span>'; return h; }
 window.addEventListener('focus',function(){ try{ if(document.querySelector('#app-cl .nav-i[data-cm="content"].on')&&document.getElementById('content-cl')&&typeof renderClContent==='function') renderClContent(); }catch(_e){} });
+/* ===================== КОНТЕНТ-ПЛАН · fill handle (как в Google Sheets) ===================== */
+let cpFill=null;
+function cpFillSeries(vals,count){
+  const out=[];
+  if(!vals.length){ for(let i=0;i<count;i++)out.push(''); return out; }
+  const nums=vals.map(function(v){ if(v===''||v==null)return null; const n=cpNum(v); return isNaN(n)?null:n; });
+  if(nums.every(function(n){return n!==null;})){ let step=vals.length>=2?(nums[nums.length-1]-nums[nums.length-2]):1; let last=nums[nums.length-1]; for(let i=0;i<count;i++){ last+=step; out.push(String(Math.round(last*1e6)/1e6)); } return out; }
+  const m=vals.map(function(v){ return /^(.*?)(-?\d+)\s*$/.exec(v==null?'':v); });
+  if(m.every(function(x){return x;})&&m.every(function(x){return x[1]===m[0][1];})){ const pre=m[0][1]; const seq=m.map(function(x){return parseInt(x[2],10);}); let step=seq.length>=2?(seq[seq.length-1]-seq[seq.length-2]):1; let last=seq[seq.length-1]; for(let i=0;i<count;i++){ last+=step; out.push(pre+last); } return out; }
+  for(let i=0;i<count;i++){ out.push(vals[i%vals.length]); }
+  return out;
+}
+function cpFillStart(e){ e.preventDefault(); e.stopPropagation(); if(cpEd)return; const rc=cpRect(); cpFill={src:rc,toR:rc.r1}; document.body.classList.add('cp-filling'); document.addEventListener('mousemove',cpFillMove); document.addEventListener('mouseup',cpFillEnd,{once:true}); }
+function cpFillMove(e){ if(!cpFill)return; const el=document.elementFromPoint(e.clientX,e.clientY); const cell=el&&el.closest?el.closest('.cp-cell'):null; if(cell&&cell.getAttribute('data-r')!=null){ const r=parseInt(cell.getAttribute('data-r'),10); if(!isNaN(r)){ cpFill.toR=Math.max(cpFill.src.r1,r); cpFillPreview(); } } }
+function cpFillPreview(){ document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); if(!cpFill)return; const x=cpFill.src; for(let r=x.r1+1;r<=cpFill.toR;r++){ for(let c=x.c0;c<=x.c1;c++){ const cell=document.querySelector('.cp-cell[data-r="'+r+'"][data-c="'+c+'"]'); if(cell)cell.classList.add('cp-fillprev'); } } }
+function cpFillEnd(){ document.removeEventListener('mousemove',cpFillMove); document.body.classList.remove('cp-filling'); document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); const f=cpFill; cpFill=null; if(f&&f.toR>f.src.r1)cpFillApply(f); }
+function cpFillApply(f){ const sh=cpSheet(); let disp=cpDisp(sh); const x=f.src; const filtered=!!(cpQ||(sh.filt&&Object.keys(sh.filt).length)); const count=f.toR-x.r1; for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(!col)continue; const srcVals=[]; for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; srcVals.push(row?(row.c[col.id]==null?'':String(row.c[col.id])):''); } const gen=cpFillSeries(srcVals,count); for(let i=0;i<count;i++){ let row=disp[x.r1+1+i]; if(!row){ if(filtered)break; row={id:cpUid(),c:{}}; sh.rows.push(row); disp=cpDisp(sh); row=disp[x.r1+1+i]; } if(!row)break; const v=gen[i]; if(v===''||v==null)delete row.c[col.id]; else row.c[col.id]=v; } } cpSel={r:x.r0,c:x.c0}; cpSelEnd={r:f.toR,c:x.c1}; cpSave(); cpRerender(); }
+
 document.addEventListener('keydown',cpKey);
 
 
