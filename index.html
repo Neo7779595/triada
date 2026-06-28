@@ -1437,9 +1437,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .lbx-delta svg{width:13px;height:13px}
 .lbx-delta.pos{color:var(--pos)}.lbx-delta.neg{color:var(--neg)}.lbx-delta.zero{color:var(--txt-3)}
 .lbx-mxw{background:var(--bg-1);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
-.lbx-mx{width:100%;border-collapse:collapse;font-size:12px;min-width:560px}
+.lbx-mx{width:100%;border-collapse:collapse;font-size:12px;min-width:680px}
 .lbx-mx th{font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt);font-weight:600;padding:11px 10px;text-align:center;border-bottom:1px solid var(--line-2);border-right:1px solid var(--line)}
-.lbx-mx td{padding:11px 10px;text-align:center;border-bottom:1px solid var(--line);border-right:1px solid var(--line);color:var(--txt-2);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.lbx-mx td{padding:16px 14px;text-align:center;vertical-align:middle;border-bottom:1px solid var(--line);border-right:1px solid var(--line);color:var(--txt-2);font-family:var(--mono);font-variant-numeric:tabular-nums}
 .lbx-mx th:last-child,.lbx-mx td:last-child{border-right:0}
 .lbx-mx th:first-child,.lbx-mx td:first-child{text-align:left;font-family:var(--font);position:sticky;left:0;background:var(--bg-1);z-index:1}
 .lbx-mx tbody tr{cursor:pointer}
@@ -1452,6 +1452,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .lbx-mx .avg td:first-child{color:var(--txt-3);text-transform:uppercase;font-family:var(--mono);font-size:10px;letter-spacing:.1em}
 .lbx-mx .avg:hover td{background:var(--bg-1)}
 .lbx-hm1{color:var(--txt-3)}.lbx-hm2{color:var(--txt-2)}.lbx-hm3{color:var(--txt);font-weight:600}.lbx-hm4{color:var(--accent);font-weight:700}
+.lbx-cell{display:flex;flex-direction:column;align-items:center;gap:9px}
+.lbx-cv{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;color:var(--txt);letter-spacing:.01em}
+.lbx-cv.lbx-clead{color:var(--accent);font-weight:700}
+.lbx-cv.lbx-cdim{color:var(--txt-3);font-weight:500;font-size:14px}
+.lbx-cbar{width:66%;max-width:92px;height:3px;background:var(--bg-3);border-radius:2px;overflow:hidden}
+.lbx-cbar i{display:block;height:100%;border-radius:2px;transition:width .55s var(--ease-out)}
+.lbx-pcell{display:flex;align-items:center;gap:12px}
+.lbx-mav{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none;position:relative;overflow:hidden}
+.lbx-pn2{font-size:14px;font-weight:600;color:var(--txt);letter-spacing:-.01em}
 .lbx-ft{font-size:11px;color:var(--txt-3);margin-top:14px;display:flex;align-items:center;gap:6px}
 .lbx-ft svg{width:13px;height:13px}
 .lbx-state{text-align:center;color:var(--txt-3);padding:48px 0;font-size:12.5px;font-family:var(--mono);line-height:1.8}
@@ -6318,12 +6327,20 @@ function smmRenderLb(){
   const heat=(v,mc)=>{ if(v==null||!cstat[mc.k]) return 0; const st=cstat[mc.k]; const rng=(st.max-st.min)||1; const t=(v-st.min)/rng; return t>=.78?4:t>=.52?3:t>=.26?2:t>0?1:0; };
   const mhead='<tr><th>Проект</th>'+M.map(mc=>'<th'+(mc.k===_smmLbMetric?' class="sel"':'')+'>'+mc.l+'</th>').join('')+'</tr>';
   const mbody=disp.map(r=>{
-    const pmedal=r.rank<=3?('<svg style="color:'+medalC[r.rank-1]+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="15" r="6"/><path d="M9 9.5L6.5 3M15 9.5l2.5-6.5M9.5 3h5"/></svg>'):'';
-    const cells=M.map(mc=>{ const v=mc.get(r.m); const lvl=heat(v,mc); return '<td class="'+(lvl?'lbx-hm'+lvl:'')+(mc.k===_smmLbMetric?' sel':'')+'">'+fmtCell(v,mc)+'</td>'; }).join('');
-    return '<tr data-lbpn="'+_ddH((r.proj.name||'').toLowerCase())+'" onclick="smmOpenFromLb(\''+r.reportId+'\')"><td><span class="pcell">'+pmedal+_ddH(r.proj.name)+'</span></td>'+cells+'</tr>';
+    const pc=r.proj.color||'#37E6C8';
+    const pinit=_ddH(((r.proj.name||'?').trim()[0]||'?').toUpperCase());
+    const pav='<span class="lbx-mav" style="background:'+pc+'22;color:'+pc+'">'+logoFill(r.proj.logoUrl,pinit)+'</span>';
+    const cells=M.map(mc=>{
+      const v=mc.get(r.m), st=cstat[mc.k];
+      if(v==null||!st) return '<td'+(mc.k===_smmLbMetric?' class="sel"':'')+'><div class="lbx-cell"><div class="lbx-cv lbx-cdim">—</div></div></td>';
+      const lead=(st.max!==st.min && v===st.max);
+      const w=st.max>0?Math.max(4,Math.min(100,Math.round(v/st.max*100))):4;
+      return '<td'+(mc.k===_smmLbMetric?' class="sel"':'')+'><div class="lbx-cell"><div class="lbx-cv'+(lead?' lbx-clead':'')+'">'+fmtCell(v,mc)+'</div><div class="lbx-cbar"><i style="width:'+w+'%;background:'+(lead?'var(--accent)':'rgba(55,230,200,.42)')+'"></i></div></div></td>';
+    }).join('');
+    return '<tr data-lbpn="'+_ddH((r.proj.name||'').toLowerCase())+'" onclick="smmOpenFromLb(\''+r.reportId+'\')"><td><div class="lbx-pcell">'+pav+'<span class="lbx-pn2">'+_ddH(r.proj.name)+'</span></div></td>'+cells+'</tr>';
   }).join('');
-  const mavg='<tr class="avg"><td>Среднее</td>'+M.map(mc=>'<td'+(mc.k===_smmLbMetric?' class="sel"':'')+'>'+(cstat[mc.k]?fmtCell(cstat[mc.k].avg,mc):'—')+'</td>').join('')+'</tr>';
-  const matrix='<div class="lbx-h2"><span>Матрица метрик</span><span>тепловая интенсивность по столбцу</span></div><div class="lbx-mxw"><table class="lbx-mx"><thead>'+mhead+'</thead><tbody>'+mbody+mavg+'</tbody></table></div>';
+  const mavg='<tr class="avg"><td>Среднее</td>'+M.map(mc=>'<td'+(mc.k===_smmLbMetric?' class="sel"':'')+'><div class="lbx-cell"><div class="lbx-cv lbx-cdim">'+(cstat[mc.k]?fmtCell(cstat[mc.k].avg,mc):'—')+'</div></div></td>').join('')+'</tr>';
+  const matrix='<div class="lbx-h2"><span>Матрица метрик</span><span>полоса — доля от лидера столбца</span></div><div class="lbx-mxw"><table class="lbx-mx"><thead>'+mhead+'</thead><tbody>'+mbody+mavg+'</tbody></table></div>';
 
   const footer='<div class="lbx-ft">'+I_CLICK+'Клик по проекту открывает его SMM-отчёт</div>';
 
