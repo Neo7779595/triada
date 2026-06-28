@@ -765,6 +765,9 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .cls-row.active .cls-num{background:var(--accent);color:var(--accent-ink)}
 .cls-name{flex:1;font-weight:600;font-size:13.5px}
 .cls-date{font-family:var(--mono);font-size:11px;color:var(--txt-3)}
+.cls-badges{display:flex;align-items:center;gap:9px;flex:0 0 auto}
+.cl-dl-badge.done{background:var(--pos-dim);color:var(--pos)}
+.cl-dl-badge.done b{color:var(--pos)}
 /* client report cards (reports module) */
 .crep{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:12px}
 .crep-h{display:flex;align-items:flex-start;gap:14px;padding:16px 18px}
@@ -8923,13 +8926,23 @@ function renderClStages(){
     return;
   }
   const total=stages.length, done=stages.filter(s=>s.status==='done').length, pct=total?Math.round(done/total*100):0;
+  const _calSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>';
+  const _chkSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>';
   const rows=stages.map((s,i)=>{
     const cls=s.status==='done'?'done':s.status==='active'?'active':'';
-    const badge=s.status==='done'?'<span class="badge b-active"><span class="bd"></span>Завершён</span>':s.status==='active'?'<span class="badge b-trial"><span class="bd"></span>В работе</span>':'<span class="badge b-mut">Ожидает</span>';
-    const dt=s.status==='done'
+    const isDone=s.status==='done', isActive=s.status==='active';
+    const dt=isDone
       ? (s.completed_at?_dDate(String(s.completed_at).slice(0,10)):(s.due_date?_dDate(s.due_date):''))
       : (s.due_date?_dDate(s.due_date):'');
-    return `<div class="cls-row ${cls}"><div class="cls-num">${i+1}</div><div class="cls-name">${_ddH(s.name||'Без названия')}</div>${dt?`<div class="cls-date">${dt}</div>`:''}${badge}</div>`;
+    let badges;
+    if(isDone){
+      badges=`<span class="cl-dl-badge done">${_chkSvg}Завершён${dt?` <b>${dt}</b>`:''}</span>`;
+    } else {
+      const dlB=dt?`<span class="cl-dl-badge">${_calSvg}<b>${dt}</b></span>`:'';
+      const stB=isActive?'<span class="badge b-trial"><span class="bd"></span>В работе</span>':'<span class="badge b-mut">Ожидает</span>';
+      badges=dlB+stB;
+    }
+    return `<div class="cls-row ${cls}"><div class="cls-num">${i+1}</div><div class="cls-name">${_ddH(s.name||'Без названия')}</div><div class="cls-badges">${badges}</div></div>`;
   }).join('');
   document.getElementById('content-cl').innerHTML=`
     <div class="card"><div style="padding:20px 22px">
