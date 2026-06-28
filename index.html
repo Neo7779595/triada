@@ -8808,18 +8808,21 @@ function renderClOverview(){
   let kpis;
   if(latestPerf && latestPerf.payload){
     const pp=latestPerf.payload;
+    const rem=Math.max(0,total-done), per=pp.period?_ddH(pp.period):'';
     kpis=[
-      {l:'Выручка Δ', v:_ddH(pp.rost||'—'), s:'рост выручки', c:dCol(pp.rost)},
-      {l:'Трафик Δ', v:_ddH(pp.traf||'—'), s:'за период', c:dCol(pp.traf)},
-      {l:'Ср. чек Δ', v:_ddH(pp.chek||'—'), s:'средний чек', c:dCol(pp.chek)},
-      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)'},
+      {l:'Выручка Δ', v:_ddH(pp.rost||'—'), s:'рост выручки', c:dCol(pp.rost), f:per?'период · '+per:''},
+      {l:'Трафик Δ', v:_ddH(pp.traf||'—'), s:'за период', c:dCol(pp.traf), f:per?'период · '+per:''},
+      {l:'Ср. чек Δ', v:_ddH(pp.chek||'—'), s:'средний чек', c:dCol(pp.chek), f:per?'период · '+per:''},
+      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)', f:total?(rem>0?'осталось '+rem+' '+pl(rem,'этап','этапа','этапов'):'проект завершён'):'', fp:total>0&&rem===0},
     ];
   } else {
+    const rem=Math.max(0,total-done);
+    const perfN=reports.filter(r=>r.kind!=='SMM').length, smmN=reports.length-perfN;
     kpis=[
-      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)'},
-      {l:'Завершено', v:String(done), s:'этапов закрыто', c:'var(--txt)'},
-      {l:'Отчётов', v:String(reports.length), s:'опубликовано', c:'var(--txt)'},
-      {l:'Обновлений', v:String(feed.length), s:'событий по проекту', c:'var(--txt)'},
+      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)', f:total?(rem>0?'осталось '+rem+' '+pl(rem,'этап','этапа','этапов'):'проект завершён'):'', fp:total>0&&rem===0},
+      {l:'Завершено', v:String(done), s:'этапов закрыто', c:'var(--txt)', f:total?'из '+total+' всего':''},
+      {l:'Отчётов', v:String(reports.length), s:'опубликовано', c:'var(--txt)', f:reports.length?(perfN+' PERF · '+smmN+' SMM'):''},
+      {l:'Обновлений', v:String(feed.length), s:'событий по проекту', c:'var(--txt)', f:feed.length?'последнее · '+feed[0].t:''},
     ];
   }
   let lastDone=-1; stages.forEach((s,i)=>{ if(s.status==='done') lastDone=i; });
@@ -8902,7 +8905,7 @@ function renderClOverview(){
   }
   document.getElementById('content-cl').innerHTML=`
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      ${kpis.map(k=>`<div class="kpi"><div class="l">${k.l}</div><div class="v num" style="color:${k.c}">${k.v}</div><div class="sub">${k.s}</div></div>`).join('')}
+      ${kpis.map(k=>`<div class="kpi"><div class="l">${k.l}</div><div class="v num" style="color:${k.c}">${k.v}</div><div class="sub">${k.s}</div>${k.f?`<div class="kfoot${k.fp?' pos':''}">${k.f}</div>`:''}</div>`).join('')}
     </div>
     <div class="card" style="margin-top:16px"><div style="padding:18px 20px 14px">
       <div class="cl-track-h"><div><div class="eyebrow">Ход проекта</div><div style="font-size:18px;font-weight:700;margin-top:4px">Производственный цикл</div></div></div>
