@@ -724,8 +724,9 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .cl-cur-dl b{color:var(--accent);font-weight:600;font-family:var(--mono)}
 /* report list (overview) */
 .cl-rep-list{display:flex;flex-direction:column;gap:9px;margin-top:6px}
-.cl-rep-row{display:flex;align-items:center;gap:14px;background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;cursor:pointer;transition:transform .2s var(--ease),border-color .2s var(--ease)}
+.cl-rep-row{display:flex;flex-direction:column;background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;cursor:pointer;transition:transform .2s var(--ease),border-color .2s var(--ease)}
 .cl-rep-row:hover{transform:translateX(2px);border-color:var(--line-2)}
+.cl-rep-row .rep-top{display:flex;align-items:center;gap:14px}
 .cl-rep-row .ric{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 .cl-rep-row .ric svg{width:20px;height:20px}
 .cl-rep-row .rbody{flex:1;min-width:0}
@@ -735,6 +736,10 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .cl-rep-row .rd{font-family:var(--mono);font-size:11px;color:var(--txt-3)}
 .cl-rep-row .rchev{width:16px;height:16px;color:var(--txt-3);transition:transform .2s var(--ease),color .2s var(--ease)}
 .cl-rep-row:hover .rchev{transform:translateX(3px);color:var(--txt-2)}
+.cl-rep-row .rep-metrics{display:flex;gap:14px;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+.cl-rep-row .rm{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding:9px 12px;background:var(--bg-2);border-radius:9px}
+.cl-rep-row .rm-l{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cl-rep-row .rm-v{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--txt);line-height:1}
 /* smm strip */
 .smm-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:16px}
 .smm-strip .m{background:var(--bg-1);padding:18px;text-align:center}
@@ -8812,9 +8817,24 @@ function renderClOverview(){
       <span class="badge b-active"><span class="bd"></span>Готово</span>
     </div>`;
   }
+  const _fmtRK=v=>{ v=Number(v)||0; const a=Math.abs(v); if(a>=1e6) return (v/1e6).toFixed(1).replace('.',',').replace(',0','')+'M'; if(a>=1e3) return (v/1e3).toFixed(a>=1e4?0:1).replace('.',',').replace(',0','')+'K'; return String(v); };
+  const _dcM=v=>(typeof dCol==='function'?dCol(v):'');
   const repBody = reports.length
     ? reports.slice(0,4).map((r,ri)=>{ const isSmm=r.kind==='SMM'; const col=isSmm?'#8A8FFF':'#37E6C8'; const tint=isSmm?'rgba(138,143,255,.13)':'var(--accent-dim)';
-        return `<div class="cl-rep-row" onclick="clNav('reports')"><div class="ric" style="background:${tint};color:${col}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2.5h8l5 5v14H6z"/><path d="M14 2.5v5h5"/></svg></div><div class="rbody"><div class="rt">${_ddH(r.title||'Отчёт')}</div><span class="rtag" style="color:${col};background:${tint}">${_ddH(r.kind||'')}</span></div><div class="rmeta"><span class="rd">${_dDateFull(r.published_at)}</span><svg class="rchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div></div>`;
+        let mets=[];
+        if(isSmm){ const sm=(typeof smmNormalize==='function'?smmNormalize(r.payload||{}):{metrics:{}}); const m=sm.metrics||{};
+          if(m.reels_views!=null) mets.push(['Просмотры',_fmtRK(m.reels_views),'']);
+          if(m.reels_reach!=null) mets.push(['Охват',_fmtRK(m.reels_reach),'']);
+          if(m.followers!=null) mets.push(['Подписчики',_fmtRK(m.followers),'']);
+          if(m.er!=null) mets.push(['ER',(+m.er).toFixed(1).replace('.',',')+'%','']);
+        } else { const pp=r.payload||{};
+          if(pp.rost) mets.push(['Выручка',_ddH(String(pp.rost)),_dcM(pp.rost)]);
+          if(pp.traf) mets.push(['Трафик',_ddH(String(pp.traf)),_dcM(pp.traf)]);
+          if(pp.chek) mets.push(['Ср. чек',_ddH(String(pp.chek)),_dcM(pp.chek)]);
+        }
+        mets=mets.slice(0,3);
+        const metHtml=mets.length?`<div class="rep-metrics">${mets.map(x=>`<div class="rm"><span class="rm-l">${x[0]}</span><span class="rm-v"${x[2]?` style="color:${x[2]}"`:''}>${x[1]}</span></div>`).join('')}</div>`:'';
+        return `<div class="cl-rep-row" onclick="clNav('reports')"><div class="rep-top"><div class="ric" style="background:${tint};color:${col}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2.5h8l5 5v14H6z"/><path d="M14 2.5v5h5"/></svg></div><div class="rbody"><div class="rt">${_ddH(r.title||'Отчёт')}</div><span class="rtag" style="color:${col};background:${tint}">${_ddH(r.kind||'')}</span></div><div class="rmeta"><span class="rd">${_dDateFull(r.published_at)}</span><svg class="rchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div></div>${metHtml}</div>`;
       }).join('')
     : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Отчёты скоро появятся здесь.</div>`;
   const actBody = feed.length
