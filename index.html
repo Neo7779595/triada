@@ -5478,9 +5478,7 @@ function cpSave(){
   var _cur=JSON.stringify(p._cp); if(p._cpSnap!=null&&p._cpSnap!==_cur){ p._cpUndo=p._cpUndo||[]; p._cpUndo.push(p._cpSnap); if(p._cpUndo.length>60)p._cpUndo.shift(); p._cpRedo=[]; } p._cpSnap=_cur;
   cpSaved=false; const ind=document.getElementById('cp-save'); if(ind)ind.innerHTML=cpSaveHTML();
   clearTimeout(cpSaveT);
-  cpSaveT=setTimeout(()=>{ try{localStorage.setItem(cpKeyLS(p),JSON.stringify(p._cp));}catch(e){}
-    if(window.LIVE&&window.SB){ try{ const me=(window.tMe&&window.tMe())||{}; window.SB.from('content_plans').upsert({project_id:p.id,data:p._cp,updated_at:new Date().toISOString(),updated_by:me.id||null},{onConflict:'project_id'}).then(function(){},function(e){console.warn('cp save',e);}); }catch(e){console.warn('cp save',e);} }
-    cpSaved=true; const i2=document.getElementById('cp-save'); if(i2)i2.innerHTML=cpSaveHTML(); },500);
+  cpSaveT=setTimeout(()=>{ cpPersist(p); cpSaved=true; const i2=document.getElementById('cp-save'); if(i2)i2.innerHTML=cpSaveHTML(); },500);
 }
 function cpRerender(){ if(pdTabCur==='content') renderPd(); }
 
@@ -5920,13 +5918,7 @@ async function cpSendSheet(){
     toast('Лист «'+sh.name+'» отправлен клиенту'); cpRerender();
   }catch(e){ console.error('cp send',e); toast('Не удалось отправить'); }
 }
-function cpSendStatusHTML(p,sh){
-  if(!(window.LIVE&&window.SB))return '';
-  const sent=p._cpShared&&p._cpShared[sh.id]; if(!sent)return '';
-  const cur=cpHash(JSON.stringify({id:sh.id,name:sh.name,color:sh.color,cols:sh.cols,rows:sh.rows}));
-  if(sent.hash!==cur)return '<span class="cp-sent chg">● Изменён после отправки</span>';
-  return '<span class="cp-sent">✓ Отправлено клиенту</span>';
-}
+function cpSendStatusHTML(p,sh){ if(!(window.LIVE&&window.SB))return ''; const sent=p._cpShared&&p._cpShared[sh.id]; if(!sent)return ''; return '<span class="cp-sent">✓ Виден клиенту · обновляется</span>'; }
 
 /* ===================== КОНТЕНТ-ПЛАН · кабинет клиента ===================== */
 async function renderClContent(){
@@ -6026,7 +6018,8 @@ function cpSheetApprHTML(p,sh){
 }
 
 /* ===================== КОНТЕНТ-ПЛАН · мощные фичи (undo, диапазон, буфер) ===================== */
-function cpPersist(p){ try{localStorage.setItem(cpKeyLS(p),JSON.stringify(p._cp));}catch(e){} if(window.LIVE&&window.SB){ try{ const me=(window.tMe&&window.tMe())||{}; window.SB.from('content_plans').upsert({project_id:p.id,data:p._cp,updated_at:new Date().toISOString(),updated_by:me.id||null},{onConflict:'project_id'}).then(function(){},function(e){console.warn('cp save',e);}); }catch(e){console.warn(e);} } }
+function cpPersist(p){ try{localStorage.setItem(cpKeyLS(p),JSON.stringify(p._cp));}catch(e){} if(window.LIVE&&window.SB){ try{ const me=(window.tMe&&window.tMe())||{}; window.SB.from('content_plans').upsert({project_id:p.id,data:p._cp,updated_at:new Date().toISOString(),updated_by:me.id||null},{onConflict:'project_id'}).then(function(){},function(e){console.warn('cp save',e);});
+    if(p._cpShared){ (p._cp.sheets||[]).forEach(function(_sh){ if(p._cpShared[_sh.id]){ const _snap={id:_sh.id,name:_sh.name,color:_sh.color,cols:_sh.cols,rows:_sh.rows}; p._cpShared[_sh.id]={at:new Date().toISOString(),hash:cpHash(JSON.stringify(_snap))}; window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:_sh.id,name:_sh.name,data:_snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'}).then(function(){},function(e){console.warn('cp resync',e);}); } }); } }catch(e){console.warn(e);} } }
 function cpUndo(){ const p=cpP(); if(!p||!(p._cpUndo&&p._cpUndo.length))return; if(cpEd)cpEd=null; p._cpRedo=p._cpRedo||[]; p._cpRedo.push(JSON.stringify(p._cp)); const prev=p._cpUndo.pop(); var d; try{d=JSON.parse(prev);}catch(e){return;} p._cp=d; p._cpSnap=prev; cpSel={r:0,c:0}; cpSelEnd=null; cpPersist(p); cpRerender(); if(typeof toast==='function')toast('Отменено'); }
 function cpRedo(){ const p=cpP(); if(!p||!(p._cpRedo&&p._cpRedo.length))return; if(cpEd)cpEd=null; p._cpUndo=p._cpUndo||[]; p._cpUndo.push(JSON.stringify(p._cp)); const nx=p._cpRedo.pop(); var d; try{d=JSON.parse(nx);}catch(e){return;} p._cp=d; p._cpSnap=nx; cpSel={r:0,c:0}; cpSelEnd=null; cpPersist(p); cpRerender(); }
 function cpRect(){ const a=cpSel, b=cpSelEnd||cpSel; return {r0:Math.min(a.r,b.r),r1:Math.max(a.r,b.r),c0:Math.min(a.c,b.c),c1:Math.max(a.c,b.c)}; }
@@ -6046,6 +6039,7 @@ document.addEventListener('cut',cpOnCut);
 document.addEventListener('paste',cpOnPaste);
 
 function cpClientSummaryHTML(p,sh){ const ap=p._cpAppr||{}, pre=sh.id+'/'; let ok=0,ch=0; Object.keys(ap).forEach(function(k){ if(k.indexOf(pre)===0&&k!==pre+'__sheet__'){ if(ap[k].status==='approved')ok++; else if(ap[k].status==='changes')ch++; } }); if(!ok&&!ch)return ''; let h='<span class="cp-clsum" title="Решения клиента по строкам">'; if(ok)h+='<span class="ok">✓ '+ok+'</span>'; if(ch)h+='<span class="ch">✎ '+ch+'</span>'; h+='</span>'; return h; }
+window.addEventListener('focus',function(){ try{ if(document.querySelector('#app-cl .nav-i[data-cm="content"].on')&&document.getElementById('content-cl')&&typeof renderClContent==='function') renderClContent(); }catch(_e){} });
 document.addEventListener('keydown',cpKey);
 
 
