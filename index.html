@@ -705,9 +705,9 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .cl-node.active .nc{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);animation:clPulse 1.9s ease-in-out infinite}
 .cl-node .nl{font-size:10.5px;color:var(--txt-3);width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cl-node.done .nl,.cl-node.active .nl{color:var(--txt-2)}
-.cl-seg{position:relative;flex:1;height:2px;background:var(--bg-3);margin-top:43px;border-radius:2px;transition:background .45s var(--ease)}
-.cl-seg.on{background:var(--accent);box-shadow:0 0 7px rgba(55,230,200,.45)}
-.cl-seg.tip::before{content:'';position:absolute;left:0;top:50%;transform:translate(-50%,-50%);width:11px;height:11px;border-radius:50%;background:var(--accent);animation:clPulse 1.9s ease-in-out infinite}
+.cl-seg{position:relative;flex:1;height:2px;background:var(--bg-3);margin-top:43px;border-radius:2px}
+.cl-seg .fill{position:absolute;left:0;top:0;height:100%;border-radius:2px;background:var(--accent);box-shadow:0 0 7px rgba(55,230,200,.45);transition:width .7s var(--ease)}
+.cl-seg .dot{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;background:var(--accent);transform:translate(-50%,-50%);animation:clPulse 1.9s ease-in-out infinite;pointer-events:none}
 .cl-active-line{display:flex;align-items:center;gap:9px;margin-top:10px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--txt-3)}
 .cl-active-line b{color:var(--accent)}
 .cl-al-right{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--txt-3)}
@@ -8765,21 +8765,23 @@ function renderClOverview(){
     ];
   }
   let lastDone=-1; stages.forEach((s,i)=>{ if(s.status==='done') lastDone=i; });
+  const segFill=(s)=>{ if(s.status==='done') return 100; if(s.status==='active'){ const tt=s.taskTotal||0; return tt>0?Math.max(0,Math.min(100,Math.round((s.taskDone||0)/tt*100))):0; } return 0; };
   const nodes=stages.map((s,i)=>{
     const cls=s.status==='done'?'done':s.status==='active'?'active':'';
     const ic=CL_STAGE_ICONS[i%CL_STAGE_ICONS.length];
     const nm=(s.name||'—').split(' ').slice(0,2).join(' ');
     const node=`<div class="cl-node ${cls}"><div class="nn">${String(i+1).padStart(2,'0')}</div><div class="nc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></div><div class="nl">${_ddH(nm)}</div></div>`;
     let seg='';
-    if(i<stages.length-1){ const nx=stages[i+1];
-      const on=s.status==='done'&&(nx.status==='done'||nx.status==='active');
-      const tip=activeIdx<0&&i===lastDone&&nx.status!=='done';
-      seg=`<div class="cl-seg${on?' on':''}${tip?' tip':''}"></div>`;
+    if(i<stages.length-1){
+      const f=segFill(s), isAct=s.status==='active';
+      const ttl=(isAct&&(s.taskTotal||0)>0)?` title="Задачи: ${s.taskDone||0} из ${s.taskTotal}"`:'';
+      const dot=(isAct&&f>3)?`<span class="dot" style="left:${f}%"></span>`:'';
+      seg=`<div class="cl-seg"${ttl}><i class="fill" style="width:${f}%"></i>${dot}</div>`;
     }
     return node+seg;
   }).join('');
   const activeLine = active
-    ? `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px var(--accent)"></span>Активный этап: <b>${_ddH(active.name||'—')}</b> · ${activeIdx+1} / ${total}`
+    ? `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px var(--accent)"></span>Активный этап: <b>${_ddH(active.name||'—')}</b> · ${activeIdx+1} / ${total}${(active.taskTotal||0)>0?` · задачи <b>${active.taskDone||0} / ${active.taskTotal}</b>`:''}`
     : (total&&done===total
         ? `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--pos)"></span>Все этапы завершены`
         : `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--txt-3)"></span>Нет этапа в работе`);
@@ -10147,6 +10149,10 @@ window.tLoadClient = async () => {
   } catch(_e){}
   try { const td = await SB.from('project_stages').select('id,completed_at').eq('project_id', pid);
     if (!td.error && td.data){ const m={}; td.data.forEach(r=>{ if(r.completed_at) m[r.id]=r.completed_at; }); stages.forEach(s=>{ s.completed_at = m[s.id]||null; }); }
+  } catch(_e){}
+  // 2.1) прогресс по задачам каждого этапа (RPC, только счётчики; мягкая деградация, если функции ещё нет)
+  try { const { data: tp } = await SB.rpc('client_stage_progress', { p_project: pid });
+    if (tp && tp.length){ const m={}; tp.forEach(r=>{ m[r.stage_id]={ total:Number(r.total)||0, done:Number(r.done)||0 }; }); stages.forEach(s=>{ const x=m[s.id]; s.taskTotal=x?x.total:0; s.taskDone=x?x.done:0; }); }
   } catch(_e){}
   // 3) отчёты
   let reports = [];
