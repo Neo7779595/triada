@@ -1640,6 +1640,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-sw i{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent}
 .cp-sw i:hover{border-color:var(--txt-3)}
 .cp-newopt input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--txt);font-size:12px;padding:6px 8px;outline:none;font-family:var(--font)}
+.cp-sarr{color:var(--accent);font-size:12px;font-weight:700;flex:0 0 auto}
+.cp-head .nm{cursor:pointer}
+.cp-head.cp-c0{position:sticky;left:40px;z-index:6;background:var(--bg-1)}
+.cp-head.cp-dragover{box-shadow:inset 3px 0 0 var(--accent)}
+.cp-row.cp-rowover>.cp-gut{box-shadow:inset 0 3px 0 var(--accent)}
+.cp-gut[draggable=true]{cursor:grab}
+.cp-gut[draggable=true]:active{cursor:grabbing}
+.cp-fchip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-dim);color:var(--accent);border-radius:999px;padding:3px 6px 3px 11px;font-size:11.5px;white-space:nowrap}
+.cp-fchip button{background:none;border:0;color:var(--accent);cursor:pointer;font-size:12px;line-height:1;padding:0 2px}
 
 .pd-act-div{width:1px;height:22px;background:linear-gradient(180deg,transparent,var(--line-2),transparent);margin:0 3px;flex:0 0 auto}
 .pdl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
@@ -5409,7 +5418,7 @@ function cpData(p){
   return p._cp;
 }
 function cpSheet(){const p=cpP();const d=cpData(p);return d.sheets.find(s=>s.id===d.active)||d.sheets[0];}
-function cpDisp(sh){ if(!cpQ)return sh.rows; const q=cpQ.toLowerCase(); return sh.rows.filter(r=>sh.cols.some(c=>String(r.c[c.id]==null?'':r.c[c.id]).toLowerCase().indexOf(q)>=0)); }
+function cpDisp(sh){ let rows=sh.rows.slice(); if(cpQ){ const q=cpQ.toLowerCase(); rows=rows.filter(r=>sh.cols.some(c=>String(r.c[c.id]==null?'':r.c[c.id]).toLowerCase().indexOf(q)>=0)); } if(sh.sort){ const col=sh.cols.find(c=>c.id===sh.sort.col); if(col){ const dir=sh.sort.dir==='desc'?-1:1; rows.sort((a,b)=>{ const va=a.c[col.id],vb=b.c[col.id]; const ea=(va==null||va===''),eb=(vb==null||vb===''); if(ea&&eb)return 0; if(ea)return 1; if(eb)return -1; return cpCmp(col,va,vb)*dir; }); } } return rows; }
 function cpColAt(ci){return cpSheet().cols[ci];}
 function cpRowAt(ri){return cpDisp(cpSheet())[ri];}
 function cpColorCss(k){return (CP_PAL[k]||CP_PAL.teal)[1];}
@@ -5442,13 +5451,15 @@ function cpEditor(row,col){
   return '<input id="cp-ed" type="'+t+'" class="cp-ed" value="'+_ddA(v)+'"'+im+' onkeydown="cpEdKey(event)" onblur="cpBlur()">';
 }
 function cpHeadCell(col,ci){
-  let inner;
+  const sh=cpSheet(); const sticky=ci===0?' cp-c0':'';
   if(cpHeadEd===col.id){
-    inner='<input id="cp-hed" class="cp-hed" value="'+_ddA(col.name)+'" onkeydown="cpHeadKey(event,'+ci+')" onblur="cpHeadCommit('+ci+')" onclick="event.stopPropagation()">';
-  } else {
-    inner='<span class="ti">'+CP_TYICON(col.type)+'</span><span class="nm" ondblclick="cpColRename('+ci+')">'+_ddH(col.name)+'</span><button class="cp-hmenu" onclick="event.stopPropagation();cpColMenu(event,'+ci+')">⋮</button>';
+    const inp='<input id="cp-hed" class="cp-hed" value="'+_ddA(col.name)+'" onkeydown="cpHeadKey(event,'+ci+')" onblur="cpHeadCommit('+ci+')" onclick="event.stopPropagation()">';
+    return '<div class="cp-head'+sticky+'" style="width:'+col.w+'px">'+inp+'</div>';
   }
-  return '<div class="cp-head" style="width:'+col.w+'px">'+inner+'</div>';
+  const sd=(sh.sort&&sh.sort.col===col.id)?sh.sort.dir:'';
+  const arr=sd?('<span class="cp-sarr">'+(sd==='asc'?'↑':'↓')+'</span>'):'';
+  const inner='<span class="ti">'+CP_TYICON(col.type)+'</span><span class="nm" onclick="event.stopPropagation();cpSortToggle('+ci+')" title="Сортировка по колонке">'+_ddH(col.name)+'</span>'+arr+'<button class="cp-hmenu" onclick="event.stopPropagation();cpColMenu(event,'+ci+')">⋮</button>';
+  return '<div class="cp-head cp-dragcol'+sticky+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+col.w+'px">'+inner+'</div>';
 }
 function CP_TYICON(t){
   const m={text:'<path d="M4 7h16M4 12h10M4 17h7"/>',long:'<path d="M4 6h16M4 10h16M4 14h12M4 18h8"/>',num:'<path d="M6 4l-1 16M14 4l-1 16M4 9h16M3 15h16"/>',money:'<path d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H8m0 0h8a2.5 2.5 0 0 1 0 5H8"/>',date:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',select:'<circle cx="12" cy="12" r="8"/><path d="M9 12l2 2 4-4"/>',check:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/>',link:'<path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1"/>'};
@@ -5462,6 +5473,7 @@ function cpRender(p){
     +'<span class="cp-title">'+CP_IC.table+_ddH(sh.name)+'</span>'
     +'<span class="cp-sub">'+sh.rows.length+' '+_plural(sh.rows.length,'строка','строки','строк')+'</span>'
     +'<div class="cp-search">'+CP_IC.search+'<input id="cp-q" placeholder="Поиск по таблице" value="'+_ddA(cpQ)+'" oninput="cpSearch(this.value)"></div>'
+    +(sh.sort?('<span class="cp-fchip">Сорт: '+_ddH(((sh.cols.find(c=>c.id===sh.sort.col))||{}).name||'')+' '+(sh.sort.dir==='asc'?'↑':'↓')+'<button onclick="cpSortClear()">✕</button></span>'):'')
     +'</div><div class="cp-bar-r">'
     +'<button class="cp-mini" onclick="cpAddCol()">'+CP_IC.plus+'Колонка</button>'
     +'<button class="cp-mini" onclick="cpImport()">'+CP_IC.upload+'Импорт</button>'
@@ -5477,7 +5489,8 @@ function cpRender(p){
     html+='<div class="cp-empty">'+(cpQ?'Ничего не найдено':'Пусто — добавь первую строку ниже')+'</div>';
   }
   disp.forEach((row,ri)=>{
-    html+='<div class="cp-row"><div class="cp-gut" onclick="cpRowMenu(event,\''+row.id+'\')">'+(ri+1)+'</div>';
+    const _rd=cpSheet().sort?'':' draggable="true" ondragstart="cpDragRowStart(event,\''+row.id+'\')"';
+    html+='<div class="cp-row" ondragover="cpDragRowOver(event,this)" ondragleave="cpDragRowLeave(this)" ondrop="cpDragRowDrop(event,\''+row.id+'\')" ondragend="cpDragEnd()"><div class="cp-gut"'+_rd+' onclick="cpRowMenu(event,\''+row.id+'\')">'+(ri+1)+'</div>';
     cols.forEach((col,ci)=>{
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
       const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(sel?' cp-sel':'');
@@ -5573,8 +5586,12 @@ function cpAddOpt(c,r,v){ v=(v||'').trim(); if(!v)return; const col=cpColAt(c); 
 
 /* ---- columns ---- */
 function cpColMenu(e,ci){
-  const col=cpColAt(ci);
-  let h='<button class="cp-popi" onclick="cpColRename('+ci+')">Переименовать</button>';
+  const col=cpColAt(ci), sh=cpSheet();
+  const sortedHere=sh.sort&&sh.sort.col===col.id;
+  let h='<button class="cp-popi" onclick="cpSortSet('+ci+',\'asc\')">Сортировать ↑</button>';
+  h+='<button class="cp-popi" onclick="cpSortSet('+ci+',\'desc\')">Сортировать ↓</button>';
+  if(sortedHere)h+='<button class="cp-popi" onclick="cpSortClear()">Сбросить сортировку</button>';
+  h+='<div class="sep"></div><button class="cp-popi" onclick="cpColRename('+ci+')">Переименовать</button>';
   h+='<div class="ttl">Тип</div><div class="cp-types">';
   CP_TYPES.forEach(t=>{ h+='<button class="cp-popi'+(col.type===t[0]?' on':'')+'" onclick="cpColType('+ci+',\''+t[0]+'\')">'+t[1]+'</button>'; });
   h+='</div><div class="sep"></div>';
@@ -5663,6 +5680,22 @@ function cpDoImport(){
   const d=cpData(cpP()); const sh={id:cpUid(),name:'Импорт '+(d.sheets.length+1),color:CP_PALK[d.sheets.length%CP_PALK.length],hidden:false,cols,rows};
   d.sheets.push(sh); d.active=sh.id; cpSel={r:0,c:0}; cpSave(); pd2Close(); cpRerender(); toast('Импортировано строк: '+rows.length);
 }
+/* --- сортировка + drag --- */
+function cpNum(v){ return parseFloat(String(v).replace(/[^0-9.,-]/g,'').replace(/\s+/g,'').replace(',', '.')); }
+function cpCmp(col,x,y){ if(col.type==='num'||col.type==='money'){ const nx=cpNum(x),ny=cpNum(y); if(!isNaN(nx)&&!isNaN(ny))return nx-ny; } return String(x).localeCompare(String(y),'ru',{numeric:true}); }
+function cpSortToggle(ci){ const sh=cpSheet(),col=sh.cols[ci]; if(sh.sort&&sh.sort.col===col.id){ sh.sort=sh.sort.dir==='asc'?{col:col.id,dir:'desc'}:null; } else { sh.sort={col:col.id,dir:'asc'}; } cpEd=null; cpSave(); cpRerender(); }
+function cpSortSet(ci,dir){ const sh=cpSheet(),col=sh.cols[ci]; sh.sort={col:col.id,dir:dir}; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpSortClear(){ cpSheet().sort=null; cpCloseFloat(); cpSave(); cpRerender(); }
+let cpDragColIdx=null, cpDragRowId=null;
+function cpDragColStart(e,ci){ cpDragColIdx=ci; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','col');}catch(_e){} }
+function cpDragColOver(e,el){ if(cpDragColIdx==null)return; e.preventDefault(); el.classList.add('cp-dragover'); }
+function cpDragColLeave(el){ el.classList.remove('cp-dragover'); }
+function cpDragColDrop(e,ci){ e.preventDefault(); const from=cpDragColIdx; cpDragEnd(); if(from==null||from===ci)return; const sh=cpSheet(); const col=sh.cols.splice(from,1)[0]; sh.cols.splice(ci,0,col); cpSel={r:0,c:Math.min(ci,sh.cols.length-1)}; cpSave(); cpRerender(); }
+function cpDragRowStart(e,id){ cpDragRowId=id; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','row');}catch(_e){} }
+function cpDragRowOver(e,el){ if(cpDragRowId==null)return; e.preventDefault(); el.classList.add('cp-rowover'); }
+function cpDragRowLeave(el){ el.classList.remove('cp-rowover'); }
+function cpDragRowDrop(e,id){ e.preventDefault(); const from=cpDragRowId; cpDragEnd(); if(from==null||from===id)return; const sh=cpSheet(); const fi=sh.rows.findIndex(r=>r.id===from), ti=sh.rows.findIndex(r=>r.id===id); if(fi<0||ti<0)return; const row=sh.rows.splice(fi,1)[0]; sh.rows.splice(ti,0,row); cpSave(); cpRerender(); }
+function cpDragEnd(){ cpDragColIdx=null; cpDragRowId=null; document.querySelectorAll('.cp-dragover,.cp-rowover').forEach(el=>{el.classList.remove('cp-dragover');el.classList.remove('cp-rowover');}); }
 document.addEventListener('keydown',cpKey);
 
 
