@@ -171,6 +171,7 @@ button{font-family:inherit}
 .kpi .sub.pos{color:var(--pos)}
 .kpi .kfoot{margin-top:13px;padding-top:11px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--txt-3)}
 .kpi .kfoot.pos{color:var(--pos)}
+.kpis-smm .v{font-size:32px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 
 /* ——— card ——— */
 .card{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
@@ -9026,8 +9027,30 @@ function renderClReports(){
   };
   const perfBlock = perf.length ? `<div class="rep-group-h"><span class="gbar" style="background:#37E6C8"></span>Performance — анализ эффективности<span class="ln"></span><span class="ct">${perf.length} ${pl(perf.length,'отчёт','отчёта','отчётов')}</span></div>${perf.map(perfCard).join('')}` : '';
   const smmBlock = smm.length ? `<div class="rep-group-h"><span class="gbar" style="background:#8A8FFF"></span>SMM — социальные медиа<span class="ln"></span><span class="ct">${smm.length} ${pl(smm.length,'отчёт','отчёта','отчётов')}</span></div>${smm.map(smmCard).join('')}` : '';
+  // верхний счётчик ключевых SMM-метрик из последнего SMM-отчёта (только реальные поля)
+  const smmSorted=smm.slice().sort((a,b)=>new Date(b.published_at||0)-new Date(a.published_at||0));
+  const latestSmm=smmSorted[0]||null;
+  let smmKpiRow='', listEyebrow='';
+  if(latestSmm){
+    const sm=(typeof smmNormalize==='function'?smmNormalize(latestSmm.payload||{}):{metrics:{},period:''}); const mk=sm.metrics||{};
+    const reach=mk.reels_reach, views=mk.reels_views, er=mk.er, fol=mk.followers;
+    const err=(er!=null&&fol!=null&&reach!=null&&reach>0)?(er*fol/reach):null; // ERR по охвату = ER × подписчики / охват
+    if(reach!=null||views!=null||er!=null){
+      const foot='последний отчёт'+(sm.period?(' · '+_ddH(sm.period)):'');
+      const cells=[
+        {l:'Охват', v:reach!=null?fnum(reach):'—', s:'уникальные', c:'var(--txt)'},
+        {l:'Просмотры', v:views!=null?fnum(views):'—', s:'всего', c:'var(--txt)'},
+        {l:'ER', v:er!=null?fpc(er):'—', s:'по подписчикам', c:'var(--accent)'},
+        {l:'ERR', v:err!=null?fpc(err):'—', s:'по охвату', c:'var(--accent)'}
+      ];
+      smmKpiRow=`<div class="eyebrow" style="margin:22px 0 12px">Ключевые показатели · последний SMM-отчёт</div><div class="kpis kpis-smm" style="grid-template-columns:repeat(4,1fr)">`+cells.map(k=>`<div class="kpi"><div class="l">${k.l}</div><div class="v num" style="color:${k.c}">${k.v}</div><div class="sub">${k.s}</div><div class="kfoot">${foot}</div></div>`).join('')+`</div>`;
+      listEyebrow=`<div class="eyebrow" style="margin:24px 0 14px">Отчёты по проекту</div>`;
+    }
+  }
   document.getElementById('content-cl').innerHTML=`
     <div class="ph"><div><div class="eyebrow">Документация</div><h1>Отчёты</h1><div class="s">Опубликованные отчёты по проекту · ${reports.length} готово</div></div></div>
+    ${smmKpiRow}
+    ${listEyebrow}
     ${perfBlock}
     ${smmBlock}
     `;
