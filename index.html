@@ -681,14 +681,14 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .cl-prog .bar{height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden}
 .cl-prog .bar i{display:block;height:100%;background:var(--accent);border-radius:3px;box-shadow:0 0 8px var(--accent)}
 /* stage tracker */
-@keyframes clRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes clRise{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:none}}
 @keyframes clPulse{0%,100%{box-shadow:0 0 0 4px rgba(55,230,200,.16),0 0 14px rgba(55,230,200,.5)}50%{box-shadow:0 0 0 7px rgba(55,230,200,.05),0 0 22px rgba(55,230,200,.85)}}
-#app-cl #content-cl>*{animation:clRise .44s var(--ease) both}
-#app-cl #content-cl>*:nth-child(2){animation-delay:.05s}
-#app-cl #content-cl>*:nth-child(3){animation-delay:.1s}
-#app-cl #content-cl>*:nth-child(4){animation-delay:.15s}
-#app-cl #content-cl>*:nth-child(5){animation-delay:.2s}
-#app-cl #content-cl>*:nth-child(n+6){animation-delay:.24s}
+#app-cl #content-cl>*{animation:clRise .56s cubic-bezier(.16,.84,.44,1) both}
+#app-cl #content-cl>*:nth-child(2){animation-delay:.06s}
+#app-cl #content-cl>*:nth-child(3){animation-delay:.12s}
+#app-cl #content-cl>*:nth-child(4){animation-delay:.18s}
+#app-cl #content-cl>*:nth-child(5){animation-delay:.24s}
+#app-cl #content-cl>*:nth-child(n+6){animation-delay:.3s}
 #app-cl .act-tag{display:inline-block;background:var(--bg-3);color:var(--txt-2);font-family:var(--mono);font-size:10.5px;padding:3px 9px;border-radius:6px;margin-top:6px}
 #app-cl .act-row{transition:transform .2s var(--ease),border-color .2s var(--ease)}
 #app-cl .act-row:hover{transform:translateX(2px);border-color:var(--line-2)}
@@ -717,6 +717,9 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .cl-cur .ic{width:38px;height:38px;border-radius:10px;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-family:var(--mono);font-size:12px;font-weight:700}
 .cl-cur .t{font-weight:600;font-size:14px}
 .cl-cur .d{font-size:12px;color:var(--txt-3);margin-top:2px}
+.cl-cur-dl{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5px;color:var(--txt-3)}
+.cl-cur-dl svg{width:13px;height:13px;opacity:.6;flex:0 0 auto}
+.cl-cur-dl b{color:var(--accent);font-weight:600;font-family:var(--mono)}
 /* report list (overview) */
 .cl-rep-row{display:flex;align-items:center;gap:13px;padding:13px 10px;margin:0 -10px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:8px;transition:background .18s var(--ease)}
 .cl-rep-row:last-child{border-bottom:0}
@@ -8781,29 +8784,34 @@ function renderClOverview(){
         ? `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--pos)"></span>Все этапы завершены`
         : `<span class="d" style="width:7px;height:7px;border-radius:50%;background:var(--txt-3)"></span>Нет этапа в работе`);
   const curStage = active || stages.find(s=>s.status==='wait') || null;
+  const _fDl=s=>{ if(!s||!s.due_date) return ''; const d=(typeof _dDate==='function'?_dDate(s.due_date):s.due_date); const t=(s.due_time&&typeof _dTime==='function')?_dTime(s.due_time):''; return t?d+', '+t:d; };
+  const _dlSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>';
   let curBlock='';
   if(curStage){
     const ci=stages.indexOf(curStage), isA=curStage.status==='active';
+    const dl=_fDl(curStage);
+    const desc=isA?'Сейчас работаем над этим этапом для вас':'Следующий этап в плане работ';
+    const dlLine=dl?`<div class="cl-cur-dl">${_dlSvg}<span>${isA?'Планируем завершить к':'Ориентир —'} <b>${dl}</b></span></div>`:'';
     curBlock=`<div class="cl-cur">
       <div class="ic">${String(ci+1).padStart(2,'0')}</div>
-      <div style="flex:1"><div class="t">${_ddH(curStage.name||'—')}</div><div class="d">${isA?'Сейчас в работе · команда занимается этим этапом':'Следующий этап · ожидает начала работы'}</div></div>
-      ${isA?'<span class="badge b-trial"><span class="bd"></span>В работе</span>':'<span class="badge b-mut">Ожидает</span>'}
+      <div style="flex:1;min-width:0"><div class="t">${_ddH(curStage.name||'—')}</div><div class="d">${desc}</div>${dlLine}</div>
+      ${isA?'<span class="badge b-trial"><span class="bd"></span>В работе</span>':'<span class="badge b-mut">Скоро</span>'}
     </div>`;
   } else if(total&&done===total){
     curBlock=`<div class="cl-cur">
       <div class="ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-      <div style="flex:1"><div class="t">Все этапы завершены</div><div class="d">Проект полностью выполнен</div></div>
-      <span class="badge b-active"><span class="bd"></span>Завершён</span>
+      <div style="flex:1"><div class="t">Все этапы завершены</div><div class="d">Спасибо за доверие — проект полностью выполнен</div></div>
+      <span class="badge b-active"><span class="bd"></span>Готово</span>
     </div>`;
   }
   const repBody = reports.length
     ? reports.slice(0,4).map((r,ri)=>{ const col=r.kind==='SMM'?'#8A8FFF':'#37E6C8';
         return `<div class="cl-rep-row" onclick="clNav('reports')"><div class="rn">${String(ri+1).padStart(2,'0')}</div><div class="rt">${_ddH(r.title||'Отчёт')}</div><div class="rd">${_dDateFull(r.published_at)}</div><span class="badge" style="background:${col}22;color:${col}">${_ddH(r.kind||'')}</span><svg class="rchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>`;
       }).join('')
-    : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Пока нет опубликованных отчётов.</div>`;
+    : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Отчёты скоро появятся здесь.</div>`;
   const actBody = feed.length
     ? actFeed(feed.slice(0,5).map(a=>({k:a.k,txt:a.txt,t:a.t,tag:_ddH(a.tag||'—')})))
-    : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Пока нет событий по проекту.</div>`;
+    : `<div style="padding:18px 4px;color:var(--txt-3);font-size:12.5px">Здесь появятся события по вашему проекту.</div>`;
   // SMM-полоса показателей из последнего SMM-отчёта (только если есть реальные ставки)
   let smmStrip='';
   if(latestSmm){
@@ -8841,8 +8849,8 @@ function renderClStages(){
     document.getElementById('content-cl').innerHTML=`
       <div style="text-align:center;padding:64px 24px;color:var(--txt-3)">
         <div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg></div>
-        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Этапов пока нет</div>
-        <div style="font-size:12.5px;margin-top:5px">Появятся, когда команда агентства добавит их в проект.</div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Этапы скоро появятся</div>
+        <div style="font-size:12.5px;margin-top:5px">Как только команда сформирует план работ по вашему проекту, этапы появятся здесь.</div>
       </div>
       <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
     return;
@@ -8872,8 +8880,8 @@ function renderClReports(){
       <div class="ph"><div><div class="eyebrow">Документация</div><h1>Отчёты</h1><div class="s">Опубликованные отчёты по проекту</div></div></div>
       <div style="text-align:center;padding:56px 24px;color:var(--txt-3)">
         <div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div>
-        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Отчётов пока нет</div>
-        <div style="font-size:12.5px;margin-top:5px">Здесь появятся Performance- и SMM-отчёты, как только агентство их опубликует.</div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Отчёты скоро будут здесь</div>
+        <div style="font-size:12.5px;margin-top:5px">Мы поделимся Performance- и SMM-отчётами, как только они будут готовы.</div>
       </div>
       <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
     return;
@@ -8931,8 +8939,8 @@ function renderClUpdates(){
     document.getElementById('content-cl').innerHTML=`
       <div style="text-align:center;padding:64px 24px;color:var(--txt-3)">
         <div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
-        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Пока нет обновлений</div>
-        <div style="font-size:12.5px;margin-top:5px">Здесь будут появляться события по проекту: старт, завершение и возврат этапов.</div>
+        <div style="font-size:15px;font-weight:600;color:var(--txt-2)">Лента событий пока пуста</div>
+        <div style="font-size:12.5px;margin-top:5px">Мы будем держать вас в курсе — старт, завершение и возврат этапов появятся здесь.</div>
       </div>
       <div class="cl-footer">TRIADA SMART SYSTEM · конфиденциально · только для клиента</div>`;
     return;
@@ -8950,6 +8958,9 @@ function renderClShell(){
   const pv=q('.cl-prog .v'), pl=q('.cl-prog .l'), pbar=q('.cl-prog .bar i');
   const hb=q('.topbar2 .pg b'), dchip=q('.topbar2 .u-chip');
   if(dchip) dchip.textContent=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+  const _hr=new Date().getHours();
+  const _greet=_hr<5?'Доброй ночи':_hr<12?'Доброе утро':_hr<18?'Добрый день':'Добрый вечер';
+  const _pg=q('.topbar2 .pg'); if(_pg&&_pg.firstChild&&_pg.firstChild.nodeType===3) _pg.firstChild.nodeValue=_greet;
   if(!P){
     const who=(me&&me.full_name)?me.full_name:'—';
     if(av) av.textContent=(who[0]||'—').toUpperCase();
