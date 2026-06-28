@@ -1659,6 +1659,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-filt .lk{display:flex;gap:6px;padding:5px 4px 2px}
 .cp-filt .lk button{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--txt-3);font-size:11px;padding:5px;cursor:pointer;font-family:var(--font)}
 .cp-filt .lk button:hover{color:var(--accent);border-color:var(--accent-line)}
+.cp-sent{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--pos);white-space:nowrap}
+.cp-sent.chg{color:var(--warn)}
+.clcp-tabs{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+.clcp-tab{background:var(--bg-1);border:1px solid var(--line-2);border-radius:999px;padding:6px 14px;font-size:12.5px;color:var(--txt-2);cursor:pointer;font-family:var(--font)}
+.clcp-tab.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-line)}
+.clcp-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-1);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 14px}
+.clcp-bar-l{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--txt)}
+.clcp-badge{font-size:11.5px;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--txt-2)}
+.clcp-badge.ok{background:rgba(80,210,140,.15);color:var(--pos)}
+.clcp-badge.ch{background:rgba(240,180,80,.16);color:var(--warn)}
+.clcp-btns{display:flex;gap:6px}
+.clcp-b{font-size:11.5px;padding:5px 10px;border-radius:7px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);cursor:pointer;font-family:var(--font);white-space:nowrap}
+.clcp-b.ok.on{background:var(--pos);border-color:transparent;color:#06351c}
+.clcp-b.ch.on{background:var(--warn);border-color:transparent;color:#3a2a06}
+.clcp-b:hover{border-color:var(--accent-line)}
+.clcp-cm{background:var(--bg-2);border:1px solid var(--line);border-radius:7px;color:var(--txt);font-size:12px;padding:6px 9px;outline:none;font-family:var(--font);min-width:140px}
+.clcp-cm.wide{flex:1;min-width:200px}
+.clcp-ctl{display:flex;flex-direction:column;gap:5px;width:100%}
+.clcp-appcell{align-items:stretch}
+.clcp-apphead{background:var(--accent-dim)}
+.clcp-grid .cp-cell{height:auto;min-height:48px;padding-top:6px;padding-bottom:6px}
 
 .pd-act-div{width:1px;height:22px;background:linear-gradient(180deg,transparent,var(--line-2),transparent);margin:0 3px;flex:0 0 auto}
 .pdl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
@@ -3162,6 +3183,7 @@ button:active{transform:translateY(.5px) scale(.99)}
       <div class="nav-i on" data-cm="overview" onclick="clNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Обзор</div>
       <div class="nav-i" data-cm="stages" onclick="clNav('stages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Этапы <span class="ct">2/6</span></div>
       <div class="nav-i" data-cm="reports" onclick="clNav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6"/></svg>Отчёты <span class="ct">3</span></div>
+      <div class="nav-i" data-cm="content" onclick="clNav('content')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>Контент-план</div>
       <div class="nav-i" data-cm="updates" onclick="clNav('updates')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Обновления <span class="dot-n"></span></div>
     </nav>
     <div class="flex1"></div>
@@ -5425,6 +5447,7 @@ function cpData(p){
     const f=p._cp.sheets.find(s=>!s.hidden)||p._cp.sheets[0];
     if(f)p._cp.active=f.id;
   }
+  if(window.LIVE&&window.SB&&!p._cpLoad){ p._cpLoad=1; cpLoadServer(p); }
   return p._cp;
 }
 function cpSheet(){const p=cpP();const d=cpData(p);return d.sheets.find(s=>s.id===d.active)||d.sheets[0];}
@@ -5438,7 +5461,9 @@ function cpSave(){
   const p=cpP(); if(!p)return;
   cpSaved=false; const ind=document.getElementById('cp-save'); if(ind)ind.innerHTML=cpSaveHTML();
   clearTimeout(cpSaveT);
-  cpSaveT=setTimeout(()=>{ try{localStorage.setItem(cpKeyLS(p),JSON.stringify(p._cp));}catch(e){} cpSaved=true; const i2=document.getElementById('cp-save'); if(i2)i2.innerHTML=cpSaveHTML(); },500);
+  cpSaveT=setTimeout(()=>{ try{localStorage.setItem(cpKeyLS(p),JSON.stringify(p._cp));}catch(e){}
+    if(window.LIVE&&window.SB){ try{ const me=(window.tMe&&window.tMe())||{}; window.SB.from('content_plans').upsert({project_id:p.id,data:p._cp,updated_at:new Date().toISOString(),updated_by:me.id||null},{onConflict:'project_id'}).then(function(){},function(e){console.warn('cp save',e);}); }catch(e){console.warn('cp save',e);} }
+    cpSaved=true; const i2=document.getElementById('cp-save'); if(i2)i2.innerHTML=cpSaveHTML(); },500);
 }
 function cpRerender(){ if(pdTabCur==='content') renderPd(); }
 
@@ -5490,7 +5515,8 @@ function cpRender(p){
     +'<button class="cp-mini" onclick="cpAddCol()">'+CP_IC.plus+'Колонка</button>'
     +'<button class="cp-mini" onclick="cpImport()">'+CP_IC.upload+'Импорт</button>'
     +'<span class="cp-save" id="cp-save">'+cpSaveHTML()+'</span>'
-    +'<button class="cp-mini cp-send" onclick="toast(\'Согласование с клиентом — следующий шаг\')">'+CP_IC.send+'На согласование</button>'
+    +cpSendStatusHTML(p,sh)
+    +'<button class="cp-mini cp-send" onclick="cpSendSheet()">'+CP_IC.send+'Отправить на согласование</button>'
     +'</div></div>';
   const gw=40+cols.reduce((s,c)=>s+c.w,0)+44;
   html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px">';
@@ -5841,6 +5867,123 @@ async function cpImportXlsx(input){
     cpSel={r:0,c:0}; cpQ=''; cpSave(); pd2Close(); cpRerender();
     toast('Импортировано листов: '+made.length);
   }catch(err){ console.error('xlsx',err); toast('Не удалось прочитать файл'); }
+}
+
+/* ===================== КОНТЕНТ-ПЛАН · сервер (LIVE) ===================== */
+function cpHash(s){ let h=5381; for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0; return h; }
+async function cpLoadServer(p){
+  try{
+    const pid=p.id;
+    const r1=await window.SB.from('content_plans').select('data').eq('project_id',pid).maybeSingle();
+    if(r1&&r1.data&&r1.data.data&&r1.data.data.sheets&&r1.data.data.sheets.length){ p._cp=r1.data.data; }
+    const r2=await window.SB.from('content_shares').select('sheet_id,shared_at,data').eq('project_id',pid);
+    p._cpShared={}; if(r2&&r2.data){ r2.data.forEach(function(x){ p._cpShared[x.sheet_id]={at:x.shared_at,hash:cpHash(JSON.stringify(x.data||{}))}; }); }
+    const r3=await window.SB.from('content_approvals').select('sheet_id,row_id,status,comment').eq('project_id',pid);
+    p._cpAppr={}; if(r3&&r3.data){ r3.data.forEach(function(x){ p._cpAppr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; }); }
+    if(pdTabCur==='content') renderPd();
+  }catch(e){ console.warn('cp load',e); }
+}
+async function cpSendSheet(){
+  const p=cpP(), sh=cpSheet();
+  if(!(window.LIVE&&window.SB)){ toast('Для отправки клиенту нужен онлайн-режим (Supabase)'); return; }
+  try{
+    const me=(window.tMe&&window.tMe())||{};
+    const snap={id:sh.id,name:sh.name,color:sh.color,cols:sh.cols,rows:sh.rows};
+    const res=await window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:sh.id,name:sh.name,data:snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'});
+    if(res&&res.error)throw res.error;
+    p._cpShared=p._cpShared||{}; p._cpShared[sh.id]={at:new Date().toISOString(),hash:cpHash(JSON.stringify(snap))};
+    toast('Лист «'+sh.name+'» отправлен клиенту'); cpRerender();
+  }catch(e){ console.error('cp send',e); toast('Не удалось отправить'); }
+}
+function cpSendStatusHTML(p,sh){
+  if(!(window.LIVE&&window.SB))return '';
+  const sent=p._cpShared&&p._cpShared[sh.id]; if(!sent)return '';
+  const cur=cpHash(JSON.stringify({id:sh.id,name:sh.name,color:sh.color,cols:sh.cols,rows:sh.rows}));
+  if(sent.hash!==cur)return '<span class="cp-sent chg">● Изменён после отправки</span>';
+  return '<span class="cp-sent">✓ Отправлено клиенту</span>';
+}
+
+/* ===================== КОНТЕНТ-ПЛАН · кабинет клиента ===================== */
+async function renderClContent(){
+  const P=window.CLP, box=document.getElementById('content-cl'); if(!box)return;
+  const ph='<div class="ph"><div><div class="eyebrow">Контент</div><h1>Контент-план</h1><div class="s">Публикации на согласование</div></div></div>';
+  if(!P){ box.innerHTML=ph+'<div style="text-align:center;padding:56px 24px;color:var(--txt-3)">Проект ещё не подключён.</div>'; return; }
+  box.innerHTML=ph+'<div style="padding:40px 4px;color:var(--txt-3);font-size:13px">Загрузка…</div>';
+  let shares=[], appr={};
+  try{
+    if(window.SB){
+      const r1=await window.SB.from('content_shares').select('sheet_id,name,data,shared_at').eq('project_id',P.id).order('shared_at');
+      shares=(r1&&r1.data)||[];
+      const r2=await window.SB.from('content_approvals').select('sheet_id,row_id,status,comment').eq('project_id',P.id);
+      ((r2&&r2.data)||[]).forEach(function(x){ appr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; });
+    }
+  }catch(e){ console.warn('cl cp load',e); }
+  window.CL_CP={shares:shares, appr:appr, sel:0};
+  clCpRender();
+}
+function clCpStatusBtns(rowId,a){
+  const ap=a.status==='approved', ch=a.status==='changes';
+  return '<button class="clcp-b ok'+(ap?' on':'')+'" onclick="clCpSet(\''+rowId+'\',\'approved\')">✓ Одобрить</button>'
+    +'<button class="clcp-b ch'+(ch?' on':'')+'" onclick="clCpSet(\''+rowId+'\',\'changes\')">✎ Правки</button>';
+}
+function clCpRowControl(rowId,a){
+  return '<div class="clcp-ctl"><div class="clcp-btns">'+clCpStatusBtns(rowId,a)+'</div>'
+    +'<input class="clcp-cm" placeholder="комментарий" value="'+_ddA(a.comment||'')+'" onchange="clCpComment(\''+rowId+'\',this.value)"></div>';
+}
+function clCpApprBar(rowId,a,label){
+  const st = a.status==='approved'?'<span class="clcp-badge ok">Одобрено</span>':(a.status==='changes'?'<span class="clcp-badge ch">Нужны правки</span>':'<span class="clcp-badge">Ожидает решения</span>');
+  return '<div class="clcp-bar"><div class="clcp-bar-l"><b>'+label+'</b>'+st+'</div>'
+    +'<div class="clcp-btns">'+clCpStatusBtns(rowId,a)+'</div>'
+    +'<input class="clcp-cm wide" placeholder="общий комментарий к листу" value="'+_ddA(a.comment||'')+'" onchange="clCpComment(\''+rowId+'\',this.value)"></div>';
+}
+function clCpRender(){
+  const cp=window.CL_CP, box=document.getElementById('content-cl'); if(!box)return;
+  const ph='<div class="ph"><div><div class="eyebrow">Контент</div><h1>Контент-план</h1><div class="s">Публикации на согласование</div></div></div>';
+  if(!cp||!cp.shares.length){
+    box.innerHTML=ph+'<div style="text-align:center;padding:56px 24px;color:var(--txt-3)">'
+      +'<div style="width:46px;height:46px;margin:0 auto 16px;border-radius:12px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-2)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg></div>'
+      +'<div style="font-size:15px;font-weight:600;color:var(--txt-2)">Пока нечего согласовывать</div>'
+      +'<div style="font-size:12.5px;margin-top:5px">Как только агентство отправит контент-план, он появится здесь — и вы сможете одобрить публикации или запросить правки.</div></div>';
+    return;
+  }
+  cp.sel=Math.min(cp.sel||0, cp.shares.length-1);
+  const share=cp.shares[cp.sel], sh=share.data||{}, sid=share.sheet_id;
+  const cols=sh.cols||[], rows=sh.rows||[];
+  let tabs='';
+  if(cp.shares.length>1){ tabs='<div class="clcp-tabs">'+cp.shares.map(function(s,i){return '<button class="clcp-tab'+(i===cp.sel?' on':'')+'" onclick="clCpPick('+i+')">'+_ddH(s.name||('Лист '+(i+1)))+'</button>';}).join('')+'</div>'; }
+  const sa=cp.appr[sid+'/__sheet__']||{status:'pending',comment:''};
+  const sheetBar=clCpApprBar('__sheet__',sa,'Согласовать весь лист');
+  const gw=44+cols.reduce(function(a,c){return a+(c.w||140);},0)+240;
+  let grid='<div class="cp-scroll"><div class="cp-grid clcp-grid" style="min-width:'+gw+'px">';
+  grid+='<div class="cp-hr"><div class="cp-gut cp-hgut"></div>';
+  cols.forEach(function(col,ci){ grid+='<div class="cp-head'+(ci===0?' cp-c0':'')+'" style="width:'+(col.w||140)+'px"><span class="ti">'+(typeof CP_TYICON==='function'?CP_TYICON(col.type):'')+'</span><span class="nm">'+_ddH(col.name||'')+'</span></div>'; });
+  grid+='<div class="cp-head clcp-apphead" style="width:240px"><span class="nm">Ваше решение</span></div></div>';
+  rows.forEach(function(row,ri){
+    grid+='<div class="cp-row"><div class="cp-gut">'+(ri+1)+'</div>';
+    cols.forEach(function(col,ci){ const v=row.c?row.c[col.id]:''; grid+='<div class="cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+'" style="width:'+(col.w||140)+'px">'+(typeof cpCellView==='function'?cpCellView(col,v):_ddH(v==null?'':v))+'</div>'; });
+    const a=cp.appr[sid+'/'+row.id]||{status:'pending',comment:''};
+    grid+='<div class="cp-cell clcp-appcell" style="width:240px">'+clCpRowControl(row.id,a)+'</div></div>';
+  });
+  grid+='</div></div>';
+  box.innerHTML=ph+tabs+sheetBar+grid;
+}
+function clCpPick(i){ window.CL_CP.sel=i; clCpRender(); }
+function clCpSet(rowId,status){ clCpSave(rowId,{status:status}); }
+function clCpComment(rowId,v){ clCpSave(rowId,{comment:v}); }
+async function clCpSave(rowId,patch){
+  const P=window.CLP, cp=window.CL_CP; if(!P||!cp)return;
+  const sid=cp.shares[cp.sel].sheet_id, key=sid+'/'+rowId;
+  const cur=cp.appr[key]||{status:'pending',comment:''};
+  const next=Object.assign({},cur,patch);
+  cp.appr[key]=next;
+  if(!window.SB){ clCpRender(); return; }
+  try{
+    const me=(window.tMe&&window.tMe())||{};
+    const res=await window.SB.from('content_approvals').upsert({project_id:P.id,sheet_id:sid,row_id:rowId,status:next.status,comment:next.comment,decided_by:me.id||null,decided_at:new Date().toISOString()},{onConflict:'project_id,sheet_id,row_id'});
+    if(res&&res.error)throw res.error;
+    if(typeof toast==='function'&&patch.status) toast(patch.status==='approved'?'Одобрено':'Отправлено на правки');
+  }catch(e){ console.error('cl appr',e); if(typeof toast==='function')toast('Не удалось сохранить'); }
+  clCpRender();
 }
 
 document.addEventListener('keydown',cpKey);
@@ -9384,7 +9527,7 @@ function enterClient(){
 function clNav(m){
   renderClShell();
   document.querySelectorAll('#app-cl .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.cm===m));
-  if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else renderClUpdates();
+  if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else renderClUpdates();
 }
 function actFeed(items){
   return `<div class="act-feed">${items.map(a=>`<div class="act-row"><div class="act-ic ${a.k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ACT_IC[a.k]}</svg></div><div style="flex:1;min-width:0"><div class="act-txt">${a.txt}</div><div class="act-tag">${a.tag}</div></div><div class="act-t">${a.t}</div></div>`).join('')}</div>`;
