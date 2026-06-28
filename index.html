@@ -1680,6 +1680,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .clcp-appcell{align-items:stretch}
 .clcp-apphead{background:var(--accent-dim)}
 .clcp-grid .cp-cell{height:auto;min-height:48px;padding-top:6px;padding-bottom:6px}
+.cp-claphead{background:var(--accent-dim)}
+.cp-apc{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.cp-apc.ok{background:rgba(80,210,140,.15);color:var(--pos)}
+.cp-apc.ch{background:rgba(240,180,80,.16);color:var(--warn)}
+.cp-apc.none{color:var(--txt-3)}
+.cp-apcm{display:inline-flex;margin-left:6px;color:var(--txt-3);cursor:help}
+.cp-apcm svg{width:13px;height:13px}
+.cp-clappr.ok{background:rgba(80,210,140,.15);color:var(--pos)}
+.cp-clappr.ch{background:rgba(240,180,80,.16);color:var(--warn)}
 
 .pd-act-div{width:1px;height:22px;background:linear-gradient(180deg,transparent,var(--line-2),transparent);margin:0 3px;flex:0 0 auto}
 .pdl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
@@ -5504,6 +5513,7 @@ function CP_TYICON(t){
 
 function cpRender(p){
   const d=cpData(p), sh=cpSheet(), cols=sh.cols, disp=cpDisp(sh);
+  const sid=sh.id, ap=p._cpAppr||{}; const showClient=!!(p._cpShared&&p._cpShared[sid])||Object.keys(ap).some(function(k){return k.indexOf(sid+'/')===0;});
   let html='<div class="cp">';
   html+='<div class="cp-bar"><div class="cp-bar-l">'
     +'<span class="cp-title">'+CP_IC.table+_ddH(sh.name)+'</span>'
@@ -5511,6 +5521,7 @@ function cpRender(p){
     +'<div class="cp-search">'+CP_IC.search+'<input id="cp-q" placeholder="Поиск по таблице" value="'+_ddA(cpQ)+'" oninput="cpSearch(this.value)"></div>'
     +(sh.sort?('<span class="cp-fchip">Сорт: '+_ddH(((sh.cols.find(c=>c.id===sh.sort.col))||{}).name||'')+' '+(sh.sort.dir==='asc'?'↑':'↓')+'<button onclick="cpSortClear()">✕</button></span>'):'')
     +((sh.filt&&Object.keys(sh.filt).length)?('<span class="cp-fchip">Фильтры '+Object.keys(sh.filt).length+'<button onclick="cpClearFilters()">✕</button></span>'):'')
+    +cpSheetApprHTML(p,sh)
     +'</div><div class="cp-bar-r">'
     +'<button class="cp-mini" onclick="cpAddCol()">'+CP_IC.plus+'Колонка</button>'
     +'<button class="cp-mini" onclick="cpImport()">'+CP_IC.upload+'Импорт</button>'
@@ -5518,10 +5529,11 @@ function cpRender(p){
     +cpSendStatusHTML(p,sh)
     +'<button class="cp-mini cp-send" onclick="cpSendSheet()">'+CP_IC.send+'Отправить на согласование</button>'
     +'</div></div>';
-  const gw=40+cols.reduce((s,c)=>s+c.w,0)+44;
+  const gw=40+cols.reduce((s,c)=>s+c.w,0)+44+(showClient?180:0);
   html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px">';
   html+='<div class="cp-hr"><div class="cp-gut cp-hgut"></div>';
   cols.forEach((col,ci)=>{ html+=cpHeadCell(col,ci); });
+  if(showClient) html+='<div class="cp-head cp-claphead" style="width:180px"><span class="nm">Клиент</span></div>';
   html+='<div class="cp-addcol" onclick="cpAddCol()">'+CP_IC.plus+'</div></div>';
   if(!disp.length){
     html+='<div class="cp-empty">'+(cpQ?'Ничего не найдено':'Пусто — добавь первую строку ниже')+'</div>';
@@ -5535,6 +5547,7 @@ function cpRender(p){
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
       html+='<div class="'+cls+'" style="width:'+col.w+'px" data-r="'+ri+'" data-c="'+ci+'" onclick="cpClick('+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((sel&&!editing)?'<span class="cp-h"></span>':'')+'</div>';
     });
+    if(showClient){ const a=ap[sid+'/'+row.id]; html+='<div class="cp-cell cp-clapcell" style="width:180px">'+cpApprCellHTML(a)+'</div>'; }
     html+='<div class="cp-pad"></div></div>';
   });
   html+='<div class="cp-add" onclick="cpAddRow()">'+CP_IC.plus+'Добавить строку</div>';
@@ -5984,6 +5997,20 @@ async function clCpSave(rowId,patch){
     if(typeof toast==='function'&&patch.status) toast(patch.status==='approved'?'Одобрено':'Отправлено на правки');
   }catch(e){ console.error('cl appr',e); if(typeof toast==='function')toast('Не удалось сохранить'); }
   clCpRender();
+}
+
+/* ===================== КОНТЕНТ-ПЛАН · решения клиента в редакторе ===================== */
+function cpApprCellHTML(a){
+  if(!a||!a.status||a.status==='pending') return '<span class="cp-apc none">—</span>';
+  const ok=a.status==='approved';
+  const chip='<span class="cp-apc '+(ok?'ok':'ch')+'">'+(ok?'✓ Одобрено':'✎ Правки')+'</span>';
+  const cm=a.comment?('<span class="cp-apcm" title="'+_ddA(a.comment)+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>'):'';
+  return chip+cm;
+}
+function cpSheetApprHTML(p,sh){
+  const a=(p._cpAppr||{})[sh.id+'/__sheet__']; if(!a||!a.status||a.status==='pending')return '';
+  if(a.status==='approved')return '<span class="cp-fchip cp-clappr ok">Клиент одобрил лист</span>';
+  return '<span class="cp-fchip cp-clappr ch">Клиент: правки по листу</span>';
 }
 
 document.addEventListener('keydown',cpKey);
