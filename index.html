@@ -7008,7 +7008,7 @@ function smmConclusionsBlockHTML(){
   const head='<div style="display:flex;align-items:baseline;justify-content:space-between;padding:16px 0 20px;border-bottom:1px solid var(--line)"><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.16em;text-transform:uppercase">Принцип разбора&nbsp;&nbsp;·&nbsp;&nbsp;вывод&nbsp;→&nbsp;аргумент&nbsp;→&nbsp;рекомендация</span><span style="font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.12em;text-transform:uppercase">'+C.length+' '+pl(C.length,'вывод','вывода','выводов')+'</span></div>';
   return '<div class="smm-rep05">'+secHead+head+reactionLead+body+'</div>';
 }
-let _smmLbData=null, _smmLbMetric='er', _smmLbLoading=false, _smmLbSortDir='desc', _smmLbMenuOpen=false, _smmLbAnim=true;
+let _smmLbData=null, _smmLbMetric='er', _smmLbLoading=false, _smmLbSortDir='desc', _smmLbMenuOpen=false, _smmLbAnim=true, _smmLbAll=null, _smmLbPeriod='__latest', _smmLbPeriods=[];
 const SMM_LB_METRICS=[
   {k:'er',l:'ER',pct:true,get:m=>m.er},
   {k:'lr',l:'LR',pct:true,get:m=>m.lr},
@@ -7022,18 +7022,30 @@ async function smmLoadLb(){
   _smmLbLoading=true;
   try{
     const ids=((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]).map(p=>p.id).filter(x=>x!=null);
-    if(!window.SB||!ids.length){ _smmLbData=[]; _smmLbLoading=false; return; }
+    if(!window.SB||!ids.length){ _smmLbAll=[]; _smmLbPeriods=[]; _smmLbData=[]; _smmLbLoading=false; return; }
     const {data,error}=await SB.from('reports').select('id,project_id,title,payload,published_at').eq('kind','SMM').in('project_id',ids).order('published_at',{ascending:false});
     if(error) throw error;
-    const seen=new Set(), out=[];
-    (data||[]).forEach(r=>{ const key=String(r.project_id); if(seen.has(key)) return; seen.add(key);
-      const proj=PROJECTS.find(p=>String(p.id)===key); if(!proj) return;
-      out.push({proj, reportId:r.id, m:smmNormalize(r.payload).metrics});
+    const all=[];
+    (data||[]).forEach(r=>{ const key=String(r.project_id); const proj=PROJECTS.find(p=>String(p.id)===key); if(!proj) return;
+      const sm=smmNormalize(r.payload);
+      all.push({proj, reportId:r.id, m:sm.metrics, period:(sm.period||'').trim(), ts:r.published_at||''});
     });
-    _smmLbData=out;
-  }catch(e){ _smmLbData=[]; }
+    _smmLbAll=all;
+    // уникальные непустые периоды по свежести (max дата отчёта); n = число проектов с данными за период
+    const pm={};
+    all.forEach(r=>{ if(!r.period) return; const e=pm[r.period]||(pm[r.period]={period:r.period, ts:r.ts, projs:new Set()}); if(r.ts>e.ts)e.ts=r.ts; e.projs.add(String(r.proj.id)); });
+    _smmLbPeriods=Object.values(pm).map(e=>({period:e.period, ts:e.ts, n:e.projs.size})).sort((a,b)=> a.ts<b.ts?1:a.ts>b.ts?-1:0);
+    if(_smmLbPeriod!=='__latest' && !_smmLbPeriods.some(p=>p.period===_smmLbPeriod)) _smmLbPeriod='__latest'; // выбранный период исчез → актуальное
+    lbApplyPeriod();
+  }catch(e){ _smmLbAll=[]; _smmLbPeriods=[]; _smmLbData=[]; }
   _smmLbLoading=false;
 }
+function lbApplyPeriod(){
+  const all=_smmLbAll||[]; const seen=new Set(), out=[];
+  all.forEach(r=>{ if(_smmLbPeriod!=='__latest' && r.period!==_smmLbPeriod) return; const k=String(r.proj.id); if(seen.has(k)) return; seen.add(k); out.push({proj:r.proj, reportId:r.reportId, m:r.m}); });
+  _smmLbData=out;
+}
+function smmSetLbPeriodIdx(i){ _smmLbPeriod=(i<0?'__latest':((_smmLbPeriods[i]&&_smmLbPeriods[i].period)||'__latest')); _smmLbAnim=true; if(typeof _closePops==='function')_closePops(); lbApplyPeriod(); lbPaint(); }
 function smmSetLbMetric(k){ _smmLbMetric=k; _smmLbAnim=true; if(typeof _closePops==='function')_closePops(); lbPaint(); }
 function smmToggleLbMenu(e){ if(e&&e.stopPropagation)e.stopPropagation(); _smmLbMenuOpen=!_smmLbMenuOpen; _smmLbAnim=false; lbRender(); }
 function smmToggleLbSort(){ _smmLbSortDir=(_smmLbSortDir==='asc'?'desc':'asc'); _smmLbAnim=true; lbPaint(); }
@@ -7060,8 +7072,14 @@ function lbControlsHTML(){
   const I_CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
   const cstat={}; M.forEach(mc=>{ const vs=(_smmLbData||[]).map(d=>mc.get(d.m)).filter(v=>v!=null); cstat[mc.k]=vs.length?{avg:vs.reduce((s,x)=>s+x,0)/vs.length}:null; });
   const menuItems=M.map(mc=>'<div class="lbx-mi'+(mc.k===_smmLbMetric?' on':'')+'" onclick="smmSetLbMetric(\''+mc.k+'\')"><span class="mc">'+mc.l+'</span><span class="mn">'+NAMES[mc.k]+'</span><span class="mv">'+(cstat[mc.k]?fmtCell(cstat[mc.k].avg,mc):'—')+'</span><span class="ck">'+(mc.k===_smmLbMetric?I_CHECK:'')+'</span></div>').join('');
+  const I_CAL='<svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:-2px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.5M16 3v3.5"/></svg>';
+  const perLbl=(_smmLbPeriod==='__latest')?'Последний отчёт':_smmLbPeriod;
+  const perItems='<div class="lbx-mi'+(_smmLbPeriod==='__latest'?' on':'')+'" onclick="smmSetLbPeriodIdx(-1)"><span class="mc">'+I_CAL+'</span><span class="mn">Последний отчёт</span><span class="mv">'+(_smmLbAll?_smmLbAll.length:0)+'</span></div>'
+    +_smmLbPeriods.map((p,pi)=>'<div class="lbx-mi'+(p.period===_smmLbPeriod?' on':'')+'" onclick="smmSetLbPeriodIdx('+pi+')"><span class="mc">'+I_CAL+'</span><span class="mn">'+_ddH(p.period)+'</span><span class="mv">'+p.n+'</span></div>').join('');
+  const periodDD=_smmLbPeriods.length?('<div class="dd lbx-ddwrap" id="dd-lbperiod"><button class="lbx-dd" onclick="event.stopPropagation();ddToggle(\'lbperiod\')"><span class="c">'+I_CAL+'</span><span class="nm">'+_ddH(perLbl)+'</span><span class="ch">'+I_CHEV+'</span></button><div class="lbx-menu"><div class="lbx-mh">Период рейтинга</div>'+perItems+'</div></div>'):'';
   return '<div class="lbx-ctr">'
     +'<div class="lbx-pill lbx-search">'+I_SEARCH+'<input type="text" placeholder="Поиск проекта" oninput="smmLbFilter(this.value)"></div>'
+    +periodDD
     +'<div class="dd lbx-ddwrap" id="dd-lbmetric"><button class="lbx-dd" onclick="event.stopPropagation();ddToggle(\'lbmetric\')"><span class="c">'+cfg.l+'</span><span class="nm">'+NAMES[cfg.k]+'</span><span class="ch">'+I_CHEV+'</span></button><div class="lbx-menu"><div class="lbx-mh">Метрика рейтинга</div>'+menuItems+'</div></div>'
     +'<button class="lbx-pill lbx-icon" title="'+(_smmLbSortDir==='asc'?'По возрастанию':'По убыванию')+'" onclick="smmToggleLbSort()">'+I_SORT+'</button>'
     +'</div>';
@@ -7191,7 +7209,8 @@ function smmRenderLb(){
 
   const footer='<div class="lbx-ft">'+I_CLICK+'Клик по проекту открывает его SMM-отчёт</div>';
 
-  return '<div class="smm-wrap lbx-full"><div class="lbx'+(_smmLbAnim?' lbx-anim':'')+'">'+header+insight+kpis+ranked+matrix+footer+'</div></div>';
+  const perctx=(_smmLbPeriod!=='__latest')?('<div style="display:flex;align-items:center;gap:9px;margin:2px 0 16px;font-family:var(--mono);font-size:11.5px;color:var(--txt-3)"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)"></span>Рейтинг за период · <b style="color:var(--txt);font-weight:700;font-family:var(--font)">'+_ddH(_smmLbPeriod)+'</b> · '+rows.length+' '+_plural(rows.length,'проект','проекта','проектов')+'</div>'):'';
+  return '<div class="smm-wrap lbx-full"><div class="lbx'+(_smmLbAnim?' lbx-anim':'')+'">'+header+perctx+insight+kpis+ranked+matrix+footer+'</div></div>';
 }
 function smmTabHTML(p){
   const all=(p._reports||[]).map((r,i)=>({r,i})).filter(x=>x.r.kind==='SMM');
