@@ -1753,6 +1753,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-h{cursor:crosshair}
 .cp-fillprev{box-shadow:inset 0 0 0 1px var(--accent-line);background:rgba(55,230,200,.09)}
 .cp-filling, .cp-filling *{cursor:crosshair !important;user-select:none !important}
+/* ——— ресайз колонок/строк + читаемость + полные чипы ——— */
+.cp-head{position:relative;height:auto;min-height:38px}
+.cp-cresz{position:absolute;top:0;right:-3px;width:7px;height:100%;cursor:col-resize;z-index:8}
+.cp-cresz:hover{background:var(--accent)}
+.cp-rresz{position:absolute;left:0;right:0;bottom:-3px;height:7px;cursor:row-resize;z-index:8}
+.cp-rresz:hover{background:var(--accent)}
+.cp-rzing,.cp-rzing *{user-select:none !important}
+.cp-rzing-col,.cp-rzing-col *{cursor:col-resize !important}
+.cp-rzing-row,.cp-rzing-row *{cursor:row-resize !important}
+.cp-cell{height:auto;min-height:42px}
+.cp-cell:has(.cp-chip-full){height:auto;min-height:42px}
+.cp-chip-full .cp-chip-t{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25}
+.cp-grid{font-size:13.5px}
+.cp-mono{font-size:13px}
+.cp-chip{font-size:12.5px}
+.cp-chip.cp-chip-full{font-size:13px}
+.cp-lnk{font-size:13px}
+.cp-txt{font-size:13.5px}
+#app-cl .cp-grid{font-size:14px}
+#app-cl .cp-head{min-height:42px}
+#app-cl .cp-head .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;line-height:1.2}
+#app-cl .cp-mono{font-size:14px}
+#app-cl .cp-chip.cp-chip-full{font-size:13.5px}
+#app-cl .cp-txt{font-size:14px}
 
 .pd-act-div{width:1px;height:22px;background:linear-gradient(180deg,transparent,var(--line-2),transparent);margin:0 3px;flex:0 0 auto}
 .pdl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
@@ -5479,6 +5503,7 @@ function cpP(){return PROJECTS[pdIdx];}
 function cpKeyLS(p){return 'cp_v1_'+(p&&p.id?p.id:'demo');}
 let cpSel={r:0,c:0}, cpEd=null, cpQ='', cpHeadEd=null, cpShEd=null, cpSaveT=null, cpSaved=true;
 let cpSelEnd=null;
+let cpRz=null;
 
 function cpSeed(){
   const c=(name,type,w,opts)=>({id:cpUid(),name,type,w,opts:opts||[]});
@@ -5573,7 +5598,7 @@ function cpHeadCell(col,ci){
   const arr=sd?('<span class="cp-sarr">'+(sd==='asc'?'↑':'↓')+'</span>'):'';
   const fil=cpFiltGet(col.id)?('<span class="cp-funnel">'+CP_IC.funnel+'</span>'):'';
   const inner='<span class="ti">'+CP_TYICON(col.type)+'</span><span class="nm" onclick="event.stopPropagation();cpSortToggle('+ci+')" title="Сортировка по колонке">'+_ddH(col.name)+'</span>'+arr+fil+'<button class="cp-hmenu" onclick="event.stopPropagation();cpColMenu(event,'+ci+')">⋮</button>';
-  return '<div class="cp-head cp-dragcol'+sticky+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+col.w+'px">'+inner+'</div>';
+  return '<div class="cp-head cp-dragcol'+sticky+'" data-c="'+ci+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+col.w+'px">'+inner+'<span class="cp-cresz" onmousedown="cpColRz(event,'+ci+')"></span></div>';
 }
 function CP_TYICON(t){
   const m={text:'<path d="M4 7h16M4 12h10M4 17h7"/>',long:'<path d="M4 6h16M4 10h16M4 14h12M4 18h8"/>',num:'<path d="M6 4l-1 16M14 4l-1 16M4 9h16M3 15h16"/>',money:'<path d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H8m0 0h8a2.5 2.5 0 0 1 0 5H8"/>',date:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',select:'<circle cx="12" cy="12" r="8"/><path d="M9 12l2 2 4-4"/>',check:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/>',link:'<path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1"/>'};
@@ -5613,14 +5638,15 @@ function cpRender(p){
   }
   disp.forEach((row,ri)=>{
     const _rd=cpSheet().sort?'':' draggable="true" ondragstart="cpDragRowStart(event,\''+row.id+'\')"';
-    html+='<div class="cp-row" ondragover="cpDragRowOver(event,this)" ondragleave="cpDragRowLeave(this)" ondrop="cpDragRowDrop(event,\''+row.id+'\')" ondragend="cpDragEnd()"><div class="cp-gut"'+_rd+' onclick="cpRowMenu(event,\''+row.id+'\')">'+(ri+1)+'</div>';
+    const _rh=row.h?(';min-height:'+row.h+'px'):'';
+    html+='<div class="cp-row" data-rid="'+row.id+'" ondragover="cpDragRowOver(event,this)" ondragleave="cpDragRowLeave(this)" ondrop="cpDragRowDrop(event,\''+row.id+'\')" ondragend="cpDragEnd()"><div class="cp-gut" style="'+(row.h?('min-height:'+row.h+'px'):'')+'"'+_rd+' onclick="cpRowMenu(event,\''+row.id+'\')">'+(ri+1)+'<span class="cp-rresz" onmousedown="cpRowRz(event,\''+row.id+'\')"></span></div>';
     cols.forEach((col,ci)=>{
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
       const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'');
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
-      html+='<div class="'+cls+'" style="width:'+col.w+'px" data-r="'+ri+'" data-c="'+ci+'" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
+      html+='<div class="'+cls+'" style="width:'+col.w+'px'+_rh+'" data-r="'+ri+'" data-c="'+ci+'" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
     });
-    if(showClient){ const a=ap[sid+'/'+row.id]; html+='<div class="cp-cell cp-clapcell" style="width:240px">'+cpApprCellHTML(a)+'</div>'; }
+    if(showClient){ const a=ap[sid+'/'+row.id]; html+='<div class="cp-cell cp-clapcell" style="width:240px'+_rh+'">'+cpApprCellHTML(a)+'</div>'; }
     html+='<div class="cp-pad"></div></div>';
   });
   html+='<div class="cp-add" onclick="cpAddRow()">'+CP_IC.plus+'Добавить строку</div>';
@@ -6169,6 +6195,31 @@ function cpFillMove(e){ if(!cpFill)return; const el=document.elementFromPoint(e.
 function cpFillPreview(){ document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); if(!cpFill)return; const x=cpFill.src; for(let r=x.r1+1;r<=cpFill.toR;r++){ for(let c=x.c0;c<=x.c1;c++){ const cell=document.querySelector('.cp-cell[data-r="'+r+'"][data-c="'+c+'"]'); if(cell)cell.classList.add('cp-fillprev'); } } }
 function cpFillEnd(){ document.removeEventListener('mousemove',cpFillMove); document.body.classList.remove('cp-filling'); document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); const f=cpFill; cpFill=null; if(f&&f.toR>f.src.r1)cpFillApply(f); }
 function cpFillApply(f){ const sh=cpSheet(); let disp=cpDisp(sh); const x=f.src; const filtered=!!(cpQ||(sh.filt&&Object.keys(sh.filt).length)); const count=f.toR-x.r1; for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(!col)continue; const srcVals=[]; for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; srcVals.push(row?(row.c[col.id]==null?'':String(row.c[col.id])):''); } const gen=cpFillSeries(srcVals,count); for(let i=0;i<count;i++){ let row=disp[x.r1+1+i]; if(!row){ if(filtered)break; row={id:cpUid(),c:{}}; sh.rows.push(row); disp.push(row); } if(!row)break; const v=gen[i]; if(v===''||v==null)delete row.c[col.id]; else row.c[col.id]=v; } } cpSel={r:x.r0,c:x.c0}; cpSelEnd={r:f.toR,c:x.c1}; cpSave(); cpRerender(); }
+
+/* ===================== КОНТЕНТ-ПЛАН · ресайз колонок (ширина) и строк (высота) ===================== */
+function cpColRz(e,ci){ e.preventDefault(); e.stopPropagation(); const col=cpColAt(ci); if(!col)return; cpRz={t:'col',ci:ci,x:e.clientX,w:col.w}; document.body.classList.add('cp-rzing','cp-rzing-col'); document.addEventListener('mousemove',cpRzMove); document.addEventListener('mouseup',cpRzEnd,{once:true}); }
+function cpRowRz(e,id){ e.preventDefault(); e.stopPropagation(); const row=cpSheet().rows.find(function(r){return r.id===id;}); if(!row)return; cpRz={t:'row',id:id,y:e.clientY,h:row.h||42}; document.body.classList.add('cp-rzing','cp-rzing-row'); document.addEventListener('mousemove',cpRzMove); document.addEventListener('mouseup',cpRzEnd,{once:true}); }
+function cpRzMove(e){
+  if(!cpRz)return;
+  if(cpRz.t==='col'){
+    const w=Math.max(60,cpRz.w+(e.clientX-cpRz.x)); cpRz.nw=w;
+    const hd=document.querySelector('.cp-head[data-c="'+cpRz.ci+'"]'); if(hd){ hd.style.width=w+'px'; hd.style.flexBasis=w+'px'; }
+    document.querySelectorAll('.cp-cell[data-c="'+cpRz.ci+'"]').forEach(function(c){ c.style.width=w+'px'; c.style.flexBasis=w+'px'; });
+  } else {
+    const h=Math.max(32,cpRz.h+(e.clientY-cpRz.y)); cpRz.nh=h;
+    const rw=document.querySelector('.cp-row[data-rid="'+cpRz.id+'"]');
+    if(rw){ Array.prototype.forEach.call(rw.children,function(ch){ if(ch.classList&&(ch.classList.contains('cp-cell')||ch.classList.contains('cp-gut')))ch.style.minHeight=h+'px'; }); }
+  }
+}
+function cpRzEnd(){
+  document.removeEventListener('mousemove',cpRzMove);
+  document.body.classList.remove('cp-rzing','cp-rzing-col','cp-rzing-row');
+  if(cpRz){
+    if(cpRz.t==='col'&&cpRz.nw!=null){ const col=cpColAt(cpRz.ci); if(col)col.w=cpRz.nw; }
+    else if(cpRz.t==='row'&&cpRz.nh!=null){ const row=cpSheet().rows.find(function(r){return r.id===cpRz.id;}); if(row)row.h=cpRz.nh; }
+    cpRz=null; cpSave(); cpRerender();
+  }
+}
 
 document.addEventListener('keydown',cpKey);
 
