@@ -1688,6 +1688,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-pub::after{content:"";width:5px;height:9px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) scale(0);transition:transform .24s cubic-bezier(.5,1.55,.5,1);margin-top:-2px}
 .cp-pub.on{background:linear-gradient(135deg,var(--accent),#2ad3b7);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-dim),0 4px 13px -5px var(--accent)}
 .cp-pub.on::after{transform:rotate(45deg) scale(1)}
+.cp-pubcell{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.cp-pubview{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:7px;padding:4px 9px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.14s}
+.cp-pubview svg{width:13px;height:13px}
+.cp-pubview:hover{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.cp-pubview.is-off{color:var(--txt-3);background:transparent;border-color:var(--line);cursor:not-allowed;opacity:.65}
+.cp-pubpop{padding:13px;width:264px}
+.cp-pubpop-eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:10px}
+.cp-pubpop-lb{display:block;font-size:11px;color:var(--txt-3);margin-bottom:6px}
+.cp-pubpop-inp{width:100%;height:36px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:9px;color:var(--txt);font-size:12.5px;padding:0 11px;outline:none;font-family:var(--font);transition:.15s}
+.cp-pubpop-inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.cp-pubpop-hint{font-size:10.5px;color:var(--txt-3);margin-top:7px;line-height:1.4}
+.cp-pubpop-act{display:flex;gap:8px;margin-top:12px}
+.cp-pubpop-ok{flex:1;height:34px;border:0;border-radius:8px;background:linear-gradient(135deg,var(--accent),#2ad3b7);color:var(--accent-ink);font-weight:700;font-size:12px;cursor:pointer;font-family:var(--font);transition:.15s}
+.cp-pubpop-ok:hover{filter:brightness(1.05)}
+.cp-pubpop-ok:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.cp-pubpop-un{height:34px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--bg-1);color:var(--txt-3);font-weight:600;font-size:12px;cursor:pointer;font-family:var(--font);transition:.15s}
+.cp-pubpop-un:hover{color:var(--neg);border-color:var(--neg)}
 /* прогресс публикаций в тулбаре */
 .cp-prog{display:inline-flex;align-items:center;gap:9px;height:34px;padding:0 13px 0 11px;border-radius:999px;background:var(--bg-1);border:1px solid var(--line-2);white-space:nowrap}
 .cp-prog-ic{display:inline-flex;width:15px;height:15px;color:var(--accent)}
@@ -5652,7 +5669,7 @@ function cpSeed(){
     c('Дата публикации','date',124),
     c('Готовый пост','link',124),
     c('Расходы','money',112),
-    {id:cpUid(),name:'Статус публикации',type:'check',w:150,sys:'pub',opts:[]}
+    {id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]}
   ];
   const mk=(vals)=>{const r={id:cpUid(),c:{}};cols.forEach((col,i)=>{if(vals[i]!=null&&vals[i]!=='')r.c[col.id]=vals[i];});return r;};
   const rows=[
@@ -5668,11 +5685,11 @@ function cpSeed(){
 }
 function cpSeedEmpty(name,color){
   const c=(nm,type,w,opts)=>({id:cpUid(),name:nm,type,w,opts:opts||[]});
-  const cols=[c('Название','text',230),c('Дата','date',120),c('Статус','select',170,[{v:'Идея',c:'gray'},{v:'В работе',c:'amber'},{v:'Готово',c:'green'}]),{id:cpUid(),name:'Статус публикации',type:'check',w:150,sys:'pub',opts:[]}];
+  const cols=[c('Название','text',230),c('Дата','date',120),c('Статус','select',170,[{v:'Идея',c:'gray'},{v:'В работе',c:'amber'},{v:'Готово',c:'green'}]),{id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]}];
   const rows=[{id:cpUid(),c:{}},{id:cpUid(),c:{}},{id:cpUid(),c:{}}];
   return {id:cpUid(),name:name||'Новый лист',color:color||'gray',hidden:false,cols,rows};
 }
-function cpEnsurePub(d){ if(!d||!d.sheets)return; d.sheets.forEach(function(s){ if(!s.cols)s.cols=[]; if(!s.cols.some(function(c){return c.sys==='pub';})){ s.cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:150,sys:'pub',opts:[]}); } }); }
+function cpEnsurePub(d){ if(!d||!d.sheets)return; d.sheets.forEach(function(s){ if(!s.cols)s.cols=[]; var pc=s.cols.find(function(c){return c.sys==='pub';}); if(!pc){ s.cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]}); } else if(pc.w<160){ pc.w=172; } }); }
 function cpPubStats(sh){ const pc=(sh.cols||[]).find(function(c){return c.sys==='pub';}); if(!pc) return {done:0,total:0,pct:0}; let total=0,done=0; (sh.rows||[]).forEach(function(r){ const has=(sh.cols||[]).some(function(c){ if(c.sys==='pub')return false; const v=r.c[c.id]; return v!=null&&String(v).trim()!==''; }); if(!has)return; total++; if(r.c[pc.id])done++; }); return {done:done,total:total,pct: total?Math.round(done/total*100):0}; }
 function cpProgHTML(sh){ const st=cpPubStats(sh); const ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'; return '<span class="cp-prog" id="cp-prog" title="Опубликовано '+st.done+' из '+st.total+'"><span class="cp-prog-ic">'+ic+'</span><span class="cp-prog-track"><span class="cp-prog-fill" style="width:'+st.pct+'%"></span></span><span class="cp-prog-pct">'+st.pct+'%</span><span class="cp-prog-lb">опубликовано</span></span>'; }
 function cpProgRender(){ const sh=cpSheet(), st=cpPubStats(sh); const el=document.getElementById('cp-prog'); if(!el)return; const f=el.querySelector('.cp-prog-fill'); if(f)f.style.width=st.pct+'%'; const p=el.querySelector('.cp-prog-pct'); if(p)p.textContent=st.pct+'%'; el.setAttribute('title','Опубликовано '+st.done+' из '+st.total); }
@@ -5713,7 +5730,15 @@ function cpChip(col,v){ const o=(col.opts||[]).find(x=>x.v===v); const pal=CP_PA
 function cpCellView(col,v){
   if(v==null||v==='') { if(col.type==='check') v=false; else return ''; }
   if(col.type==='select') return cpChip(col,v);
-  if(col.type==='check') return col.sys==='pub' ? ('<span class="cp-pub'+(v?' on':'')+'"></span>') : ('<span class="cp-chk'+(v?' on':'')+'"></span>');
+  if(col.type==='check'){
+    if(col.sys==='pub'){
+      const _u=(typeof v==='string')?v:''; const _done=!!v;
+      const _eye='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+      const _view=_u?('<a class="cp-pubview" href="'+_ddA(_u)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Открыть опубликованный контент">'+_eye+'Посмотреть</a>'):('<span class="cp-pubview is-off" title="Сначала отметьте публикацию и вставьте ссылку">'+_eye+'Посмотреть</span>');
+      return '<div class="cp-pubcell"><span class="cp-pub'+(_done?' on':'')+'" title="'+(_done?'Опубликовано — нажмите, чтобы изменить ссылку':'Отметить опубликованным (нужна ссылка)')+'"></span>'+_view+'</div>';
+    }
+    return '<span class="cp-chk'+(v?' on':'')+'"></span>';
+  }
   if(col.type==='link'){ if(v==null||v==='')return ''; const _lk=cpLinkParse(v); return '<span class="cp-lnk" onclick="event.stopPropagation();cpLinkClick(this)" data-u="'+_ddA(_lk.url)+'" data-t="'+_ddA(_lk.label)+'">'+CP_IC.ext+'<span class="cp-lnk-t">'+_ddH(_lk.label||'Открыть')+'</span></span>'; }
   if(col.type==='date') return '<span class="cp-mono">'+_ddH(cpFmtDate(v))+'</span>';
   if(col.type==='money') return '<span class="cp-mono cp-money">'+cpFmtMoney(v,col)+'</span>';
@@ -5845,7 +5870,7 @@ function cpFloat(anchor,html){
 }
 
 /* ---- selection / editing ---- */
-function cpClick(e,r,c){ if(cpCellJustDragged){cpCellJustDragged=false;return;} if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); cpColSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ cpToggle(r,c); return; } cpRerender(); }
+function cpClick(e,r,c){ if(cpCellJustDragged){cpCellJustDragged=false;return;} if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); cpColSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ if(col.sys==='pub'){ cpPubMenu(r,c,e); return; } cpToggle(r,c); return; } cpRerender(); }
 function cpCellDown(e,r,c){
   if(e&&e.button!=null&&e.button!==0)return;
   if(cpEd)return;
@@ -5892,9 +5917,29 @@ function cpToggle(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(!row)return; con
   if(chip){ chip.classList.toggle('on',nv); chip.classList.remove('cp-chk-pop'); void chip.offsetWidth; chip.classList.add('cp-chk-pop'); if(col.sys==='pub')cpProgRender(); }
   else { cpRerender(); }
 }
+let cpPubR=0,cpPubC=0;
+function cpPubMenu(r,c,e){
+  const row=cpRowAt(r),col=cpColAt(c); if(!row||!col)return; cpPubR=r; cpPubC=c;
+  const cur=(typeof row.c[col.id]==='string')?row.c[col.id]:''; const done=!!row.c[col.id];
+  let h='<div class="cp-pubpop"><div class="cp-pubpop-eyebrow">Статус публикации</div>'
+    +'<label class="cp-pubpop-lb">Ссылка на опубликованный контент</label>'
+    +'<input id="cp-puburl" class="cp-pubpop-inp" placeholder="https://instagram.com/p/..." value="'+_ddA(cur)+'" oninput="cpPubInpChk()" onkeydown="if(event.key===\'Enter\')cpPubMark()">'
+    +'<div class="cp-pubpop-hint">Без ссылки отметить публикацию нельзя.</div>'
+    +'<div class="cp-pubpop-act">'
+      +(done?'<button class="cp-pubpop-un" onclick="cpPubUnmark()">Снять отметку</button>':'')
+      +'<button id="cp-pubok" class="cp-pubpop-ok" onclick="cpPubMark()"'+(cur.trim()?'':' disabled')+'>'+(done?'Сохранить ссылку':'Отметить опубликованным')+'</button>'
+    +'</div></div>';
+  const anchor=document.querySelector('.cp-grid .cp-cell[data-r="'+r+'"][data-c="'+c+'"]')||(e&&e.target)||document.body;
+  cpFloat(anchor,h);
+  setTimeout(function(){var i=document.getElementById('cp-puburl');if(i){i.focus();i.select();}},30);
+}
+function cpPubInpChk(){ var i=document.getElementById('cp-puburl'),b=document.getElementById('cp-pubok'); if(i&&b)b.disabled=!i.value.trim(); }
+function cpPubMark(){ var i=document.getElementById('cp-puburl'); if(!i)return; var u=i.value.trim(); if(!u)return; const row=cpRowAt(cpPubR),col=cpColAt(cpPubC); if(!row||!col)return; row.c[col.id]=u; cpCloseFloat(); cpSave(); cpRerender();
+  setTimeout(function(){ const chip=document.querySelector('.cp-grid .cp-cell[data-r="'+cpPubR+'"][data-c="'+cpPubC+'"] .cp-pub'); if(chip){ chip.classList.remove('cp-chk-pop'); void chip.offsetWidth; chip.classList.add('cp-chk-pop'); } },0); }
+function cpPubUnmark(){ const row=cpRowAt(cpPubR),col=cpColAt(cpPubC); if(!row||!col)return; delete row.c[col.id]; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpEdit(r,c,init){
   const col=cpColAt(c); cpSel={r,c}; cpSelEnd=null; cpRowSel=new Set();
-  if(col.type==='check'){ cpToggle(r,c); return; }
+  if(col.type==='check'){ if(col.sys==='pub'){ cpPubMenu(r,c,null); return; } cpToggle(r,c); return; }
   if(col.type==='select'){ cpRerender(); setTimeout(()=>{const cell=cpCellEl(r,c); if(cell)cpSelectMenu(r,c,cell);},0); return; }
   if(col.type==='date'){ cpRerender(); setTimeout(()=>{const cell=cpCellEl(r,c); if(cell)cpDateMenu(r,c,cell);},0); return; }
   if(col.type==='link'){ cpLinkEdit(r,c); return; }
