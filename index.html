@@ -5673,7 +5673,7 @@ function cpRender(p){
   disp.forEach((row,ri)=>{
     const _rd=cpSheet().sort?'':' draggable="true" ondragstart="cpDragRowStart(event,\''+row.id+'\')"';
     const _rh=row.h?(';min-height:'+row.h+'px'):'';
-    html+='<div class="cp-row'+(cpRowSel.has(row.id)?' rowsel':'')+'" data-rid="'+row.id+'" ondragover="cpDragRowOver(event,this)" ondragleave="cpDragRowLeave(this)" ondrop="cpDragRowDrop(event,\''+row.id+'\')" ondragend="cpDragEnd()"><div class="cp-gut" style="'+(row.h?('min-height:'+row.h+'px'):'')+'"'+_rd+' onclick="cpRowPick(event,\''+row.id+'\','+ri+')" oncontextmenu="cpRowMenu(event,\''+row.id+'\');return false;"><span class="cp-gn">'+(ri+1)+'</span><button class="cp-gm" onclick="event.stopPropagation();cpRowMenu(event,\''+row.id+'\')">⋮</button><span class="cp-rresz" onmousedown="cpRowRz(event,\''+row.id+'\')"></span></div>';
+    html+='<div class="cp-row'+(cpRowSel.has(row.id)?' rowsel':'')+'" data-rid="'+row.id+'" ondragover="cpDragRowOver(event,this)" ondragleave="cpDragRowLeave(this)" ondrop="cpDragRowDrop(event,\''+row.id+'\')" ondragend="cpDragEnd()"><div class="cp-gut" style="'+(row.h?('min-height:'+row.h+'px'):'')+'"'+' onmousedown="cpRowDown(event,\''+row.id+'\','+ri+')" oncontextmenu="cpRowMenu(event,\''+row.id+'\');return false;"><span class="cp-gn">'+(ri+1)+'</span><button class="cp-gm" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();cpRowMenu(event,\''+row.id+'\')">⋮</button><span class="cp-rresz" onmousedown="cpRowRz(event,\''+row.id+'\')"></span></div>';
     cols.forEach((col,ci)=>{
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
       const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'');
@@ -6317,6 +6317,36 @@ function cpDeleteRows(){
   cpSelEnd=null; cpCloseFloat(); cpSave(); cpRerender();
   if(typeof toast==='function')toast('Удалено строк: '+n);
 }
+
+/* ===================== КОНТЕНТ-ПЛАН · drag-выделение строк (зажал и потянул) ===================== */
+let cpRowDrag=null;
+function cpRowSelRange(anchorId,ri){ const disp=cpDisp(cpSheet()); const ai=disp.findIndex(function(r){return r.id===anchorId;}); if(ai<0)return; const a=Math.min(ai,ri),b=Math.max(ai,ri); cpRowSel=new Set(); for(var k=a;k<=b;k++){ if(disp[k])cpRowSel.add(disp[k].id); } }
+function cpRowPaint(){ document.querySelectorAll('.cp-row').forEach(function(rw){ const id=rw.getAttribute('data-rid'); if(id&&cpRowSel.has(id))rw.classList.add('rowsel'); else rw.classList.remove('rowsel'); }); }
+function cpRowDown(e,id,ri){
+  if(e.button!=null&&e.button!==0)return;
+  cpSelEnd=null; cpEd=null;
+  if(e&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); if(cpRowSel.has(id))cpRowSel.delete(id); else cpRowSel.add(id); cpRowAnchor=id; cpRerender(); return; }
+  if(e&&e.shiftKey&&cpRowAnchor!=null){ e.preventDefault(); cpRowSelRange(cpRowAnchor,ri); cpRerender(); return; }
+  e.preventDefault();
+  cpRowSel=new Set([id]); cpRowAnchor=id; cpRowDrag={anchor:ri,moved:false};
+  document.body.classList.add('cp-rzing');
+  cpRowPaint();
+  document.addEventListener('mousemove',cpRowMove);
+  document.addEventListener('mouseup',cpRowUp,{once:true});
+}
+function cpRowMove(e){
+  if(!cpRowDrag)return;
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const rowEl=el&&el.closest?el.closest('.cp-row'):null; if(!rowEl)return;
+  const id=rowEl.getAttribute('data-rid'); if(!id)return;
+  const disp=cpDisp(cpSheet()); const cur=disp.findIndex(function(r){return r.id===id;}); if(cur<0)return;
+  cpRowDrag.moved=true;
+  const a=Math.min(cpRowDrag.anchor,cur),b=Math.max(cpRowDrag.anchor,cur);
+  cpRowSel=new Set(); for(var k=a;k<=b;k++){ if(disp[k])cpRowSel.add(disp[k].id); }
+  cpRowAnchor=id;
+  cpRowPaint();
+}
+function cpRowUp(){ document.removeEventListener('mousemove',cpRowMove); document.body.classList.remove('cp-rzing'); cpRowDrag=null; cpRerender(); }
 
 document.addEventListener('keydown',cpKey);
 
