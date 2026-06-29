@@ -6269,10 +6269,10 @@ function clCpRender(){
       grid+='<div class="'+_cls+'" style="width:'+cw[ci]+'px"'+_at+'>'+(typeof cpCellView==='function'?cpCellView(col,v):_ddH(v==null?'':v))+'</div>';
     });
     const a=cp.appr[sid+'/'+row.id]||{status:'pending',comment:''};
-    grid+='<div class="cp-cell clcp-appcell" style="width:240px">'+clCpRowControl(row.id,a)+'</div></div>';
+    grid+='<div class="cp-cell clcp-appcell" data-dec="'+_ddA(row.id)+'" style="width:240px">'+clCpRowControl(row.id,a)+'</div></div>';
   });
   grid+='</div></div>';
-  box.innerHTML=ph+tabs+sheetBar+grid;
+  box.innerHTML=ph+tabs+'<div id="clcp-sheetbar-host">'+sheetBar+'</div>'+grid;
 }
 function clCpPick(i){ window.CL_CP.sel=i; clCpRender(); }
 function clCpRead(el){
@@ -6294,14 +6294,36 @@ async function clCpSave(rowId,patch){
   const cur=cp.appr[key]||{status:'pending',comment:''};
   const next=Object.assign({},cur,patch);
   cp.appr[key]=next;
-  if(!window.SB){ clCpRender(); return; }
+  if(patch.status!==undefined) clCpPatchDOM(rowId,next); /* точечно, без пересборки таблицы → скролл остаётся на месте */
+  if(!window.SB){ return; }
   try{
     const me=(window.tMe&&window.tMe())||{};
     const res=await window.SB.from('content_approvals').upsert({project_id:P.id,sheet_id:sid,row_id:rowId,status:next.status,comment:next.comment,decided_by:me.id||null,decided_at:new Date().toISOString()},{onConflict:'project_id,sheet_id,row_id'});
     if(res&&res.error)throw res.error;
     if(typeof toast==='function'&&patch.status){ toast(patch.status==='approved'?'Одобрено':patch.status==='changes'?'Отправлено на правки':'Решение сброшено'); }
   }catch(e){ console.error('cl appr',e); if(typeof toast==='function')toast('Не удалось сохранить'); }
-  clCpRender();
+}
+function clCpPatchDOM(rowId,a){
+  const cp=window.CL_CP; if(!cp||!cp.shares.length)return;
+  const sid=cp.shares[cp.sel].sheet_id;
+  if(rowId==='__sheet__'){
+    const host=document.getElementById('clcp-sheetbar-host');
+    if(host){ const rows=(cp.shares[cp.sel].data||{}).rows||[]; let okN=0; rows.forEach(function(r){ if((cp.appr[sid+'/'+r.id]||{}).status==='approved')okN++; }); host.innerHTML=clCpApprBar('__sheet__',a,'Согласовать весь лист',{ok:okN,total:rows.length}); if(a.status==='changes'){ const ta=host.querySelector('.clcp-cm2'); if(ta)setTimeout(function(){try{ta.focus();}catch(_){}}, 0); } }
+    return;
+  }
+  const sel='.clcp-appcell[data-dec="'+((window.CSS&&CSS.escape)?CSS.escape(rowId):rowId)+'"]';
+  const cell=document.querySelector(sel);
+  if(cell){ cell.innerHTML=clCpRowControl(rowId,a); if(a.status==='changes'){ const ta=cell.querySelector('.clcp-cm2'); if(ta)setTimeout(function(){try{ta.focus();}catch(_){}}, 0); } }
+  else { clCpRender(); return; }
+  clCpUpdateProg();
+}
+function clCpUpdateProg(){
+  const cp=window.CL_CP; if(!cp||!cp.shares.length)return;
+  const sid=cp.shares[cp.sel].sheet_id, rows=(cp.shares[cp.sel].data||{}).rows||[];
+  let okN=0; rows.forEach(function(r){ if((cp.appr[sid+'/'+r.id]||{}).status==='approved')okN++; });
+  const total=rows.length, pct=total?Math.round(okN/total*100):0;
+  const n=document.querySelector('#clcp-sheetbar-host .clcp-prog-n'); if(n)n.innerHTML='<b>'+okN+'</b><span>/ '+total+'</span>';
+  const f=document.querySelector('#clcp-sheetbar-host .clcp-prog-fill'); if(f)f.style.width=pct+'%';
 }
 
 /* ===================== КОНТЕНТ-ПЛАН · решения клиента в редакторе ===================== */
