@@ -1848,6 +1848,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .clcp-prog-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);margin-top:3px}
 .clcp-prog-track{height:6px;border-radius:999px;background:var(--bg-3);overflow:hidden}
 .clcp-prog-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--pos),#5fe0a8);transition:width .4s cubic-bezier(.16,.84,.44,1)}
+.clcp-pub{margin-top:15px;padding-top:14px;border-top:1px solid var(--line)}
+.clcp-pub-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+.clcp-pub-ti{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
+.clcp-pub-n{display:flex;align-items:baseline;gap:5px;font-size:13px;color:var(--txt-3);font-variant-numeric:tabular-nums}
+.clcp-pub-n b{font-size:18px;color:var(--txt);font-weight:700}
+.clcp-pub-n em{font-style:normal;color:var(--pos);font-weight:700;margin-left:4px;font-size:14px}
+.clcp-pub-track{display:flex;height:11px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.05);gap:2px}
+.clcp-pub-seg{height:100%;min-width:3px;border-radius:2px;transition:width .5s cubic-bezier(.2,.7,.3,1)}
+.clcp-pub-leg{display:flex;flex-wrap:wrap;gap:7px 13px;margin-top:10px}
+.clcp-pub-li{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt-2)}
+.clcp-pub-li b{color:var(--txt);font-weight:700}
+.clcp-pub-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
 .clcp-sheetbar-act{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .clcp-sheetbar-hint{font-size:12px;color:var(--txt-3);flex:0 0 auto}
 .clcp-sheetbar-seg{flex:1;min-width:220px;max-width:360px}
@@ -6359,7 +6371,29 @@ function clCpRowControl(rowId,a){
     +(ch?('<div class="clcp-cmwrap"><textarea class="clcp-cm2" rows="2" placeholder="Что нужно поправить?" onchange="clCpComment(\''+rowId+'\',this.value)">'+_ddH(a.comment||'')+'</textarea></div>'):'')
     +'</div>';
 }
-function clCpApprBar(rowId,a,label,prog){
+function cpPubBarHTML(cols,rows){
+  if(!cols||!rows||!rows.length)return '';
+  let col=null;
+  for(let i=0;i<cols.length;i++){ if(cols[i].type==='select'&&/статус/i.test(cols[i].name||'')){col=cols[i];break;} }
+  if(!col){ for(let i=0;i<cols.length;i++){ if(cols[i].type==='select'){col=cols[i];break;} } }
+  if(!col)return '';
+  const opts=col.opts||[], cnt={}; let filled=0;
+  rows.forEach(function(r){ const v=r.c?r.c[col.id]:''; if(v!=null&&v!==''){ cnt[v]=(cnt[v]||0)+1; filled++; } });
+  if(!filled)return '';
+  const segs=[],seen={};
+  opts.forEach(function(o){ if(cnt[o.v]){ const pal=CP_PAL[o.c]||CP_PAL.gray; segs.push({label:o.v,count:cnt[o.v],color:pal[1]}); seen[o.v]=1; } });
+  Object.keys(cnt).forEach(function(v){ if(!seen[v])segs.push({label:v,count:cnt[v],color:CP_PAL.gray[1]}); });
+  const total=rows.length; let pub=0; Object.keys(cnt).forEach(function(v){ if(/опубликован/i.test(v))pub+=cnt[v]; });
+  const pubPct=total?Math.round(pub/total*100):0;
+  let bar='<div class="clcp-pub-track">';
+  segs.forEach(function(sg){ bar+='<div class="clcp-pub-seg" style="width:'+(sg.count/total*100)+'%;background:'+sg.color+'" title="'+_ddA(sg.label+': '+sg.count)+'"></div>'; });
+  bar+='</div>';
+  let leg='<div class="clcp-pub-leg">';
+  segs.forEach(function(sg){ leg+='<span class="clcp-pub-li"><span class="clcp-pub-dot" style="background:'+sg.color+'"></span>'+_ddH(sg.label)+' <b>'+sg.count+'</b></span>'; });
+  leg+='</div>';
+  return '<div class="clcp-pub"><div class="clcp-pub-h"><div class="clcp-pub-ti">Прогресс публикаций</div><div class="clcp-pub-n"><b>'+pub+'</b><span>/ '+total+' опубл.</span><em>'+pubPct+'%</em></div></div>'+bar+leg+'</div>';
+}
+function clCpApprBar(rowId,a,label,prog,pub){
   const ap=a.status==='approved', ch=a.status==='changes';
   const stTxt=ap?'Лист одобрен':ch?'Запрошены правки по листу':'Ожидает вашего решения';
   const cls=ap?'is-ok':ch?'is-ch':'';
@@ -6371,6 +6405,7 @@ function clCpApprBar(rowId,a,label,prog){
   if(prog&&prog.total){ h+='<div class="clcp-prog"><div class="clcp-prog-n"><b>'+prog.ok+'</b><span>/ '+prog.total+'</span></div><div class="clcp-prog-l">одобрено</div></div>'; }
   h+='</div>';
   if(prog&&prog.total){ const pct=Math.round(prog.ok/prog.total*100); h+='<div class="clcp-prog-track"><div class="clcp-prog-fill" style="width:'+pct+'%"></div></div>'; }
+  if(pub)h+=pub;
   h+='<div class="clcp-sheetbar-act"><span class="clcp-sheetbar-hint">Решение по всему листу:</span><div class="clcp-sheetbar-seg">'+clCpSeg(rowId,a)+'</div></div>';
   if(ch){ h+='<div class="clcp-cmwrap"><textarea class="clcp-cm2" rows="2" placeholder="Общий комментарий к листу — что поправить?" onchange="clCpComment(\''+rowId+'\',this.value)">'+_ddH(a.comment||'')+'</textarea></div>'; }
   h+='</div>';
@@ -6397,7 +6432,8 @@ function clCpRender(){
   if(_vis.length>1){ tabs='<div class="clcp-tabs">'+_vis.map(function(s,i){return '<button class="clcp-tab'+(i===cp.sel?' on':'')+'" onclick="clCpPick('+i+')">'+_ddH(s.name||('Лист '+(i+1)))+'</button>';}).join('')+'</div>'; }
   const sa=cp.appr[sid+'/__sheet__']||{status:'pending',comment:''};
   let _okN=0; rows.forEach(function(row){ if((cp.appr[sid+'/'+row.id]||{}).status==='approved')_okN++; });
-  const sheetBar=clCpApprBar('__sheet__',sa,'Согласовать весь лист',{ok:_okN,total:rows.length});
+  const _pub=cpPubBarHTML(cols,rows);
+  const sheetBar=clCpApprBar('__sheet__',sa,'Согласовать весь лист',{ok:_okN,total:rows.length},_pub);
   const cw=cols.map(function(c){return Math.max(c.w||140,cpHeadFitW(c.name));});
   const gw=44+cw.reduce(function(a,w){return a+w;},0)+240;
   let grid='<div class="cp-scroll"><div class="cp-grid clcp-grid" style="min-width:'+gw+'px">';
