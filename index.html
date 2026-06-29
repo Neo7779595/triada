@@ -1714,6 +1714,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-scaret:hover{color:var(--txt)}
 .cp-shed{background:var(--bg);border:1px solid var(--accent);border-radius:4px;color:var(--txt);font-size:12px;padding:2px 6px;outline:none;width:130px;font-family:var(--font)}
 .cp-saddbtn,.cp-shidbtn{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--txt-3);font-size:12px;cursor:pointer;padding:0 13px;font-family:var(--font);white-space:nowrap}
+/* фильтр месяца (агентство, бар листов) */
+.cp-mfilt{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap;margin-right:6px;transition:.14s}
+.cp-mfilt svg{width:14px;height:14px}
+.cp-mfilt:hover{border-color:var(--accent-line);color:var(--txt)}
+.cp-mfilt.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-line)}
+.cp-mfilt-car{opacity:.6;font-size:10px;margin-left:1px}
+/* пикер месяца при создании листа */
+.cp-mpick{padding:13px;width:240px}
+.cp-mpick-eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin-bottom:10px;text-align:center}
+.cp-mpick-h{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:12px}
+.cp-mpick-yr{width:27px;height:27px;border-radius:7px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);cursor:pointer;font-size:16px;display:inline-flex;align-items:center;justify-content:center;transition:.14s}
+.cp-mpick-yr:hover{border-color:var(--accent-line);color:var(--accent)}
+.cp-mpick-y{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--txt);min-width:56px;text-align:center}
+.cp-mpick-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cp-mpick-m{height:34px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font);transition:.14s}
+.cp-mpick-m:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.cp-mpick-m.now{box-shadow:inset 0 0 0 1.5px var(--accent-line)}
+/* фильтр месяца (клиент) */
+.clcp-mfwrap{display:flex;margin:0 0 14px}
+.clcp-mfilt{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:.14s}
+.clcp-mfilt svg{width:15px;height:15px;color:var(--accent)}
+.clcp-mfilt span{color:var(--txt-3);font-weight:500}
+.clcp-mfilt:hover{border-color:var(--accent-line)}
+.clcp-mfilt.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 .cp-saddbtn:hover,.cp-shidbtn:hover{color:var(--accent)}
 .cp-saddbtn svg,.cp-shidbtn svg{width:14px;height:14px}
 .cp-pop{position:fixed;z-index:200;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;min-width:178px;box-shadow:0 16px 44px rgba(0,0,0,.55)}
@@ -5776,16 +5800,29 @@ function cpRender(p){
   html+='</div>';
   return html;
 }
+const CP_MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+let cpMonthFilt=null, cpPickYear=null;
+function cpMonthLabel(m){ if(!m||!/^\d{4}-\d{2}$/.test(String(m)))return ''; const p=String(m).split('-'); return CP_MONTHS[(+p[1])-1]+' '+p[0]; }
+function cpSheetMonths(d){ const set={}; ((d&&d.sheets)||[]).forEach(function(s){ if(!s.hidden && s.month)set[s.month]=1; }); return Object.keys(set).sort().reverse(); }
+function cpMonthFiltChip(months){ if(!months.length)return ''; const lbl=cpMonthFilt?cpMonthLabel(cpMonthFilt):'Все месяцы'; return '<button class="cp-mfilt'+(cpMonthFilt?' on':'')+'" onclick="event.stopPropagation();cpMonthFiltMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>'+_ddH(lbl)+'<span class="cp-mfilt-car">▾</span></button>'; }
+function cpMonthFiltMenu(e){ const d=cpData(cpP()); const months=cpSheetMonths(d); let h='<button class="cp-popi'+(!cpMonthFilt?' on':'')+'" onclick="cpSetMonthFilt(null)">Все месяцы</button>'; if(months.length)h+='<div class="sep"></div>'; months.forEach(function(m){ h+='<button class="cp-popi'+(cpMonthFilt===m?' on':'')+'" onclick="cpSetMonthFilt(\''+m+'\')">'+cpMonthLabel(m)+'</button>'; }); cpFloat((e.target&&e.target.closest('button'))||e.target,h); }
+function cpSetMonthFilt(m){ cpMonthFilt=m; cpCloseFloat(); const d=cpData(cpP()); const vis=(d.sheets||[]).filter(function(s){return !s.hidden&&(!m||s.month===m);}); if(vis.length&&!vis.some(function(s){return s.id===d.active;}))d.active=vis[0].id; cpRerender(); }
+function cpMonthPickHTML(){ const cur=new Date(),curM=cur.getMonth(),curY=cur.getFullYear(); let h='<div class="cp-mpick"><div class="cp-mpick-eyebrow">Контент-план за месяц</div><div class="cp-mpick-h"><button class="cp-mpick-yr" onclick="cpPickYearStep(-1)">‹</button><span class="cp-mpick-y">'+cpPickYear+'</span><button class="cp-mpick-yr" onclick="cpPickYearStep(1)">›</button></div><div class="cp-mpick-g">'; for(let i=0;i<12;i++){ const isCur=(cpPickYear===curY&&i===curM); h+='<button class="cp-mpick-m'+(isCur?' now':'')+'" onclick="cpCreateMonthSheet('+cpPickYear+','+i+')">'+CP_MONTHS[i].slice(0,3)+'</button>'; } h+='</div></div>'; return h; }
+function cpMonthPicker(anchor){ if(cpPickYear==null)cpPickYear=new Date().getFullYear(); cpFloat(anchor,cpMonthPickHTML()); }
+function cpPickYearStep(d){ if(cpPickYear==null)cpPickYear=new Date().getFullYear(); cpPickYear+=d; const pop=document.querySelector('.cp-pop'); if(pop)pop.innerHTML=cpMonthPickHTML(); }
+function cpCreateMonthSheet(y,m){ cpCloseFloat(); const d=cpData(cpP()); const mm=y+'-'+String(m+1).padStart(2,'0'); const sh=cpSeedEmpty(CP_MONTHS[m]+' '+y, CP_PALK[d.sheets.length%CP_PALK.length]); sh.month=mm; d.sheets.push(sh); d.active=sh.id; cpMonthFilt=null; cpSel={r:0,c:0}; cpQ=''; cpSave(); cpRerender(); }
 function cpSheetsBar(d){
+  const months=cpSheetMonths(d);
   let h='<div class="cp-sheets">';
-  d.sheets.filter(s=>!s.hidden).forEach(s=>{
+  h+=cpMonthFiltChip(months);
+  d.sheets.filter(s=>!s.hidden && (!cpMonthFilt||s.month===cpMonthFilt)).forEach(s=>{
     const on=s.id===d.active, editing=cpShEd===s.id;
     h+='<div class="cp-stab'+(on?' on':'')+'"'+(on?' style="box-shadow:inset 0 2px 0 '+cpColorCss(s.color)+'"':'')+' onclick="cpSwitch(\''+s.id+'\')" ondblclick="cpShRename(\''+s.id+'\')">';
     if(editing){ h+='<input id="cp-shed" class="cp-shed" value="'+_ddA(s.name)+'" onkeydown="cpShKey(event,\''+s.id+'\')" onblur="cpShCommit(\''+s.id+'\')" onclick="event.stopPropagation()">'; }
     else { h+='<span class="cp-sdot" style="background:'+cpColorCss(s.color)+'"></span>'+_ddH(s.name); if(on) h+='<button class="cp-scaret" onclick="event.stopPropagation();cpSheetMenu(event,\''+s.id+'\')">▾</button>'; }
     h+='</div>';
   });
-  h+='<button class="cp-saddbtn" onclick="cpAddSheet()">'+CP_IC.plus+'Лист</button><div style="flex:1"></div>';
+  h+='<button class="cp-saddbtn" onclick="cpAddSheet(this)">'+CP_IC.plus+'Лист</button><div style="flex:1"></div>';
   const hid=d.sheets.filter(s=>s.hidden);
   if(hid.length) h+='<button class="cp-shidbtn" onclick="cpHiddenMenu(event)">'+CP_IC.eye+'Скрытые '+hid.length+'</button>';
   h+='</div>'; return h;
@@ -6009,7 +6046,7 @@ function cpRowDel(id){ const sh=cpSheet(); const i=cpRowIdx(id); if(i<0)return; 
 
 /* ---- sheets ---- */
 function cpSwitch(id){ if(cpEd){cpStore();cpEd=null;} cpData(cpP()).active=id; cpSel={r:0,c:0}; cpQ=''; cpRerender(); }
-function cpAddSheet(){ const d=cpData(cpP()); const sh=cpSeedEmpty('Лист '+(d.sheets.length+1),CP_PALK[d.sheets.length%CP_PALK.length]); d.sheets.push(sh); d.active=sh.id; cpSel={r:0,c:0}; cpShEd=sh.id; cpSave(); cpRerender(); setTimeout(()=>{const i=document.getElementById('cp-shed');if(i){i.focus();i.select();}},0); }
+function cpAddSheet(anchor){ cpPickYear=new Date().getFullYear(); cpMonthPicker(anchor||document.querySelector('.cp-saddbtn')); }
 function cpShRename(id){ cpCloseFloat(); cpShEd=id; cpRerender(); setTimeout(()=>{const i=document.getElementById('cp-shed');if(i){i.focus();i.select();}},0); }
 function cpShKey(e,id){ if(e.key==='Enter'){e.preventDefault();cpShCommit(id);} else if(e.key==='Escape'){cpShEd=null;cpRerender();} }
 function cpShCommit(id){ const i=document.getElementById('cp-shed'); const s=cpData(cpP()).sheets.find(x=>x.id===id); if(i&&s){const t=i.value.trim(); if(t)s.name=t;} cpShEd=null; cpSave(); cpRerender(); }
@@ -6233,7 +6270,7 @@ async function cpSendSheet(){
   if(!(window.LIVE&&window.SB)){ toast('Для отправки клиенту нужен онлайн-режим (Supabase)'); return; }
   try{
     const me=(window.tMe&&window.tMe())||{};
-    const snap={id:sh.id,name:sh.name,color:sh.color,cols:sh.cols,rows:sh.rows};
+    const snap={id:sh.id,name:sh.name,color:sh.color,month:sh.month||null,cols:sh.cols,rows:sh.rows};
     const res=await window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:sh.id,name:sh.name,data:snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'});
     if(res&&res.error)throw res.error;
     p._cpShared=p._cpShared||{}; p._cpShared[sh.id]={at:new Date().toISOString(),hash:cpHash(JSON.stringify(snap))};
@@ -6257,7 +6294,7 @@ async function renderClContent(){
       ((r2&&r2.data)||[]).forEach(function(x){ appr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; });
     }
   }catch(e){ console.warn('cl cp load',e); }
-  window.CL_CP={shares:shares, appr:appr, sel:0};
+  window.CL_CP={shares:shares, appr:appr, sel:0, monthFilt:null};
   clCpRender();
 }
 function clCpSeg(rowId,a){
@@ -6300,11 +6337,14 @@ function clCpRender(){
       +'<div style="font-size:12.5px;margin-top:5px">Как только агентство отправит контент-план, он появится здесь — и вы сможете одобрить публикации или запросить правки.</div></div>';
     return;
   }
-  cp.sel=Math.min(cp.sel||0, cp.shares.length-1);
-  const share=cp.shares[cp.sel], sh=share.data||{}, sid=share.sheet_id;
+  const _all=cp.shares, _cmonths=clCpMonths(_all);
+  const _vis=cp.monthFilt?_all.filter(function(s){return (s.data&&s.data.month)===cp.monthFilt;}):_all;
+  if(!_vis.length){ box.innerHTML=ph+clCpMonthBar(_cmonths)+'<div style="text-align:center;padding:46px 24px;color:var(--txt-3)">За «'+_ddH(cpMonthLabel(cp.monthFilt)||'выбранный месяц')+'» планов нет.</div>'; return; }
+  cp.sel=Math.min(cp.sel||0, _vis.length-1);
+  const share=_vis[cp.sel], sh=share.data||{}, sid=share.sheet_id;
   const cols=sh.cols||[], rows=sh.rows||[];
   let tabs='';
-  if(cp.shares.length>1){ tabs='<div class="clcp-tabs">'+cp.shares.map(function(s,i){return '<button class="clcp-tab'+(i===cp.sel?' on':'')+'" onclick="clCpPick('+i+')">'+_ddH(s.name||('Лист '+(i+1)))+'</button>';}).join('')+'</div>'; }
+  if(_vis.length>1){ tabs='<div class="clcp-tabs">'+_vis.map(function(s,i){return '<button class="clcp-tab'+(i===cp.sel?' on':'')+'" onclick="clCpPick('+i+')">'+_ddH(s.name||('Лист '+(i+1)))+'</button>';}).join('')+'</div>'; }
   const sa=cp.appr[sid+'/__sheet__']||{status:'pending',comment:''};
   let _okN=0; rows.forEach(function(row){ if((cp.appr[sid+'/'+row.id]||{}).status==='approved')_okN++; });
   const sheetBar=clCpApprBar('__sheet__',sa,'Согласовать весь лист',{ok:_okN,total:rows.length});
@@ -6327,9 +6367,13 @@ function clCpRender(){
     grid+='<div class="cp-cell clcp-appcell" data-dec="'+_ddA(row.id)+'" style="width:240px">'+clCpRowControl(row.id,a)+'</div></div>';
   });
   grid+='</div></div>';
-  box.innerHTML=ph+tabs+'<div id="clcp-sheetbar-host">'+sheetBar+'</div>'+grid;
+  box.innerHTML=ph+clCpMonthBar(_cmonths)+tabs+'<div id="clcp-sheetbar-host">'+sheetBar+'</div>'+grid;
 }
 function clCpPick(i){ window.CL_CP.sel=i; clCpRender(); }
+function clCpMonths(shares){ const set={}; (shares||[]).forEach(function(s){ const m=s.data&&s.data.month; if(m)set[m]=1; }); return Object.keys(set).sort().reverse(); }
+function clCpMonthBar(months){ if(!months||!months.length)return ''; const cp=window.CL_CP; const lbl=cp.monthFilt?cpMonthLabel(cp.monthFilt):'Все месяцы'; return '<div class="clcp-mfwrap"><button class="clcp-mfilt'+(cp.monthFilt?' on':'')+'" onclick="clCpMonthMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg><span>Месяц:</span>&nbsp;'+_ddH(lbl)+' ▾</button></div>'; }
+function clCpMonthMenu(e){ e.stopPropagation(); const months=clCpMonths(window.CL_CP.shares); let h='<button class="cp-popi'+(!window.CL_CP.monthFilt?' on':'')+'" onclick="clCpSetMonth(null)">Все месяцы</button>'; if(months.length)h+='<div class="sep"></div>'; months.forEach(function(m){ h+='<button class="cp-popi'+(window.CL_CP.monthFilt===m?' on':'')+'" onclick="clCpSetMonth(\''+m+'\')">'+cpMonthLabel(m)+'</button>'; }); cpFloat((e.target&&e.target.closest('button'))||e.target,h); }
+function clCpSetMonth(m){ window.CL_CP.monthFilt=m; window.CL_CP.sel=0; cpCloseFloat(); clCpRender(); }
 function clCpRead(el){
   if(!el || typeof pd2Open!=='function') return;
   var text=el.getAttribute('data-read')||'', title=el.getAttribute('data-title')||'Описание', topic=el.getAttribute('data-topic')||'';
