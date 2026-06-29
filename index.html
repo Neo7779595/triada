@@ -1601,6 +1601,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-h{position:absolute;right:-1px;bottom:-1px;width:7px;height:7px;background:var(--accent);border:1px solid var(--bg);z-index:5}
 .cp-txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .cp-mono{font-family:var(--mono);font-size:12px;color:var(--txt-2)}
+.cp-money{color:var(--pos)}
 .cp-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11.5px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .cp-chip .d{width:5px;height:5px;border-radius:50%;background:currentColor;flex:0 0 auto}
 .cp-lnk{display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-size:12px;text-decoration:none}
@@ -5489,6 +5490,7 @@ function cpSave(){
 function cpRerender(){ if(pdTabCur==='content') renderPd(); }
 
 function cpFmtDate(v){ if(!v)return ''; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v); return m?(m[3]+'.'+m[2]+'.'+m[1]):v; }
+function cpFmtMoney(v,col){ const n=cpNum(v); if(isNaN(n)) return _ddH(String(v)); const g=n.toLocaleString('ru-RU',{maximumFractionDigits:2}); return g+' '+((col&&col.cur==='usd')?'$':'сумм'); }
 function cpChip(col,v){ const o=(col.opts||[]).find(x=>x.v===v); const pal=CP_PAL[o?o.c:'gray']; return '<span class="cp-chip" style="background:'+pal[0]+';color:'+pal[1]+'"><span class="d"></span>'+_ddH(v)+'</span>'; }
 function cpCellView(col,v){
   if(v==null||v==='') { if(col.type==='check') v=false; else return ''; }
@@ -5496,7 +5498,8 @@ function cpCellView(col,v){
   if(col.type==='check') return '<span class="cp-chk'+(v?' on':'')+'"></span>';
   if(col.type==='link') return v?('<a class="cp-lnk" href="'+_ddA(v)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">'+CP_IC.ext+'Открыть</a>'):'';
   if(col.type==='date') return '<span class="cp-mono">'+_ddH(cpFmtDate(v))+'</span>';
-  if(col.type==='num'||col.type==='money') return '<span class="cp-mono">'+_ddH(v)+'</span>';
+  if(col.type==='money') return '<span class="cp-mono cp-money">'+cpFmtMoney(v,col)+'</span>';
+  if(col.type==='num') return '<span class="cp-mono">'+_ddH(v)+'</span>';
   return '<span class="cp-txt">'+_ddH(v)+'</span>';
 }
 function cpEditor(row,col){
@@ -5694,6 +5697,7 @@ function cpColMenu(e,ci){
   h+='<div class="ttl">Тип</div><div class="cp-types">';
   CP_TYPES.forEach(t=>{ h+='<button class="cp-popi'+(col.type===t[0]?' on':'')+'" onclick="cpColType('+ci+',\''+t[0]+'\')">'+t[1]+'</button>'; });
   h+='</div><div class="sep"></div>';
+  if(col.type==='money'){ h+='<div class="ttl">Валюта</div><div class="cp-types"><button class="cp-popi'+((col.cur||'uzs')==='uzs'?' on':'')+'" onclick="cpColCur('+ci+',\'uzs\')">сумм</button><button class="cp-popi'+(col.cur==='usd'?' on':'')+'" onclick="cpColCur('+ci+',\'usd\')">$</button></div><div class="sep"></div>'; }
   h+='<button class="cp-popi" onclick="cpColIns('+ci+',0)">Вставить слева</button>';
   h+='<button class="cp-popi" onclick="cpColIns('+ci+',1)">Вставить справа</button>';
   h+='<button class="cp-popi" onclick="cpColDel('+ci+')" style="color:var(--neg)">Удалить колонку</button>';
@@ -5702,7 +5706,8 @@ function cpColMenu(e,ci){
 function cpColRename(ci){ cpCloseFloat(); cpHeadEd=cpColAt(ci).id; cpRerender(); setTimeout(()=>{const i=document.getElementById('cp-hed');if(i){i.focus();i.select();}},0); }
 function cpHeadKey(e,ci){ if(e.key==='Enter'){e.preventDefault();cpHeadCommit(ci);} else if(e.key==='Escape'){cpHeadEd=null;cpRerender();} }
 function cpHeadCommit(ci){ const i=document.getElementById('cp-hed'); const col=cpColAt(ci); if(i&&col){const t=i.value.trim(); if(t)col.name=t;} cpHeadEd=null; cpSave(); cpRerender(); }
-function cpColType(ci,t){ const col=cpColAt(ci); col.type=t; if(t==='select'&&(!col.opts||!col.opts.length))col.opts=[{v:'Вариант',c:'gray'}]; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpColType(ci,t){ const col=cpColAt(ci); col.type=t; if(t==='select'&&(!col.opts||!col.opts.length))col.opts=[{v:'Вариант',c:'gray'}]; if(t==='money'&&!col.cur)col.cur='uzs'; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpColCur(ci,cur){ const col=cpColAt(ci); if(col)col.cur=cur; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColIns(ci,side){ const sh=cpSheet(); sh.cols.splice(ci+(side?1:0),0,{id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColDel(ci){ const sh=cpSheet(); if(sh.cols.length<=1){toast('Нельзя удалить единственную колонку');cpCloseFloat();return;} const id=sh.cols[ci].id; sh.cols.splice(ci,1); sh.rows.forEach(r=>{delete r.c[id];}); if(cpSel.c>=sh.cols.length)cpSel.c=sh.cols.length-1; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpAddCol(){ const sh=cpSheet(); sh.cols.push({id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpSave(); cpRerender(); }
