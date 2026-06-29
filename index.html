@@ -1851,6 +1851,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-tplm-add{padding:13px;font-size:14px;margin-top:4px}
 .cp-tplm-add.ghost{background:none;border:1px solid var(--line-2);color:var(--txt-2)}
 .cp-tplm-add.ghost:hover{border-color:var(--accent-line);color:var(--txt)}
+/* меню колонки — крупнее, иконки, удобная навигация */
+.cp-pop:has(.cp-colmenu){padding:7px;min-width:262px;border-radius:14px}
+.cp-colmenu{display:flex;flex-direction:column;gap:1px}
+.cpm-item{display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border-radius:9px;background:none;border:0;color:var(--txt-2);font-size:13.5px;font-weight:500;cursor:pointer;text-align:left;font-family:var(--font);transition:background .12s,color .12s}
+.cpm-item svg{width:16px;height:16px;flex:0 0 auto;color:var(--txt-3);transition:color .12s}
+.cpm-item:hover{background:var(--bg-3);color:var(--txt)}
+.cpm-item:hover svg{color:var(--accent)}
+.cpm-item.danger{color:var(--neg)}
+.cpm-item.danger svg{color:var(--neg)}
+.cpm-item.danger:hover{background:color-mix(in srgb,var(--neg) 14%,transparent);color:var(--neg)}
+.cpm-sep{height:1px;background:var(--line);margin:6px 9px}
+.cpm-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:700;padding:9px 11px 6px}
+.cpm-note{font-size:12px;color:var(--txt-3);padding:0 11px 6px;line-height:1.42}
+.cpm-types{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:0 7px 3px}
+.cpm-type{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--bg-2);border:1px solid var(--line);color:var(--txt-2);font-size:12.5px;font-weight:500;cursor:pointer;font-family:var(--font);transition:border-color .12s,color .12s,background .12s;text-align:left}
+.cpm-type svg{width:15px;height:15px;flex:0 0 auto;opacity:.75}
+.cpm-type span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cpm-type:hover{border-color:var(--accent-line);color:var(--txt)}
+.cpm-type:hover svg{opacity:1}
+.cpm-type.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+.cpm-type.on svg{color:var(--accent);opacity:1}
 .clcp-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-1);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 14px}
 .clcp-bar-l{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--txt)}
 .clcp-badge{font-size:11.5px;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--txt-2)}
@@ -6088,26 +6109,43 @@ function cpDatePick(iso){ const row=cpRowAt(_cpDp.r),col=cpColAt(_cpDp.c); if(ro
 function cpColMenu(e,ci){
   const col=cpColAt(ci), sh=cpSheet();
   const sortedHere=sh.sort&&sh.sort.col===col.id;
-  let h='<button class="cp-popi" onclick="cpSortSet('+ci+',\'asc\')">Сортировать ↑</button>';
-  h+='<button class="cp-popi" onclick="cpSortSet('+ci+',\'desc\')">Сортировать ↓</button>';
-  if(sortedHere)h+='<button class="cp-popi" onclick="cpSortClear()">Сбросить сортировку</button>';
-  h+='<div class="sep"></div><button class="cp-popi" onclick="cpFilterMenu(event,'+ci+')">Фильтр…</button>';
-  if(cpFiltGet(col.id))h+='<button class="cp-popi" onclick="cpClearColFilter('+ci+')">Сбросить фильтр</button>';
+  const I={
+    sa:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+    sd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+    fl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H3l7 8.5V19l4 2v-8.5z"/></svg>',
+    xr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+    il:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="13" y="4" width="8" height="16" rx="1.5"/><path d="M6 9v6M3 12h6"/></svg>',
+    ir:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="16" rx="1.5"/><path d="M18 9v6M15 12h6"/></svg>',
+    sv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h7"/></svg>'
+  };
+  let h='<div class="cp-colmenu">';
+  h+='<button class="cpm-item" onclick="cpSortSet('+ci+',\'asc\')">'+I.sa+'Сортировать по возрастанию</button>';
+  h+='<button class="cpm-item" onclick="cpSortSet('+ci+',\'desc\')">'+I.sd+'Сортировать по убыванию</button>';
+  if(sortedHere)h+='<button class="cpm-item" onclick="cpSortClear()">'+I.xr+'Сбросить сортировку</button>';
+  h+='<button class="cpm-item" onclick="cpFilterMenu(event,'+ci+')">'+I.fl+'Фильтр…</button>';
+  if(cpFiltGet(col.id))h+='<button class="cpm-item" onclick="cpClearColFilter('+ci+')">'+I.xr+'Сбросить фильтр</button>';
   if(col.sys==='pub'){
-    h+='<div class="sep"></div><div class="ttl">Системная колонка</div><button class="cp-popi" disabled style="opacity:.55;cursor:default">Статус публикации · обязательна</button>';
-    h+='<button class="cp-popi" onclick="cpColIns('+ci+',0)">Вставить слева</button><button class="cp-popi" onclick="cpColIns('+ci+',1)">Вставить справа</button>';
+    h+='<div class="cpm-sep"></div><div class="cpm-label">Системная колонка</div>';
+    h+='<div class="cpm-note">«Статус публикации» — обязательная колонка, тип менять нельзя.</div>';
+    h+='<div class="cpm-sep"></div>';
+    h+='<button class="cpm-item" onclick="cpColIns('+ci+',0)">'+I.il+'Вставить слева</button>';
+    h+='<button class="cpm-item" onclick="cpColIns('+ci+',1)">'+I.ir+'Вставить справа</button>';
   } else {
-  h+='<div class="sep"></div><button class="cp-popi" onclick="cpColRename('+ci+')">Переименовать</button>';
-  h+='<div class="ttl">Тип</div><div class="cp-types">';
-  CP_TYPES.forEach(t=>{ h+='<button class="cp-popi'+(col.type===t[0]?' on':'')+'" onclick="cpColType('+ci+',\''+t[0]+'\')">'+t[1]+'</button>'; });
-  h+='</div><div class="sep"></div>';
-  if(col.type==='money'){ h+='<div class="ttl">Валюта</div><div class="cp-types"><button class="cp-popi'+((col.cur||'uzs')==='uzs'?' on':'')+'" onclick="cpColCur('+ci+',\'uzs\')">сумм</button><button class="cp-popi'+(col.cur==='usd'?' on':'')+'" onclick="cpColCur('+ci+',\'usd\')">$</button></div><div class="sep"></div>'; }
-  h+='<button class="cp-popi" onclick="cpColIns('+ci+',0)">Вставить слева</button>';
-  h+='<button class="cp-popi" onclick="cpColIns('+ci+',1)">Вставить справа</button>';
-  h+='<div class="sep"></div><button class="cp-popi" onclick="cpTplApplyMenu(event,'+ci+')">Применить шаблон…</button>';
-  if(col.type==='select'&&(col.opts||[]).length)h+='<button class="cp-popi" onclick="cpTplSaveCol('+ci+')">Сохранить как шаблон</button>';
-  h+='<button class="cp-popi" onclick="cpColDel('+ci+')" style="color:var(--neg)">Удалить колонку</button>';
+    h+='<div class="cpm-sep"></div>';
+    h+='<button class="cpm-item" onclick="cpColRename('+ci+')">'+CP_IC.edit+'Переименовать</button>';
+    h+='<div class="cpm-label">Тип данных</div><div class="cpm-types">';
+    CP_TYPES.forEach(function(t){ h+='<button class="cpm-type'+(col.type===t[0]?' on':'')+'" onclick="cpColType('+ci+',\''+t[0]+'\')">'+CP_TYICON(t[0])+'<span>'+t[1]+'</span></button>'; });
+    h+='</div>';
+    if(col.type==='money'){ h+='<div class="cpm-label">Валюта</div><div class="cpm-types"><button class="cpm-type'+((col.cur||'uzs')==='uzs'?' on':'')+'" onclick="cpColCur('+ci+',\'uzs\')"><span>сумм</span></button><button class="cpm-type'+(col.cur==='usd'?' on':'')+'" onclick="cpColCur('+ci+',\'usd\')"><span>$ USD</span></button></div>'; }
+    h+='<div class="cpm-sep"></div>';
+    h+='<button class="cpm-item" onclick="cpColIns('+ci+',0)">'+I.il+'Вставить слева</button>';
+    h+='<button class="cpm-item" onclick="cpColIns('+ci+',1)">'+I.ir+'Вставить справа</button>';
+    h+='<div class="cpm-sep"></div>';
+    h+='<button class="cpm-item" onclick="cpTplApplyMenu(event,'+ci+')">'+CP_IC.tpl+'Применить шаблон…</button>';
+    if(col.type==='select'&&(col.opts||[]).length)h+='<button class="cpm-item" onclick="cpTplSaveCol('+ci+')">'+I.sv+'Сохранить как шаблон</button>';
+    h+='<button class="cpm-item danger" onclick="cpColDel('+ci+')">'+CP_IC.trash+'Удалить колонку</button>';
   }
+  h+='</div>';
   cpFloat(e.target,h);
 }
 function cpColRename(ci){ cpCloseFloat(); cpHeadEd=cpColAt(ci).id; cpRerender(); setTimeout(()=>{const i=document.getElementById('cp-hed');if(i){i.focus();i.select();}},0); }
