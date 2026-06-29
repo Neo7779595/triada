@@ -1792,7 +1792,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-sent{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--pos);white-space:nowrap}
 .cp-sent.chg{color:var(--warn)}
 .clcp-tabs{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
-.clcp-tab{background:var(--bg-1);border:1px solid var(--line-2);border-radius:999px;padding:6px 14px;font-size:12.5px;color:var(--txt-2);cursor:pointer;font-family:var(--font)}
+.clcp-tab{background:var(--bg-1);border:1px solid var(--line-2);border-radius:10px;padding:8px 15px;font-size:12.5px;color:var(--txt-2);cursor:pointer;font-family:var(--font)}
 .clcp-tab.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-line)}
 .clcp-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg-1);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 14px}
 .clcp-bar-l{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--txt)}
@@ -6339,7 +6339,7 @@ async function renderClContent(){
       ((r2&&r2.data)||[]).forEach(function(x){ appr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; });
     }
   }catch(e){ console.warn('cl cp load',e); }
-  window.CL_CP={shares:shares, appr:appr, sel:0, monthFilt:null};
+  const _m0=clCpMonths(shares); window.CL_CP={shares:shares, appr:appr, sel:0, monthFilt:(_m0&&_m0.length?_m0[0]:null)};
   clCpRender();
 }
 function clCpSeg(rowId,a){
@@ -6383,7 +6383,8 @@ function clCpRender(){
     return;
   }
   const _all=cp.shares, _cmonths=clCpMonths(_all);
-  const _vis=cp.monthFilt?_all.filter(function(s){return (s.data&&s.data.month)===cp.monthFilt;}):_all;
+  let _vis=cp.monthFilt?_all.filter(function(s){return clCpShareMonth(s)===cp.monthFilt;}):_all.slice();
+  _vis.sort(function(a,b){return String(b.shared_at||'').localeCompare(String(a.shared_at||''));});
   if(!_vis.length){ box.innerHTML=ph+clCpMonthBar(_cmonths)+'<div style="text-align:center;padding:46px 24px;color:var(--txt-3)">За «'+_ddH(cpMonthLabel(cp.monthFilt)||'выбранный месяц')+'» планов нет.</div>'; return; }
   cp.sel=Math.min(cp.sel||0, _vis.length-1);
   const share=_vis[cp.sel], sh=share.data||{}, sid=share.sheet_id;
@@ -6415,7 +6416,19 @@ function clCpRender(){
   box.innerHTML=ph+clCpMonthBar(_cmonths)+tabs+'<div id="clcp-sheetbar-host">'+sheetBar+'</div>'+grid;
 }
 function clCpPick(i){ window.CL_CP.sel=i; clCpRender(); }
-function clCpMonths(shares){ const set={}; (shares||[]).forEach(function(s){ const m=s.data&&s.data.month; if(m)set[m]=1; }); return Object.keys(set).sort().reverse(); }
+function cpSheetMonthFromDates(d){
+  if(!d||!d.cols||!d.rows)return null;
+  let col=null;
+  for(let i=0;i<d.cols.length;i++){ const c=d.cols[i]; if(c.type==='date'&&/публикац/i.test(c.name||'')){col=c;break;} }
+  if(!col){ for(let i=0;i<d.cols.length;i++){ if(d.cols[i].type==='date'){col=d.cols[i];break;} } }
+  if(!col)return null;
+  const cnt={};
+  d.rows.forEach(function(r){ const v=String((r.c?r.c[col.id]:'')||''); let mm=null; let m=/^(\d{4})-(\d{2})/.exec(v); if(m)mm=m[1]+'-'+m[2]; else { m=/(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(v); if(m)mm=m[3]+'-'+('0'+m[2]).slice(-2); } if(mm)cnt[mm]=(cnt[mm]||0)+1; });
+  let best=null,bn=-1; Object.keys(cnt).forEach(function(k){ if(cnt[k]>bn||(cnt[k]===bn&&best&&k>best)){ bn=cnt[k]; best=k; } });
+  return best;
+}
+function clCpShareMonth(s){ return (s&&s.data&&s.data.month)||(s&&s.data?cpSheetMonthFromDates(s.data):null); }
+function clCpMonths(shares){ const set={}; (shares||[]).forEach(function(s){ const m=clCpShareMonth(s); if(m)set[m]=1; }); return Object.keys(set).sort().reverse(); }
 function clCpMonthBar(months){ if(!months||!months.length)return ''; const cp=window.CL_CP; const lbl=cp.monthFilt?cpMonthLabel(cp.monthFilt):'Все месяцы'; return '<div class="clcp-mfwrap"><button class="clcp-mfilt'+(cp.monthFilt?' on':'')+'" onclick="clCpMonthMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg><span>Месяц:</span>&nbsp;'+_ddH(lbl)+' ▾</button></div>'; }
 function clCpMonthMenu(e){ e.stopPropagation(); const months=clCpMonths(window.CL_CP.shares); let h='<button class="cp-popi'+(!window.CL_CP.monthFilt?' on':'')+'" onclick="clCpSetMonth(null)">Все месяцы</button>'; if(months.length)h+='<div class="sep"></div>'; months.forEach(function(m){ h+='<button class="cp-popi'+(window.CL_CP.monthFilt===m?' on':'')+'" onclick="clCpSetMonth(\''+m+'\')">'+cpMonthLabel(m)+'</button>'; }); cpFloat((e.target&&e.target.closest('button'))||e.target,h); }
 function clCpSetMonth(m){ window.CL_CP.monthFilt=m; window.CL_CP.sel=0; cpCloseFloat(); clCpRender(); }
