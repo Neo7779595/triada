@@ -1804,6 +1804,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-row:hover .cp-gm{opacity:1}
 .cp-gm:hover{color:var(--txt)}
 .cp-row.rowsel>.cp-cell{background:rgba(55,230,200,.12)}
+.cp-cell.cp-colsel{background:rgba(55,230,200,.12)}
+.cp-head.colsel{background:rgba(55,230,200,.15);box-shadow:inset 0 -2px 0 var(--accent)}
 .cp-row.rowsel>.cp-cell.cp-c0{background:rgba(55,230,200,.12)}
 .cp-row.rowsel>.cp-gut{background:var(--accent-dim);color:var(--accent)}
 .cp-mini.cp-del{border-color:color-mix(in srgb,var(--neg) 45%,transparent);color:var(--neg)}
@@ -5536,6 +5538,7 @@ let cpSel={r:0,c:0}, cpEd=null, cpQ='', cpHeadEd=null, cpShEd=null, cpSaveT=null
 let cpSelEnd=null;
 let cpRz=null;
 let cpRowSel=new Set(); let cpRowAnchor=null;
+let cpColSel=new Set(); let cpColAnchor=null;
 
 function cpSeed(){
   const c=(name,type,w,opts)=>({id:cpUid(),name,type,w,opts:opts||[]});
@@ -5630,7 +5633,7 @@ function cpHeadCell(col,ci){
   const arr=sd?('<span class="cp-sarr">'+(sd==='asc'?'↑':'↓')+'</span>'):'';
   const fil=cpFiltGet(col.id)?('<span class="cp-funnel">'+CP_IC.funnel+'</span>'):'';
   const inner='<span class="ti">'+CP_TYICON(col.type)+'</span><span class="nm" onclick="event.stopPropagation();cpSortToggle('+ci+')" title="Сортировка по колонке">'+_ddH(col.name)+'</span>'+arr+fil+'<button class="cp-hmenu" onclick="event.stopPropagation();cpColMenu(event,'+ci+')">⋮</button>';
-  return '<div class="cp-head cp-dragcol'+sticky+'" data-c="'+ci+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+col.w+'px">'+inner+'<span class="cp-cresz" onmousedown="cpColRz(event,'+ci+')"></span></div>';
+  return '<div class="cp-head cp-dragcol'+sticky+(cpColSel.has(col.id)?' colsel':'')+'" data-c="'+ci+'" onclick="cpColPick(event,'+ci+')" title="Клик — выделить столбец" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+col.w+'px">'+inner+'<span class="cp-cresz" onmousedown="cpColRz(event,'+ci+')"></span></div>';
 }
 function CP_TYICON(t){
   const m={text:'<path d="M4 7h16M4 12h10M4 17h7"/>',long:'<path d="M4 6h16M4 10h16M4 14h12M4 18h8"/>',num:'<path d="M6 4l-1 16M14 4l-1 16M4 9h16M3 15h16"/>',money:'<path d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H8m0 0h8a2.5 2.5 0 0 1 0 5H8"/>',date:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',select:'<circle cx="12" cy="12" r="8"/><path d="M9 12l2 2 4-4"/>',check:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/>',link:'<path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1"/>'};
@@ -5646,6 +5649,7 @@ function cpRender(p){
     +'<span class="cp-title">'+CP_IC.table+_ddH(sh.name)+'</span>'
     +'<span class="cp-sub">'+sh.rows.length+' '+_plural(sh.rows.length,'строка','строки','строк')+'</span>'
     +(cpRowSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteRows()">'+CP_IC.trash+'Удалить '+cpRowSel.size+'</button>'):'')
+    +(cpColSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteCols()">'+CP_IC.trash+'Удалить '+cpColSel.size+' кол.</button>'):'')
     +'<div class="cp-search">'+CP_IC.search+'<input id="cp-q" placeholder="Поиск по таблице" value="'+_ddA(cpQ)+'" oninput="cpSearch(this.value)"></div>'
     +(sh.sort?('<span class="cp-fchip">Сорт: '+_ddH(((sh.cols.find(c=>c.id===sh.sort.col))||{}).name||'')+' '+(sh.sort.dir==='asc'?'↑':'↓')+'<button onclick="cpSortClear()">✕</button></span>'):'')
     +((sh.filt&&Object.keys(sh.filt).length)?('<span class="cp-fchip">Фильтры '+Object.keys(sh.filt).length+'<button onclick="cpClearFilters()">✕</button></span>'):'')
@@ -5676,7 +5680,7 @@ function cpRender(p){
     html+='<div class="cp-row'+(cpRowSel.has(row.id)?' rowsel':'')+'" data-rid="'+row.id+'" ondragover="cpDragRowOver(event,this)" ondragleave="cpDragRowLeave(this)" ondrop="cpDragRowDrop(event,\''+row.id+'\')" ondragend="cpDragEnd()"><div class="cp-gut" style="'+(row.h?('min-height:'+row.h+'px'):'')+'"'+' onmousedown="cpRowDown(event,\''+row.id+'\','+ri+')" oncontextmenu="cpRowMenu(event,\''+row.id+'\');return false;"><span class="cp-gn">'+(ri+1)+'</span><button class="cp-gm" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();cpRowMenu(event,\''+row.id+'\')">⋮</button><span class="cp-rresz" onmousedown="cpRowRz(event,\''+row.id+'\')"></span></div>';
     cols.forEach((col,ci)=>{
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
-      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'');
+      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'');
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
       html+='<div class="'+cls+'" style="width:'+col.w+'px'+_rh+'" data-r="'+ri+'" data-c="'+ci+'" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
     });
@@ -5721,7 +5725,7 @@ function cpFloat(anchor,html){
 }
 
 /* ---- selection / editing ---- */
-function cpClick(e,r,c){ if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ cpToggle(r,c); return; } cpRerender(); }
+function cpClick(e,r,c){ if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); cpColSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ cpToggle(r,c); return; } cpRerender(); }
 function cpToggle(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(!row)return; row.c[col.id]=!row.c[col.id]; cpSave(); cpRerender(); }
 function cpEdit(r,c,init){
   const col=cpColAt(c); cpSel={r,c}; cpSelEnd=null; cpRowSel=new Set();
@@ -5752,7 +5756,7 @@ function cpKey(e){
   if(mod&&(k==='d'||k==='D')){ e.preventDefault(); cpFillDown(); return; }
   if(k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight'){ e.preventDefault(); const dr=k==='ArrowUp'?-1:(k==='ArrowDown'?1:0), dc=k==='ArrowLeft'?-1:(k==='ArrowRight'?1:0); if(e.shiftKey){ cpExtendSel(dr,dc); } else { cpMoveSel(dr,dc); cpSelEnd=null; } cpRerender(); return; }
   if(k==='Enter'||k==='F2'){ e.preventDefault(); cpEdit(cpSel.r,cpSel.c); return; }
-  if(k==='Delete'||k==='Backspace'){ e.preventDefault(); if(cpRowSel.size)cpDeleteRows(); else cpClearSel(); return; }
+  if(k==='Delete'||k==='Backspace'){ e.preventDefault(); if(cpColSel.size)cpDeleteCols(); else if(cpRowSel.size)cpDeleteRows(); else cpClearSel(); return; }
   if(k.length===1&&!mod&&!e.altKey){ e.preventDefault(); cpSelEnd=null; cpEdit(cpSel.r,cpSel.c,k); }
 }
 
@@ -5825,6 +5829,33 @@ function cpColType(ci,t){ const col=cpColAt(ci); col.type=t; if(t==='select'&&(!
 function cpColCur(ci,cur){ const col=cpColAt(ci); if(col)col.cur=cur; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColIns(ci,side){ const sh=cpSheet(); sh.cols.splice(ci+(side?1:0),0,{id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColDel(ci){ const sh=cpSheet(); if(sh.cols.length<=1){toast('Нельзя удалить единственную колонку');cpCloseFloat();return;} const id=sh.cols[ci].id; sh.cols.splice(ci,1); sh.rows.forEach(r=>{delete r.c[id];}); if(cpSel.c>=sh.cols.length)cpSel.c=sh.cols.length-1; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpColPick(e,ci){
+  if(cpEd){cpStore();cpEd=null;}
+  const sh=cpSheet(); const col=sh.cols[ci]; if(!col)return; const id=col.id;
+  if(e&&e.shiftKey&&cpColAnchor!=null){
+    const ai=sh.cols.findIndex(function(c){return c.id===cpColAnchor;});
+    if(ai>=0){ const a=Math.min(ai,ci),b=Math.max(ai,ci); cpColSel=new Set(); for(var k=a;k<=b;k++){ if(sh.cols[k])cpColSel.add(sh.cols[k].id); } }
+    else { cpColSel=new Set([id]); cpColAnchor=id; }
+  } else if(e&&(e.ctrlKey||e.metaKey)){
+    if(cpColSel.has(id))cpColSel.delete(id); else cpColSel.add(id); cpColAnchor=id;
+  } else { cpColSel=new Set([id]); cpColAnchor=id; }
+  cpRowSel=new Set(); cpRowAnchor=null; cpSel={r:cpSel.r,c:ci}; cpSelEnd=null; cpRerender();
+}
+function cpDeleteCols(){
+  if(!cpColSel.size)return;
+  const sh=cpSheet();
+  const remaining=(sh.cols||[]).filter(function(c){return !cpColSel.has(c.id);});
+  if(!remaining.length){ if(typeof toast==='function')toast('Нельзя удалить все колонки'); return; }
+  const n=cpColSel.size; const delIds=Array.from(cpColSel);
+  sh.cols=remaining;
+  (sh.rows||[]).forEach(function(r){ if(r.c) delIds.forEach(function(id){ delete r.c[id]; }); });
+  if(sh.sort&&cpColSel.has(sh.sort.col))sh.sort=null;
+  if(sh.filt) delIds.forEach(function(id){ if(sh.filt[id])delete sh.filt[id]; });
+  cpColSel=new Set(); cpColAnchor=null;
+  if(cpSel.c>=sh.cols.length)cpSel.c=Math.max(0,sh.cols.length-1);
+  cpSelEnd=null; cpCloseFloat(); cpSave(); cpRerender();
+  if(typeof toast==='function')toast('Удалено колонок: '+n);
+}
 function cpAddCol(){ const sh=cpSheet(); sh.cols.push({id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpSave(); cpRerender(); }
 
 /* ---- rows ---- */
@@ -6324,7 +6355,7 @@ function cpRowSelRange(anchorId,ri){ const disp=cpDisp(cpSheet()); const ai=disp
 function cpRowPaint(){ document.querySelectorAll('.cp-row').forEach(function(rw){ const id=rw.getAttribute('data-rid'); if(id&&cpRowSel.has(id))rw.classList.add('rowsel'); else rw.classList.remove('rowsel'); }); }
 function cpRowDown(e,id,ri){
   if(e.button!=null&&e.button!==0)return;
-  cpSelEnd=null; cpEd=null;
+  cpSelEnd=null; cpEd=null; cpColSel=new Set(); cpColAnchor=null;
   if(e&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); if(cpRowSel.has(id))cpRowSel.delete(id); else cpRowSel.add(id); cpRowAnchor=id; cpRerender(); return; }
   if(e&&e.shiftKey&&cpRowAnchor!=null){ e.preventDefault(); cpRowSelRange(cpRowAnchor,ri); cpRerender(); return; }
   e.preventDefault();
