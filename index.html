@@ -9079,19 +9079,19 @@ function renderTeam(){
         <div class="wlx-s"><div class="v" style="color:var(--accent)">${_totWork>0?_cycDur(_totWork*1000):'—'}</div><div class="l"><span class="dt" style="background:var(--accent)"></span>Время в работе · за ${_periodLbl()}</div></div>
       </div>
       <div class="card">
-        <div class="wlx-cardh"><span>По сотрудникам <span style="color:var(--txt-3);font-weight:400;font-size:11px">· время за ${_periodLbl()}</span></span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
+        <div class="wlx-cardh"><span>По сотрудникам <span style="color:var(--txt-3);font-weight:400;font-size:11px">· время за ${_periodLbl()}</span></span><div class="wlx-leg"><span><i style="background:var(--warn)"></i>Ожидание</span><span><i style="background:var(--accent)"></i>В работе</span><span><i style="background:var(--violet)"></i>На утверждении</span><span><i style="background:var(--pos)"></i>Готово</span></div></div>
         ${_totWork<=0?`<div style="padding:9px 14px;font-size:11.5px;color:var(--txt-3);border-bottom:1px solid var(--line);line-height:1.5">За выбранный период учтённого времени нет. Журнал заполняется по мере работы команды — время копится с момента включения учёта (паузы и переносы из «В работе»).</div>`:''}
         <table class="wlx-tbl">
-          <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>Готово</th><th>Итого</th><th>Время в работе</th></tr></thead>
-          <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,d=e._done||0,t=w+a+d,tt=t||1;
-            const dist=[[w,'var(--warn)'],[a,'var(--accent)'],[d,'var(--pos)']].map(([v,c])=>v>0?`<i style="width:${(v/tt*100).toFixed(1)}%;background:${c}"></i>`:'').join('');
+          <thead><tr><th>Сотрудник</th><th>Распределение задач</th><th>Ожидание</th><th>В работе</th><th>На утверждении</th><th>Готово</th><th>Время в работе</th></tr></thead>
+          <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,r=e._review||0,d=e._done||0,t=w+a+r+d,tt=t||1;
+            const dist=[[w,'var(--warn)'],[a,'var(--accent)'],[r,'var(--violet)'],[d,'var(--pos)']].map(([v,c])=>v>0?`<i style="width:${(v/tt*100).toFixed(1)}%;background:${c}"></i>`:'').join('');
             return `<tr class="wlx-click" onclick="openEmpStats('${e._id}')" onkeydown="if(event.key==='Enter')openEmpStats('${e._id}')" tabindex="0" role="button">
               <td><div class="wlx-id"><span class="wlx-av" style="background:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span><div><div class="nm">${e.name}</div><div class="sl">${t} ${_plural(t,'задача','задачи','задач')}</div></div></div></td>
               <td><div class="wlx-dist">${dist||'<i style="width:100%;background:var(--bg-3)"></i>'}</div></td>
               <td>${cell(w,'var(--warn-dim)','var(--warn)')}</td>
               <td>${cell(a,'var(--accent-dim)','var(--accent)')}</td>
+              <td>${cell(r,'rgba(138,143,255,.14)','var(--violet)')}</td>
               <td>${cell(d,'var(--pos-dim)','var(--pos)')}</td>
-              <td><span class="wlx-tot">${t}</span></td>
               <td>${_wcell(e)}</td>
             </tr>`;}).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--txt-3);padding:28px">Нет данных</td></tr>'}</tbody>
         </table>
@@ -10899,14 +10899,14 @@ window.tLoadTeam = async () => {
   window._teamRaw = { tasks, hist, taskHist, taskDue, loadedAt: now };
   const rank = { wait:0, active:1, done:2 };
   const stat = {};
-  const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 });
+  const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,review:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 });
 
   tasks.forEach(t => { if (!t.assignee_id) return; const a = S(t.assignee_id); a.assigned++;
     const _ws=(t.time_spent||0)+((t.timer_started&&t.status==='active')?Math.max(0,Math.round((now-new Date(t.timer_started).getTime())/1000)):0);
     if(_ws>0){ a.worksec+=_ws; a.workcnt++; }
     (_td[t.assignee_id]||(_td[t.assignee_id]=[])).push({ title:(t.title||'Задача'), sec:_ws, done:(t.status==='done'), status:t.status, project:(_projName[t.project_id]||'') });
     if (t.status==='done') a.done++;
-    else { a.open++; if (t.status==='wait') a.wait++; if (t.status==='active') a.active++;
+    else { a.open++; if (t.status==='wait') a.wait++; if (t.status==='active') a.active++; if (t.status==='review') a.review++;
       if (t.due_date && new Date(t.due_date+'T00:00:00') < today) a.overdue++; } });
 
   /* кредитуем выработку/возвраты по changed_by; уникальные vs повторные — по первому done предмета за всю историю */
@@ -10936,8 +10936,8 @@ window.tLoadTeam = async () => {
 
   let tA=0, tO=0, tOv=0, tV=0;
   (typeof TEAM!=='undefined'?TEAM:[]).forEach(m => {
-    const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 };
-    m._assigned=a.assigned; m._done=a.done; m._open=a.open; m._wait=a.wait; m._active=a.active;
+    const a = stat[m._id] || { assigned:0,done:0,open:0,wait:0,active:0,review:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 };
+    m._assigned=a.assigned; m._done=a.done; m._open=a.open; m._wait=a.wait; m._active=a.active; m._review=a.review;
     m._workSec=a.worksec; m._workCnt=a.workcnt;
     m._taskStat=_td[m._id]||[];
     m._overdue=a.overdue; m._uniq30=a.uniq30; m._redo30=a.redo30; m._sUniq30=a.sUniq30; m._tUniq30=a.tUniq30;
