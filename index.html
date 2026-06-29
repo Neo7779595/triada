@@ -1629,6 +1629,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-saddbtn:hover,.cp-shidbtn:hover{color:var(--accent)}
 .cp-saddbtn svg,.cp-shidbtn svg{width:14px;height:14px}
 .cp-pop{position:fixed;z-index:200;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;min-width:178px;box-shadow:0 16px 44px rgba(0,0,0,.55)}
+.cp-pop .cp-dpcal{width:248px;padding:6px 8px 8px}
 .cp-popi{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;color:var(--txt-2);font-size:12.5px;padding:7px 9px;border-radius:7px;cursor:pointer;text-align:left;font-family:var(--font)}
 .cp-popi:hover{background:var(--bg-3);color:var(--txt)}
 .cp-popi.on{color:var(--accent)}
@@ -5609,6 +5610,7 @@ function cpEdit(r,c,init){
   const col=cpColAt(c); cpSel={r,c}; cpSelEnd=null;
   if(col.type==='check'){ cpToggle(r,c); return; }
   if(col.type==='select'){ cpRerender(); setTimeout(()=>{const cell=cpCellEl(r,c); if(cell)cpSelectMenu(r,c,cell);},0); return; }
+  if(col.type==='date'){ cpRerender(); setTimeout(()=>{const cell=cpCellEl(r,c); if(cell)cpDateMenu(r,c,cell);},0); return; }
   cpEd={r,c}; cpRerender();
   setTimeout(()=>{ const i=document.getElementById('cp-ed'); if(i){ if(init!=null){i.value=init;} i.focus(); if(init==null&&i.select){i.select();} else { try{const L=i.value.length;i.setSelectionRange(L,L);}catch(_e){} } } },0);
 }
@@ -5650,6 +5652,35 @@ function cpSetSelect(r,c,v){ const row=cpRowAt(r),col=cpColAt(c); if(row){row.c[
 function cpClearSelect(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(row){delete row.c[col.id];cpSave();} cpCloseFloat(); cpRerender(); }
 function cpAddOpt(c,r,v){ v=(v||'').trim(); if(!v)return; const col=cpColAt(c); col.opts=col.opts||[]; if(!col.opts.some(o=>o.v===v)){ col.opts.push({v,c:CP_PALK[col.opts.length%CP_PALK.length]}); } const row=cpRowAt(r); if(row){row.c[col.id]=v;} cpSave(); cpCloseFloat(); cpRerender(); }
 
+/* ---- date cell · кастомный календарь (тот же, что в дедлайнах/датах проекта) ---- */
+let _cpDp={r:-1,c:-1,y:0,m:0};
+function cpDateMenu(r,c,anchor){
+  const row=cpRowAt(r),col=cpColAt(c); if(!row||!col||!anchor)return;
+  const cur=row.c[col.id]||''; const t=new Date(); let y,m;
+  if(cur){ const a=String(cur).split('-').map(Number); y=a[0]; m=(a[1]||1)-1; } else { y=t.getFullYear(); m=t.getMonth(); }
+  _cpDp={r,c,y,m};
+  cpFloat(anchor, cpDpGrid());
+}
+function cpDpGrid(){
+  const st=_cpDp, y=st.y, m=st.m; const row=cpRowAt(st.r),col=cpColAt(st.c); const iso=(row&&col&&row.c[col.id])||'';
+  const now=new Date(); const tISO=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  let start=new Date(y,m,1).getDay(); start=(start===0?6:start-1);
+  const dim=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate();
+  let cells='';
+  for(let i=0;i<start;i++) cells+='<button class="oth" disabled>'+(prev-start+1+i)+'</button>';
+  for(let d=1;d<=dim;d++){ const ci=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const cls=[ci===iso?'sel':'', ci===tISO?'today':''].filter(Boolean).join(' ');
+    cells+='<button class="'+cls+'" onclick="cpDatePick(\''+ci+'\')">'+d+'</button>'; }
+  const tot=start+dim, trail=(7-(tot%7))%7;
+  for(let i=1;i<=trail;i++) cells+='<button class="oth" disabled>'+i+'</button>';
+  return '<div class="cp-dpcal"><div class="dp-head"><div class="dp-title">'+DP_MON[m]+' '+y+'</div><div class="dp-nav">'
+    +'<button type="button" onclick="cpDpNav(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>'
+    +'<button type="button" onclick="cpDpNav(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button></div></div>'
+    +'<div class="dp-dow">'+DP_DOW.map(d=>'<span>'+d+'</span>').join('')+'</div><div class="dp-grid">'+cells+'</div>'
+    +'<div class="dp-foot"><button type="button" onclick="cpDatePick(\''+tISO+'\')">Сегодня</button><button type="button" class="clr" onclick="cpDatePick(\'\')">Очистить</button></div></div>';
+}
+function cpDpNav(delta){ let m=_cpDp.m+delta,y=_cpDp.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} _cpDp.y=y; _cpDp.m=m; const p=document.querySelector('.cp-pop'); if(p)p.innerHTML=cpDpGrid(); }
+function cpDatePick(iso){ const row=cpRowAt(_cpDp.r),col=cpColAt(_cpDp.c); if(row&&col){ if(iso) row.c[col.id]=iso; else delete row.c[col.id]; cpSave(); } cpCloseFloat(); cpRerender(); }
 /* ---- columns ---- */
 function cpColMenu(e,ci){
   const col=cpColAt(ci), sh=cpSheet();
