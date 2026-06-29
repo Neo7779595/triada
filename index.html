@@ -1661,6 +1661,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-chk{width:16px;height:16px;border:1.5px solid var(--line-2);border-radius:4px;display:inline-block;cursor:pointer;position:relative}
 .cp-chk.on{background:var(--accent);border-color:var(--accent)}
 .cp-chk.on::after{content:"";position:absolute;left:4.5px;top:1px;width:4px;height:8px;border:solid var(--accent-ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.cp-cchk{justify-content:center}
+.cp-chk-pop{animation:cpPubPop .34s ease}
+@keyframes cpPubPop{0%{transform:scale(.78)}45%{transform:scale(1.16)}100%{transform:scale(1)}}
+/* премиальный чип «Статус публикации» */
+.cp-pub{width:22px;height:22px;border-radius:7px;border:1.6px solid var(--line-2);background:var(--bg-1);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:border-color .18s,background .2s,box-shadow .22s}
+.cp-pub:hover{border-color:var(--accent-line);background:var(--bg-2)}
+.cp-pub::after{content:"";width:5px;height:9px;border:solid var(--accent-ink);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) scale(0);transition:transform .24s cubic-bezier(.5,1.55,.5,1);margin-top:-2px}
+.cp-pub.on{background:linear-gradient(135deg,var(--accent),#2ad3b7);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-dim),0 4px 13px -5px var(--accent)}
+.cp-pub.on::after{transform:rotate(45deg) scale(1)}
+/* прогресс публикаций в тулбаре */
+.cp-prog{display:inline-flex;align-items:center;gap:8px;margin-left:4px;padding:5px 12px 5px 9px;border-radius:999px;background:var(--bg-1);border:1px solid var(--line);white-space:nowrap}
+.cp-prog-ic{display:inline-flex;width:15px;height:15px;color:var(--accent)}
+.cp-prog-ic svg{width:15px;height:15px}
+.cp-prog-track{width:88px;height:6px;border-radius:999px;background:var(--bg-3);overflow:hidden}
+.cp-prog-fill{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),#2ad3b7);transition:width .45s cubic-bezier(.4,0,.2,1)}
+.cp-prog-pct{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent)}
+.cp-prog-lb{font-size:11px;color:var(--txt-3);letter-spacing:.04em}
 .cp-ed{width:100%;background:var(--bg-2);border:0;color:var(--txt);font-size:12.5px;padding:0;outline:none;font-family:var(--font)}
 .cp-ta{resize:none;height:34px;line-height:1.3}
 .cp-addcol{flex:0 0 44px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);color:var(--txt-3);cursor:pointer}
@@ -5592,7 +5609,8 @@ function cpSeed(){
     c('Статус','select',182,[{v:'Идея',c:'gray'},{v:'Пишется сценарий',c:'violet'},{v:'На монтаже',c:'amber'},{v:'Опубликовано',c:'green'}]),
     c('Дата публикации','date',124),
     c('Готовый пост','link',124),
-    c('Расходы','money',112)
+    c('Расходы','money',112),
+    {id:cpUid(),name:'Статус публикации',type:'check',w:150,sys:'pub',opts:[]}
   ];
   const mk=(vals)=>{const r={id:cpUid(),c:{}};cols.forEach((col,i)=>{if(vals[i]!=null&&vals[i]!=='')r.c[col.id]=vals[i];});return r;};
   const rows=[
@@ -5608,16 +5626,21 @@ function cpSeed(){
 }
 function cpSeedEmpty(name,color){
   const c=(nm,type,w,opts)=>({id:cpUid(),name:nm,type,w,opts:opts||[]});
-  const cols=[c('Название','text',230),c('Дата','date',120),c('Статус','select',170,[{v:'Идея',c:'gray'},{v:'В работе',c:'amber'},{v:'Готово',c:'green'}])];
+  const cols=[c('Название','text',230),c('Дата','date',120),c('Статус','select',170,[{v:'Идея',c:'gray'},{v:'В работе',c:'amber'},{v:'Готово',c:'green'}]),{id:cpUid(),name:'Статус публикации',type:'check',w:150,sys:'pub',opts:[]}];
   const rows=[{id:cpUid(),c:{}},{id:cpUid(),c:{}},{id:cpUid(),c:{}}];
   return {id:cpUid(),name:name||'Новый лист',color:color||'gray',hidden:false,cols,rows};
 }
+function cpEnsurePub(d){ if(!d||!d.sheets)return; d.sheets.forEach(function(s){ if(!s.cols)s.cols=[]; if(!s.cols.some(function(c){return c.sys==='pub';})){ s.cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:150,sys:'pub',opts:[]}); } }); }
+function cpPubStats(sh){ const pc=(sh.cols||[]).find(function(c){return c.sys==='pub';}); if(!pc) return {done:0,total:0,pct:0}; let total=0,done=0; (sh.rows||[]).forEach(function(r){ const has=(sh.cols||[]).some(function(c){ if(c.sys==='pub')return false; const v=r.c[c.id]; return v!=null&&String(v).trim()!==''; }); if(!has)return; total++; if(r.c[pc.id])done++; }); return {done:done,total:total,pct: total?Math.round(done/total*100):0}; }
+function cpProgHTML(sh){ const st=cpPubStats(sh); const ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'; return '<span class="cp-prog" id="cp-prog" title="Опубликовано '+st.done+' из '+st.total+'"><span class="cp-prog-ic">'+ic+'</span><span class="cp-prog-track"><span class="cp-prog-fill" style="width:'+st.pct+'%"></span></span><span class="cp-prog-pct">'+st.pct+'%</span><span class="cp-prog-lb">опубликовано</span></span>'; }
+function cpProgRender(){ const sh=cpSheet(), st=cpPubStats(sh); const el=document.getElementById('cp-prog'); if(!el)return; const f=el.querySelector('.cp-prog-fill'); if(f)f.style.width=st.pct+'%'; const p=el.querySelector('.cp-prog-pct'); if(p)p.textContent=st.pct+'%'; el.setAttribute('title','Опубликовано '+st.done+' из '+st.total); }
 function cpData(p){
   if(!p._cp){
     let d=null;
     try{const raw=localStorage.getItem(cpKeyLS(p));if(raw)d=JSON.parse(raw);}catch(e){}
     p._cp=(d&&d.sheets&&d.sheets.length)?d:cpSeed();
   }
+  cpEnsurePub(p._cp);
   if(!p._cp.active||!p._cp.sheets.some(s=>s.id===p._cp.active&&!s.hidden)){
     const f=p._cp.sheets.find(s=>!s.hidden)||p._cp.sheets[0];
     if(f)p._cp.active=f.id;
@@ -5648,7 +5671,7 @@ function cpChip(col,v){ const o=(col.opts||[]).find(x=>x.v===v); const pal=CP_PA
 function cpCellView(col,v){
   if(v==null||v==='') { if(col.type==='check') v=false; else return ''; }
   if(col.type==='select') return cpChip(col,v);
-  if(col.type==='check') return '<span class="cp-chk'+(v?' on':'')+'"></span>';
+  if(col.type==='check') return col.sys==='pub' ? ('<span class="cp-pub'+(v?' on':'')+'"></span>') : ('<span class="cp-chk'+(v?' on':'')+'"></span>');
   if(col.type==='link'){ if(v==null||v==='')return ''; const _lk=cpLinkParse(v); return '<span class="cp-lnk" onclick="event.stopPropagation();cpLinkClick(this)" data-u="'+_ddA(_lk.url)+'" data-t="'+_ddA(_lk.label)+'">'+CP_IC.ext+'<span class="cp-lnk-t">'+_ddH(_lk.label||'Открыть')+'</span></span>'; }
   if(col.type==='date') return '<span class="cp-mono">'+_ddH(cpFmtDate(v))+'</span>';
   if(col.type==='money') return '<span class="cp-mono cp-money">'+cpFmtMoney(v,col)+'</span>';
@@ -5687,6 +5710,7 @@ function cpRender(p){
   html+='<div class="cp-bar"><div class="cp-bar-l">'
     +'<span class="cp-title">'+CP_IC.table+_ddH(sh.name)+'</span>'
     +'<span class="cp-sub">'+sh.rows.length+' '+_plural(sh.rows.length,'строка','строки','строк')+'</span>'
+    +cpProgHTML(sh)
     +(cpRowSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteRows()">'+CP_IC.trash+'Удалить '+cpRowSel.size+'</button>'):'')
     +(cpColSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteCols()">'+CP_IC.trash+'Удалить '+cpColSel.size+' кол.</button>'):'')
     +'<div class="cp-search">'+CP_IC.search+'<input id="cp-q" placeholder="Поиск по таблице" value="'+_ddA(cpQ)+'" oninput="cpSearch(this.value)"></div>'
@@ -5719,7 +5743,7 @@ function cpRender(p){
     html+='<div class="cp-row'+(cpRowSel.has(row.id)?' rowsel':'')+'" data-rid="'+row.id+'" ondragover="cpDragRowOver(event,this)" ondragleave="cpDragRowLeave(this)" ondrop="cpDragRowDrop(event,\''+row.id+'\')" ondragend="cpDragEnd()"><div class="cp-gut" style="'+(row.h?('min-height:'+row.h+'px'):'')+'"'+' onmousedown="cpRowDown(event,\''+row.id+'\','+ri+')" oncontextmenu="cpRowMenu(event,\''+row.id+'\');return false;"><span class="cp-gn">'+(ri+1)+'</span><button class="cp-gm" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();cpRowMenu(event,\''+row.id+'\')">⋮</button><span class="cp-rresz" onmousedown="cpRowRz(event,\''+row.id+'\')"></span></div>';
     cols.forEach((col,ci)=>{
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
-      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'');
+      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(col.type==='check'?' cp-cchk':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'');
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
       html+='<div class="'+cls+'" style="width:'+col.w+'px'+_rh+'" data-r="'+ri+'" data-c="'+ci+'" onmousedown="cpCellDown(event,'+ri+','+ci+')" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
     });
@@ -5806,7 +5830,11 @@ function cpCellPaint(){
   const br=document.querySelector('.cp-grid .cp-cell[data-r="'+x.r1+'"][data-c="'+x.c1+'"]');
   if(br){ var hh=document.createElement('span'); hh.className='cp-h'; hh.setAttribute('onmousedown','cpFillStart(event)'); br.appendChild(hh); }
 }
-function cpToggle(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(!row)return; row.c[col.id]=!row.c[col.id]; cpSave(); cpRerender(); }
+function cpToggle(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(!row)return; const nv=!row.c[col.id]; if(nv)row.c[col.id]=true; else delete row.c[col.id]; cpSave();
+  const cell=document.querySelector('.cp-grid .cp-cell[data-r="'+r+'"][data-c="'+c+'"]'); const chip=cell?cell.querySelector('.cp-pub,.cp-chk'):null;
+  if(chip){ chip.classList.toggle('on',nv); chip.classList.remove('cp-chk-pop'); void chip.offsetWidth; chip.classList.add('cp-chk-pop'); if(col.sys==='pub')cpProgRender(); }
+  else { cpRerender(); }
+}
 function cpEdit(r,c,init){
   const col=cpColAt(c); cpSel={r,c}; cpSelEnd=null; cpRowSel=new Set();
   if(col.type==='check'){ cpToggle(r,c); return; }
@@ -5892,6 +5920,10 @@ function cpColMenu(e,ci){
   if(sortedHere)h+='<button class="cp-popi" onclick="cpSortClear()">Сбросить сортировку</button>';
   h+='<div class="sep"></div><button class="cp-popi" onclick="cpFilterMenu(event,'+ci+')">Фильтр…</button>';
   if(cpFiltGet(col.id))h+='<button class="cp-popi" onclick="cpClearColFilter('+ci+')">Сбросить фильтр</button>';
+  if(col.sys==='pub'){
+    h+='<div class="sep"></div><div class="ttl">Системная колонка</div><button class="cp-popi" disabled style="opacity:.55;cursor:default">Статус публикации · обязательна</button>';
+    h+='<button class="cp-popi" onclick="cpColIns('+ci+',0)">Вставить слева</button><button class="cp-popi" onclick="cpColIns('+ci+',1)">Вставить справа</button>';
+  } else {
   h+='<div class="sep"></div><button class="cp-popi" onclick="cpColRename('+ci+')">Переименовать</button>';
   h+='<div class="ttl">Тип</div><div class="cp-types">';
   CP_TYPES.forEach(t=>{ h+='<button class="cp-popi'+(col.type===t[0]?' on':'')+'" onclick="cpColType('+ci+',\''+t[0]+'\')">'+t[1]+'</button>'; });
@@ -5900,15 +5932,16 @@ function cpColMenu(e,ci){
   h+='<button class="cp-popi" onclick="cpColIns('+ci+',0)">Вставить слева</button>';
   h+='<button class="cp-popi" onclick="cpColIns('+ci+',1)">Вставить справа</button>';
   h+='<button class="cp-popi" onclick="cpColDel('+ci+')" style="color:var(--neg)">Удалить колонку</button>';
+  }
   cpFloat(e.target,h);
 }
 function cpColRename(ci){ cpCloseFloat(); cpHeadEd=cpColAt(ci).id; cpRerender(); setTimeout(()=>{const i=document.getElementById('cp-hed');if(i){i.focus();i.select();}},0); }
 function cpHeadKey(e,ci){ if(e.key==='Enter'){e.preventDefault();cpHeadCommit(ci);} else if(e.key==='Escape'){cpHeadEd=null;cpRerender();} }
 function cpHeadCommit(ci){ const i=document.getElementById('cp-hed'); const col=cpColAt(ci); if(i&&col){const t=i.value.trim(); if(t)col.name=t;} cpHeadEd=null; cpSave(); cpRerender(); }
-function cpColType(ci,t){ const col=cpColAt(ci); col.type=t; if(t==='select'&&(!col.opts||!col.opts.length))col.opts=[{v:'Вариант',c:'gray'}]; if(t==='money'&&!col.cur)col.cur='uzs'; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpColType(ci,t){ const col=cpColAt(ci); if(col&&col.sys==='pub'){if(typeof toast==='function')toast('Тип колонки публикации менять нельзя');cpCloseFloat();return;} col.type=t; if(t==='select'&&(!col.opts||!col.opts.length))col.opts=[{v:'Вариант',c:'gray'}]; if(t==='money'&&!col.cur)col.cur='uzs'; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColCur(ci,cur){ const col=cpColAt(ci); if(col)col.cur=cur; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColIns(ci,side){ const sh=cpSheet(); sh.cols.splice(ci+(side?1:0),0,{id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpCloseFloat(); cpSave(); cpRerender(); }
-function cpColDel(ci){ const sh=cpSheet(); if(sh.cols.length<=1){toast('Нельзя удалить единственную колонку');cpCloseFloat();return;} const id=sh.cols[ci].id; sh.cols.splice(ci,1); sh.rows.forEach(r=>{delete r.c[id];}); if(cpSel.c>=sh.cols.length)cpSel.c=sh.cols.length-1; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpColDel(ci){ const sh=cpSheet(); if(sh.cols[ci]&&sh.cols[ci].sys==='pub'){if(typeof toast==='function')toast('Колонка «Статус публикации» обязательна и не удаляется');cpCloseFloat();return;} if(sh.cols.length<=1){toast('Нельзя удалить единственную колонку');cpCloseFloat();return;} const id=sh.cols[ci].id; sh.cols.splice(ci,1); sh.rows.forEach(r=>{delete r.c[id];}); if(cpSel.c>=sh.cols.length)cpSel.c=sh.cols.length-1; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColPick(e,ci){
   if(cpEd){cpStore();cpEd=null;}
   const sh=cpSheet(); const col=sh.cols[ci]; if(!col)return; const id=col.id;
@@ -5924,9 +5957,11 @@ function cpColPick(e,ci){
 function cpDeleteCols(){
   if(!cpColSel.size)return;
   const sh=cpSheet();
-  const remaining=(sh.cols||[]).filter(function(c){return !cpColSel.has(c.id);});
+  const delIds=Array.from(cpColSel).filter(function(id){ const c=(sh.cols||[]).find(function(x){return x.id===id;}); return !(c&&c.sys==='pub'); });
+  if(!delIds.length){ if(typeof toast==='function')toast('Колонка «Статус публикации» обязательна'); cpColSel=new Set(); cpColAnchor=null; cpCloseFloat(); cpRerender(); return; }
+  const remaining=(sh.cols||[]).filter(function(c){return delIds.indexOf(c.id)<0;});
   if(!remaining.length){ if(typeof toast==='function')toast('Нельзя удалить все колонки'); return; }
-  const n=cpColSel.size; const delIds=Array.from(cpColSel);
+  const n=delIds.length;
   sh.cols=remaining;
   (sh.rows||[]).forEach(function(r){ if(r.c) delIds.forEach(function(id){ delete r.c[id]; }); });
   if(sh.sort&&cpColSel.has(sh.sort.col))sh.sort=null;
