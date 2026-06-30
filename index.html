@@ -4404,13 +4404,15 @@ window.NP_SVCS=[];
 function _svcMoney(n){ return (Number(n)||0).toLocaleString('ru-RU'); }
 function svcTariffPrice(name){ const t=(window.TARIFF_TPL||[]).find(x=>x.name===name); return t?(Number(t.price)||0):null; }
 function svcReset(arr){ window.NP_SVCS=(Array.isArray(arr)&&arr.length?arr:[{service:'',tariff:'',mrr:0,cost:0}]).map(s=>({service:s.service||'',tariff:s.tariff||'',mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})); svcRender(); }
-function svcEditorHTML(){
+function svcEditorHTML(showCost){
+  window.NP_SVC_SHOWCOST=(showCost!==false); const sc=window.NP_SVC_SHOWCOST;
   const svcs=(typeof _tagList==='function')?_tagList('service',['SMM','PROD','DESIGN'],''):['SMM'];
   const tfs=((window.TARIFF_TPL||[]).map(t=>t.name)); const tfList=tfs.length?tfs:((typeof _tagList==='function')?_tagList('tariff',['Platinum','Gold','Silver'],''):[]);
   return '<style>'
     +'.svc-ed{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:11px}'
     +'.svc-head{display:grid;grid-template-columns:1.3fr 1.1fr .9fr .9fr 30px;gap:8px;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3);font-weight:600;padding:0 2px 8px}'
     +'.svc-row{display:grid;grid-template-columns:1.3fr 1.1fr .9fr .9fr 30px;gap:8px;margin-bottom:7px;align-items:center}'
+    +'.svc-ed.no-cost .svc-head,.svc-ed.no-cost .svc-row{grid-template-columns:1.4fr 1.2fr 1fr 30px}'
     +'.svc-i{background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit;font-size:13px;outline:none;width:100%;transition:.14s}'
     +'.svc-i:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}'
     +'.svc-num{text-align:right;font-family:var(--mono)}'
@@ -4424,22 +4426,22 @@ function svcEditorHTML(){
     +'</style>'
     +'<datalist id="svc-dl">'+svcs.map(s=>'<option value="'+_attr(s)+'">').join('')+'</datalist>'
     +'<datalist id="svc-tf-dl">'+tfList.map(t=>'<option value="'+_attr(t)+'">').join('')+'</datalist>'
-    +'<div class="svc-ed"><div class="svc-head"><span>Услуга</span><span>Тариф</span><span>Доход/мес</span><span>Расход/мес</span><span></span></div>'
+    +'<div class="svc-ed'+(sc?'':' no-cost')+'"><div class="svc-head"><span>Услуга</span><span>Тариф</span><span>Доход/мес</span>'+(sc?'<span>Расход/мес</span>':'')+'<span></span></div>'
     +'<div id="svc-list"></div>'
     +'<button type="button" class="svc-add" onclick="svcAdd()">+ Добавить услугу</button>'
     +'<div class="svc-tot" id="svc-tot"></div></div>';
 }
-function svcRender(){ const box=document.getElementById('svc-list'); if(!box)return; const a=window.NP_SVCS||[]; box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
+function svcRender(){ const box=document.getElementById('svc-list'); if(!box)return; const sc=window.NP_SVC_SHOWCOST!==false; const a=window.NP_SVCS||[]; box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
   +'<input class="svc-i" list="svc-dl" placeholder="Услуга" value="'+_attr(s.service)+'" onchange="svcSet('+i+',\'service\',this.value)">'
   +'<input class="svc-i" list="svc-tf-dl" placeholder="Тариф" value="'+_attr(s.tariff)+'" onchange="svcSet('+i+',\'tariff\',this.value)">'
   +'<input class="svc-i svc-num" type="number" min="0" placeholder="0" value="'+(s.mrr||'')+'" oninput="svcSet('+i+',\'mrr\',this.value)">'
-  +'<input class="svc-i svc-num" type="number" min="0" placeholder="0" value="'+(s.cost||'')+'" oninput="svcSet('+i+',\'cost\',this.value)">'
+  +(sc?('<input class="svc-i svc-num" type="number" min="0" placeholder="0" value="'+(s.cost||'')+'" oninput="svcSet('+i+',\'cost\',this.value)">'):'')
   +'<button type="button" class="svc-del" title="Убрать услугу" onclick="svcDel('+i+')"'+(a.length<=1?' style="opacity:.4"':'')+'>✕</button>'
   +'</div>').join(''); svcRenderTot(); }
 function svcAdd(){ (window.NP_SVCS=window.NP_SVCS||[]).push({service:'',tariff:'',mrr:0,cost:0,status:'active'}); svcRender(); }
 function svcDel(i){ const a=window.NP_SVCS||[]; if(a.length<=1){ a[0]={service:'',tariff:'',mrr:0,cost:0,status:'active'}; } else { a.splice(i,1); } svcRender(); }
 function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(v); if(pr!=null && !a[i].mrr){ a[i].mrr=pr; svcRender(); return; } } if(f==='service' && i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function'){ npStagesReload(); } }
-function svcRenderTot(){ const el=document.getElementById('svc-tot'); if(!el)return; let inc=0,cst=0; (window.NP_SVCS||[]).forEach(s=>{inc+=Number(s.mrr)||0;cst+=Number(s.cost)||0;}); const mrg=inc>0?Math.round(100*(inc-cst)/inc):0; el.innerHTML='<span class="inc">Доход: <b>'+_svcMoney(inc)+'</b></span><span class="cst">Расход: <b>'+_svcMoney(cst)+'</b></span><span class="mrg">Маржа: <b>'+mrg+'%</b></span>'; }
+function svcRenderTot(){ const el=document.getElementById('svc-tot'); if(!el)return; const sc=window.NP_SVC_SHOWCOST!==false; let inc=0,cst=0; (window.NP_SVCS||[]).forEach(s=>{inc+=Number(s.mrr)||0;cst+=Number(s.cost)||0;}); const mrg=inc>0?Math.round(100*(inc-cst)/inc):0; el.innerHTML='<span class="inc">Доход: <b>'+_svcMoney(inc)+'</b></span>'+(sc?('<span class="cst">Расход: <b>'+_svcMoney(cst)+'</b></span><span class="mrg">Маржа: <b>'+mrg+'%</b></span>'):''); if(window.PFIN && document.getElementById('pf-pl')){ window.PFIN.mrr=inc; if(typeof pfRecalc==='function')pfRecalc(); } }
 function svcCollect(){ return (window.NP_SVCS||[]).map(s=>({service:(s.service||'').trim(),tariff:(s.tariff||'').trim()||null,mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})).filter(s=>s.service||s.mrr||s.cost); }
 function svcPrimary(list){ const a=(list||svcCollect()).slice().sort((x,y)=>(y.mrr||0)-(x.mrr||0)); return a[0]||{service:'',tariff:null}; }
 function svcTotals(list){ const a=list||svcCollect(); let mrr=0,cost=0; a.forEach(s=>{mrr+=s.mrr||0;cost+=s.cost||0;}); return {mrr:mrr,cost:cost}; }
@@ -9278,8 +9280,9 @@ function openProjFinance(id){
   const f=p.finance||{};
   const arr=k=>Array.isArray(f[k])?JSON.parse(JSON.stringify(f[k])):[];
   PFIN={ id, name:p.name, logoUrl:p.logoUrl, logo:p.logo, mrr:p.mrr||0,
-    salaries:arr('salaries'), opex:arr('opex'), projex:arr('projex'), hours:f.hours||0 };
+    salaries:arr('salaries'), opex:arr('opex'), projex:arr('projex'), hours:f.hours||0, _svcs:(p._svcs||null), _svcsInit:false };
   pfRender();
+  if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_services').select('id,service,tariff,mrr,cost,status,sort').eq('project_id',id).order('sort').then(r=>{ if(r&&r.data&&r.data.length && PFIN&&PFIN.id===id){ PFIN._svcs=r.data; svcReset(r.data); } }); }catch(_e){} }
 }
 function pfTotals(){
   const sum=a=>a.reduce((s,r)=>s+(r.amount||0),0);
@@ -9335,8 +9338,7 @@ function pfRender(){
       <div><h3 style="margin:0">Финансы проекта</h3><p style="margin:2px 0 0;text-transform:uppercase;letter-spacing:.04em">${PFIN.name}</p></div>
     </div>
     <div class="modal-b" style="max-height:64vh;overflow:auto">
-      <div class="fld"><label style="display:flex;justify-content:space-between">Доход от клиента <span style="color:var(--txt-3);font-weight:400;text-transform:uppercase;font-size:9.5px;letter-spacing:.07em;align-self:center">бюджет / мес</span></label>
-        <div style="display:flex"><input id="pf-mrr" type="number" min="0" step="100000" value="${PFIN.mrr}" oninput="pfSetMrr(this.value)" style="flex:1;border-radius:9px 0 0 9px;font-family:var(--mono)">${suff('сум')}</div></div>
+      <div class="fld"><label style="display:flex;justify-content:space-between">Услуги и доход от клиента <span style="color:var(--txt-3);font-weight:400;text-transform:uppercase;font-size:9.5px;letter-spacing:.07em;align-self:center">бюджет / мес</span></label>${svcEditorHTML(false)}</div>
       ${pfSection('salaries','Зарплаты','имя / роль','Имя сотрудника')}
       ${pfSection('opex','Операционные расходы','статья (аренда, инструменты…)','Аренда, инструменты, реклама…')}
       ${pfSection('projex','Расходы на проект','статья (съёмка, реквизит…)','Съёмка, реквизит, студия…')}
@@ -9347,15 +9349,22 @@ function pfRender(){
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close();PFIN=null">Отмена</button><button class="btn-add" onclick="saveProjFinance()">✓ Сохранить P&L</button></div>
   </div>`);
+  svcReset( (PFIN._svcsInit ? (window.NP_SVCS||[]) : ((PFIN._svcs&&PFIN._svcs.length)?PFIN._svcs:[{service:'',tariff:'',mrr:PFIN.mrr,cost:0}])) ); PFIN._svcsInit=true;
 }
-function saveProjFinance(){
+async function saveProjFinance(){
   if(!PFIN) return;
+  const svcsArr=svcCollect(); const prim=svcPrimary(svcsArr); PFIN.mrr=svcTotals(svcsArr).mrr;
   const t=pfTotals();
   const clean=arr=>arr.filter(r=>(r.name&&r.name.trim())||r.amount>0).map(r=>({name:(r.name||'').trim(),amount:r.amount||0}));
   const finance={ salaries:clean(PFIN.salaries), opex:clean(PFIN.opex), projex:clean(PFIN.projex), hours:PFIN.hours||0 };
-  if(window.LIVE&&window.tProjectUpdate){ window.tProjectUpdate(PFIN.id,{mrr:PFIN.mrr,cost:t.cost,finance}); pd2Close(); PFIN=null; toast('P&L сохранён'); return; }
+  if(window.LIVE&&window.tProjectUpdate){
+    try{ await SB.from('project_services').delete().eq('project_id',PFIN.id); if(svcsArr.length){ const rows=svcsArr.map((s,k)=>({project_id:PFIN.id,service:s.service||'Услуга',tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; } }catch(e){ console.error('fin services',e); toast('Услуги не сохранились'); }
+    const patch={mrr:PFIN.mrr,cost:t.cost,finance,tariff:(prim.tariff||null)}; if(prim.service)patch.service=prim.service;
+    window.tProjectUpdate(PFIN.id,patch); pd2Close(); PFIN=null; toast('P&L сохранён'); return;
+  }
   if(typeof FINANCE!=='undefined'&&FINANCE.projects){ const p=FINANCE.projects.find(x=>x.id===PFIN.id);
-    if(p){ p.mrr=PFIN.mrr; p.cost=t.cost; p.hours=PFIN.hours; p.finance=finance; p.profit=PFIN.mrr-t.cost; p.margin=PFIN.mrr>0?Math.round(100*(PFIN.mrr-t.cost)/PFIN.mrr):null; } }
+    if(p){ p.mrr=PFIN.mrr; p.cost=t.cost; p.hours=PFIN.hours; p.finance=finance; p.profit=PFIN.mrr-t.cost; p.margin=PFIN.mrr>0?Math.round(100*(PFIN.mrr-t.cost)/PFIN.mrr):null; p._svcs=svcsArr; } }
+  if(typeof PROJECTS!=='undefined'){ const pp=PROJECTS.find(x=>x.id===PFIN.id); if(pp){ pp.mrr=PFIN.mrr; pp._svcs=svcsArr; if(prim.service)pp.svc=prim.service; pp.tariff=prim.tariff||null; } }
   pd2Close(); PFIN=null; renderFinance(); toast('P&L сохранён');
 }
 
