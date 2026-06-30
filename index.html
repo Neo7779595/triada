@@ -8654,8 +8654,6 @@ function ovCompositionHTML(){
   const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
   const total=PJ.length;
   if(!total) return '';
-  const RAMP=['#37E6C8','#31C2B2','#2DA1A2','#2C8290','#34657E','#3D5370'];
-  const NEUTRAL='#5B616B';
   const dist=(getter,fallback)=>{
     const m={};
     PJ.forEach(p=>{ let v=getter(p); v=(v==null||String(v).trim()===''||String(v).trim()==='—')?fallback:String(v).trim(); m[v]=(m[v]||0)+1; });
@@ -8665,29 +8663,29 @@ function ovCompositionHTML(){
   const bySvc=dist(p=>p.svc,'Без услуги');
   const byTar=dist(p=>p.tariff,'Без тарифа');
   const pack=arr=>{
-    if(arr.length<=6) return arr.map((s,i)=>Object.assign({},s,{c:RAMP[Math.min(i,RAMP.length-1)]}));
-    const top=arr.slice(0,5).map((s,i)=>Object.assign({},s,{c:RAMP[i]}));
-    const rest=arr.slice(5), rn=rest.reduce((a,x)=>a+x.n,0);
-    top.push({k:'Прочее ('+rest.length+')',n:rn,pct:Math.round(100*rn/total),c:NEUTRAL});
+    if(arr.length<=6) return arr;
+    const top=arr.slice(0,5), rest=arr.slice(5), rn=rest.reduce((a,x)=>a+x.n,0);
+    top.push({k:'Прочее ('+rest.length+')',n:rn,pct:Math.round(100*rn/total),_o:true});
     return top;
   };
-  const dim=(label,arr,noun)=>{
-    const segs=pack(arr);
-    const bar=segs.map(s=>`<div class="ovc-seg" style="width:${s.pct}%;background:${s.c}" title="${_ddH(s.k)} · ${s.n} ${_plural(s.n,'проект','проекта','проектов')} · ${s.pct}%"></div>`).join('');
-    const legend=segs.map((s,i)=>`<span class="ovc-lg"><span class="ovc-dot" style="background:${s.c}"></span><span class="ovc-nm"${i===0?' style="color:var(--txt);font-weight:650"':''}>${_ddH(s.k)}</span><b>${s.pct}%</b><i>${s.n}</i></span>`).join('');
-    return `<div class="ovc-row"><div class="ovc-head"><div class="ovc-label">${label}</div><div class="ovc-meta">${arr.length} ${_plural(arr.length,noun[0],noun[1],noun[2])}</div></div><div class="ovc-bar">${bar}</div><div class="ovc-legend">${legend}</div></div>`;
+  const dim=(label,arr,accent,noun)=>{
+    const rows=pack(arr).map((s,i)=>{
+      const lead=i===0&&!s._o, col=s._o?'var(--txt-3)':accent;
+      return `<div class="ovc-row${lead?' lead':''}"><div class="ovc-cat" title="${_ddH(s.k)}">${_ddH(s.k)}</div><div class="ovc-track"><div class="ovc-fill" style="width:${Math.max(s.pct,2)}%;background:${col}"></div></div><div class="ovc-val"><b>${s.pct}%</b><i>${s.n}</i></div></div>`;
+    }).join('');
+    return `<div class="ovc-dim"><div class="ovc-dhead"><span class="ovc-dlabel" style="color:${accent}">${label}</span><span class="ovc-dmeta">${arr.length} ${_plural(arr.length,noun[0],noun[1],noun[2])}</span></div>${rows}</div>`;
   };
   const conc=byCat[0].pct;
   const cc = conc>=50?{c:'var(--neg)',b:'rgba(229,90,90,.14)',t:'Высокая концентрация'} : conc>=35?{c:'var(--warn)',b:'rgba(227,181,103,.15)',t:'Умеренная концентрация'} : {c:'var(--accent)',b:'var(--accent-dim)',t:'Диверсифицирован'};
   const lead = `Ведущая услуга — <b>${_ddH(bySvc[0].k)}</b> (${bySvc[0].pct}%); крупнейшая сфера — <b>${_ddH(byCat[0].k)}</b> (${byCat[0].pct}% портфеля).`;
   return `<div class="card ov-comp" style="margin-top:16px">
-    <div class="card-h"><div class="t">Структура портфеля <span class="c">распределение по направлениям</span></div>
+    <div class="card-h"><div class="t">Структура портфеля <span class="c">${total} ${_plural(total,'проект','проекта','проектов')} · по направлениям</span></div>
       <span style="font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:${cc.b};color:${cc.c};white-space:nowrap">${cc.t}</span></div>
-    <div class="ovc-top"><div class="ovc-lead">${lead}</div><div class="ovc-total"><div class="v">${total}</div><div class="l">проектов в портфеле</div></div></div>
-    <div class="ovc-rows">
-      ${dim('Сфера',byCat,['сфера','сферы','сфер'])}
-      ${dim('Услуга',bySvc,['услуга','услуги','услуг'])}
-      ${dim('Тариф',byTar,['тариф','тарифа','тарифов'])}
+    <div class="ovc-lead">${lead}</div>
+    <div class="ovc-dims">
+      ${dim('Сфера',byCat,'var(--accent)',['сфера','сферы','сфер'])}
+      ${dim('Услуга',bySvc,'#8A8FFF',['услуга','услуги','услуг'])}
+      ${dim('Тариф',byTar,'#E3B567',['тариф','тарифа','тарифов'])}
     </div>
   </div>`;
 }
@@ -8770,24 +8768,20 @@ function renderOverview(){
       #content-ag .ov-rtok svg{width:11px;height:11px} #content-ag .ov-rtok.st{background:var(--accent-dim);color:var(--accent)} #content-ag .ov-rtok.tk{background:rgba(138,143,255,.14);color:var(--violet)}
       #content-ag .ov-redo{display:flex;align-items:center;gap:6px;font-size:11px;margin-top:7px}
       #content-ag .ov-redo svg{width:12px;height:12px;flex:none} #content-ag .ov-redo b{font-family:var(--mono);font-weight:600}
-      #content-ag .ov-comp .ovc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:2px}
-      #content-ag .ovc-lead{font-size:13.5px;line-height:1.6;color:var(--txt-2);max-width:680px}
+      #content-ag .ov-comp .ovc-lead{font-size:13.5px;line-height:1.6;color:var(--txt-2);max-width:760px;margin-top:4px}
       #content-ag .ovc-lead b{color:var(--txt);font-weight:650}
-      #content-ag .ovc-total{text-align:right;flex:0 0 auto}
-      #content-ag .ovc-total .v{font-size:26px;font-weight:700;color:var(--txt);font-variant-numeric:tabular-nums;line-height:1}
-      #content-ag .ovc-total .l{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--txt-3);margin-top:4px}
-      #content-ag .ovc-rows{display:flex;flex-direction:column;gap:20px;margin-top:20px}
-      #content-ag .ovc-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
-      #content-ag .ovc-label{font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:var(--txt-2);font-weight:650}
-      #content-ag .ovc-meta{font-size:11px;color:var(--txt-3);font-variant-numeric:tabular-nums}
-      #content-ag .ovc-bar{display:flex;height:30px;border-radius:8px;overflow:hidden;background:var(--bg-3);gap:2px}
-      #content-ag .ovc-seg{height:100%;min-width:3px;transition:filter .15s}
-      #content-ag .ovc-seg:hover{filter:brightness(1.13)}
-      #content-ag .ovc-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:11px}
-      #content-ag .ovc-lg{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--txt-2)}
-      #content-ag .ovc-dot{width:9px;height:9px;border-radius:3px;flex:none}
-      #content-ag .ovc-lg b{color:var(--txt);font-weight:650;font-variant-numeric:tabular-nums}
-      #content-ag .ovc-lg i{color:var(--txt-3);font-style:normal;font-size:11px;font-variant-numeric:tabular-nums}
+      #content-ag .ovc-dims{display:flex;flex-direction:column;gap:22px;margin-top:20px}
+      #content-ag .ovc-dhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:11px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+      #content-ag .ovc-dlabel{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+      #content-ag .ovc-dmeta{font-size:11px;color:var(--txt-3);font-variant-numeric:tabular-nums}
+      #content-ag .ovc-row{display:grid;grid-template-columns:152px 1fr 64px;align-items:center;gap:14px;height:30px}
+      #content-ag .ovc-cat{font-size:12.5px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #content-ag .ovc-row.lead .ovc-cat{color:var(--txt);font-weight:650}
+      #content-ag .ovc-track{height:11px;background:var(--bg-3);border-radius:6px;overflow:hidden}
+      #content-ag .ovc-fill{height:100%;border-radius:6px;transition:width .55s cubic-bezier(.16,.84,.44,1)}
+      #content-ag .ovc-val{text-align:right;display:flex;align-items:baseline;justify-content:flex-end;gap:7px}
+      #content-ag .ovc-val b{font-size:13px;color:var(--txt);font-weight:700;font-variant-numeric:tabular-nums}
+      #content-ag .ovc-val i{font-size:11px;color:var(--txt-3);font-style:normal;font-variant-numeric:tabular-nums}
     </style>
     <div class="px-ov">
       <div class="px-ov-cell">
