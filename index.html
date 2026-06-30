@@ -6682,21 +6682,30 @@ function cpSheetFromWs(name,ws,shared,dateXf,hidden){
   let hi=norm.findIndex(function(a){ return a.filter(function(x){return x!=='';}).length>=2; });
   if(hi<0)hi=0;
   const head=norm[hi]||[]; const body=norm.slice(hi+1);
-  const cols=[];
+  // только реально используемые колонки (есть заголовок ИЛИ данные) — без пустых «Колонка N»
+  const used=[];
   for(let i=0;i<maxc;i++){
+    const hasHead=(head[i]!=null&&String(head[i]).trim()!=='');
+    const hasData=body.some(function(r){return r[i]!=null&&String(r[i]).trim()!=='';});
+    if(hasHead||hasData)used.push(i);
+  }
+  if(!used.length)used.push(0);
+  const cols=used.map(function(i){
     const vals=body.map(function(r){return r[i];}).filter(function(x){return x!=='';});
     let type='text';
     if(vals.length){
       if(vals.every(function(v){return /^\d{4}-\d{2}-\d{2}/.test(v);})) type='date';
       else if(vals.every(function(v){return /^[-+]?[\d\s.,]+%?$/.test(v);})) type='num';
     }
-    const nm=(head[i]||('Колонка '+(i+1))).toString().trim()||('Колонка '+(i+1));
-    cols.push({id:cpUid(),name:nm,type:type,w:type==='text'?180:120,opts:[]});
-  }
+    const nm=(head[i]==null?'':String(head[i])).trim()||('Колонка '+(i+1));
+    return {id:cpUid(),name:nm,type:type,w:type==='text'?180:120,opts:[],_src:i};
+  });
   const rows=body.filter(function(r){return r.some(function(x){return x!=='';});}).map(function(r){
-    const o={id:cpUid(),c:{}}; cols.forEach(function(col,i){ const v=(r[i]||'').toString().trim(); if(v)o.c[col.id]=v; }); return o;
+    const o={id:cpUid(),c:{}}; cols.forEach(function(col){ const v=(r[col._src]||'').toString().trim(); if(v)o.c[col.id]=v; }); return o;
   });
   if(!rows.length)rows.push({id:cpUid(),c:{}});
+  cols.forEach(function(c){ delete c._src; });
+  cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]});
   return {id:cpUid(),name:(name||'Лист').slice(0,40),color:'blue',hidden:!!hidden,cols:cols,rows:rows};
 }
 async function cpImportXlsx(input){
