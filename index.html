@@ -4284,8 +4284,8 @@ function projSettings(i){
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pj-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
-      <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}${tagCombo('pj-svc','Услуга (тег)',svcs,p.svc,'Выбери или создай','service')}</div>
-      <div class="fld2">${tagCombo('pj-tariff','Тариф',tariffs,(p.tariff||''),'Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('pj-lead',leadOpts,(p.lead_id||''))}</div></div>
+      <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}<div class="fld"><label>Ответственный</label>${selField('pj-lead',leadOpts,(p.lead_id||''))}</div></div>
+      <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML()}</div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
         <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('np-cstart','')}</div><div class="np-ct-d"><span>Окончание</span>${dateField('np-cend','')}</div></div>
@@ -4301,17 +4301,20 @@ function projSettings(i){
   if(typeof npRenderTeam==='function') npRenderTeam();
   if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_members').select('member_id').eq('project_id',p.id).then(r=>{ if(r&&r.data){ window.NP_TEAM=new Set(r.data.map(x=>x.member_id)); if(typeof npRenderTeam==='function') npRenderTeam(); } }); }catch(_e){} }
   npContractInit();
+  svcReset((p._svcs&&p._svcs.length)?p._svcs:[{service:p.svc||'',tariff:p.tariff||'',mrr:p.mrr||0,cost:p.cost||0}]);
+  if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_services').select('id,service,tariff,mrr,cost,status,sort').eq('project_id',p.id).order('sort').then(r=>{ if(r&&r.data&&r.data.length){ p._svcs=r.data; svcReset(r.data); } }); }catch(_e){} }
   if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_contracts').select('start_date,end_date').eq('project_id',p.id).maybeSingle().then(r=>{ if(r&&r.data) npContractInit(r.data.start_date,r.data.end_date); }); }catch(_e){} }
 }
 async function pjSaveSettings(i){
   const p=PROJECTS[i];
   const b=document.querySelector('#pj-stseg button.on'); const status=b?b.dataset.st:p.status;
-  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:_v('pj-svc')||p.svc, tariff:(_v('pj-tariff')||null), lead_id:(_v('pj-lead')||null), status };
+  const svcsArr=svcCollect(); const prim=svcPrimary(svcsArr); const tot=svcTotals(svcsArr);
+  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:(prim.service||p.svc||'—'), tariff:(prim.tariff||null), mrr:tot.mrr, cost:tot.cost, lead_id:(_v('pj-lead')||null), status };
   if(status==='done'&&p.status!=='done')patch.closed_at=new Date().toISOString(); else if(status==='active')patch.closed_at=null;
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():null);
   const ctTerm={start:_v('np-cstart')||null, end:_v('np-cend')||null};
   if(window.LIVE && p.status==='done' && status==='active'){
-    window._reactData={ id:p.id, patch, selTeam, ctTerm, oldContract:(p._contract||null) };
+    window._reactData={ id:p.id, patch, selTeam, ctTerm, oldContract:(p._contract||null), svcs:svcsArr };
     pd2Open(`<div class="modal"><div class="modal-h"><h3>Вернуть проект в работу</h3><p>${_ddH(p.name)} · новый цикл</p></div>`
       +`<div class="modal-b"><div style="font-size:13px;color:var(--txt-2);line-height:1.55">Проект возвращается в работу как <b>новый цикл</b>. Прошлый цикл (этапы и задачи) будет заархивирован в «Прошлые периоды», а текущие этапы и задачи — <b>обнулены</b>: первый этап в работу, остальные в очередь. Срок договора возьмётся из формы настроек.</div></div>`
       +`<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjDoReactivate()">Вернуть и начать новый цикл</button></div></div>`);
@@ -4320,11 +4323,12 @@ async function pjSaveSettings(i){
   if(window.LIVE){
     if(selTeam){ try{ await SB.from('project_members').delete().eq('project_id',p.id); if(selTeam.length){ const {error}=await SB.from('project_members').insert(selTeam.map(mid=>({project_id:p.id,member_id:mid}))); if(error)throw error; } }catch(e){ console.error('team save',e); toast('Команда не сохранилась'); } }
     if(ctTerm.start && ctTerm.end){ try{ const {error}=await SB.from('project_contracts').upsert({project_id:p.id, start_date:ctTerm.start, end_date:ctTerm.end, updated_at:new Date().toISOString()}, {onConflict:'project_id'}); if(error)throw error; }catch(e){ console.error('contract save',e); toast('Срок договора не сохранился'); } }
+    try{ await SB.from('project_services').delete().eq('project_id',p.id); if(svcsArr.length){ const rows=svcsArr.map((s,k)=>({project_id:p.id,service:s.service||'Услуга',tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; } p._svcs=svcsArr; }catch(e){ console.error('services save',e); toast('Услуги не сохранились'); }
     if(window.tProjectUpdate) return window.tProjectUpdate(p.id,patch);
     return;
   }
   if(selTeam){ p._team=selTeam.map(id=>{ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:id}:null; }).filter(Boolean); }
-  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.lead_id=patch.lead_id; p._lead=null; p.status=status;
+  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.mrr=patch.mrr; p.cost=patch.cost; p._svcs=svcsArr; p.lead_id=patch.lead_id; p._lead=null; p.status=status;
   pd2Close(); renderProjects(); toast('Проект обновлён');
 }
 function pjDoReactivate(){
@@ -4332,7 +4336,8 @@ function pjDoReactivate(){
   (async()=>{
     try{
       if(d.selTeam){ await SB.from('project_members').delete().eq('project_id',d.id); if(d.selTeam.length){ const {error}=await SB.from('project_members').insert(d.selTeam.map(mid=>({project_id:d.id,member_id:mid}))); if(error) console.error('react team',error); } }
-      await SB.from('projects').update({name:d.patch.name, logo_url:d.patch.logo_url, category:d.patch.category, service:d.patch.service, tariff:d.patch.tariff, lead_id:d.patch.lead_id}).eq('id',d.id);
+      await SB.from('projects').update({name:d.patch.name, logo_url:d.patch.logo_url, category:d.patch.category, service:d.patch.service, tariff:d.patch.tariff, mrr:d.patch.mrr, cost:d.patch.cost, lead_id:d.patch.lead_id}).eq('id',d.id);
+      if(Array.isArray(d.svcs)){ try{ await SB.from('project_services').delete().eq('project_id',d.id); if(d.svcs.length){ const {error:se}=await SB.from('project_services').insert(d.svcs.map((s,k)=>({project_id:d.id,service:s.service||'Услуга',tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k}))); if(se)console.error('react services',se); } }catch(_e){ console.error(_e); } }
     }catch(e){ console.error('reactivate fields',e); }
     const ns=d.ctTerm.start || (d.oldContract&&d.oldContract.start) || (typeof npToday==='function'?npToday():null);
     const ne=d.ctTerm.end || (typeof npAddMonths==='function'?npAddMonths(ns,1):null);
@@ -4394,6 +4399,51 @@ function contractBadgeHTML(p){
 }
 function setAgFilter(f){agFilter=f;renderProjects();}
 
+/* ===== редактор услуг проекта (много услуг + тарифов на проект) ===== */
+window.NP_SVCS=[];
+function _svcMoney(n){ return (Number(n)||0).toLocaleString('ru-RU'); }
+function svcTariffPrice(name){ const t=(window.TARIFF_TPL||[]).find(x=>x.name===name); return t?(Number(t.price)||0):null; }
+function svcReset(arr){ window.NP_SVCS=(Array.isArray(arr)&&arr.length?arr:[{service:'',tariff:'',mrr:0,cost:0}]).map(s=>({service:s.service||'',tariff:s.tariff||'',mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})); svcRender(); }
+function svcEditorHTML(){
+  const svcs=(typeof _tagList==='function')?_tagList('service',['SMM','PROD','DESIGN'],''):['SMM'];
+  const tfs=((window.TARIFF_TPL||[]).map(t=>t.name)); const tfList=tfs.length?tfs:((typeof _tagList==='function')?_tagList('tariff',['Platinum','Gold','Silver'],''):[]);
+  return '<style>'
+    +'.svc-ed{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:11px}'
+    +'.svc-head{display:grid;grid-template-columns:1.3fr 1.1fr .9fr .9fr 30px;gap:8px;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3);font-weight:600;padding:0 2px 8px}'
+    +'.svc-row{display:grid;grid-template-columns:1.3fr 1.1fr .9fr .9fr 30px;gap:8px;margin-bottom:7px;align-items:center}'
+    +'.svc-i{background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit;font-size:13px;outline:none;width:100%;transition:.14s}'
+    +'.svc-i:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}'
+    +'.svc-num{text-align:right;font-family:var(--mono)}'
+    +'.svc-del{width:30px;height:34px;border:1px solid var(--line-2);border-radius:8px;background:transparent;color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:.14s}'
+    +'.svc-del:hover{color:var(--neg);border-color:var(--neg)}'
+    +'.svc-add{margin-top:3px;width:100%;padding:9px;border:1px dashed var(--accent-line);border-radius:9px;background:var(--accent-dim);color:var(--accent);cursor:pointer;font:inherit;font-weight:600;font-size:12.5px;transition:.14s}'
+    +'.svc-add:hover{background:var(--accent);color:var(--accent-ink);border-color:transparent}'
+    +'.svc-tot{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--txt-3)}'
+    +'.svc-tot b{font-family:var(--mono);font-size:14px}'
+    +'.svc-tot .inc b{color:var(--accent)}.svc-tot .cst b{color:var(--txt)}.svc-tot .mrg b{color:var(--violet)}'
+    +'</style>'
+    +'<datalist id="svc-dl">'+svcs.map(s=>'<option value="'+_attr(s)+'">').join('')+'</datalist>'
+    +'<datalist id="svc-tf-dl">'+tfList.map(t=>'<option value="'+_attr(t)+'">').join('')+'</datalist>'
+    +'<div class="svc-ed"><div class="svc-head"><span>Услуга</span><span>Тариф</span><span>Доход/мес</span><span>Расход/мес</span><span></span></div>'
+    +'<div id="svc-list"></div>'
+    +'<button type="button" class="svc-add" onclick="svcAdd()">+ Добавить услугу</button>'
+    +'<div class="svc-tot" id="svc-tot"></div></div>';
+}
+function svcRender(){ const box=document.getElementById('svc-list'); if(!box)return; const a=window.NP_SVCS||[]; box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
+  +'<input class="svc-i" list="svc-dl" placeholder="Услуга" value="'+_attr(s.service)+'" onchange="svcSet('+i+',\'service\',this.value)">'
+  +'<input class="svc-i" list="svc-tf-dl" placeholder="Тариф" value="'+_attr(s.tariff)+'" onchange="svcSet('+i+',\'tariff\',this.value)">'
+  +'<input class="svc-i svc-num" type="number" min="0" placeholder="0" value="'+(s.mrr||'')+'" oninput="svcSet('+i+',\'mrr\',this.value)">'
+  +'<input class="svc-i svc-num" type="number" min="0" placeholder="0" value="'+(s.cost||'')+'" oninput="svcSet('+i+',\'cost\',this.value)">'
+  +'<button type="button" class="svc-del" title="Убрать услугу" onclick="svcDel('+i+')"'+(a.length<=1?' style="opacity:.4"':'')+'>✕</button>'
+  +'</div>').join(''); svcRenderTot(); }
+function svcAdd(){ (window.NP_SVCS=window.NP_SVCS||[]).push({service:'',tariff:'',mrr:0,cost:0,status:'active'}); svcRender(); }
+function svcDel(i){ const a=window.NP_SVCS||[]; if(a.length<=1){ a[0]={service:'',tariff:'',mrr:0,cost:0,status:'active'}; } else { a.splice(i,1); } svcRender(); }
+function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(v); if(pr!=null && !a[i].mrr){ a[i].mrr=pr; svcRender(); return; } } if(f==='service' && i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function'){ npStagesReload(); } }
+function svcRenderTot(){ const el=document.getElementById('svc-tot'); if(!el)return; let inc=0,cst=0; (window.NP_SVCS||[]).forEach(s=>{inc+=Number(s.mrr)||0;cst+=Number(s.cost)||0;}); const mrg=inc>0?Math.round(100*(inc-cst)/inc):0; el.innerHTML='<span class="inc">Доход: <b>'+_svcMoney(inc)+'</b></span><span class="cst">Расход: <b>'+_svcMoney(cst)+'</b></span><span class="mrg">Маржа: <b>'+mrg+'%</b></span>'; }
+function svcCollect(){ return (window.NP_SVCS||[]).map(s=>({service:(s.service||'').trim(),tariff:(s.tariff||'').trim()||null,mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})).filter(s=>s.service||s.mrr||s.cost); }
+function svcPrimary(list){ const a=(list||svcCollect()).slice().sort((x,y)=>(y.mrr||0)-(x.mrr||0)); return a[0]||{service:'',tariff:null}; }
+function svcTotals(list){ const a=list||svcCollect(); let mrr=0,cost=0; a.forEach(s=>{mrr+=s.mrr||0;cost+=s.cost||0;}); return {mrr:mrr,cost:cost}; }
+
 /* ——— create project (mirrors projSettings shape) ——— */
 function openNewProject(){
   if(!agIsPM()){ toast('Создавать проекты могут только PM'); return; }
@@ -4422,9 +4472,8 @@ function openNewProject(){
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. Uzbek Doner"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
-      <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}${tagCombo('np-svc','Услуга',svcs,'SMM','Выбери или создай','service')}</div>
-      <div class="fld2">${tagCombo('np-tariff','Тариф',tariffs,'','Выбери или создай','tariff')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
-      <div class="fld"><label>Доход / мес <span style="color:var(--txt-3);font-weight:400;text-transform:none;letter-spacing:0" id="np-income-hint"></span></label><input id="np-income" type="number" placeholder="0"></div>
+      <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
+      <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML()}</div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
         <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('np-cstart','')}</div><div class="np-ct-d"><span>Окончание</span>${dateField('np-cend','')}</div></div>
@@ -4434,26 +4483,28 @@ function openNewProject(){
       <div class="fld2" id="np-client"><div class="fld"><label>Логин клиента</label><input id="np-clogin" placeholder="client"></div><div class="fld"><label>Пароль клиента</label><input id="np-cpass" type="password" placeholder="мин. 6 символов"></div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="npSaveProject()">Создать проект</button></div></div>`);
-  setTimeout(()=>{npStagesReload();npTeamReset();npContractInit();const n=document.getElementById('np-name');if(n)n.focus();},30);
+  setTimeout(()=>{svcReset([{service:'SMM',tariff:'',mrr:0,cost:0}]);npStagesReload();npTeamReset();npContractInit();const n=document.getElementById('np-name');if(n)n.focus();},30);
 }
 function npSaveProject(){
   if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } 
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
-  const svc=_v('np-svc')||'SMM';
-  const tariff=_v('np-tariff')||null;
-  const income=Number(_v('np-income'))||0;
+  const svcsArr=svcCollect(); if(!svcsArr.length){toast('Добавь хотя бы одну услугу');return;}
+  const prim=svcPrimary(svcsArr), tot=svcTotals(svcsArr);
+  const svc=prim.service||'SMM';
+  const tariff=prim.tariff||null;
+  const income=tot.mrr;
   const lead=_v('np-lead')||null;
   const selStages=(typeof npSelectedStages==='function'?npSelectedStages():[]);
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():[]);
   const selContract={start:(_v('np-cstart')||null), end:(_v('np-cend')||null)};
   const totN=stageSetFor(svc).length;
-  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,team:selTeam,contract:selContract,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead,mrr:income}}); pd2Close(); return; }
-  PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,mrr:income,pct:0,stages:'0 / '+(selStages.length||totN),health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
+  if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,team:selTeam,contract:selContract,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead,mrr:income,cost:tot.cost,services:svcsArr}}); pd2Close(); return; }
+  PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,mrr:income,cost:tot.cost,_svcs:svcsArr,pct:0,stages:'0 / '+(selStages.length||totN),health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
 
 /* ——— custom stages in create modal (путь A: добавить / переименовать / удалить / порядок) ——— */
-function npStagesReload(){ const svc=(_v('np-svc')||'SMM'); window.NP_STAGES=stageSetFor(svc).map(n=>({name:n})); npRenderStages(); }
+function npStagesReload(){ const svc=((window.NP_SVCS&&window.NP_SVCS[0]&&window.NP_SVCS[0].service)||_v('np-svc')||'SMM'); window.NP_STAGES=stageSetFor(svc).map(n=>({name:n})); npRenderStages(); }
 function npRenderStages(){
   const box=document.getElementById('np-stages'); if(!box) return;
   const sv=p=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">'+p+'</svg>';
@@ -11879,11 +11930,15 @@ window.tLoadTeam = async () => {
 /* ===== FINANCE · live P&L from projects.mrr / projects.cost ===== */
 window.tLoadFinance = async () => {
   if (!SB) return;
-  const [res, tt, snapsRes] = await Promise.all([
+  const [res, tt, snapsRes, svcRes] = await Promise.all([
     SB.from('projects').select('id,name,service,status,category,logo,logo_url,mrr,cost,finance,tariff,created_at'),
     SB.from('project_tasks').select('project_id,time_spent,timer_started'),
-    SB.from('fin_snapshots').select('*').order('period') ]);
+    SB.from('fin_snapshots').select('*').order('period'),
+    SB.from('project_services').select('project_id,service,tariff,mrr,cost,status') ]);
   if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost/finance ещё не добавлены
+  // карта услуг по проекту (только активные строки идут в разбивки)
+  const svcMap = {};
+  (svcRes && !svcRes.error && svcRes.data ? svcRes.data : []).forEach(s => { if((s.status||'active')!=='active') return; (svcMap[s.project_id]||(svcMap[s.project_id]=[])).push({ service:s.service||'Прочее', tariff:s.tariff||null, mrr:Number(s.mrr)||0, cost:Number(s.cost)||0 }); });
   // мягкая догрузка дат старта/закрытия — если колонок нет, финансы всё равно работают
   let _datesById = {};
   try {
@@ -11929,12 +11984,12 @@ window.tLoadFinance = async () => {
 
   const COLORS = ['#37E6C8','#8A8FFF','#F0785C','#E3B567','#43D88C','#5BC8F5'];
   const sm = {}, so = [];
-  rows.forEach(p => { if (p.mrr<=0) return; if (!sm[p.service]){ sm[p.service]={amount:0,cost:0,count:0}; so.push(p.service); } sm[p.service].amount += p.mrr; sm[p.service].cost += p.cost; sm[p.service].count++; });
+  rows.forEach(p => { const _ls=svcMap[p.id]; const _eff=(_ls&&_ls.length)?_ls:[{service:p.service,tariff:p.tariff,mrr:p.mrr,cost:p.cost}]; _eff.forEach(L => { if ((L.mrr||0)<=0) return; const _s=L.service||'Прочее'; if (!sm[_s]){ sm[_s]={amount:0,cost:0,count:0}; so.push(_s); } sm[_s].amount += (L.mrr||0); sm[_s].cost += (L.cost||0); sm[_s].count++; }); });
   let services = so.map((n,i)=>({ name:n, amount:sm[n].amount, cost:sm[n].cost, count:sm[n].count, pct: totalMrr?Math.round(100*sm[n].amount/totalMrr):0, margin: sm[n].amount>0?Math.round(100*(sm[n].amount-sm[n].cost)/sm[n].amount):0, color:COLORS[i%COLORS.length] }));
   services.sort((a,b)=> b.amount-a.amount);
   const TARIFF_COLORS = { Platinum:'#8A8FFF', Gold:'#E3B567', Silver:'#37E6C8', '—':'#5B616B' };
   const tm = {}, to = [];
-  rows.forEach(p => { if (p.mrr<=0) return; const tf=p.tariff||'—'; if (!tm[tf]){ tm[tf]={amount:0,cost:0,count:0}; to.push(tf); } tm[tf].amount += p.mrr; tm[tf].cost += p.cost; tm[tf].count++; });
+  rows.forEach(p => { const _ls=svcMap[p.id]; const _eff=(_ls&&_ls.length)?_ls:[{service:p.service,tariff:p.tariff,mrr:p.mrr,cost:p.cost}]; _eff.forEach(L => { if ((L.mrr||0)<=0) return; const tf=L.tariff||'—'; if (!tm[tf]){ tm[tf]={amount:0,cost:0,count:0}; to.push(tf); } tm[tf].amount += (L.mrr||0); tm[tf].cost += (L.cost||0); tm[tf].count++; }); });
   let tariffs = to.map((n,i)=>({ name:n, amount:tm[n].amount, cost:tm[n].cost, count:tm[n].count, pct: totalMrr?Math.round(100*tm[n].amount/totalMrr):0, margin: tm[n].amount>0?Math.round(100*(tm[n].amount-tm[n].cost)/tm[n].amount):0, color: TARIFF_COLORS[n]||COLORS[i%COLORS.length] }));
   tariffs.sort((a,b)=> b.amount-a.amount);
 
@@ -12205,7 +12260,7 @@ window.tProvisionClient = async (c) => {
     if(!np){ await new Promise(r=>setTimeout(r,700)); await window.tLoadAll(ME.role); np=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name).pop(); }
     // тариф/ответственный edge-функция может не сохранять — дожимаем прямым апдейтом (сбой не глушим)
     if (np && np.id && c.project && (c.project.tariff!==undefined || c.project.lead_id!==undefined || c.project.mrr!==undefined)){
-      const patch={}; if(c.project.tariff) patch.tariff=c.project.tariff; if(c.project.lead_id) patch.lead_id=c.project.lead_id; if(c.project.mrr!==undefined && c.project.mrr!==null) patch.mrr=c.project.mrr;
+      const patch={}; if(c.project.tariff) patch.tariff=c.project.tariff; if(c.project.lead_id) patch.lead_id=c.project.lead_id; if(c.project.mrr!==undefined && c.project.mrr!==null) patch.mrr=c.project.mrr; if(c.project.cost!==undefined && c.project.cost!==null) patch.cost=c.project.cost;
       if(Object.keys(patch).length){ try{ const {error}=await SB.from('projects').update(patch).eq('id',np.id); if(error)throw error; await window.tLoadAll(ME.role); }catch(_e){ toast('Проект создан, но тариф/ответственный не сохранились'); } }
     }
     // засев этапов (путь A): кастомный набор имеет приоритет над дефолтами edge-функции
@@ -12228,6 +12283,11 @@ window.tProvisionClient = async (c) => {
     if (np && np.id && c.contract && c.contract.start && c.contract.end){
       try{ const {error}=await SB.from('project_contracts').insert({project_id:np.id, start_date:c.contract.start, end_date:c.contract.end}); if(error)throw error; }
       catch(e){ console.error('contract insert',e); toast('Проект создан, но срок договора не сохранился'); }
+    }
+    // услуги проекта (много услуг/тарифов)
+    if (np && np.id && c.project && Array.isArray(c.project.services) && c.project.services.length){
+      try{ const rows=c.project.services.map((s,i)=>({project_id:np.id, service:s.service||'Услуга', tariff:s.tariff||null, mrr:s.mrr||0, cost:s.cost||0, status:s.status||'active', sort:i})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; }
+      catch(e){ console.error('services insert',e); toast('Проект создан, но услуги не сохранились'); }
     }
     await window.tLoadAll(ME.role);
     toast('Проект и клиентский доступ созданы');
