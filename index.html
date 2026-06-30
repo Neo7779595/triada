@@ -1808,6 +1808,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .clcp-bsep{width:1px;height:22px;background:var(--line-2);margin:0 2px;flex:0 0 auto}
 /* шаблоны списков */
 .cp-tplm,.cp-tple{padding:28px}
+.cp-plan-cic{width:34px;height:34px;border-radius:10px;background:var(--accent-dim);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.cp-plan-cic svg{width:18px;height:18px}
+.cp-tplm-ic{width:34px;height:34px;border-radius:10px;background:var(--accent-dim);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.cp-tplm-ic svg{width:17px;height:17px}
 /* ШАБЛОНЫ КОНТЕНТ-ПЛАНОВ */
 #ov-pd2 .cp-plan{max-width:860px}
 #ov-pd2 .cp-plane{max-width:680px}
@@ -6022,7 +6026,7 @@ function cpRender(p){
     +'</span>'
     +'<button class="cp-mini" onclick="cpAddCol()">'+CP_IC.plus+'Колонка</button>'
     +'<button class="cp-mini" onclick="cpImport()">'+CP_IC.upload+'Импорт</button>'
-    +'<button class="cp-mini" onclick="cpPlanGallery()">'+CP_IC.grid+'Шаблоны</button>'
+    +'<button class="cp-mini" onclick="cpPlanGallery()">'+CP_IC.grid+'Таблицы</button>'
     +'<button class="cp-mini" onclick="cpTplManager()">'+CP_IC.tpl+'Списки</button>'
     +'<button class="cp-mini cp-send" onclick="cpSendSheet()">'+CP_IC.send+'Отправить на согласование</button>'
     +'</div></div>';
@@ -6948,7 +6952,7 @@ function cpTplManager(){
   h+='<div class="cp-tplm-list">';
   if(!all.length)h+='<div class="cp-tplm-empty">Пока нет шаблонов — создайте первый ниже.</div>';
   all.forEach(function(t){
-    h+='<div class="cp-tplm-item"><div class="cp-tplm-main"><div class="cp-tplm-iname">'+_ddH(t.name)+'</div><div class="cp-tplm-chips">'+cpTplChips(t)+'</div></div>'
+    h+='<div class="cp-tplm-item"><span class="cp-tplm-ic">'+cpTplIcon(t.name,'tag')+'</span><div class="cp-tplm-main"><div class="cp-tplm-iname">'+_ddH(t.name)+'</div><div class="cp-tplm-chips">'+cpTplChips(t)+'</div></div>'
       +'<div class="cp-tplm-iact"><button class="cp-tplm-ib" title="Изменить" onclick="cpTplEdit(\''+t.id+'\')">'+CP_IC.edit+'</button><button class="cp-tplm-ib del" title="Удалить" onclick="cpTplDelete(\''+t.id+'\')">'+CP_IC.trash+'</button></div></div>';
   });
   h+='</div><button class="cp-tplm-add" onclick="cpTplEdit(null)">'+CP_IC.plus+'Новый шаблон</button></div>';
@@ -7104,7 +7108,7 @@ function cpPlanGallery(){
   h+='<div class="cp-plan-grid">';
   all.forEach(function(t){
     const nc=(t.cols||[]).filter(c=>c.sys!=='pub').length, nr=(t.rows||[]).length;
-    h+='<div class="cp-plan-card"><div class="cp-plan-ctop"><div class="cp-plan-cname">'+_ddH(t.name)+'</div><button class="cp-plan-cmenu" title="Ещё" onclick="cpPlanCardMenu(event,\''+t.id+'\')">'+CP_IC.dots+'</button></div>';
+    h+='<div class="cp-plan-card"><div class="cp-plan-ctop"><span class="cp-plan-cic">'+cpTplIcon(t.name,'grid')+'</span><div class="cp-plan-cname">'+_ddH(t.name)+'</div><button class="cp-plan-cmenu" title="Ещё" onclick="cpPlanCardMenu(event,\''+t.id+'\')">'+CP_IC.dots+'</button></div>';
     h+='<div class="cp-plan-cdesc">'+(t.desc?_ddH(t.desc):'Без описания')+'</div>';
     h+='<div class="cp-plan-cols">'+cpPlanChips(t)+'</div>';
     h+='<div class="cp-plan-cmeta">'+nc+' '+cpPlur(nc,'колонка','колонки','колонок')+(nr?' · '+nr+' '+cpPlur(nr,'строка','строки','строк'):'')+'</div>';
@@ -7173,6 +7177,35 @@ function cpPlanEditSave(){ cpPlanSync(); const d=cpPlanDraft; if(!d)return; d.na
 function cpPlanDup(id){ const t=cpPlanAll().find(function(x){return x.id===id;}); if(!t)return; const copy=JSON.parse(JSON.stringify(t)); copy.id=cpUid(); copy.name=(t.name||'Шаблон')+' (копия)'; copy.updated=Date.now(); const all=cpPlanAll(); all.push(copy); cpPlanSet(all); cpCloseFloat(); if(typeof toast==='function')toast('Шаблон продублирован'); cpPlanGallery(); }
 function cpPlanDelete(id){ const all=cpPlanAll().filter(function(x){return x.id!==id;}); cpPlanSet(all); cpCloseFloat(); if(typeof toast==='function')toast('Шаблон удалён'); cpPlanGallery(); }
 
+function cpTplIcon(name,def){
+  const n=(name||'').toLowerCase();
+  const I={
+    video:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 9l6-3v12l-6-3"/></svg>',
+    social:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16.5 8.5a4 4 0 0 1 0 7"/></svg>',
+    target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/></svg>',
+    rocket:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15c-1.5 1-2 5-2 5s4-.5 5-2c.6-.9.5-2.1-.3-2.9-.8-.8-2-.9-2.7-.1z"/><path d="M9 13l-2-2c1-5 4-8 8-9 .9 3-.5 7-3 9l-3 2z"/><circle cx="14" cy="9" r="1.2"/></svg>',
+    palette:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 0 0 0 18c1 0 1.5-.8 1.5-1.6 0-.4-.2-.7-.5-1-.3-.3-.5-.6-.5-1 0-.8.7-1.4 1.5-1.4H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="11" r="1"/></svg>',
+    doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
+    tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12.2V5a2 2 0 0 1 2-2h7.2c.5 0 1 .2 1.4.6l7 7a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg>',
+    flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+    calendar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>',
+    list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>',
+    grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>'
+  };
+  const rules=[
+    [/видео|youtube|ютуб|ролик|shorts|стрим|монтаж|reels|reel/,'video'],
+    [/смм|smm|instagram|инстаграм|сторис|stories|пост|соцсет/,'social'],
+    [/реклам|ads|таргет|кампан|промо|трафик/,'target'],
+    [/запуск|launch|лонч|воронк|прогрев/,'rocket'],
+    [/дизайн|креатив|бренд|визуал|макет/,'palette'],
+    [/блог|стать|текст|копирайт|редакц|сценар|описан/,'doc'],
+    [/рубрик|категор|тип|жанр|формат/,'tag'],
+    [/статус|публикац|готов|этап|стади|модер/,'flag'],
+    [/план|календар|график|расписан|месяц|недел/,'calendar']
+  ];
+  for(var i=0;i<rules.length;i++){ if(rules[i][0].test(n)) return I[rules[i][1]]; }
+  return I[def]||I.grid;
+}
 document.addEventListener('keydown',cpKey);
 
 
