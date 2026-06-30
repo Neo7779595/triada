@@ -6936,7 +6936,30 @@ function cpDoUnmerge(rowsInSel,cols,x){
 }
 
 function dlHighlight(sel,tries){ tries=tries||0; const el=document.querySelector(sel); if(el){ try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(_e){try{el.scrollIntoView();}catch(_e2){}} el.classList.add('dl-hl'); setTimeout(function(){el.classList.remove('dl-hl');},2600); return; } if(tries<45) setTimeout(function(){dlHighlight(sel,tries+1);},80); }
-function dlGoto(pid,type,id){ const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]); const idx=PJ.findIndex(function(p){return String(p.id)===String(pid);}); if(idx<0){ if(typeof toast==='function')toast('Проект не найден'); return; } if(typeof openProject==='function')openProject(idx); if(type==='task'){ if(typeof pdTab==='function')pdTab('kanban'); dlHighlight('.pk-card[data-tkid="'+id+'"]'); } else { dlHighlight('.pd-st[data-stid="'+id+'"]'); } }
+function dlGoto(pid,type,id){
+  const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const idx=PJ.findIndex(function(p){return String(p.id)===String(pid);});
+  if(idx<0){ if(typeof toast==='function')toast('Проект не найден'); return; }
+  window._dlPending={ tab:(type==='task'?'kanban':'stages'),
+    sel:(type==='task'?'.pk-card[data-tkid="'+id+'"]':'.pd-st[data-stid="'+id+'"]'),
+    until:Date.now()+8000, found:0, _el:null };
+  if(typeof openProject==='function')openProject(idx);
+  dlApplyPending();
+}
+function dlApplyPending(){
+  const p=window._dlPending; if(!p)return; const now=Date.now();
+  /* держим нужную вкладку (задача → Операционка, этап → Этапы) */
+  if(typeof pdTabCur!=='undefined' && pdTabCur!==p.tab && typeof pdTab==='function') pdTab(p.tab);
+  /* ждём, пока реальные данные проекта дорисуются (id появляются только после tLoadProjectWork) */
+  const el=document.querySelector(p.sel);
+  if(el){
+    if(!p.found){ p.found=now; try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(_e){try{el.scrollIntoView();}catch(_e2){}} }
+    el.classList.add('dl-hl'); p._el=el;
+  }
+  const enough = p.found && (now - p.found > 2600);
+  if(enough || now > p.until){ window._dlPending=null; if(p._el){ const e=p._el; setTimeout(function(){ e.classList.remove('dl-hl'); }, 50); } return; }
+  setTimeout(dlApplyPending, 90);
+}
 document.addEventListener('keydown',cpKey);
 
 
