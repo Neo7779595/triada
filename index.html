@@ -10506,6 +10506,7 @@ function renderClOverview(){
   }
   const stages=P.stages||[], reports=P.reports||[], feed=P.feed||[];
   const total=stages.length, done=stages.filter(s=>s.status==='done').length, pct=total?Math.round(done/total*100):0;
+  const tasksTotal=stages.reduce((a,s)=>a+(s.taskTotal||0),0), tasksDone=stages.reduce((a,s)=>a+(s.taskDone||0),0);
   const activeIdx=stages.findIndex(s=>s.status==='active'), active=activeIdx>=0?stages[activeIdx]:null;
   const pl=(n,a,b,c)=>typeof _plural==='function'?_plural(n,a,b,c):c;
   // последние отчёты по типам (reports уже отсортированы по published_at ↓)
@@ -10521,14 +10522,14 @@ function renderClOverview(){
       {l:'Выручка Δ', v:_ddH(pp.rost||'—'), s:'рост выручки', c:dCol(pp.rost), f:per?'период · '+per:''},
       {l:'Трафик Δ', v:_ddH(pp.traf||'—'), s:'за период', c:dCol(pp.traf), f:per?'период · '+per:''},
       {l:'Ср. чек Δ', v:_ddH(pp.chek||'—'), s:'средний чек', c:dCol(pp.chek), f:per?'период · '+per:''},
-      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)', f:total?(rem>0?'осталось '+rem+' '+pl(rem,'этап','этапа','этапов'):'проект завершён'):'', fp:total>0&&rem===0},
+      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)', f:tasksTotal>0?(tasksDone+' из '+tasksTotal+' '+pl(tasksTotal,'задача','задачи','задач')):(total?(rem>0?'осталось '+rem+' '+pl(rem,'этап','этапа','этапов'):'проект завершён'):''), fp:total>0&&rem===0},
     ];
   } else {
     const rem=Math.max(0,total-done);
     const perfN=reports.filter(r=>r.kind!=='SMM').length, smmN=reports.length-perfN;
     kpis=[
-      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)', f:total?(rem>0?'осталось '+rem+' '+pl(rem,'этап','этапа','этапов'):'проект завершён'):'', fp:total>0&&rem===0},
-      {l:'Завершено', v:String(done), s:'этапов закрыто', c:'var(--txt)', f:total?'из '+total+' всего':''},
+      {l:'Прогресс', v:pct+'%', s:done+' из '+total+' '+pl(total,'этапа','этапов','этапов'), c:'var(--accent)', f:tasksTotal>0?(tasksDone+' из '+tasksTotal+' '+pl(tasksTotal,'задача','задачи','задач')):(total?(rem>0?'осталось '+rem+' '+pl(rem,'этап','этапа','этапов'):'проект завершён'):''), fp:total>0&&rem===0},
+      {l:'Завершено', v:String(done), s:'этапов закрыто', c:'var(--txt)', f:total?('из '+total+' этапов'+(tasksTotal>0?(' · '+tasksDone+'/'+tasksTotal+' задач'):'')):''},
       {l:'Отчётов', v:String(reports.length), s:'опубликовано', c:'var(--txt)', f:reports.length?(perfN+' PERF · '+smmN+' SMM'):''},
       {l:'Обновлений', v:String(feed.length), s:'событий по проекту', c:'var(--txt)', f:feed.length?'последнее · '+feed[0].t:''},
     ];
@@ -10642,6 +10643,7 @@ function renderClStages(){
     return;
   }
   const total=stages.length, done=stages.filter(s=>s.status==='done').length, pct=total?Math.round(done/total*100):0;
+  const tasksTotal=stages.reduce((a,s)=>a+(s.taskTotal||0),0), tasksDone=stages.reduce((a,s)=>a+(s.taskDone||0),0);
   const _calSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>';
   const _chkSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>';
   const rows=stages.map((s,i)=>{
