@@ -476,6 +476,14 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .rd-main{flex:1;min-width:0}
 .rd-stage{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rd-proj{font-size:11px;color:var(--txt-3);margin-top:2px}
+.rd-row{cursor:pointer}
+.rd-row:hover{border-color:var(--accent-line);background:var(--bg-3)}
+.rd-resp{display:flex;align-items:center;gap:6px;flex:0 0 auto;max-width:132px}
+.rd-resp-av{width:22px;height:22px;border-radius:50%;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0b0d10;overflow:hidden}
+.rd-resp-av img{width:100%;height:100%;object-fit:cover}
+.rd-resp-n{font-size:11.5px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl-hl{animation:dlHl 2.6s ease-out both;border-radius:12px;position:relative;z-index:3}
+@keyframes dlHl{0%,16%{box-shadow:0 0 0 2px var(--accent),0 0 22px -2px var(--accent)}100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent}}
 .mrg{font-family:var(--mono)}
 .empty-mini{text-align:center;color:var(--txt-3);font-size:12.5px;padding:34px 10px}
 .card-body{padding:6px 18px 12px}
@@ -5413,7 +5421,7 @@ function renderPd(){
           if(s.status==='active'&&tk.length){
             tasksHtml=`<div class="pd-tasks">`+tk.map(t=>{ const td=t.status==='done'; const chk=td?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''; return `<div class="pd-task"><span class="pd-cbx ${td?'':'empty'}">${chk}</span><span class="pd-tnm ${td?'done':''}">${t.title||'Задача'}</span><span class="pd-tmr">${t.timer_started?'в работе':pkFmtDur(_taskElapsed(t))}</span></div>`; }).join('')+`</div>`;
           }
-          return `<div class="pd-st ${s.status}">
+          return `<div class="pd-st ${s.status}" data-stid="${s.id}">
             <div class="pd-rail"><div class="pd-node">${node}</div></div>
             <div class="pd-body">
               <div class="pd-brow"><span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></span><div class="pd-st-nm">${s.name}</div>${dd}<div class="pd-st-status">${s.status==='active'?'● '+status:status}</div><button class="pd-edit" onclick="event.stopPropagation();pdEditStage('${s.id}')">Изменить</button></div>
@@ -5454,7 +5462,7 @@ function renderPd(){
           } else if(rel>0){
             rtimer=`<div class="pk-timer review mini"><span class="ic">${eyeic}</span><span class="pk-time" id="rtmr-${c.id}">${pkFmtDur(rel)}</span></div>`;
           }
-          return `<div class="pk-card" draggable="true" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)" style="animation-delay:${(i*0.045).toFixed(2)}s">
+          return `<div class="pk-card" draggable="true" data-tkid="${c.id}" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)" style="animation-delay:${(i*0.045).toFixed(2)}s">
               <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
@@ -6927,6 +6935,8 @@ function cpDoUnmerge(rowsInSel,cols,x){
   cpSave(); cpRerender(); if(typeof toast==='function')toast('Объединение снято');
 }
 
+function dlHighlight(sel,tries){ tries=tries||0; const el=document.querySelector(sel); if(el){ try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(_e){try{el.scrollIntoView();}catch(_e2){}} el.classList.add('dl-hl'); setTimeout(function(){el.classList.remove('dl-hl');},2600); return; } if(tries<45) setTimeout(function(){dlHighlight(sel,tries+1);},80); }
+function dlGoto(pid,type,id){ const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]); const idx=PJ.findIndex(function(p){return String(p.id)===String(pid);}); if(idx<0){ if(typeof toast==='function')toast('Проект не найден'); return; } if(typeof openProject==='function')openProject(idx); if(type==='task'){ if(typeof pdTab==='function')pdTab('kanban'); dlHighlight('.pk-card[data-tkid="'+id+'"]'); } else { dlHighlight('.pd-st[data-stid="'+id+'"]'); } }
 document.addEventListener('keydown',cpKey);
 
 
@@ -8760,10 +8770,10 @@ function renderOverview(){
     <div class="row2" style="margin-top:16px">
       <div class="card">
         <div class="card-h"><div class="t">Радар дедлайнов <span class="c">просрочено · сегодня · неделя</span></div></div>
-        <div class="card-body rd-scroll">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);const tt=d.type==='task'?`<span class="ov-rtok tk" title="Задача">${_svg(IC_TK)}</span>`:`<span class="ov-rtok st" title="Этап">${_svg(IC_ST)}</span>`;return `<div class="rd-row bk-${d.bucket}">
+        <div class="card-body rd-scroll">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);const tt=d.type==='task'?`<span class="ov-rtok tk" title="Задача">${_svg(IC_TK)}</span>`:`<span class="ov-rtok st" title="Этап">${_svg(IC_ST)}</span>`; let _r=null; if(d.type==='task'&&d.assignee){const w=_who(d.assignee);if(w&&w.n!=='—')_r={name:w.n,color:w.c,avatar:w.avatar};} else if(d.type==='stage'){const _pp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(p=>String(p.id)===String(d.pid));if(_pp&&_pp._lead)_r={name:_pp._lead.name,color:_pp._lead.color,avatar:_pp._lead.avatar};} const resp=_r?`<span class="rd-resp" title="Ответственный: ${_ddH(_r.name)}"><span class="rd-resp-av" style="background:${_r.color||'var(--accent)'}">${logoFill(_r.avatar||null,((_r.name||'?')[0]||'?').toUpperCase())}</span><span class="rd-resp-n">${_ddH(_r.name)}</span></span>`:''; return `<div class="rd-row bk-${d.bucket}" onclick="dlGoto('${d.pid}','${d.type}','${d._id}')" title="Открыть ${d.type==='task'?'задачу':'этап'}">
           ${tt}<div class="rd-date">${d.day} ${d.mon}</div>
           <div class="rd-main"><div class="rd-stage">${d.stage}</div><div class="rd-proj">${d.project}</div></div>
-          <span class="badge ${rb[0]}" style="font-size:9px;padding:2px 7px">${rb[1]}</span>
+          ${resp}<span class="badge ${rb[0]}" style="font-size:9px;padding:2px 7px">${rb[1]}</span>
         </div>`;}).join(''):'<div class="empty-mini">Нет ближайших дедлайнов</div>'}</div>
       </div>
       <div class="card">
@@ -11119,16 +11129,16 @@ function dlBucket(due, status){
 window.tLoadDeadlines = async () => {
   if (!SB) return;
   const [st, tk, hist] = await Promise.all([
-    SB.from('project_stages').select('id,name,status,due_date,due_time, projects(name,logo,logo_url)').not('due_date','is',null),
-    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id, projects(name,logo,logo_url)').not('due_date','is',null),
+    SB.from('project_stages').select('id,name,status,due_date,due_time,project_id, projects(name,logo,logo_url)').not('due_date','is',null),
+    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,project_id, projects(name,logo,logo_url)').not('due_date','is',null),
     SB.from('stage_history').select('stage_name,old_status,new_status,created_at, projects(name)').order('created_at',{ascending:false}).limit(30)
   ]);
-  const _push = (label, status, due, projObj, id, type, assignee, dueTime, doneAt) => {
+  const _push = (label, status, due, projObj, id, type, assignee, dueTime, doneAt, pid) => {
     const d = due ? new Date(due+'T00:00:00') : null;
     DEADLINES.push({ stage:label, project:(projObj&&projObj.name)||'—',
       plogo:(projObj&&(projObj.logo||((projObj.name||'?')[0])))||'?', plogoUrl:(projObj&&projObj.logo_url)||'',
       day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'', dueTime: _dTime(dueTime),
-      due: due, bucket: dlBucket(due, status), status, type, _id:id, assignee: assignee||null, done_at: doneAt||null });
+      due: due, bucket: dlBucket(due, status), status, type, _id:id, pid:pid||null, assignee: assignee||null, done_at: doneAt||null });
   };
   if (typeof DEADLINES !== 'undefined'){
     DEADLINES.length = 0;
@@ -11136,8 +11146,8 @@ window.tLoadDeadlines = async () => {
     let _stDone = {}, _tkDone = {};
     try { const sd = await SB.from('project_stages').select('id,completed_at'); if(!sd.error && sd.data) sd.data.forEach(r=>{ if(r.completed_at) _stDone[r.id]=r.completed_at; }); } catch(_){}
     try { const td = await SB.from('project_tasks').select('id,completed_at'); if(!td.error && td.data) td.data.forEach(r=>{ if(r.completed_at) _tkDone[r.id]=r.completed_at; }); } catch(_){}
-    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id]));
-    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, _tkDone[r.id]));
+    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id], r.project_id));
+    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, _tkDone[r.id], r.project_id));
   }
   if (typeof DL_ACT !== 'undefined'){
     DL_ACT.length = 0;
