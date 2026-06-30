@@ -4749,12 +4749,14 @@ function _lifeDur(months){ const u=t=>`<span class="u">${t}</span>`;
   if(d>=30){ m++; d=0; }
   return d>0 ? (m+u(' мес ')+d+u(' дн')) : (m+u(' мес')); }
 function _lifeOf(p){
-  const startISO=(p._contract&&p._contract.start)||p.createdAt||null;
-  const prev=p._prevDays||0, done=(p.status==='done');
-  if(!startISO) return {cur:0, prev:prev, frozen:done};
-  const start=new Date(startISO).getTime();
-  const end=done?(p._closedAt?new Date(p._closedAt).getTime():Date.now()):Date.now();
-  let cur=Math.floor((end-start)/86400000); if(!(cur>=0))cur=0;
+  const done=(p.status==='done'); const createdISO=p.createdAt||null;
+  if(!createdISO) return {cur:0, prev:0, frozen:done};
+  const created=new Date(createdISO).getTime();
+  const lastArch=p._lastArch?new Date(p._lastArch).getTime():null;   /* момент последнего перезапуска (реальный) */
+  const cycleStart=(lastArch&&lastArch>=created)?lastArch:created;   /* старт текущего цикла */
+  const endNow=done?(p._closedAt?new Date(p._closedAt).getTime():Date.now()):Date.now();
+  let cur=Math.floor((endNow-cycleStart)/86400000); if(!(cur>=0))cur=0;
+  let prev=(lastArch&&lastArch>=created)?Math.floor((lastArch-created)/86400000):0; if(!(prev>=0))prev=0;
   return {cur:cur, prev:prev, frozen:done};
 }
 function _projComplexity(p){
@@ -11202,7 +11204,7 @@ window.tProjectRenew = async (pid, ns, ne) => { try {
   // 2. архивируем завершённый цикл (со СТАРЫМ периодом договора)
   if(stages.length || tasks.length){
     const snap={ stages: stages.map(s=>({name:s.name,status:s.status,idx:s.idx})), tasks };
-    const {error:ae}=await SB.from('project_cycles').insert({project_id:pid, cycle_no:nextNo, period_start:oldPeriod.start_date||null, period_end:oldPeriod.end_date||null, snapshot:snap});
+    const {error:ae}=await SB.from('project_cycles').insert({project_id:pid, cycle_no:nextNo, period_start:oldPeriod.start_date||null, period_end:oldPeriod.end_date||null, snapshot:snap, archived_at:new Date().toISOString()});
     if(ae)throw ae;
   }
   // 3. аннулируем задачи завершённого цикла
@@ -11432,10 +11434,10 @@ window.tLoadProjectAggregates = async () => {
     SB.from('project_contracts').select('project_id,start_date,end_date') ]);
   const _pm={}; ((pm&&pm.data)||[]).forEach(r=>{ (_pm[r.project_id]=_pm[r.project_id]||[]).push(r.member_id); });
   const _pc={}; ((pc&&pc.data)||[]).forEach(r=>{ _pc[r.project_id]={start:r.start_date, end:r.end_date}; });
-  let _closed={}, _prevd={};
-  try{ const [_cl,_cy]=await Promise.all([ SB.from('projects').select('id,closed_at'), SB.from('project_cycles').select('project_id,period_start,period_end') ]);
+  let _closed={}, _lastArch={};
+  try{ const [_cl,_cy]=await Promise.all([ SB.from('projects').select('id,closed_at'), SB.from('project_cycles').select('project_id,archived_at') ]);
     ((_cl&&_cl.data)||[]).forEach(r=>{ _closed[r.id]=r.closed_at||null; });
-    ((_cy&&_cy.data)||[]).forEach(r=>{ if(r.period_start&&r.period_end){ const a=Date.parse(r.period_start), b=Date.parse(r.period_end); if(b>a) _prevd[r.project_id]=(_prevd[r.project_id]||0)+Math.floor((b-a)/86400000); } });
+    ((_cy&&_cy.data)||[]).forEach(r=>{ if(!r.archived_at)return; const cur=_lastArch[r.project_id]; if(!cur||Date.parse(r.archived_at)>Date.parse(cur)) _lastArch[r.project_id]=r.archived_at; });
   }catch(_e){ console.warn('life agg',_e); }
   const agg={};
   const A=pid=>(agg[pid]||(agg[pid]={over:false,next:null,overN:0,overAll:0,wait:0,active:0,done:0,by:{},asg:{}}));
@@ -11458,7 +11460,7 @@ window.tLoadProjectAggregates = async () => {
     p._healthCls = (p.status!=='done'&&a.over)?'risk':'ok';
     const lid=p.lead_id||top(a.by)||top(a.asg); p._lead = lid?mem(lid):null;
     p._team=(_pm[p.id]||[]).map(mid=>{ const m=mem(mid); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:mid}:null; }).filter(Boolean);
-    p._contract=_pc[p.id]||null; p._closedAt=_closed[p.id]||null; p._prevDays=_prevd[p.id]||0;
+    p._contract=_pc[p.id]||null; p._closedAt=_closed[p.id]||null; p._lastArch=_lastArch[p.id]||null;
   });
 };
 
