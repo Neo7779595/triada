@@ -1203,6 +1203,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-fc label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);margin-bottom:11px}
 .smm-fc input{width:100%;background:transparent;border:none;outline:none;color:var(--txt);font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.015em;font-variant-numeric:tabular-nums;padding:0}
 .smm-fc input::placeholder{color:var(--txt-3);opacity:.32;font-weight:400}
+.smm-subgrp{margin-bottom:20px}
+.smm-subgrp:last-child{margin-bottom:0}
+.smm-sub-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 2px 11px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-2);font-weight:600}
+.smm-sub-tag{font-family:var(--mono);font-size:9px;letter-spacing:.04em;text-transform:none;color:var(--txt-3);font-weight:400}
+.smm-fc-ro{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 5%,var(--bg-2)),var(--bg-2))}
+.smm-fc-ro .smm-fc-val{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--txt);letter-spacing:-.015em;font-variant-numeric:tabular-nums;line-height:1.15;min-height:26px}
+.smm-fc label .smm-fc-badge{margin-left:8px;font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;text-transform:uppercase;border-radius:4px;padding:2px 5px;font-weight:700;vertical-align:middle}
+.smm-fc-badge.auto{color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line)}
+.smm-fc-badge.calc{color:var(--violet);background:rgba(138,143,255,.12);border:1px solid rgba(138,143,255,.32)}
 .smm-mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
 #smm-mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;background:transparent;border:none;border-radius:0;overflow:visible}
 .smm-mc{position:relative;overflow:hidden;background:radial-gradient(130% 90% at 50% -10%,color-mix(in srgb,var(--mc) 8%,var(--bg-2)),var(--bg-2) 62%);border:1px solid var(--line);border-radius:16px;padding:17px 18px 16px;transition:transform .18s var(--ease-out),border-color .18s,box-shadow .18s}
@@ -8393,7 +8402,8 @@ function smmEmptyPayload(){
     period:'', note:'',
     metrics:{ reels_count:null, posts_count:null, stories_count:null,
       reels_reach:null, stories_reach:null, reels_views:null, stories_views:null,
-      followers:null, subscribers_current:null, ad_creatives:null, frequency:null,
+      posts_views:null, posts_reach:null, total_views:null, total_reach:null, content_total:null,
+      followers:null, followers_prev:null, subscribers_current:null, ad_creatives:null, frequency:null,
       er:null, lr:null, tr:null, shr:null, sr:null },
     prev:{ followers:null, er:null, lr:null, tr:null, shr:null, sr:null },
     goals:{ er:null, lr:null, tr:null, shr:null, sr:null },
@@ -8505,6 +8515,41 @@ function smmComputeMetrics(){
 }
 function smmRefreshMetrics(){ smmComputeMetrics(); const el=document.getElementById('smm-mgrid'); if(el) el.innerHTML=smmMetricCardsHTML(SMM_METRIC_DEFS); }
 
+/* ——— общие показатели: Reels и итоги считаются автоматически ———
+   Reels (кол-во/просмотры/охват) = сумма из добавленных рилсов.
+   Сторис (просмотры/охват) = остаток: Профиль − Reels − Посты.
+   Всего контента = Reels + Посты + Сторис. */
+function smmComputeGeneral(){
+  if(!_smmCur) return;
+  const m=_smmCur.metrics, reels=_smmCur.reels||[];
+  const N=v=>(v==null||v==='')?null:(+v);
+  let rv=0,rr=0; reels.forEach(r=>{ rv+=(+r.views||0); rr+=(+r.reach|| +r.views||0); });
+  m.reels_count=reels.length; m.reels_views=rv; m.reels_reach=rr;
+  const pv=N(m.posts_views)||0, pr=N(m.posts_reach)||0, tv=N(m.total_views), tr=N(m.total_reach);
+  m.stories_views = tv!=null ? Math.max(0, tv-rv-pv) : null;
+  m.stories_reach = tr!=null ? Math.max(0, tr-rr-pr) : null;
+  m.content_total = (m.reels_count||0)+(N(m.posts_count)||0)+(N(m.stories_count)||0);
+}
+function smmGenNum(k,zero){ const m=_smmCur.metrics; return m[k]==null?(zero||'—'):Number(m[k]).toLocaleString('ru-RU'); }
+function smmGeneralHTML(){
+  const m=_smmCur.metrics, iv=v=>(v==null||v==='')?'':v;
+  const auto=(lab,key,zero)=>'<div class="smm-fc smm-fc-ro"><label>'+lab+'<span class="smm-fc-badge auto">авто</span></label><div class="smm-fc-val" id="gv-'+key+'">'+smmGenNum(key,zero)+'</div></div>';
+  const calc=(lab,key)=>'<div class="smm-fc smm-fc-ro"><label>'+lab+'<span class="smm-fc-badge calc">остаток</span></label><div class="smm-fc-val" id="gv-'+key+'">'+smmGenNum(key)+'</div></div>';
+  const inp=(lab,key,ph)=>'<div class="smm-fc"><label>'+lab+'</label><input type="text" inputmode="decimal" value="'+iv(m[key])+'" placeholder="'+(ph||'0')+'" oninput="smmSetGen(\''+key+'\',this.value)"></div>';
+  const grp=(title,tag,cards)=>'<div class="smm-subgrp"><div class="smm-sub-h">'+title+(tag?'<span class="smm-sub-tag">'+tag+'</span>':'')+'</div><div class="smm-fgrid">'+cards+'</div></div>';
+  return grp('Reels','авто из добавленных рилсов', auto('Кол-во','reels_count','0')+auto('Просмотры','reels_views')+auto('Охват','reels_reach'))
+    + grp('Посты','', inp('Кол-во','posts_count')+inp('Просмотры','posts_views')+inp('Охват','posts_reach'))
+    + grp('Сторис','просмотры и охват — остаток от профиля', inp('Кол-во','stories_count')+calc('Просмотры','stories_views')+calc('Охват','stories_reach'))
+    + grp('Профиль за месяц','всего из статистики Instagram', inp('Всего просмотров','total_views')+inp('Всего охват','total_reach')+auto('Всего контента','content_total','0')+inp('Креативы','ad_creatives'))
+    + grp('Аудитория','', inp('Подписчики','subscribers_current')+inp('Прирост','followers')+inp('Прирост пред.','followers_prev')+inp('Частота','frequency'));
+}
+function smmGenVals(){
+  ['reels_count','reels_views','reels_reach','stories_views','stories_reach','content_total'].forEach(k=>{
+    const el=document.getElementById('gv-'+k); if(el) el.textContent=smmGenNum(k, (k==='reels_count'||k==='content_total')?'0':'—');
+  });
+}
+function smmSetGen(key,val){ _smmCur.metrics[key]=smmNumOf(val); smmMark(); smmComputeGeneral(); smmGenVals(); }
+
 function openSMM(report, ro){
   _smmRO=!!ro;
   _smmCur=smmNormalize(report.payload);
@@ -8546,6 +8591,7 @@ function smmInitReveal(){
 }
 function smmRender(){
   const ov=document.getElementById('ov-smm'); if(!ov||!_smmCur) return;
+  smmComputeMetrics(); smmComputeGeneral();
   const tabs=[['data','Данные'],['preview','Презентация']];
   ov.innerHTML='<div class="smm-shell">'
     +'<div class="smm-top">'
@@ -8563,16 +8609,12 @@ function smmRender(){
 let _smmReelView='list', _smmModalIdx=-1;
 function smmRenderData(){
   smmComputeMetrics();
-  const fields=[
-    ['reels_count','Reels'],['posts_count','Посты'],['stories_count','Сторис'],['ad_creatives','Креативы'],
-    ['reels_reach','Охват Reels'],['stories_reach','Охват Сторис'],['reels_views','Просм Reels'],['stories_views','Просм Сторис'],
-    ['subscribers_current','Подписчики'],['followers','Прирост тек.'],['followers_prev','Прирост пред.'],['frequency','Частота']
-  ];
+  smmComputeGeneral();
   return '<div class="smm-edit">'
     +'<div class="smm-edit-title">Ввод данных</div>'
     +'<div class="smm-edit-sub">'+(_smmCur.period?_ddH(_smmCur.period):'период не указан')+' · '+_smmCur.reels.length+' reels · '+_smmCur.rubrics.length+' рубрик</div>'
-    +'<div class="smm-es"><div class="smm-es-h"><span class="n">01</span><span class="tt">Общие показатели</span></div>'
-    +'<div class="smm-fgrid">'+smmFieldCardsHTML(fields)+'</div></div>'
+    +'<div class="smm-es" id="smm-gen"><div class="smm-es-h"><span class="n">01</span><span class="tt">Показатели</span><span class="sp"></span><span class="smm-es-note">Reels и итоги — авто</span></div>'
+    +smmGeneralHTML()+'</div>'
     +'<div class="smm-es"><div class="smm-es-h"><span class="n">02</span><span class="tt">Метрики</span><span class="sp"></span><span class="smm-es-note">считаются из Reels</span></div>'
     +'<div class="smm-mgrid" id="smm-mgrid">'+smmMetricCardsHTML(SMM_METRIC_DEFS)+'</div></div>'
     +'<div class="smm-es" id="smm-reels-ed">'+smmReelsEditHTML()+'</div>'
@@ -8743,7 +8785,7 @@ function smmReelEdit(i,field,val){
   const r=_smmCur.reels[i]; if(!r) return;
   if(field==='title'||field==='rubric'||field==='link'||field==='cover'){ r[field]=val; }
   else { r[field]=smmNumOf(val); smmReelRates(r); const c=document.getElementById('smm-er-'+i); if(c) c.textContent=(r.er||0).toFixed(2)+'%'; }
-  smmMark(); smmRefreshRubrics(); smmRefreshMetrics();
+  smmMark(); smmRefreshRubrics(); smmRefreshMetrics(); smmComputeGeneral(); smmGenVals();
 }
 function smmRubricConfirm(){
   const gv=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
@@ -8779,6 +8821,7 @@ function smmPasteImport(){
 
 async function smmSave(viaButton){
   if(!_smmCur||!_smmMeta) return;
+  smmComputeMetrics(); smmComputeGeneral();
   const payload=JSON.parse(JSON.stringify(_smmCur));
   delete payload._legacy;
   aggregateRubricsFromReels(payload);
