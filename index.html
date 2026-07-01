@@ -6547,7 +6547,7 @@ function cpSheetsBar(d){
 }
 
 /* ---- floating menu ---- */
-function cpCloseFloat(){ document.querySelectorAll('.cp-pop').forEach(e=>e.remove()); }
+function cpCloseFloat(){ document.querySelectorAll('.cp-pop').forEach(e=>e.remove()); document.removeEventListener('click',cpCloseFloat); }
 function cpFloat(anchor,html){
   cpCloseFloat();
   const r=anchor.getBoundingClientRect();
@@ -7191,8 +7191,10 @@ function briefEditorInner(pid){
   h+='</div></div>';
   return h;
 }
-function briefRerenderEditor(pid){ const e=document.getElementById('bf-editor'); if(e)e.innerHTML=briefEditorInner(pid); briefRefreshPreview(pid); }
-function briefRefreshPreview(pid){ const pv=document.getElementById('bf-preview-body'); if(pv)pv.innerHTML=briefClientFormHTML(pid,true); }
+function briefRerenderEditor(pid){ const e=document.getElementById('bf-editor'); if(e)e.innerHTML=briefEditorInner(pid); _briefPreviewNow(pid); }
+var _briefPvT=null;
+function _briefPreviewNow(pid){ clearTimeout(_briefPvT); _briefPvT=null; if(typeof cpCloseFloat==='function')cpCloseFloat(); const pv=document.getElementById('bf-preview-body'); if(pv)pv.innerHTML=briefClientFormHTML(pid,true); }
+function briefRefreshPreview(pid){ clearTimeout(_briefPvT); _briefPvT=setTimeout(function(){ _briefPreviewNow(pid); },90); }
 function briefFieldEditHTML(pid,f,i,total){
   const isSec=f.type==='section'; const hasOpts=briefHasOpts(f.type);
   let h='<div class="bf-field'+(isSec?' is-sec':'')+'">';
