@@ -2763,6 +2763,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .bfc-other-row{align-items:center}
 .bfc-other{margin-left:8px;flex:1;min-width:90px;background:var(--bg-2);border:0;border-bottom:1px solid var(--line-2);color:var(--txt);padding:5px 4px;font-size:13px;font-family:var(--font);outline:none}
 .bfc-other:focus{border-bottom-color:var(--accent)}
+/* БРИФ · Проход 7: инлайн-ошибки у клиента */
+.bfc-invalid .bfc-in{border-color:var(--neg)}
+.bfc-invalid .bfc-in:focus{border-color:var(--neg)}
+.bfc-err{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:12.5px;color:var(--neg);line-height:1.35}
+.bfc-err svg{width:15px;height:15px;flex:0 0 auto}
+/* БРИФ · Проход 8: загрузка файла */
+.bfc-fileup{display:inline-flex;align-items:center;gap:9px;margin-top:6px;background:var(--bg-2);border:1px dashed var(--line-2);border-radius:10px;color:var(--txt-2);font-size:13px;font-weight:500;padding:10px 16px;cursor:pointer;font-family:var(--font);transition:.15s}
+.bfc-fileup:hover{border-color:var(--accent-line);color:var(--txt);background:var(--bg-3)}
+.bfc-fileup svg{width:16px;height:16px;color:var(--accent);flex:0 0 auto}
+.bfc-fileup.uploading{opacity:.6;pointer-events:none}
+.bfc-fileset{display:flex;align-items:center;gap:10px;margin-top:6px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:9px 12px}
+.bfc-filelink{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none;min-width:0}
+.bfc-filelink svg{width:15px;height:15px;flex:0 0 auto}
+.bfc-filelink span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bfc-filesize{font-size:11.5px;color:var(--txt-3);margin-left:auto;flex:0 0 auto}
+.bfc-filerm{width:24px;height:24px;flex:0 0 auto;background:none;border:0;color:var(--txt-3);font-size:13px;cursor:pointer;border-radius:6px}
+.bfc-filerm:hover{color:var(--neg);background:var(--bg-3)}
+.bpass-file{display:inline-flex;align-items:center;gap:7px;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none}
+.bpass-file svg{width:15px;height:15px;flex:0 0 auto}
 .bpass-glist{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .bpass-grow{display:flex;gap:12px;align-items:baseline;font-size:13px}
 .bpass-grk{color:var(--txt-2);min-width:130px;flex:0 0 auto}
@@ -7023,7 +7042,8 @@ const BRIEF_TYPES=[
   {t:'time',n:'Время'},
   {t:'email',n:'Email'},
   {t:'phone',n:'Телефон'},
-  {t:'url',n:'Ссылка'}
+  {t:'url',n:'Ссылка'},
+  {t:'file',n:'Загрузка файла'}
 ];
 const _BMON=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 function _briefUid(){ return 'f'+Math.random().toString(36).slice(2,9); }
@@ -8153,6 +8173,131 @@ function briefStepNext(pid){ var b=briefGet(pid); var secs=briefSections(b.field
 function briefClientSave(pid){ var b=briefGet(pid); var secs=briefSections(b.fields||[]); var step=(window._BRIEF_STEP[pid]||0); var root=document.querySelector('#cl-pass-host .bfc-form'); if(root)briefCollectInto(pid,root,secs[step]?secs[step].fields:[]); var missAll=briefMissingIn(pid,b.fields||[]); var badAll=briefInvalidIn(pid,b.fields||[]); if(missAll.length||badAll.length){ if(typeof toast==='function')toast(missAll.length?('Заполните обязательные поля ('+missAll.length+')'):('Проверьте формат полей ('+badAll.length+')')); var target=missAll.concat(badAll); for(var si=0;si<secs.length;si++){ if(secs[si].fields.some(function(f){return target.indexOf(f)>=0;})){ window._BRIEF_STEP[pid]=si; _clPassRerenderForm(pid); break; } } return; } b._editing=false; window._BRIEF_STEP[pid]=0; briefSave(pid); if(typeof toast==='function')toast('Паспорт проекта сохранён'); if(typeof _clPassFill==='function')_clPassFill(pid); }
 
 function briefPane(btn,which){ var bf=(btn&&btn.closest)?btn.closest('.bf2'):document.querySelector('.bf2'); if(!bf)return; bf.classList.toggle('show-preview',which==='preview'); var tabs=bf.querySelectorAll('.bf2-tab'); Array.prototype.forEach.call(tabs,function(t){ t.classList.toggle('on',t.getAttribute('data-pane')===which); }); }
+/* ===== БРИФ · Проход 7: инлайн-подсветка ошибок у клиента (переопределяет актуальные версии) ===== */
+function briefClientFieldHTML(f,val){
+  if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
+  val=(val==null)?'':val; var fid=_ddA(f.id);
+  var inp='';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  else if(f.type==='select') inp='<select class="bfc-in bfc-sel" data-fid="'+fid+'"><option value="">— выберите —</option>'+briefOptsList(f).map(function(o){return '<option'+(o===val?' selected':'')+'>'+_ddH(o)+'</option>';}).join('')+'</select>';
+  else if(f.type==='radio'){
+    var inO=(f.options||[]).indexOf(val)>=0; var oSel=(f.hasOther&&!inO&&String(val).trim()!=='');
+    inp='<div class="bfc-choices">'+briefOptsList(f).map(function(o){return '<label class="bfc-choice"><input type="radio" name="bfr_'+fid+'" value="'+_ddA(o)+'"'+(o===val?' checked':'')+'><span class="bfc-mk r"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')
+      +(f.hasOther?'<label class="bfc-choice bfc-other-row"><input type="radio" name="bfr_'+fid+'" value="__other__"'+(oSel?' checked':'')+'><span class="bfc-mk r"></span><span class="bfc-ot">Другое:</span><input type="text" class="bfc-other" data-other="'+fid+'" value="'+_ddA(oSel?val:'')+'" placeholder="свой вариант"></label>':'')+'</div>';
+  }
+  else if(f.type==='checks'){
+    var arr=Array.isArray(val)?val:[]; var oVal=arr.filter(function(x){return (f.options||[]).indexOf(x)<0;})[0]||'';
+    inp='<div class="bfc-choices">'+briefOptsList(f).map(function(o){return '<label class="bfc-choice"><input type="checkbox" data-grp="'+fid+'" value="'+_ddA(o)+'"'+(arr.indexOf(o)>=0?' checked':'')+'><span class="bfc-mk c"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')
+      +(f.hasOther?'<label class="bfc-choice bfc-other-row"><input type="checkbox" data-grp="'+fid+'" value="__other__"'+(oVal?' checked':'')+'><span class="bfc-mk c"></span><span class="bfc-ot">Другое:</span><input type="text" class="bfc-other" data-other="'+fid+'" value="'+_ddA(oVal)+'" placeholder="свой вариант"></label>':'')+'</div>';
+  }
+  else if(f.type==='scale') inp=briefScaleClient(f,val);
+  else if(f.type==='grid') inp=briefGridClient(f,val,false);
+  else if(f.type==='checkgrid') inp=briefGridClient(f,val,true);
+  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; }
+  var bad=(val!=null && typeof val!=='object' && String(val).trim()!=='' && typeof briefValCheck==='function' && !briefValCheck(f,val));
+  var err=bad?'<div class="bfc-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+_ddH((typeof briefValMsg==='function')?briefValMsg(f):'Проверьте значение')+'</div>':'';
+  return '<div class="bfc-field'+(bad?' bfc-invalid':'')+'"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+err+'</div>';
+}
+
+/* переход к след. шагу: при ошибке перерисовываем текущий шаг, чтобы показать инлайн-ошибки */
+function briefStepNext(pid){
+  var b=briefGet(pid); var secs=briefSections(b.fields||[]); var step=(window._BRIEF_STEP[pid]||0);
+  var root=document.querySelector('#cl-pass-host .bfc-form'); var fs=secs[step]?secs[step].fields:[];
+  if(root)briefCollectInto(pid,root,fs);
+  var miss=briefMissingIn(pid,fs); var bad=briefInvalidIn(pid,fs);
+  if(miss.length||bad.length){ if(typeof toast==='function')toast(miss.length?('Заполните обязательные поля ('+miss.length+')'):('Проверьте формат полей ('+bad.length+')')); _clPassRerenderForm(pid); return; }
+  briefSave(pid); window._BRIEF_STEP[pid]=Math.min(step+1,secs.length-1); _clPassRerenderForm(pid);
+  var host=document.getElementById('cl-pass-host'); if(host){ try{host.scrollIntoView({block:'start',behavior:'smooth'});}catch(_e){} }
+}
+
+/* ===== БРИФ · Проход 8 (Фаза 2): загрузка файла (Supabase Storage bucket 'brief-files') ===== */
+function briefFileSize(n){ n=+n||0; if(n<1024)return n+' Б'; if(n<1048576)return (n/1024).toFixed(0)+' КБ'; return (n/1048576).toFixed(1)+' МБ'; }
+function briefFileClient(f,val,fid){
+  var has=(val&&typeof val==='object'&&val.url); var meta=has?val:'';
+  var h='';
+  if(has){
+    h+='<div class="bfc-fileset"><a class="bfc-filelink" href="'+_ddA(val.url)+'" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7-7L14 5.4a3.3 3.3 0 0 1 4.7 4.7l-9.2 9.2a1.7 1.7 0 0 1-2.4-2.4l8.5-8.5"/></svg><span>'+_ddH(val.name||'Файл')+'</span></a>'+(val.size?'<span class="bfc-filesize">'+briefFileSize(val.size)+'</span>':'')+'<button type="button" class="bfc-filerm" onclick="briefFileRemove(\''+_ddA(f.id)+'\')" title="Удалить">✕</button></div>';
+  } else {
+    h+='<label class="bfc-fileup"><input type="file" style="display:none" onchange="briefFileUpload(this,\''+_ddA(f.id)+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg><span>Прикрепить файл</span></label>';
+  }
+  h+='<input type="hidden" data-file="'+fid+'" value="'+_ddA(JSON.stringify(meta))+'">';
+  return h;
+}
+function briefFileUpload(inputEl,fid){
+  var pid=(window.CLP&&window.CLP.id); if(!pid){ if(typeof toast==='function')toast('Загрузка доступна в кабинете проекта'); return; }
+  var file=inputEl&&inputEl.files&&inputEl.files[0]; if(!file)return;
+  if(file.size>15*1024*1024){ if(typeof toast==='function')toast('Файл больше 15 МБ'); return; }
+  if(!window.SB||!SB.storage){ if(typeof toast==='function')toast('Хранилище недоступно'); return; }
+  var lbl=inputEl.closest?inputEl.closest('.bfc-fileup'):null; if(lbl){ lbl.classList.add('uploading'); var sp=lbl.querySelector('span'); if(sp)sp.textContent='Загрузка…'; }
+  var ext=((file.name||'').split('.').pop()||'dat').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,8)||'dat';
+  var path=pid+'/'+fid+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.'+ext;
+  SB.storage.from('brief-files').upload(path,file,{upsert:false,contentType:file.type||undefined}).then(function(up){
+    if(up&&up.error)throw up.error;
+    var pu=SB.storage.from('brief-files').getPublicUrl(path);
+    var meta={name:file.name,url:(pu&&pu.data&&pu.data.publicUrl)||'',path:path,size:file.size};
+    var b=briefGet(pid); b.answers=b.answers||{}; b.answers[fid]=meta; briefSave(pid);
+    if(typeof toast==='function')toast('Файл прикреплён');
+    if(typeof _clPassRerenderForm==='function')_clPassRerenderForm(pid);
+  }).catch(function(e){ if(lbl){ lbl.classList.remove('uploading'); var sp2=lbl.querySelector('span'); if(sp2)sp2.textContent='Прикрепить файл'; } if(typeof toast==='function')toast('Не удалось загрузить файл'); });
+}
+function briefFileRemove(fid){ var pid=(window.CLP&&window.CLP.id); if(!pid)return; var b=briefGet(pid); if(b.answers)delete b.answers[fid]; briefSave(pid); if(typeof _clPassRerenderForm==='function')_clPassRerenderForm(pid); }
+
+/* ---- переопределение: чтение поля (+ file из скрытого input) ---- */
+function briefReadField(root,esc,f){
+  if(f.type==='file'){ var fe=root.querySelector('input[data-file="'+esc(f.id)+'"]'); if(fe&&fe.value){ try{return JSON.parse(fe.value);}catch(_e){return '';} } return ''; }
+  if(f.type==='radio'||f.type==='scale'){ var el=root.querySelector('input[name="bfr_'+esc(f.id)+'"]:checked'); var v=el?el.value:''; if(v==='__other__'){ var ot=root.querySelector('input[data-other="'+esc(f.id)+'"]'); v=ot?ot.value:''; } return v; }
+  if(f.type==='checks'){ var els=root.querySelectorAll('input[data-grp="'+esc(f.id)+'"]:checked'); var out=[]; Array.prototype.forEach.call(els,function(e){ if(e.value==='__other__'){ var o2=root.querySelector('input[data-other="'+esc(f.id)+'"]'); if(o2&&String(o2.value).trim())out.push(o2.value); } else out.push(e.value); }); return out; }
+  if(f.type==='grid'){ var o={}; ((f.grid&&f.grid.rows)||[]).forEach(function(_r,ri){ var g=root.querySelector('input[name="bfg_'+esc(f.id)+'_'+ri+'"]:checked'); if(g)o[ri]=g.value; }); return o; }
+  if(f.type==='checkgrid'){ var oc={}; ((f.grid&&f.grid.rows)||[]).forEach(function(_r,ri){ var ge=root.querySelectorAll('input[data-grid="'+esc(f.id)+'"][data-row="'+ri+'"]:checked'); var aa=Array.prototype.map.call(ge,function(e){return e.value;}); if(aa.length)oc[ri]=aa; }); return oc; }
+  var el2=root.querySelector('[data-fid="'+esc(f.id)+'"]'); return el2?el2.value:'';
+}
+
+/* ---- переопределение: клиентское поле (+ file) ---- */
+function briefClientFieldHTML(f,val){
+  if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
+  val=(val==null)?'':val; var fid=_ddA(f.id);
+  var inp='';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  else if(f.type==='select') inp='<select class="bfc-in bfc-sel" data-fid="'+fid+'"><option value="">— выберите —</option>'+briefOptsList(f).map(function(o){return '<option'+(o===val?' selected':'')+'>'+_ddH(o)+'</option>';}).join('')+'</select>';
+  else if(f.type==='radio'){
+    var inO=(f.options||[]).indexOf(val)>=0; var oSel=(f.hasOther&&!inO&&String(val).trim()!=='');
+    inp='<div class="bfc-choices">'+briefOptsList(f).map(function(o){return '<label class="bfc-choice"><input type="radio" name="bfr_'+fid+'" value="'+_ddA(o)+'"'+(o===val?' checked':'')+'><span class="bfc-mk r"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')
+      +(f.hasOther?'<label class="bfc-choice bfc-other-row"><input type="radio" name="bfr_'+fid+'" value="__other__"'+(oSel?' checked':'')+'><span class="bfc-mk r"></span><span class="bfc-ot">Другое:</span><input type="text" class="bfc-other" data-other="'+fid+'" value="'+_ddA(oSel?val:'')+'" placeholder="свой вариант"></label>':'')+'</div>';
+  }
+  else if(f.type==='checks'){
+    var arr=Array.isArray(val)?val:[]; var oVal=arr.filter(function(x){return (f.options||[]).indexOf(x)<0;})[0]||'';
+    inp='<div class="bfc-choices">'+briefOptsList(f).map(function(o){return '<label class="bfc-choice"><input type="checkbox" data-grp="'+fid+'" value="'+_ddA(o)+'"'+(arr.indexOf(o)>=0?' checked':'')+'><span class="bfc-mk c"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')
+      +(f.hasOther?'<label class="bfc-choice bfc-other-row"><input type="checkbox" data-grp="'+fid+'" value="__other__"'+(oVal?' checked':'')+'><span class="bfc-mk c"></span><span class="bfc-ot">Другое:</span><input type="text" class="bfc-other" data-other="'+fid+'" value="'+_ddA(oVal)+'" placeholder="свой вариант"></label>':'')+'</div>';
+  }
+  else if(f.type==='scale') inp=briefScaleClient(f,val);
+  else if(f.type==='grid') inp=briefGridClient(f,val,false);
+  else if(f.type==='checkgrid') inp=briefGridClient(f,val,true);
+  else if(f.type==='file') inp=briefFileClient(f,val,fid);
+  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; }
+  var bad=(val!=null && typeof val!=='object' && String(val).trim()!=='' && typeof briefValCheck==='function' && !briefValCheck(f,val));
+  var err=bad?'<div class="bfc-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+_ddH((typeof briefValMsg==='function')?briefValMsg(f):'Проверьте значение')+'</div>':'';
+  return '<div class="bfc-field'+(bad?' bfc-invalid':'')+'"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+err+'</div>';
+}
+
+/* ---- переопределение: паспорт (+ file-ссылка) ---- */
+function briefPassportFieldHTML(f,val){
+  var disp='', empty=false;
+  if(f.type==='file'){ if(val&&typeof val==='object'&&val.url){ disp='<a href="'+_ddA(val.url)+'" target="_blank" rel="noopener" class="bpass-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5l-8.6 8.6a5 5 0 0 1-7-7L14 5.4a3.3 3.3 0 0 1 4.7 4.7l-9.2 9.2a1.7 1.7 0 0 1-2.4-2.4l8.5-8.5"/></svg>'+_ddH(val.name||'Файл')+'</a>'; } else empty=true; }
+  else if(f.type==='checks'){ var arr=Array.isArray(val)?val:[]; if(arr.length)disp='<div class="bpass-chips">'+arr.map(function(o){return '<span class="bpass-chip">'+_ddH(o)+'</span>';}).join('')+'</div>'; else empty=true; }
+  else if(f.type==='scale'){ if(val!=null&&String(val).trim()!==''){ disp='<div class="bpass-val">'+_ddH(String(val))+(f.scale?(' <span style="color:var(--txt-3)">/ '+f.scale.max+'</span>'):'')+'</div>'; } else empty=true; }
+  else if(f.type==='grid'){ var go=(val&&typeof val==='object')?val:{}; var gr=(f.grid&&f.grid.rows)||[], gc=(f.grid&&f.grid.cols)||[]; var gk=Object.keys(go); if(gk.length){ disp='<div class="bpass-glist">'+gk.map(function(ri){ return '<div class="bpass-grow"><span class="bpass-grk">'+_ddH(gr[ri]||('Строка '+(+ri+1)))+'</span><span class="bpass-grv">'+_ddH(gc[go[ri]]||'')+'</span></div>'; }).join('')+'</div>'; } else empty=true; }
+  else if(f.type==='checkgrid'){ var co=(val&&typeof val==='object')?val:{}; var cr=(f.grid&&f.grid.rows)||[], cc=(f.grid&&f.grid.cols)||[]; var ck=Object.keys(co); if(ck.length){ disp='<div class="bpass-glist">'+ck.map(function(ri){ var cs=(co[ri]||[]).map(function(ci){return _ddH(cc[ci]||'');}).filter(Boolean); return '<div class="bpass-grow"><span class="bpass-grk">'+_ddH(cr[ri]||('Строка '+(+ri+1)))+'</span><span class="bpass-grv">'+cs.join(', ')+'</span></div>'; }).join('')+'</div>'; } else empty=true; }
+  else if(val==null||!String(val).trim()){ empty=true; }
+  else if(f.type==='url'){ var u=String(val); disp='<a href="'+_ddA(u)+'" target="_blank" rel="noopener" class="bpass-link">'+_ddH(u)+'</a>'; }
+  else if(f.type==='email'){ disp='<a href="mailto:'+_ddA(String(val))+'" class="bpass-link">'+_ddH(String(val))+'</a>'; }
+  else if(f.type==='date'){ var d=new Date(String(val)+'T00:00:00'); disp='<div class="bpass-val">'+(isNaN(d)?_ddH(String(val)):(d.getDate()+' '+_BMON[d.getMonth()]+' '+d.getFullYear()))+'</div>'; }
+  else if(f.type==='long'){ disp='<div class="bpass-long">'+_ddH(String(val)).replace(/\n/g,'<br>')+'</div>'; }
+  else disp='<div class="bpass-val">'+_ddH(String(val))+'</div>';
+  if(empty) disp='<div class="bpass-empty">—</div>';
+  var wide=(f.type==='long')||(f.type==='checks'&&Array.isArray(val)&&val.length>3)||briefHasGrid(f.type);
+  return '<div class="bpass-cell'+(wide?' wide':'')+(empty?' is-empty':'')+'"><div class="bpass-lbl">'+_ddH(f.label||'')+'</div>'+disp+'</div>';
+}
+
 document.addEventListener('keydown',cpKey);
 
 
