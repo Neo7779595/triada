@@ -2620,7 +2620,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pt-ct2.over .pt-ct2-days{color:var(--neg)}
 /* ===== БРИФ: конструктор (агентство) ===== */
 /* ============ БРИФ: конструктор (агентство) ============ */
-.bf2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:start}
+.bf2{display:grid;grid-template-columns:minmax(0,1fr) clamp(340px,30%,400px);gap:30px;align-items:start}
 .bf2-editor{min-width:0;max-width:none}
 .bf2-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
 .bf2-top-l{display:flex;align-items:center;gap:13px;min-width:0}
@@ -2698,10 +2698,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .bf-add-t.sec{color:var(--txt);border-style:dashed}
 /* живое превью */
 .bf2-preview{position:sticky;top:8px}
-.bf2-frame{border:1px solid var(--line-2);border-radius:18px;background:var(--bg-1);overflow:hidden;box-shadow:0 24px 60px -40px rgba(0,0,0,.75)}
+.bf2-frame{border:1px solid var(--line-2);border-radius:20px;background:var(--bg-1);overflow:hidden;box-shadow:0 30px 72px -34px rgba(0,0,0,.82),inset 0 1px 0 rgba(255,255,255,.03)}
 .bf2-frame-h{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:600;background:var(--bg-2)}
 .bf2-dot{width:7px;height:7px;border-radius:50%;background:var(--pos);box-shadow:0 0 8px -1px var(--pos)}
 .bf2-frame-b{padding:24px 22px 28px;max-height:calc(100vh - 200px);overflow:auto}
+/* Независимый скролл колонок: .bf2 фиксируется по высоте (JS), каждая колонка скроллится сама */
+.bf2-split{align-items:stretch;overflow:hidden}
+.bf2-split .bf2-editor{overflow-y:auto;overscroll-behavior:contain;min-height:0;padding-right:8px;scrollbar-width:thin;scrollbar-gutter:stable}
+.bf2-split .bf2-editor::-webkit-scrollbar,.bf2-split .bf2-frame-b::-webkit-scrollbar{width:9px}
+.bf2-split .bf2-editor::-webkit-scrollbar-track,.bf2-split .bf2-frame-b::-webkit-scrollbar-track{background:transparent}
+.bf2-split .bf2-editor::-webkit-scrollbar-thumb,.bf2-split .bf2-frame-b::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+.bf2-split .bf2-editor::-webkit-scrollbar-thumb:hover,.bf2-split .bf2-frame-b::-webkit-scrollbar-thumb:hover{background:var(--line)}
+.bf2-split .bf2-preview{position:static;top:auto;min-height:0;height:100%}
+.bf2-split .bf2-frame{display:flex;flex-direction:column;min-height:0;height:100%}
+.bf2-split .bf2-frame-b{flex:1;min-height:0;max-height:none;overscroll-behavior:contain;scrollbar-width:thin}
 .bf-formhead{position:relative;background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:22px 22px 16px;margin-bottom:18px;overflow:hidden}
 .bf-formhead-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--accent),var(--violet))}
 .bf-formtitle{display:block;width:100%;background:transparent;border:0;border-bottom:1px solid transparent;color:var(--txt);font-size:22px;font-weight:700;font-family:var(--font);outline:none;padding:2px 0 8px}
@@ -6094,6 +6104,7 @@ function renderPd(){
   const body=document.getElementById('pd-body');
   body.innerHTML=`<div class="pd-inner">${h}</div>`;
   if(typeof animateCounters==='function') requestAnimationFrame(()=>animateCounters(body));
+  if(typeof bfSizeSplit==='function') requestAnimationFrame(bfSizeSplit);
 }
 
 /* ——— project secondary modals ——— */
@@ -8253,6 +8264,25 @@ function briefStepNext(pid){ var b=briefGet(pid); var secs=briefSections(b.field
 function briefClientSave(pid){ var b=briefGet(pid); var secs=briefSections(b.fields||[]); var step=(window._BRIEF_STEP[pid]||0); var root=document.querySelector('#cl-pass-host .bfc-form'); if(root)briefCollectInto(pid,root,secs[step]?secs[step].fields:[]); var missAll=briefMissingIn(pid,b.fields||[]); var badAll=briefInvalidIn(pid,b.fields||[]); if(missAll.length||badAll.length){ if(typeof toast==='function')toast(missAll.length?('Заполните обязательные поля ('+missAll.length+')'):('Проверьте формат полей ('+badAll.length+')')); var target=missAll.concat(badAll); for(var si=0;si<secs.length;si++){ if(secs[si].fields.some(function(f){return target.indexOf(f)>=0;})){ window._BRIEF_STEP[pid]=si; _clPassRerenderForm(pid); break; } } return; } b._editing=false; window._BRIEF_STEP[pid]=0; briefSave(pid); if(typeof toast==='function')toast('Паспорт проекта сохранён'); if(typeof _clPassFill==='function')_clPassFill(pid); }
 
 function briefPane(btn,which){ var bf=(btn&&btn.closest)?btn.closest('.bf2'):document.querySelector('.bf2'); if(!bf)return; bf.classList.toggle('show-preview',which==='preview'); var tabs=bf.querySelectorAll('.bf2-tab'); Array.prototype.forEach.call(tabs,function(t){ t.classList.toggle('on',t.getAttribute('data-pane')===which); }); }
+
+/* ---- Независимый скролл двух колонок конструктора брифа ---- */
+function bfSizeSplit(){
+  var el=document.querySelector('.bf2');
+  var body=document.getElementById('pd-body');
+  if(!el){ if(body)body.style.overflowY=''; return; }
+  if(window.innerWidth<=1180){ el.classList.remove('bf2-split'); el.style.height=''; if(body)body.style.overflowY=''; return; }
+  if(body)body.scrollTop=0;
+  el.classList.add('bf2-split');
+  var rect=el.getBoundingClientRect();
+  var bottom;
+  if(body){ var br=body.getBoundingClientRect(); var pb=parseFloat(getComputedStyle(body).paddingBottom)||0; bottom=br.bottom-pb; }
+  else bottom=window.innerHeight-16;
+  var h=Math.round(bottom-rect.top)-2;
+  if(h<320)h=320;
+  el.style.height=h+'px';
+  if(body)body.style.overflowY='hidden';
+}
+window.addEventListener('resize',function(){ if(typeof bfSizeSplit==='function')bfSizeSplit(); });
 /* ===== БРИФ · Проход 7: инлайн-подсветка ошибок у клиента (переопределяет актуальные версии) ===== */
 function briefClientFieldHTML(f,val){
   if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
