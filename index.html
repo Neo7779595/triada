@@ -2782,6 +2782,35 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .bfc-filerm:hover{color:var(--neg);background:var(--bg-3)}
 .bpass-file{display:inline-flex;align-items:center;gap:7px;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none}
 .bpass-file svg{width:15px;height:15px;flex:0 0 auto}
+/* БРИФ · кастомные контролы (дата/время/список) */
+.bxfield{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;background:var(--bg-2);border:1px solid var(--line-2);border-radius:11px;color:var(--txt);font-size:13.5px;padding:11px 14px;font-family:var(--font);margin-top:6px;cursor:pointer;transition:border-color .16s,box-shadow .16s;user-select:none}
+.bxfield:hover{border-color:var(--accent-line)}
+.bxfield-val{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bxfield-val.ph{color:var(--txt-3)}
+.bxfield-ic{width:17px;height:17px;flex:0 0 auto;color:var(--accent)}
+.bxsel-type{display:inline-flex;align-items:center;gap:8px;height:31px;padding:0 10px 0 12px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);cursor:pointer;width:auto;min-width:158px;transition:.14s;user-select:none}
+.bxsel-type:hover{border-color:var(--accent-line)}
+.bxsel-type .bxfield-val{font-size:12px;font-weight:600;flex:1}
+.bxsel-type .bxfield-ic{width:13px;height:13px;color:var(--txt-3)}
+.bxsel-type:hover .bxfield-ic{color:var(--accent)}
+.bxsel-list{max-height:min(58vh,400px);overflow-y:auto;scrollbar-width:thin}
+.bxsel-list::-webkit-scrollbar{width:7px}
+.bxsel-list::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
+.bxtime{width:210px}
+.bxtime-lbl{display:flex;gap:8px;padding:2px 2px 7px}
+.bxtime-lbl span{flex:1;text-align:center;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-3)}
+.bxtime-cols{display:flex;gap:8px;height:186px}
+.bxtime-col{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:2px;scrollbar-width:thin}
+.bxtime-col::-webkit-scrollbar{width:6px}
+.bxtime-col::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:3px}
+.bxt-i{background:transparent;border:0;color:var(--txt-2);font-family:var(--font);font-size:13px;padding:7px 0;border-radius:7px;cursor:pointer;transition:.12s;text-align:center;flex:0 0 auto}
+.bxt-i:hover{background:var(--bg-3);color:var(--txt)}
+.bxt-i.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.bxtime-foot{display:flex;justify-content:space-between;margin-top:8px;padding-top:9px;border-top:1px solid var(--line)}
+.bxtime-foot button{background:transparent;border:0;color:var(--txt-2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;padding:6px 11px;border-radius:7px;transition:.12s}
+.bxtime-foot button:hover{background:var(--bg-3);color:var(--txt)}
+.bxtime-foot button.pri{background:var(--accent);color:var(--accent-ink)}
+.bxtime-foot button.pri:hover{filter:brightness(1.08);background:var(--accent)}
 .bpass-glist{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .bpass-grow{display:flex;gap:12px;align-items:baseline;font-size:13px}
 .bpass-grk{color:var(--txt-2);min-width:130px;flex:0 0 auto}
@@ -8296,6 +8325,144 @@ function briefPassportFieldHTML(f,val){
   if(empty) disp='<div class="bpass-empty">—</div>';
   var wide=(f.type==='long')||(f.type==='checks'&&Array.isArray(val)&&val.length>3)||briefHasGrid(f.type);
   return '<div class="bpass-cell'+(wide?' wide':'')+(empty?' is-empty':'')+'"><div class="bpass-lbl">'+_ddH(f.label||'')+'</div>'+disp+'</div>';
+}
+
+/* ===== БРИФ · Проход 9: кастомные контролы даты/времени/списков + переопределения ===== */
+/* ===== БРИФ · кастомные контролы (дата/время/выпадающий список) — брендовый стиль, клик по всему полю ===== */
+function _bxPad(n){ n=+n||0; return (n<10?'0':'')+n; }
+function _bxEsc(s){ return (window.CSS&&CSS.escape)?CSS.escape(String(s)):String(s).replace(/"/g,'\\"'); }
+function bxDateFmt(iso){ var p=String(iso).split('-'); if(p.length!==3)return String(iso); return p[2]+'.'+p[1]+'.'+p[0]; }
+function _bxInp(el){ var fid=el.getAttribute('data-forfid'); return el.parentNode?el.parentNode.querySelector('input[data-fid="'+_bxEsc(fid)+'"]'):null; }
+
+/* ---- Календарь (дата) ---- */
+function bxDateOpen(el){
+  var inp=_bxInp(el); var cur=inp?inp.value:''; var d=cur?new Date(cur+'T00:00:00'):new Date(); if(isNaN(d.getTime()))d=new Date();
+  window._BX={el:el,inp:inp,y:d.getFullYear(),m:d.getMonth()};
+  cpFloat(el,bxCalGrid());
+}
+function bxCalGrid(){
+  var b=window._BX; var y=b.y,m=b.m; var t=new Date();
+  var tISO=t.getFullYear()+'-'+_bxPad(t.getMonth()+1)+'-'+_bxPad(t.getDate());
+  var iso=(b.inp&&b.inp.value)||'';
+  var start=(new Date(y,m,1).getDay()+6)%7; var dim=new Date(y,m+1,0).getDate(); var prev=new Date(y,m,0).getDate();
+  var cells=''; var i;
+  for(i=0;i<start;i++) cells+='<button class="oth" disabled>'+(prev-start+1+i)+'</button>';
+  for(i=1;i<=dim;i++){ var ci=y+'-'+_bxPad(m+1)+'-'+_bxPad(i); var cls=[ci===iso?'sel':'',ci===tISO?'today':''].filter(Boolean).join(' '); cells+='<button class="'+cls+'" onclick="bxDatePick(\''+ci+'\')">'+i+'</button>'; }
+  var tot=start+dim, trail=(7-(tot%7))%7; for(i=1;i<=trail;i++) cells+='<button class="oth" disabled>'+i+'</button>';
+  return '<div class="cp-dpcal"><div class="dp-head"><div class="dp-title">'+DP_MON[m]+' '+y+'</div><div class="dp-nav">'
+    +'<button type="button" onclick="bxCalNav(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>'
+    +'<button type="button" onclick="bxCalNav(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button></div></div>'
+    +'<div class="dp-dow">'+DP_DOW.map(function(x){return '<span>'+x+'</span>';}).join('')+'</div><div class="dp-grid">'+cells+'</div>'
+    +'<div class="dp-foot"><button type="button" onclick="bxDatePick(\''+tISO+'\')">Сегодня</button><button type="button" class="clr" onclick="bxDatePick(\'\')">Очистить</button></div></div>';
+}
+function bxCalNav(delta){ var b=window._BX; if(!b)return; var m=b.m+delta,y=b.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} b.y=y;b.m=m; var p=document.querySelector('.cp-pop'); if(p)p.innerHTML=bxCalGrid(); }
+function bxDatePick(iso){ var b=window._BX; if(!b)return; if(b.inp)b.inp.value=iso; var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=iso?bxDateFmt(iso):'дд.мм.гггг'; sp.classList.toggle('ph',!iso); } cpCloseFloat(); }
+
+/* ---- Пикер времени ---- */
+function bxTimeOpen(el){
+  var inp=_bxInp(el); var cur=inp?inp.value:''; var h=12,m=0;
+  if(cur&&/^\d{1,2}:\d{2}$/.test(cur)){ var pp=cur.split(':'); h=Math.min(23,+pp[0]); m=Math.min(59,+pp[1]); }
+  else if(!cur){ var now=new Date(); h=now.getHours(); m=now.getMinutes(); }
+  window._BX={el:el,inp:inp,h:h,m:m};
+  cpFloat(el,bxTimeGrid()); bxTimeScroll();
+}
+function bxTimeGrid(){
+  var b=window._BX; var hcol='',mcol='',i;
+  for(i=0;i<24;i++) hcol+='<button class="bxt-i'+(i===b.h?' on':'')+'" onclick="bxTimePick(\'h\','+i+')">'+_bxPad(i)+'</button>';
+  for(i=0;i<60;i++) mcol+='<button class="bxt-i'+(i===b.m?' on':'')+'" onclick="bxTimePick(\'m\','+i+')">'+_bxPad(i)+'</button>';
+  return '<div class="bxtime"><div class="bxtime-lbl"><span>Часы</span><span>Минуты</span></div><div class="bxtime-cols"><div class="bxtime-col">'+hcol+'</div><div class="bxtime-col">'+mcol+'</div></div>'
+    +'<div class="bxtime-foot"><button type="button" onclick="bxTimeClear()">Очистить</button><button type="button" class="pri" onclick="cpCloseFloat()">Готово</button></div></div>';
+}
+function bxTimePick(which,val){ var b=window._BX; if(!b)return; if(which==='h')b.h=val; else b.m=val; var t=_bxPad(b.h)+':'+_bxPad(b.m); if(b.inp)b.inp.value=t; var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=t; sp.classList.remove('ph'); } var p=document.querySelector('.cp-pop'); if(p)p.innerHTML=bxTimeGrid(); bxTimeScroll(); }
+function bxTimeScroll(){ setTimeout(function(){ var cols=document.querySelectorAll('.cp-pop .bxtime-col'); Array.prototype.forEach.call(cols,function(col){ var on=col.querySelector('.bxt-i.on'); if(on)col.scrollTop=on.offsetTop-col.clientHeight/2+on.clientHeight/2; }); },0); }
+function bxTimeClear(){ var b=window._BX; if(b&&b.inp)b.inp.value=''; if(b&&b.el){ var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent='--:--'; sp.classList.add('ph'); } } cpCloseFloat(); }
+
+/* ---- Выпадающий список ---- */
+function bxSelOpen(el,mode){
+  window._BX={el:el,mode:mode}; var h='<div class="bxsel-list">';
+  if(mode==='type'){
+    var cur=el.getAttribute('data-tv');
+    BRIEF_TYPES.forEach(function(t,i){ h+='<button class="cp-popi'+(t.t===cur?' on':'')+'" onclick="bxSelType('+i+')">'+_ddH(t.n)+'</button>'; });
+  } else {
+    var opts=[]; try{opts=JSON.parse(el.getAttribute('data-opts')||'[]');}catch(e){} window._BX.opts=opts;
+    var inp=el.parentNode.querySelector('input[data-fid]'); var cv=inp?inp.value:'';
+    h+='<button class="cp-popi'+(cv===''?' on':'')+'" onclick="bxSelPick(-1)">— не выбрано —</button>';
+    if(opts.length)h+='<div class="sep"></div>';
+    opts.forEach(function(o,i){ h+='<button class="cp-popi'+(cv===o?' on':'')+'" onclick="bxSelPick('+i+')">'+_ddH(o)+'</button>'; });
+  }
+  h+='</div>'; cpFloat(el,h);
+}
+function bxSelPick(i){ var b=window._BX; if(!b)return; var val=(i<0)?'':((b.opts&&b.opts[i]!=null)?b.opts[i]:''); var inp=b.el.parentNode.querySelector('input[data-fid]'); if(inp)inp.value=val; var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=val||'— выберите —'; sp.classList.toggle('ph',!val); } cpCloseFloat(); }
+function bxSelType(i){ var b=window._BX; if(!b)return; var t=BRIEF_TYPES[i]; if(!t)return; var pid=b.el.getAttribute('data-pid'), fid=b.el.getAttribute('data-fid'); cpCloseFloat(); if(typeof briefSetType==='function')briefSetType(pid,fid,t.t); }
+
+
+/* ---- переопределение: клиентское поле (дата/время/список = кастомные) ---- */
+function briefClientFieldHTML(f,val){
+  if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
+  val=(val==null)?'':val; var fid=_ddA(f.id);
+  var inp='';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  else if(f.type==='select'){ var _bopts=briefOptsList(f); inp='<div class="bxfield bxsel" data-forfid="'+fid+'" data-opts="'+_ddA(JSON.stringify(_bopts))+'" onclick="bxSelOpen(this,\'field\')"><span class="bxfield-val'+(val?'':' ph')+'">'+(val?_ddH(String(val)):'— выберите —')+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'">'; }
+  else if(f.type==='radio'){
+    var inO=(f.options||[]).indexOf(val)>=0; var oSel=(f.hasOther&&!inO&&String(val).trim()!=='');
+    inp='<div class="bfc-choices">'+briefOptsList(f).map(function(o){return '<label class="bfc-choice"><input type="radio" name="bfr_'+fid+'" value="'+_ddA(o)+'"'+(o===val?' checked':'')+'><span class="bfc-mk r"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')
+      +(f.hasOther?'<label class="bfc-choice bfc-other-row"><input type="radio" name="bfr_'+fid+'" value="__other__"'+(oSel?' checked':'')+'><span class="bfc-mk r"></span><span class="bfc-ot">Другое:</span><input type="text" class="bfc-other" data-other="'+fid+'" value="'+_ddA(oSel?val:'')+'" placeholder="свой вариант"></label>':'')+'</div>';
+  }
+  else if(f.type==='checks'){
+    var arr=Array.isArray(val)?val:[]; var oVal=arr.filter(function(x){return (f.options||[]).indexOf(x)<0;})[0]||'';
+    inp='<div class="bfc-choices">'+briefOptsList(f).map(function(o){return '<label class="bfc-choice"><input type="checkbox" data-grp="'+fid+'" value="'+_ddA(o)+'"'+(arr.indexOf(o)>=0?' checked':'')+'><span class="bfc-mk c"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')
+      +(f.hasOther?'<label class="bfc-choice bfc-other-row"><input type="checkbox" data-grp="'+fid+'" value="__other__"'+(oVal?' checked':'')+'><span class="bfc-mk c"></span><span class="bfc-ot">Другое:</span><input type="text" class="bfc-other" data-other="'+fid+'" value="'+_ddA(oVal)+'" placeholder="свой вариант"></label>':'')+'</div>';
+  }
+  else if(f.type==='scale') inp=briefScaleClient(f,val);
+  else if(f.type==='grid') inp=briefGridClient(f,val,false);
+  else if(f.type==='checkgrid') inp=briefGridClient(f,val,true);
+  else if(f.type==='date'){ inp='<div class="bxfield" data-forfid="'+fid+'" onclick="bxDateOpen(this)"><span class="bxfield-val'+(val?'':' ph')+'">'+(val?bxDateFmt(String(val)):'дд.мм.гггг')+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></div><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'">'; }
+  else if(f.type==='time'){ inp='<div class="bxfield" data-forfid="'+fid+'" onclick="bxTimeOpen(this)"><span class="bxfield-val'+(val?'':' ph')+'">'+(val?_ddH(String(val)):'--:--')+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></div><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'">'; }
+  else if(f.type==='file') inp=briefFileClient(f,val,fid);
+  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; }
+  var bad=(val!=null && typeof val!=='object' && String(val).trim()!=='' && typeof briefValCheck==='function' && !briefValCheck(f,val));
+  var err=bad?'<div class="bfc-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+_ddH((typeof briefValMsg==='function')?briefValMsg(f):'Проверьте значение')+'</div>':'';
+  return '<div class="bfc-field'+(bad?' bfc-invalid':'')+'"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+err+'</div>';
+}
+
+/* ---- переопределение: карточка-редактор (тип = кастомный список) ---- */
+function briefFieldEditHTML(pid,f,i,total){
+  var isSec=f.type==='section'; var hasOpts=briefHasOpts(f.type);
+  var act=window._BRIEF_ACT[pid]; var isActive=(act===f.id)||(act==null&&i===0);
+  var dnd=' draggable="true" ondragstart="briefDragStart(event,\''+pid+'\','+i+')" ondragover="briefDragOver(event)" ondragleave="briefDragLeave(event)" ondrop="briefDrop(event,\''+pid+'\','+i+')" ondragend="briefDragEnd(event)"';
+  if(!isActive){
+    var tn=(BRIEF_TYPES.filter(function(t){return t.t===f.type;})[0]||{}).n||f.type;
+    var lbl=(f.label||'').trim();
+    return '<div class="bf-field is-compact'+(isSec?' is-sec':'')+'"'+dnd+' onclick="briefSetActive(\''+pid+'\',\''+f.id+'\')">'
+      +'<div class="bf-compact"><span class="bf-grip" title="Перетащите">⋮⋮</span><span class="bf-fnum">'+(isSec?'§':(i+1))+'</span>'
+      +'<div class="bf-compact-main"><div class="bf-compact-label'+(lbl?'':' empty')+'">'+_ddH(lbl||(isSec?'Раздел без названия':'Вопрос без названия'))+'</div>'
+      +'<div class="bf-compact-type">'+_ddH(tn)+(f.required?' · обязательное':'')+'</div></div></div></div>';
+  }
+  var h='<div class="bf-field is-active'+(isSec?' is-sec':'')+'"'+dnd+'>';
+  h+='<div class="bf-grip-top" title="Перетащите, чтобы изменить порядок">⋮⋮⋮</div>';
+  h+='<div class="bf-fhead">';
+  h+='<div class="bf-fmove"><button onclick="briefMove(\''+pid+'\','+i+',-1)" '+(i===0?'disabled':'')+' title="Выше">↑</button><button onclick="briefMove(\''+pid+'\','+i+',1)" '+(i===total-1?'disabled':'')+' title="Ниже">↓</button></div>';
+  h+='<span class="bf-fnum">'+(isSec?'§':(i+1))+'</span>';
+  var _tn=(BRIEF_TYPES.filter(function(t){return t.t===f.type;})[0]||{}).n||f.type; h+='<div class="bxsel-type" data-pid="'+pid+'" data-fid="'+f.id+'" data-tv="'+_ddA(f.type)+'" onclick="bxSelOpen(this,\'type\')"><span class="bxfield-val">'+_ddH(_tn)+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>';
+  h+='<div class="bf-fhead-r">';
+  if(!isSec) h+='<label class="bf-req"><input type="checkbox" '+(f.required?'checked':'')+' onchange="briefSetReq(\''+pid+'\',\''+f.id+'\',this.checked)"><span class="bf-req-sw"></span><span class="bf-req-tx">Обязательное</span></label>';
+  h+='<button class="bf-dup" onclick="briefDupField(\''+pid+'\',\''+f.id+'\')" title="Дублировать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>';
+  h+='<button class="bf-del" onclick="briefDelField(\''+pid+'\',\''+f.id+'\')" title="Удалить поле"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>';
+  h+='</div></div>';
+  h+='<input class="bf-flabel'+(isSec?' sec':'')+'" value="'+_ddA(f.label||'')+'" placeholder="'+(isSec?'Название раздела':'Текст вопроса')+'" oninput="briefSetLabel(\''+pid+'\',\''+f.id+'\',this.value)">';
+  if(!isSec) h+='<input class="bf-fhelp" value="'+_ddA(f.help||'')+'" placeholder="Подсказка под вопросом (необязательно)" oninput="briefSetHelp(\''+pid+'\',\''+f.id+'\',this.value)">';
+  if(hasOpts){
+    h+='<div class="bf-opts">';
+    (f.options||[]).forEach(function(o,oi){ h+='<div class="bf-opt"><span class="bf-opt-mk'+(f.type==='checks'?' sq':'')+'"></span><input value="'+_ddA(o)+'" placeholder="Вариант '+(oi+1)+'" oninput="briefSetOpt(\''+pid+'\',\''+f.id+'\','+oi+',this.value)"><button class="bf-opt-x" onclick="briefDelOpt(\''+pid+'\',\''+f.id+'\','+oi+')" title="Убрать">×</button></div>'; });
+    if(f.hasOther) h+='<div class="bf-opt is-other"><span class="bf-opt-mk'+(f.type==='checks'?' sq':'')+'"></span><input value="Другое…" disabled><span class="bf-opt-othertag">текст вводит клиент</span></div>';
+    h+='<button class="bf-opt-add" onclick="briefAddOpt(\''+pid+'\',\''+f.id+'\')">+ добавить вариант</button></div>';
+  }
+  if(hasOpts) h+=briefOptExtras(pid,f);
+  if(f.type==='scale') h+=briefScaleEdit(pid,f);
+  if(briefHasGrid(f.type)) h+=briefGridEdit(pid,f);
+  if(f.type==='short'||f.type==='number') h+=briefValEdit(pid,f);
+  h+='</div>';
+  return h;
 }
 
 document.addEventListener('keydown',cpKey);
