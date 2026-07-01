@@ -2832,6 +2832,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .bf-grip{display:inline-flex;align-items:center;justify-content:center;width:22px;height:26px;color:var(--txt-3);cursor:grab;flex:0 0 auto;border-radius:6px;transition:background .12s,color .12s;touch-action:none}
 .bf-grip svg{width:15px;height:15px}
 .bf-grip:hover{background:var(--bg-3);color:var(--accent)}
+.bf-grip-h{width:26px;height:30px;flex:none}
+.bf-grip-h svg{width:17px;height:17px}
 .bf-compact-main{flex:1;min-width:0}
 .bf-compact-label{font-size:14px;color:var(--txt);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bf-compact-label.empty{color:var(--txt-3);font-style:italic;font-weight:400}
@@ -7178,7 +7180,7 @@ function briefFieldEditHTML(pid,f,i,total){
   const isSec=f.type==='section'; const hasOpts=briefHasOpts(f.type);
   let h='<div class="bf-field'+(isSec?' is-sec':'')+'">';
   h+='<div class="bf-fhead">';
-  h+='<div class="bf-fmove"><button onclick="briefMove(\''+pid+'\','+i+',-1)" '+(i===0?'disabled':'')+' title="Выше">↑</button><button onclick="briefMove(\''+pid+'\','+i+',1)" '+(i===total-1?'disabled':'')+' title="Ниже">↓</button></div>';
+  h+='<span class="bf-grip bf-grip-h" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>';
   h+='<span class="bf-fnum">'+(isSec?'§':(i+1))+'</span>';
   h+='<div class="bf-tysel" id="bfty-'+f.id+'"><button type="button" class="bf-tybtn" onclick="briefTypeOpen(event,\''+pid+'\',\''+f.id+'\')"><span class="bf-tylbl">'+((BRIEF_TYPES.filter(function(t){return t.t===f.type;})[0]||{n:'—'}).n)+'</span><svg class="bf-tycar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="bf-typop">'+BRIEF_TYPES.map(function(t){return '<div class="bf-tyopt'+(t.t===f.type?' on':'')+'" onclick="briefTypePick(\''+pid+'\',\''+f.id+'\',\''+t.t+'\')">'+t.n+'</div>';}).join('')+'</div></div>';
   h+='<div class="bf-fhead-r">';
@@ -7941,7 +7943,7 @@ function briefFieldEditHTML(pid,f,i,total){
   var isSec=f.type==='section'; var hasOpts=briefHasOpts(f.type);
   var h='<div class="bf-field'+(isSec?' is-sec':'')+'">';
   h+='<div class="bf-fhead">';
-  h+='<div class="bf-fmove"><button onclick="briefMove(\''+pid+'\','+i+',-1)" '+(i===0?'disabled':'')+' title="Выше">↑</button><button onclick="briefMove(\''+pid+'\','+i+',1)" '+(i===total-1?'disabled':'')+' title="Ниже">↓</button></div>';
+  h+='<span class="bf-grip bf-grip-h" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>';
   h+='<span class="bf-fnum">'+(isSec?'§':(i+1))+'</span>';
   h+='<div class="bf-tysel" id="bfty-'+f.id+'"><button type="button" class="bf-tybtn" onclick="briefTypeOpen(event,\''+pid+'\',\''+f.id+'\')"><span class="bf-tylbl">'+((BRIEF_TYPES.filter(function(t){return t.t===f.type;})[0]||{n:'—'}).n)+'</span><svg class="bf-tycar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="bf-typop">'+BRIEF_TYPES.map(function(t){return '<div class="bf-tyopt'+(t.t===f.type?' on':'')+'" onclick="briefTypePick(\''+pid+'\',\''+f.id+'\',\''+t.t+'\')">'+t.n+'</div>';}).join('')+'</div></div>';
   h+='<div class="bf-fhead-r">';
@@ -8056,9 +8058,9 @@ function briefFieldEditHTML(pid,f,i,total){
       +'<div class="bf-compact-type">'+_ddH(tn)+(f.required?' · обязательное':'')+'</div></div></div></div>';
   }
   var h='<div class="bf-field is-active'+(isSec?' is-sec':'')+'"'+dnd+'>';
-  h+='<div class="bf-grip-top" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="9" r="1.5"/><circle cx="12" cy="9" r="1.5"/><circle cx="16" cy="9" r="1.5"/><circle cx="8" cy="14" r="1.5"/><circle cx="12" cy="14" r="1.5"/><circle cx="16" cy="14" r="1.5"/></svg></div>';
+  
   h+='<div class="bf-fhead">';
-  h+='<div class="bf-fmove"><button onclick="briefMove(\''+pid+'\','+i+',-1)" '+(i===0?'disabled':'')+' title="Выше">↑</button><button onclick="briefMove(\''+pid+'\','+i+',1)" '+(i===total-1?'disabled':'')+' title="Ниже">↓</button></div>';
+  h+='<span class="bf-grip bf-grip-h" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>';
   h+='<span class="bf-fnum">'+(isSec?'§':(i+1))+'</span>';
   h+='<div class="bf-tysel" id="bfty-'+f.id+'"><button type="button" class="bf-tybtn" onclick="briefTypeOpen(event,\''+pid+'\',\''+f.id+'\')"><span class="bf-tylbl">'+((BRIEF_TYPES.filter(function(t){return t.t===f.type;})[0]||{n:'—'}).n)+'</span><svg class="bf-tycar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="bf-typop">'+BRIEF_TYPES.map(function(t){return '<div class="bf-tyopt'+(t.t===f.type?' on':'')+'" onclick="briefTypePick(\''+pid+'\',\''+f.id+'\',\''+t.t+'\')">'+t.n+'</div>';}).join('')+'</div></div>';
   h+='<div class="bf-fhead-r">';
@@ -8212,9 +8214,9 @@ function briefFieldEditHTML(pid,f,i,total){
       +'<div class="bf-compact-type">'+_ddH(tn)+(f.required?' · обязательное':'')+'</div></div></div></div>';
   }
   var h='<div class="bf-field is-active'+(isSec?' is-sec':'')+'"'+dnd+'>';
-  h+='<div class="bf-grip-top" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="9" r="1.5"/><circle cx="12" cy="9" r="1.5"/><circle cx="16" cy="9" r="1.5"/><circle cx="8" cy="14" r="1.5"/><circle cx="12" cy="14" r="1.5"/><circle cx="16" cy="14" r="1.5"/></svg></div>';
+  
   h+='<div class="bf-fhead">';
-  h+='<div class="bf-fmove"><button onclick="briefMove(\''+pid+'\','+i+',-1)" '+(i===0?'disabled':'')+' title="Выше">↑</button><button onclick="briefMove(\''+pid+'\','+i+',1)" '+(i===total-1?'disabled':'')+' title="Ниже">↓</button></div>';
+  h+='<span class="bf-grip bf-grip-h" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>';
   h+='<span class="bf-fnum">'+(isSec?'§':(i+1))+'</span>';
   h+='<div class="bf-tysel" id="bfty-'+f.id+'"><button type="button" class="bf-tybtn" onclick="briefTypeOpen(event,\''+pid+'\',\''+f.id+'\')"><span class="bf-tylbl">'+((BRIEF_TYPES.filter(function(t){return t.t===f.type;})[0]||{n:'—'}).n)+'</span><svg class="bf-tycar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="bf-typop">'+BRIEF_TYPES.map(function(t){return '<div class="bf-tyopt'+(t.t===f.type?' on':'')+'" onclick="briefTypePick(\''+pid+'\',\''+f.id+'\',\''+t.t+'\')">'+t.n+'</div>';}).join('')+'</div></div>';
   h+='<div class="bf-fhead-r">';
@@ -8544,9 +8546,9 @@ function briefFieldEditHTML(pid,f,i,total){
       +'<div class="bf-compact-type">'+_ddH(tn)+(f.required?' · обязательное':'')+'</div></div></div></div>';
   }
   var h='<div class="bf-field is-active'+(isSec?' is-sec':'')+'"'+dnd+'>';
-  h+='<div class="bf-grip-top" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="9" r="1.5"/><circle cx="12" cy="9" r="1.5"/><circle cx="16" cy="9" r="1.5"/><circle cx="8" cy="14" r="1.5"/><circle cx="12" cy="14" r="1.5"/><circle cx="16" cy="14" r="1.5"/></svg></div>';
+  
   h+='<div class="bf-fhead">';
-  h+='<div class="bf-fmove"><button onclick="briefMove(\''+pid+'\','+i+',-1)" '+(i===0?'disabled':'')+' title="Выше">↑</button><button onclick="briefMove(\''+pid+'\','+i+',1)" '+(i===total-1?'disabled':'')+' title="Ниже">↓</button></div>';
+  h+='<span class="bf-grip bf-grip-h" title="Перетащите, чтобы изменить порядок" onmousedown="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')" ontouchstart="briefPtrDown(event,\''+pid+'\',\''+f.id+'\')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>';
   h+='<span class="bf-fnum">'+(isSec?'§':(i+1))+'</span>';
   var _tn=(BRIEF_TYPES.filter(function(t){return t.t===f.type;})[0]||{}).n||f.type; h+='<div class="bxsel-type" data-pid="'+pid+'" data-fid="'+f.id+'" data-tv="'+_ddA(f.type)+'" onclick="bxSelOpen(this,\'type\')"><span class="bxfield-val">'+_ddH(_tn)+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>';
   h+='<div class="bf-fhead-r">';
