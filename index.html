@@ -13569,8 +13569,11 @@ window.tSaveStageTemplate = async (service, stages) => { try {
   window.STAGE_TPL=window.STAGE_TPL||{}; window.STAGE_TPL[service]=stages;
   toast('Шаблон сохранён'); if(typeof tplRenderSvcs==='function') tplRenderSvcs();
 } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageSave = async (id,patch) => { try {
-  const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); const _old=_st&&_st.status;
+window.tStageSave = async (id,patch) => {
+  const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); const _old=_st&&_st.status; const _snap=_st?Object.assign({},_st):null;
+  if(_st){ Object.keys(patch).forEach(k=>{ _st[k]=patch[k]; }); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  if(typeof pd2Close==='function')pd2Close(); toast('Этап обновлён');
+  try {
   const {error}=await SB.from('project_stages').update(patch).eq('id',id); if(error)throw error;
   if(patch.status && _st && patch.status!==_old){
     const pid=_st.project_id||curProjId();
@@ -13583,27 +13586,51 @@ window.tStageSave = async (id,patch) => { try {
       if(others.length && others.every(s=>s.status==='done')){ tgNotify(pid,'project_done',{}); window._cmPending=pid; }
     }
   }
-  if(typeof pd2Close==='function')pd2Close(); toast('Этап обновлён'); await _pwReload(curProjId());
-  if(window._cmPending){ const _cpid=window._cmPending; window._cmPending=null; const _cp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===_cpid); if(_cp && _cp.status!=='done' && typeof openCompletionModal==='function') setTimeout(()=>openCompletionModal(_cpid),350); } } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageAdd = async (projectId,row) => { try { const {error}=await SB.from('project_stages').insert({project_id:projectId,...row}); if(error)throw error;
-  if(typeof pd2Close==='function')pd2Close(); toast('Этап создан'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageDel = async (id) => { try { const {error}=await SB.from('project_stages').delete().eq('id',id); if(error)throw error;
-  if(typeof pd2Close==='function')pd2Close(); toast('Этап удалён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
-  const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); return true; } catch(e){ toast('Ошибка: '+(e.message||e)); return false; } };
-window.tTaskAdd = async (projectId,row) => { try {
+  window._localTaskWriteTs=Date.now();
+  if(window._cmPending){ const _cpid=window._cmPending; window._cmPending=null; const _cp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===_cpid); if(_cp && _cp.status!=='done' && typeof openCompletionModal==='function') setTimeout(()=>openCompletionModal(_cpid),350); } } catch(e){ if(_st&&_snap){ Object.assign(_st,_snap); _pkRerender(); } toast('Ошибка: '+(e.message||e)); } };
+window.tStageAdd = async (projectId,row) => {
+  const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId);
+  const _tmp=Object.assign({id:'tmp_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),project_id:projectId,_tmp:true},row);
+  if(_p){ _p._stages=_p._stages||[]; _p._stages.push(_tmp); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  if(typeof pd2Close==='function')pd2Close(); toast('Этап создан');
+  try { const {data,error}=await SB.from('project_stages').insert({project_id:projectId,...row}).select().single(); if(error)throw error;
+    if(_p&&data){ const i=_p._stages.indexOf(_tmp); if(i>=0)_p._stages[i]=data; else _p._stages.push(data); window._localTaskWriteTs=Date.now(); _pkRerender(); } }
+  catch(e){ if(_p){ const i=_p._stages.indexOf(_tmp); if(i>=0)_p._stages.splice(i,1); _pkRerender(); } toast('Ошибка: '+(e.message||e)); } };
+window.tStageDel = async (id) => {
+  const _p=_tgCurProj(); let _rm=null,_ix=-1;
+  if(_p&&_p._stages){ _ix=_p._stages.findIndex(s=>s.id===id); if(_ix>=0){ _rm=_p._stages[_ix]; _p._stages.splice(_ix,1); window._localTaskWriteTs=Date.now(); _pkRerender(); } }
+  if(typeof pd2Close==='function')pd2Close(); toast('Этап удалён');
+  try { const {error}=await SB.from('project_stages').delete().eq('id',id); if(error)throw error; }
+  catch(e){ if(_p&&_rm&&_ix>=0){ _p._stages.splice(_ix,0,_rm); _pkRerender(); } toast('Ошибка: '+(e.message||e)); } };
+window.tStageSeed = async (projectId,names) => {
+  const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId);
+  const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
+  const tmps=rows.map(r=>Object.assign({id:'tmp_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),_tmp:true},r));
+  if(_p){ _p._stages=(_p._stages||[]).concat(tmps); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  toast('Этапы созданы');
+  try { const {data,error}=await SB.from('project_stages').insert(rows).select(); if(error)throw error;
+    if(_p&&data){ tmps.forEach(t=>{ const i=_p._stages.indexOf(t); if(i>=0)_p._stages.splice(i,1); }); _p._stages=_p._stages.concat(data); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+    return true; }
+  catch(e){ if(_p){ tmps.forEach(t=>{ const i=_p._stages.indexOf(t); if(i>=0)_p._stages.splice(i,1); }); _pkRerender(); } toast('Ошибка: '+(e.message||e)); return false; } };
+window.tTaskAdd = async (projectId,row) => {
   const _now=new Date().toISOString();
   if(row && row.status==='active' && !row.timer_started) row.timer_started=_now;    // автостарт рабочего таймера
   if(row && row.status==='review' && !row.review_started) row.review_started=_now;   // автостарт таймера утверждения
-  let {error}=await SB.from('project_tasks').insert({project_id:projectId,...row});
+  const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId);
+  const _tmp=Object.assign({id:'tmp_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),project_id:projectId,time_spent:0,review_spent:0,_tmp:true},row);
+  if(_p){ _p._tasks=_p._tasks||[]; _p._tasks.push(_tmp); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  if(typeof pd2Close==='function')pd2Close(); toast('Задача создана');
+  try {
+  let {data,error}=await SB.from('project_tasks').insert({project_id:projectId,...row}).select().single();
   if(error && /review_/.test(error.message||'')){                                    // колонок review_* ещё нет (миграция 08 не применена)
     const {review_started,review_spent,...row2}=row||{};
-    const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}); error=r2.error;
+    const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}).select().single(); error=r2.error; data=r2.data;
     if(!error) toast('Задача создана. Таймер утверждения отключён — примените SQL-миграцию 08');
   }
   if(error)throw error;
+  if(_p&&data){ const i=_p._tasks.indexOf(_tmp); if(i>=0)_p._tasks[i]=data; else _p._tasks.push(data); window._localTaskWriteTs=Date.now(); _pkRerender(); }
   if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
-  if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  } catch(e){ if(_p){ const i=_p._tasks.indexOf(_tmp); if(i>=0)_p._tasks.splice(i,1); _pkRerender(); } toast('Ошибка: '+(e.message||e)); } };
 let _pkRaf=0;
 function _pkRerender(){ if(_pkRaf) return; _pkRaf=requestAnimationFrame(()=>{ _pkRaf=0; try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }); }
 window.tTaskMove = async (id,status) => { const t=_findTask(id); try {
@@ -13625,13 +13652,20 @@ window.tTaskMove = async (id,status) => { const t=_findTask(id); try {
     if(_wlog) _logWork(_wlog);
     if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); }   // запись подтверждена — держим локальное состояние; реалтайм-эхо не перезагружаем (без гонки)
   } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
-window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
-  toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tTaskUpdate = async (id,patch) => { try {
-  const _pu=_tgCurProj(); const _tu=(_pu&&_pu._tasks||[]).find(t=>t.id===id); const _oldAsg=_tu&&_tu.assignee_id;
+window.tTaskDel = async (id) => {
+  const _p=_tgCurProj(); let _rm=null,_ix=-1;
+  if(_p&&_p._tasks){ _ix=_p._tasks.findIndex(t=>t.id===id); if(_ix>=0){ _rm=_p._tasks[_ix]; _p._tasks.splice(_ix,1); window._localTaskWriteTs=Date.now(); _pkRerender(); } }
+  toast('Задача удалена');
+  try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error; }
+  catch(e){ if(_p&&_rm&&_ix>=0){ _p._tasks.splice(_ix,0,_rm); _pkRerender(); } toast('Ошибка: '+(e.message||e)); } };
+window.tTaskUpdate = async (id,patch) => {
+  const _pu=_tgCurProj(); const _tu=(_pu&&_pu._tasks||[]).find(t=>t.id===id); const _oldAsg=_tu&&_tu.assignee_id; const _snap=_tu?Object.assign({},_tu):null;
+  if(_tu){ Object.keys(patch).forEach(k=>{ _tu[k]=patch[k]; }); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена');
+  try {
   const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
   if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
-  if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  window._localTaskWriteTs=Date.now(); } catch(e){ if(_tu&&_snap){ Object.assign(_tu,_snap); _pkRerender(); } toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
 function _logWork(o){
   if(!o || !o.member_id || !(o.sec>0) || typeof SB==='undefined' || !SB) return;
