@@ -2622,11 +2622,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* ============ БРИФ: конструктор (агентство) ============ */
 .bf2{display:grid;grid-template-columns:minmax(0,1fr) clamp(340px,30%,400px);gap:30px;align-items:start}
 /* БРИФ · агентский просмотр паспорта клиента */
-.bf-viewtog{display:inline-flex;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
-.bf-viewtog-b{background:none;border:0;border-radius:8px;color:var(--txt-3);font-family:var(--font);font-size:12.5px;font-weight:600;padding:7px 13px;cursor:pointer;transition:.14s;white-space:nowrap}
-.bf-viewtog-b.on{background:var(--accent);color:var(--accent-ink)}
-.bf-viewtog-b:not(.on):hover{color:var(--txt)}
-.bf2-top-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.bf-viewtog{position:relative;display:flex;border:1px solid var(--line);border-radius:11px;background:var(--bg-2);overflow:hidden;flex:0 0 auto}
+.bf-viewtog-thumb{position:absolute;top:0;bottom:0;left:0;width:50%;background:var(--accent);z-index:0;transition:transform .38s cubic-bezier(.34,1.24,.5,1)}
+.bf-viewtog--answers .bf-viewtog-thumb{transform:translateX(100%)}
+.bf-viewtog-b{position:relative;z-index:1;flex:1;background:none;border:0;color:var(--txt-3);font-family:var(--font);font-size:12.5px;font-weight:600;padding:8px 16px;cursor:pointer;transition:color .3s;white-space:nowrap}
+.bf-viewtog-b:hover{color:var(--txt-2)}
+.bf-viewtog:not(.bf-viewtog--answers) .bf-viewtog-b:first-of-type{color:var(--accent-ink)}
+.bf-viewtog--answers .bf-viewtog-b:last-of-type{color:var(--accent-ink)}
+.bf2.bf2-answers .bf-prev-btn{display:none}
+.bf2-top-r{display:flex;align-items:center;gap:10px}
 .bf2.bf2-answers{grid-template-columns:minmax(0,1fr)}
 .bf2.bf2-answers .bf2-preview{display:none}
 .bf2.bf2-answers .bf2-tabs{display:none}
@@ -7354,19 +7358,24 @@ function briefEditorInner(pid){
   const b=briefGet(pid); const F=b.fields||[]; const st=briefFillStats(b); const qn=st.total;
   let h='<div class="bf2-top"><div class="bf2-top-l"><div class="bf2-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg></div>'
     +'<div><div class="bf-title">Конструктор брифа</div><div class="bf-sub">'+qn+' '+_plural(qn,'вопрос','вопроса','вопросов')+(qn?(' · '+(st.done>0?('<span style="color:var(--pos)">клиент заполнил '+st.done+'/'+st.total+'</span>'):'клиент ещё не заполнял')):'')+'</div></div></div>'
-    +briefViewTogHTML(pid)+'</div>';
+    +'<button class="bf-prev-btn" onclick="briefPreview(\''+pid+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Во весь экран</button></div>';
   var _bl=briefList(pid); var _cur=briefDoc(pid).cur; var _cb=briefGet(pid);
   h+='<div class="bf-briefs"><div class="bf-briefs-tabs">';
   _bl.forEach(function(bb){ var on=bb.id===_cur; var qn2=(bb.fields||[]).filter(function(f){return f.type!=='section';}).length; h+='<button class="bf-brief-tab'+(on?' on':'')+'" onclick="briefSwitch(\''+pid+'\',\''+bb.id+'\')" title="'+_ddA(bb.name||'')+(bb.visible?' · виден клиенту':' · скрыт')+'"><span class="bf-brief-dot'+(bb.visible?' vis':'')+'"></span><span class="bf-brief-nm">'+_ddH(bb.name||'Бриф')+'</span>'+(on?'<span class="bf-brief-qn">'+qn2+'</span>':'')+'</button>'; });
   h+='<button class="bf-brief-add" onclick="briefAddNew(\''+pid+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Бриф</button>';
-  h+='</div><div class="bf-briefs-act">';
+  h+='</div><div class="bf-briefs-act">'+briefViewTogHTML(pid);
   if(_cb.visible){ h+='<span class="bf-brief-sent" title="Клиент видит этот бриф · ваши правки применяются автоматически"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Виден клиенту</span><button class="bf-brief-hide" onclick="briefToggleVisible(\''+pid+'\',\''+_cur+'\')" title="Скрыть от клиента">Скрыть</button>'; }
   else { h+='<button class="bf-brief-send" onclick="briefToggleVisible(\''+pid+'\',\''+_cur+'\')" title="Показать бриф клиенту — появится у него моментально"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>Отправить клиенту</button>'; }
   h+='<button class="bf-brief-ic" onclick="briefRename(\''+pid+'\',\''+_cur+'\')" title="Переименовать бриф"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>';
   h+='<button class="bf-brief-ic danger" onclick="briefDelBrief(\''+pid+'\',\''+_cur+'\')" title="Удалить этот бриф"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>';
   h+='</div></div>';
-  if((window._BRIEF_VIEW&&window._BRIEF_VIEW[pid])==='answers'){ h+=briefAgencyAnswersHTML(pid); return h; }
-  h+='<div class="bf-formhead"><span class="bf-formhead-bar"></span><input class="bf-formtitle" value="'+_ddA(b.title||'')+'" placeholder="Название брифа" oninput="briefSetTitle(\''+pid+'\',this.value)"><textarea class="bf-formdesc" rows="2" placeholder="Описание брифа для клиента (необязательно)" oninput="briefSetDesc(\''+pid+'\',this.value)">'+_ddH(b.description||'')+'</textarea></div>';
+  h+='<div class="bf-body" id="bf-body">'+briefBodyHTML(pid)+'</div>';
+  return h;
+}
+function briefBodyHTML(pid){
+  var b=briefGet(pid); var F=b.fields||[];
+  if((window._BRIEF_VIEW&&window._BRIEF_VIEW[pid])==='answers') return briefAgencyAnswersHTML(pid);
+  var h='<div class="bf-formhead"><span class="bf-formhead-bar"></span><input class="bf-formtitle" value="'+_ddA(b.title||'')+'" placeholder="Название брифа" oninput="briefSetTitle(\''+pid+'\',this.value)"><textarea class="bf-formdesc" rows="2" placeholder="Описание брифа для клиента (необязательно)" oninput="briefSetDesc(\''+pid+'\',this.value)">'+_ddH(b.description||'')+'</textarea></div>';
   if(!F.length){
     h+='<div class="bf-empty"><div class="bf-empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></div><div class="bf-empty-t">Бриф пока пуст</div><div class="bf-empty-s">Соберите вопросы под задачи проекта — превью справа сразу покажет, как это увидит клиент.</div></div>';
   } else {
@@ -8847,18 +8856,16 @@ function briefFieldEditHTML(pid,f,i,total){
 window._BRIEF_VIEW = window._BRIEF_VIEW || {};
 function briefViewTogHTML(pid){
   var ans=(window._BRIEF_VIEW&&window._BRIEF_VIEW[pid])==='answers';
-  var h='<div class="bf2-top-r"><div class="bf-viewtog">';
-  h+='<button class="bf-viewtog-b'+(ans?'':' on')+'" onclick="briefSetView(\''+pid+'\',\'edit\')">Редактор</button>';
-  h+='<button class="bf-viewtog-b'+(ans?' on':'')+'" onclick="briefSetView(\''+pid+'\',\'answers\')">Паспорт клиента</button>';
-  h+='</div>';
-  if(!ans) h+='<button class="bf-prev-btn" onclick="briefPreview(\''+pid+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Во весь экран</button>';
-  h+='</div>';
-  return h;
+  return '<div class="bf-viewtog'+(ans?' bf-viewtog--answers':'')+'"><span class="bf-viewtog-thumb"></span>'
+    +'<button class="bf-viewtog-b" onclick="briefSetView(\''+pid+'\',\'edit\')">Редактор</button>'
+    +'<button class="bf-viewtog-b" onclick="briefSetView(\''+pid+'\',\'answers\')">Паспорт клиента</button>'
+    +'</div>';
 }
 function briefSetView(pid,v){
   window._BRIEF_VIEW[pid]=v;
   var bf=document.querySelector('.bf2'); if(bf)bf.classList.toggle('bf2-answers',v==='answers');
-  var e=document.getElementById('bf-editor'); if(e)e.innerHTML=briefEditorInner(pid);
+  var tog=document.querySelector('.bf-viewtog'); if(tog)tog.classList.toggle('bf-viewtog--answers',v==='answers');
+  var body=document.getElementById('bf-body'); if(body)body.innerHTML=briefBodyHTML(pid);
   if(v!=='answers'&&typeof _briefPreviewNow==='function')_briefPreviewNow(pid);
 }
 function briefAgencyAnswersHTML(pid){
