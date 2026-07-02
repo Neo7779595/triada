@@ -1744,6 +1744,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cl-readm-eyebrow svg{width:14px;height:14px}
 .cl-readm-topic{font-size:18px;font-weight:700;color:var(--txt);margin-top:9px;line-height:1.32}
 .cl-readm-body{padding:22px 26px 26px;font-size:15px;line-height:1.78;color:var(--txt-2);max-height:60vh;overflow-y:auto;letter-spacing:.004em;overflow-wrap:anywhere}
+.cl-readm-sttag{margin-top:11px}
+.cl-readm-st{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:8px}
+.cl-readm-st.ok{background:rgba(52,211,153,.14);color:var(--pos)}
+.cl-readm-st.ch{background:rgba(245,158,11,.14);color:var(--warn)}
+.cp-apct-read{cursor:pointer;transition:color .14s,text-decoration-color .14s;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:2px}
+.cp-apct-read:hover{color:var(--accent);text-decoration-color:var(--accent)}
 .cp-row:hover>.cp-cell{background:var(--bg-1)}
 .cp-gut{flex:0 0 40px;width:40px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--txt-3);border-right:1px solid var(--line);border-bottom:1px solid var(--line);position:sticky;left:0;z-index:3;background:var(--bg-1);cursor:pointer}
 .cp-gut:hover{color:var(--accent)}
@@ -7717,6 +7723,19 @@ function clCpRead(el){
     +'<button class="tg-x" onclick="pd2Close()" aria-label="Закрыть">✕</button></div>'
     +'<div class="cl-readm-body">'+(body||'<span style="color:var(--txt-3)">Пусто</span>')+'</div></div>');
 }
+function cpCommentRead(el,ev){
+  if(ev){ try{ev.stopPropagation();}catch(_e){} }
+  if(!el || typeof pd2Open!=='function') return;
+  var text=el.getAttribute('data-cm')||'', status=el.getAttribute('data-st')||'';
+  var body=_ddH(text).replace(/\n/g,'<br>');
+  var ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  var st = status==='approved' ? '<span class="cl-readm-st ok">✓ Одобрено</span>' : (status==='changes' ? '<span class="cl-readm-st ch">✎ Нужны правки</span>' : '');
+  pd2Open('<div class="modal cl-readm">'
+    +'<div class="cl-readm-h"><div class="cl-readm-meta"><div class="cl-readm-eyebrow">'+ic+'Комментарий клиента</div>'
+    +(st?('<div class="cl-readm-sttag">'+st+'</div>'):'')+'</div>'
+    +'<button class="tg-x" onclick="pd2Close()" aria-label="Закрыть">✕</button></div>'
+    +'<div class="cl-readm-body">'+(body||'<span style="color:var(--txt-3)">Комментарий пуст</span>')+'</div></div>');
+}
 function clCpSet(rowId,status){ clCpSave(rowId,{status:status}); }
 function clCpComment(rowId,v){ clCpSave(rowId,{comment:v}); }
 async function clCpSave(rowId,patch){
@@ -7758,7 +7777,7 @@ function clCpUpdateProg(){
 }
 
 /* ===================== КОНТЕНТ-ПЛАН · решения клиента в редакторе ===================== */
-function cpApprCellHTML(a){ if(!a||!a.status||a.status==='pending') return '<span class="cp-apc none">—</span>'; const ok=a.status==='approved'; const chip='<span class="cp-apc '+(ok?'ok':'ch')+'">'+(ok?'✓ Одобрено':'✎ Правки')+'</span>'; const cm=a.comment?('<span class="cp-apct" title="'+_ddA(a.comment)+'">'+_ddH(a.comment)+'</span>'):''; return '<span class="cp-apwrap">'+chip+cm+'</span>'; }
+function cpApprCellHTML(a){ if(!a||!a.status||a.status==='pending') return '<span class="cp-apc none">—</span>'; const ok=a.status==='approved'; const chip='<span class="cp-apc '+(ok?'ok':'ch')+'">'+(ok?'✓ Одобрено':'✎ Правки')+'</span>'; const cm=a.comment?('<span class="cp-apct cp-apct-read" data-cm="'+_ddA(a.comment)+'" data-st="'+_ddA(a.status)+'" onclick="cpCommentRead(this,event)" onkeydown="if(event.key===\'Enter\')cpCommentRead(this,event)" role="button" tabindex="0" title="Открыть комментарий клиента">'+_ddH(a.comment)+'</span>'):''; return '<span class="cp-apwrap">'+chip+cm+'</span>'; }
 function cpSheetApprHTML(p,sh){
   const a=(p._cpAppr||{})[sh.id+'/__sheet__']; if(!a||!a.status||a.status==='pending')return '';
   if(a.status==='approved')return '<span class="cp-fchip cp-clappr ok">Клиент одобрил лист</span>';
