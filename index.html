@@ -5142,7 +5142,22 @@ function segmSyncOne(seg,solid){
   window._segmPos[key]={l:l,w:w};
 }
 function segmSyncAll(){ try{ document.querySelectorAll('.segm').forEach(function(s){segmSyncOne(s,false);}); document.querySelectorAll('.stpl-tabs').forEach(function(s){segmSyncOne(s,true);}); }catch(_e){} }
-(function(){ var raf=null; var kick=function(){ if(raf)return; raf=requestAnimationFrame(function(){ raf=null; segmSyncAll(); }); }; function go(){ try{ new MutationObserver(kick).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); }catch(_e){} window.addEventListener('resize',kick); kick(); setTimeout(kick,250); }; if(document.body)go(); else document.addEventListener('DOMContentLoaded',go); })();
+(function(){
+  var raf=null;
+  var kick=function(){ if(raf)return; raf=requestAnimationFrame(function(){ raf=null; segmSyncAll(); }); };
+  var rel=function(m){
+    var t=m.target;
+    if(t&&t.closest&&(t.closest('.segm')||t.closest('.stpl-tabs'))) return true;
+    var an=m.addedNodes;
+    if(an){ for(var i=0;i<an.length;i++){ var n=an[i]; if(n&&n.nodeType===1&&n.matches&&(n.matches('.segm,.stpl-tabs')||(n.querySelector&&n.querySelector('.segm,.stpl-tabs')))) return true; } }
+    return false;
+  };
+  function go(){
+    try{ new MutationObserver(function(muts){ for(var i=0;i<muts.length;i++){ if(rel(muts[i])){ kick(); return; } } }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); }catch(_e){}
+    window.addEventListener('resize',kick); kick(); setTimeout(kick,250);
+  }
+  if(document.body)go(); else document.addEventListener('DOMContentLoaded',go);
+})();
 
 /* ===== редактор услуг проекта (много услуг + тарифов на проект) ===== */
 window.NP_SVCS=[];
@@ -5770,7 +5785,7 @@ const PD_TABS=[
 ];
 function buildDetail(p){
   const base=stageSetFor(p.svc);
-  const [doneN,totN]=String(p.stages||'0 / 0').split('/').map(s=>parseInt(s.trim())||0);
+  const [doneN,totN]=p.stages.split('/').map(s=>parseInt(s.trim())||0);
   const names=base.slice(0,totN||base.length);
   const today='12 июня 2026';
   const stages=names.map((n,i)=>{
@@ -5969,24 +5984,20 @@ function _tgDeepLink(){
 }
 window._tgDeepLink=_tgDeepLink;
 function openProject(i){
-  try{
-    pdIdx=i;pdTabCur='stages';
-    const p=PROJECTS[i]; if(!p)return; try{ p._d=p._d||buildDetail(p); }catch(_e){ console.error('buildDetail',_e); p._d=p._d||{stages:[],tasks:[]}; } window._pdProj=p.id;
-    var _S=function(id,v){var e=document.getElementById(id); if(e)e.textContent=v;};
-    var _H=function(id,v){var e=document.getElementById(id); if(e)e.innerHTML=v;};
-    _H('pd-logo',logoFill(p.logoUrl,p.logo));
-    _S('pd-name',p.name);
-    _S('pd-desc',p.cat&&p.cat!=='—'?p.cat:'Нет описания');
-    { const _pdt=document.getElementById('pd-team'); if(_pdt) _pdt.innerHTML=(typeof teamStripHTML==='function'?teamStripHTML(p):''); }
-    { const _pdc=document.getElementById('pd-ct'); if(_pdc) _pdc.innerHTML=(typeof contractBadgeHTML==='function'?contractBadgeHTML(p):''); }
-    _S('pd-pct',(p.pct||0)+'%');
-    _S('pd-agency',(document.getElementById('ag-name')?.textContent||'detroyd').toLowerCase());
-    try{ _H('pd-tabbar',pdTabbar(p)); }catch(_e){ console.error('pdTabbar',_e); }
-    var _ov=document.getElementById('ov-proj'); if(_ov)_ov.classList.add('on');
-    renderPd();
-    requestAnimationFrame(()=>{var mb=document.getElementById('pd-minibar'); if(mb)mb.style.width=(p.pct||0)+'%';});
-    if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).then(()=>{ if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id) renderPd(); });
-  }catch(e){ console.error('openProject',e); try{ var _o=document.getElementById('ov-proj'); if(_o)_o.classList.add('on'); if(typeof renderPd==='function')renderPd(); }catch(_){} }
+  pdIdx=i;pdTabCur='stages';
+  const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id;
+  document.getElementById('pd-logo').innerHTML=logoFill(p.logoUrl,p.logo);
+  document.getElementById('pd-name').textContent=p.name;
+  document.getElementById('pd-desc').textContent=p.cat&&p.cat!=='—'?p.cat:'Нет описания';
+  { const _pdt=document.getElementById('pd-team'); if(_pdt) _pdt.innerHTML=(typeof teamStripHTML==='function'?teamStripHTML(p):''); }
+  { const _pdc=document.getElementById('pd-ct'); if(_pdc) _pdc.innerHTML=(typeof contractBadgeHTML==='function'?contractBadgeHTML(p):''); }
+  document.getElementById('pd-pct').textContent=p.pct+'%';
+  document.getElementById('pd-agency').textContent=(document.getElementById('ag-name')?.textContent||'detroyd').toLowerCase();
+  document.getElementById('pd-tabbar').innerHTML=pdTabbar(p);
+  document.getElementById('ov-proj').classList.add('on');
+  renderPd();
+  requestAnimationFrame(()=>{document.getElementById('pd-minibar').style.width=p.pct+'%';});
+  if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).then(()=>{ if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id) renderPd(); });
 }
 function closeProject(){document.getElementById('ov-proj').classList.remove('on');}
 function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));renderPd();if(t==='content'){const _p=PROJECTS[pdIdx];if(_p&&window.LIVE&&window.SB){ if(!_p._cpLoad){_p._cpLoad=1;cpLoadServer(_p);} else if(typeof cpRefreshAppr==='function')cpRefreshAppr(_p); }}}
@@ -6189,9 +6200,7 @@ function _pdDeadlinesHTML(p){
   return insight + kpis + filterBar + list;
 }
 function renderPd(){
-  const p=PROJECTS[pdIdx], d=p&&p._d; let h='';
-  if(!p){ var _pb=document.getElementById('pd-body'); if(_pb)_pb.innerHTML='<div class="pk-empty" style="padding:44px 0">Проект не найден.</div>'; return; }
-  try{
+  const p=PROJECTS[pdIdx], d=p._d; let h='';
   if(pdTabCur==='stages'){
     if(p._stages===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка этапов…</div>'; }
     else {
@@ -6344,8 +6353,7 @@ function renderPd(){
   } else {
     h=(p._history&&p._history.length)?actFeed(p._history):'<div class="pk-empty" style="padding:44px 0">История пуста — события появятся при смене статусов этапов.</div>';
   }
-  }catch(_rpe){ console.error('renderPd tab:',pdTabCur,_rpe); h='<div class="pk-empty" style="padding:44px 0"><div style="font-weight:600;color:var(--txt-2);margin-bottom:6px">Не удалось отобразить эту вкладку</div><div style="font-size:13px">Подробности — в консоли (F12). Попробуйте другую вкладку или обновите страницу.</div></div>'; }
-  const body=document.getElementById('pd-body'); if(!body)return;
+  const body=document.getElementById('pd-body');
   body.innerHTML=`<div class="pd-inner">${h}</div>`;
   if(typeof animateCounters==='function') requestAnimationFrame(()=>animateCounters(body));
   if(typeof bfSizeSplit==='function') requestAnimationFrame(bfSizeSplit);
