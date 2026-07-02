@@ -1661,6 +1661,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .bth-banner-btn:hover{border-color:var(--accent-line);color:var(--txt)}
 .bth-banner-btn.danger:hover{border-color:var(--neg);color:var(--neg)}
 .bth-fonts{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:10px}
+/* превью шрифта в оформлении */
+.bth-fpreview{background:linear-gradient(180deg,var(--bg-3),var(--bg-2));border:1px solid var(--line);border-radius:13px;padding:20px 22px;margin-bottom:14px;transition:font-family .05s}
+.bth-fp-t{font-size:24px;font-weight:700;color:var(--txt);line-height:1.15}
+.bth-fp-s{font-size:14px;color:var(--txt-2);margin-top:8px;line-height:1.5}
+.bth-fp-g{font-size:13px;color:var(--txt-3);margin-top:12px;letter-spacing:.02em}
 .bth-font{display:flex;align-items:center;gap:12px;background:var(--bg-2);border:1.5px solid var(--line-2);border-radius:12px;padding:11px 14px;cursor:pointer;transition:.14s;text-align:left;position:relative}
 .bth-font:hover{border-color:var(--accent-line)}
 .bth-font.on{border-color:var(--accent);background:linear-gradient(180deg,var(--accent-dim),var(--bg-2))}
@@ -3150,7 +3155,10 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .bpass-sec-h{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-2);margin:26px 0 14px}
 .bpass-sec-h:first-child{margin-top:14px}
 .bpass-sec-bar{width:3px;height:14px;border-radius:2px;background:var(--accent);flex:none}
-.bpass-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:4px}
+.bpass-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-flow:dense;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-bottom:4px}
+.bpass-cell.is-empty{background-color:var(--bg-1);background-image:repeating-linear-gradient(135deg,transparent,transparent 9px,rgba(255,255,255,.014) 9px,rgba(255,255,255,.014) 18px)}
+.bpass-cell.is-empty .bpass-empty{display:inline-flex;align-items:center;gap:6px}
+.bpass-cell.is-empty .bpass-empty::before{content:'';width:14px;height:2px;border-radius:2px;background:var(--txt-3);opacity:.5}
 .bpass-grid+.bpass-sec-h{margin-top:26px}
 .bpass-cell{background:var(--bg-1);padding:15px 18px}
 .bpass-cell.wide{grid-column:1 / -1}
@@ -8958,12 +8966,12 @@ function briefThemeModal(pid){
   var ban = b.banner
     ? '<div class="bth-banner-cur"><img src="'+_ddA(b.banner)+'" alt=""><div class="bth-banner-acts"><label class="bth-banner-btn"><input type="file" accept="image/*" style="display:none" onchange="briefBannerUpload(this,\''+pid+'\')">Заменить</label><button class="bth-banner-btn danger" onclick="briefBannerRemove(\''+pid+'\')">Удалить</button></div></div>'
     : '<label class="bth-drop"><input type="file" accept="image/*" style="display:none" onchange="briefBannerUpload(this,\''+pid+'\')"><div class="bth-drop-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="bth-drop-t">Загрузить баннер</div><div class="bth-drop-s">PNG, JPG или WebP · до 8 МБ · лучше 1600×400</div></label>';
-  var fonts=BRIEF_FONTS.map(function(f){ var on=(b.font||'')===f.k; var stack=f.k?("'"+f.k+"', "+(f.serif?'Georgia,serif':'sans-serif')):'inherit'; if(f.k)briefLoadFont(f.k); return '<button class="bth-font'+(on?' on':'')+'" onclick="briefSetFont(\''+pid+'\',\''+_ddA(f.k)+'\')"><span class="bth-font-aa" style="font-family:'+stack+'">Аа</span><span class="bth-font-meta"><span class="bth-font-nm" style="font-family:'+stack+'">'+_ddH(f.n)+'</span><span class="bth-font-cat">'+_ddH(f.cat)+'</span></span>'+(on?'<span class="bth-font-ck">✓</span>':'')+'</button>'; }).join('');
+  var fonts=BRIEF_FONTS.map(function(f){ var on=(b.font||'')===f.k; var stack=f.k?("'"+f.k+"', "+(f.serif?'Georgia,serif':'sans-serif')):'inherit'; if(f.k)briefLoadFont(f.k); return '<button class="bth-font'+(on?' on':'')+'" onmouseenter="briefFpEnter(\''+_ddA(f.k)+'\')" onmouseleave="briefFpLeave()" onclick="briefSetFont(\''+pid+'\',\''+_ddA(f.k)+'\')"><span class="bth-font-aa" style="font-family:'+stack+'">Аа</span><span class="bth-font-meta"><span class="bth-font-nm" style="font-family:'+stack+'">'+_ddH(f.n)+'</span><span class="bth-font-cat">'+_ddH(f.cat)+'</span></span>'+(on?'<span class="bth-font-ck">✓</span>':'')+'</button>'; }).join('');
   var html='<div class="modal bth-modal">'
     +'<div class="bth-head"><div><div class="bth-h1">Оформление брифа</div><div class="bth-h2">'+_ddH(b.name||'Бриф')+' · видят клиент и вы в предпросмотре</div></div><button class="bth-x" onclick="pd2Close()">✕</button></div>'
     +'<div class="bth-body">'
     +'<div class="bth-sec"><div class="bth-lbl">Баннер формы</div>'+ban+'</div>'
-    +'<div class="bth-sec"><div class="bth-lbl">Шрифт</div><div class="bth-fonts">'+fonts+'</div></div>'
+    +'<div class="bth-sec"><div class="bth-lbl">Шрифт</div>'+briefFpPanel(b)+'<div class="bth-fonts">'+fonts+'</div></div>'
     +'</div>'
     +'<div class="bth-foot"><button class="bth-done" onclick="pd2Close()">Готово</button></div>'
     +'</div>';
@@ -8988,6 +8996,9 @@ function briefBannerUpload(inputEl,pid){
 function briefBannerRemove(pid){ var b=briefGet(pid); b.banner=''; briefSaveStructure(pid); briefThemeModal(pid); if(typeof _briefPreviewNow==='function')_briefPreviewNow(pid); if(typeof toast==='function')toast('Баннер удалён'); }
 function briefSetFont(pid,k){ var b=briefGet(pid); b.font=k||''; if(k)briefLoadFont(k); briefSaveStructure(pid); briefThemeModal(pid); if(typeof _briefPreviewNow==='function')_briefPreviewNow(pid); }
 
+function briefFpPanel(b){ var sel=(typeof briefFontStack==='function'&&briefFontStack(b.font))?briefFontStack(b.font):'var(--font)'; return '<div class="bth-fpreview" id="bth-fp" data-sel="'+_ddA(sel)+'" style="font-family:'+sel+'"><div class="bth-fp-t">Заголовок брифа</div><div class="bth-fp-s">Так текст формы увидит ваш клиент — заголовки, описания и подписи к вопросам.</div><div class="bth-fp-g">Аа Бб Вв Гг · Aa Bb Cc · 0123456789</div></div>'; }
+function briefFpEnter(k){ var el=document.getElementById('bth-fp'); if(!el)return; if(k&&typeof briefLoadFont==='function')briefLoadFont(k); el.style.fontFamily=(k&&typeof briefFontStack==='function'&&briefFontStack(k))?briefFontStack(k):'var(--font)'; }
+function briefFpLeave(){ var el=document.getElementById('bth-fp'); if(!el)return; el.style.fontFamily=el.getAttribute('data-sel')||'var(--font)'; }
 document.addEventListener('keydown',cpKey);
 
 
