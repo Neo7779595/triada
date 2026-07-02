@@ -4838,7 +4838,7 @@ let PROJECTS = [
   {name:'Тестовый проект',logo:'Т',cat:'Кофейня',svc:'DESIGN',pct:0,stages:'0 / 4',health:'В норме',dyn:'— 0 / 7д',status:'active'},
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
-let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all';
+let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all',agCplx='all';
 let PROJECT_TAGS={category:[],service:[],tariff:[],dept:[]};
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты'};
 
@@ -5461,9 +5461,10 @@ function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const list=docum
 document.addEventListener('click',e=>{if(!e.target.closest('.dd'))document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));});
 function setAgCat(v){agCat=v;renderProjects();}
 function setAgSvc(v){agSvc=v;renderProjects();}
+function setAgCplx(v){agCplx=v;renderProjects();}
 function setAgLead(v){agLead=v;renderProjects();}
 function setAgSort(v){agSort=v;renderProjects();}
-function projResetFilters(){agFilter='active';agCat='all';agSvc='all';agLead='all';agQ='';agSort='active';renderProjects();}
+function projResetFilters(){agFilter='active';agCat='all';agSvc='all';agLead='all';agCplx='all';agQ='';agSort='active';renderProjects();}
 function projFiltered(){
   const q=(agQ||'').trim().toLowerCase();
   let l=PROJECTS.filter(p=>{
@@ -5473,6 +5474,7 @@ function projFiltered(){
     if(agCat!=='all'&&p.cat!==agCat)return false;
     if(agSvc!=='all'&&p.svc!==agSvc)return false;
     if(agLead!=='all'){ if(agLead==='__none'){ if(p.lead_id)return false; } else if(p.lead_id!==agLead)return false; }
+    if(agCplx!=='all'){ var _cl=(typeof _projComplexity==='function')?_projComplexity(p).label:'нет замеров'; if(agCplx==='none'){ if(_cl!=='нет замеров')return false; } else if(_cl!==agCplx)return false; }
     if(q&&!((p.name||'').toLowerCase().includes(q)||(p.cat||'').toLowerCase().includes(q)||(p.svc||'').toLowerCase().includes(q)))return false;
     return true;
   });
@@ -5673,7 +5675,7 @@ function renderProjects(){
       ${_dd('cat','Категория', agCat==='all'?'Все':agCat, [['all','Все категории']].concat(cats.map(c=>[c,c])), agCat, 'setAgCat')}
       ${_dd('svc','Услуга', agSvc==='all'?'Все':agSvc, [['all','Все услуги']].concat(svcs.map(x=>[x,x])), agSvc, 'setAgSvc')}
       ${_dd('sort','Сортировка', SORT_LABEL[agSort]||'По активности', SORT_OPTS, agSort, 'setAgSort')}
-      ${_dd('lead','Ответственный', leadLbl, leadOpts, agLead, 'setAgLead')}${(agFilter!=='active'||agCat!=='all'||agSvc!=='all'||agLead!=='all'||agQ||agSort!=='active')?`<button class="pk-fclear" onclick="projResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
+      ${_dd('lead','Ответственный', leadLbl, leadOpts, agLead, 'setAgLead')}${_dd('cplx','Сложность', agCplx==='all'?'Все':(agCplx==='none'?'Без замеров':agCplx), [['all','Любая сложность'],['Высокая','Высокая'],['Средняя','Средняя'],['Низкая','Низкая'],['none','Без замеров']], agCplx, 'setAgCplx')}${(agFilter!=='active'||agCat!=='all'||agSvc!=='all'||agLead!=='all'||agCplx!=='all'||agQ||agSort!=='active')?`<button class="pk-fclear" onclick="projResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
       <div class="flex1"></div>
       <button class="pj-lbbtn" onclick="openLb()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM5 4H4a2 2 0 0 0 0 4h1M19 4h1a2 2 0 0 1 0 4h-1"/></svg>Лидерборд</button>
     </div>
