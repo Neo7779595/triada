@@ -1004,6 +1004,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .stpl-tab{flex:1;border:none;background:transparent;color:var(--txt-3);font-family:var(--font);font-size:14px;font-weight:600;padding:13px 14px;border-radius:10px;cursor:pointer;transition:.18s var(--ease);letter-spacing:.005em}
 .stpl-tab:hover{color:var(--txt);background:rgba(255,255,255,.03)}
 .stpl-tab.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 6px 20px -8px var(--accent),inset 0 1px 0 rgba(255,255,255,.25)}
+/* анимированные сегментированные переключатели — скользящий бегунок */
+.segm{position:relative}
+.segm button{position:relative;z-index:1;transition:color .28s var(--ease-out),transform .12s}
+.segm button.on{background:transparent!important;box-shadow:none!important;color:var(--accent)}
+.segm-thumb{position:absolute;left:0;top:0;z-index:0;pointer-events:none;border-radius:6px;background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--accent-line);opacity:0;will-change:transform,width;transition:transform .42s cubic-bezier(.34,1.26,.48,1),width .42s cubic-bezier(.34,1.26,.48,1)}
+.stpl-tabs{position:relative}
+.stpl-tab{position:relative;z-index:1;transition:color .28s var(--ease-out)}
+.stpl-tab.on{background:transparent!important;box-shadow:none!important;color:var(--accent-ink)!important}
+.segm-thumb.solid{background:var(--accent);border-radius:10px;box-shadow:0 6px 20px -8px var(--accent),inset 0 1px 0 rgba(255,255,255,.25)}
 #stpl-body{min-height:440px;max-height:62vh;overflow-y:auto;overflow-x:hidden;padding:30px 38px 10px}
 @media(max-width:980px){#ov-pd2 .modal.stpl-modal{max-width:92vw}.stpl-two{grid-template-columns:1fr;gap:26px}.stpl-col-l{border-right:none;padding-right:0;border-bottom:1px solid var(--line);padding-bottom:24px}.stpl-col-r{padding-left:0}}
 .stpl-sec-h{display:flex;align-items:center;gap:12px;font-size:11.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--txt-3);font-weight:600;padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid var(--line)}
@@ -5083,6 +5092,31 @@ function contractBadgeHTML(p){
   return '<div class="pt-blk"><div class="pt-blk-lbl">Срок договора</div><div class="pt-blk-val pt-ct2 '+cls+'"><span class="pt-ct2-ic">'+cal+'</span><span class="pt-ct2-date">'+dnice+'</span><span class="pt-ct2-sep">·</span><span class="pt-ct2-days">'+daysTxt+'</span></div></div>';
 }
 function setAgFilter(f){agFilter=f;renderProjects();}
+/* ---- плавный скользящий бегунок для сегментированных переключателей ---- */
+window._segmPos = window._segmPos || {};
+function _segmKey(seg){ var b=seg.querySelector('button'); var oc=(b&&b.getAttribute('onclick'))||''; return (oc.split('(')[0])||seg.className; }
+function segmSyncOne(seg,solid){
+  var th=seg.querySelector('.segm-thumb');
+  if(!th || th.parentNode!==seg){ th=document.createElement('span'); th.className='segm-thumb'+(solid?' solid':''); seg.insertBefore(th, seg.firstChild); }
+  var act=seg.querySelector('button.on')||seg.querySelector('.stpl-tab.on');
+  if(!act){ th.style.opacity='0'; return; }
+  var l=act.offsetLeft, t=act.offsetTop, w=act.offsetWidth, hh=act.offsetHeight;
+  if(!w){ return; }
+  th.style.top=t+'px'; th.style.height=hh+'px';
+  var key=_segmKey(seg), prev=window._segmPos[key];
+  if(prev && (prev.l!==l||prev.w!==w)){
+    th.style.transition='none'; th.style.transform='translateX('+prev.l+'px)'; th.style.width=prev.w+'px'; th.style.opacity='1';
+    void th.offsetWidth; th.style.transition='';
+    th.style.transform='translateX('+l+'px)'; th.style.width=w+'px';
+  } else {
+    if(!prev)th.style.transition='none';
+    th.style.transform='translateX('+l+'px)'; th.style.width=w+'px'; th.style.opacity='1';
+    if(!prev){ void th.offsetWidth; th.style.transition=''; }
+  }
+  window._segmPos[key]={l:l,w:w};
+}
+function segmSyncAll(){ try{ document.querySelectorAll('.segm').forEach(function(s){segmSyncOne(s,false);}); document.querySelectorAll('.stpl-tabs').forEach(function(s){segmSyncOne(s,true);}); }catch(_e){} }
+(function(){ var raf=null; var kick=function(){ if(raf)return; raf=requestAnimationFrame(function(){ raf=null; segmSyncAll(); }); }; function go(){ try{ new MutationObserver(kick).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']}); }catch(_e){} window.addEventListener('resize',kick); kick(); setTimeout(kick,250); }; if(document.body)go(); else document.addEventListener('DOMContentLoaded',go); })();
 
 /* ===== редактор услуг проекта (много услуг + тарифов на проект) ===== */
 window.NP_SVCS=[];
