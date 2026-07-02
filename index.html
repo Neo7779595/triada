@@ -2922,6 +2922,26 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .bf-quickadd button{display:inline-flex;align-items:center;gap:7px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;color:var(--txt-2);font-size:13px;font-weight:600;padding:8px 15px;cursor:pointer;font-family:var(--font);transition:.15s}
 .bf-quickadd button:hover{border-color:var(--accent-line);color:var(--txt);background:var(--bg-3)}
 .bf-quickadd button span{display:inline-flex;width:18px;height:18px;align-items:center;justify-content:center;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:13px;font-weight:700;flex:0 0 auto}
+.bf-quickadd button .sq{background:rgba(138,143,255,.16);color:var(--violet)}
+.bf-quickadd .qa-more{border-style:dashed}
+.bf-quickadd .qa-more .dt{background:var(--bg-3);color:var(--txt-2);font-size:15px;letter-spacing:-1px}
+/* липкая панель добавления в конец — всегда на виду */
+.bf-addbar{position:sticky;bottom:0;z-index:6;display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:18px;padding:16px 8px 12px;background:linear-gradient(to top,var(--bg) 58%,transparent)}
+.bf-addbar-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:600;margin-right:4px}
+.bf-addbar-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:11px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;font-family:var(--font)}
+.bf-addbar-btn:hover{border-color:var(--accent-line);color:var(--txt);background:var(--bg-3)}
+.bf-addbar-btn span{display:inline-flex;width:19px;height:19px;align-items:center;justify-content:center;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:13px;font-weight:700;flex:0 0 auto}
+.bf-addbar-btn .sq{background:rgba(138,143,255,.16);color:var(--violet)}
+.bf-addbar-btn.more{border-style:dashed}
+.bf-addbar-btn.more .dt{background:var(--bg-3);color:var(--txt-2);font-size:15px;letter-spacing:-1px}
+/* поповер выбора типа поля */
+.bf-tymenu{min-width:290px;max-width:360px;max-height:min(62vh,540px);overflow-y:auto}
+.bf-tymenu-h{font-size:12.5px;font-weight:700;color:var(--txt);padding:5px 7px 9px}
+.bf-tymenu-g{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:700;padding:9px 7px 6px}
+.bf-tymenu-row{display:flex;flex-wrap:wrap;gap:6px;padding:0 5px 3px}
+.bf-tymenu-i{padding:7px 12px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);font-size:12.5px;font-weight:600;cursor:pointer;transition:.13s;font-family:var(--font)}
+.bf-tymenu-i:hover{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+.bf-tymenu-i.sec{border-style:dashed;color:var(--txt)}
 @media(max-width:1180px){.bf2{grid-template-columns:1fr;gap:0}.bf2-editor{max-width:none}.bf2-tabs{display:flex}.bf2-preview{display:none;position:static}.bf2-frame{position:static}.bf2.show-preview .bf2-editor{display:none}.bf2.show-preview .bf2-preview{display:block}}
 /* полноэкранный предпросмотр */
 .bf-prev-ov{position:fixed;inset:0;z-index:2000;background:rgba(6,12,16,.7);backdrop-filter:blur(7px);display:flex;align-items:flex-start;justify-content:center;padding:44px 20px;overflow:auto;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s,visibility .22s}
@@ -7287,11 +7307,9 @@ function briefEditorInner(pid){
   if(!F.length){
     h+='<div class="bf-empty"><div class="bf-empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></div><div class="bf-empty-t">Бриф пока пуст</div><div class="bf-empty-s">Соберите вопросы под задачи проекта — превью справа сразу покажет, как это увидит клиент.</div></div>';
   } else {
-    h+='<div class="bf-list">'; var _act=window._BRIEF_ACT&&window._BRIEF_ACT[pid]; F.forEach(function(f,i){ h+=briefFieldEditHTML(pid,f,i,F.length); var _ia=(f.id===_act)||(_act==null&&i===0); if(_ia)h+='<div class="bf-quickadd"><button onclick="briefAddField(\''+pid+'\',\'short\')"><span>+</span>Вопрос</button><button onclick="briefAddField(\''+pid+'\',\'section\')"><span>§</span>Раздел</button></div>'; }); h+='</div>';
+    h+='<div class="bf-list">'; var _act=window._BRIEF_ACT&&window._BRIEF_ACT[pid]; F.forEach(function(f,i){ h+=briefFieldEditHTML(pid,f,i,F.length); var _ia=(f.id===_act)||(_act==null&&i===0); if(_ia)h+='<div class="bf-quickadd"><button onclick="briefInsertAfter(\''+pid+'\',\'short\',\''+f.id+'\')"><span>+</span>Вопрос</button><button onclick="briefInsertAfter(\''+pid+'\',\'section\',\''+f.id+'\')"><span class="sq">§</span>Раздел</button><button class="qa-more" onclick="briefTypeMenu(event,\''+pid+'\',\''+f.id+'\')"><span class="dt">⋯</span>Другой тип</button></div>'; }); h+='</div>';
   }
-  h+='<div class="bf-add"><div class="bf-add-lbl">Добавить поле</div><div class="bf-add-types">';
-  BRIEF_TYPES.forEach(function(t){ h+='<button class="bf-add-t'+(t.t==='section'?' sec':'')+'" onclick="briefAddField(\''+pid+'\',\''+t.t+'\')"><span class="bf-add-plus">+</span>'+t.n+'</button>'; });
-  h+='</div></div>';
+  h+='<div class="bf-addbar"><span class="bf-addbar-lbl">Добавить в конец</span><button class="bf-addbar-btn" onclick="briefAddField(\''+pid+'\',\'short\')"><span>+</span>Вопрос</button><button class="bf-addbar-btn" onclick="briefAddField(\''+pid+'\',\'section\')"><span class="sq">§</span>Раздел</button><button class="bf-addbar-btn more" onclick="briefTypeMenu(event,\''+pid+'\',null)"><span class="dt">⋯</span>Другой тип</button></div>';
   return h;
 }
 function briefRerenderEditor(pid){ const e=document.getElementById('bf-editor'); if(e)e.innerHTML=briefEditorInner(pid); _briefPreviewNow(pid); }
@@ -8004,6 +8022,25 @@ function cpTplIcon(name,def){
 }
 /* ===== БРИФ · Проход 2: шкала / сетки / «Другое» / перемешивание (переопределяет ранние объявления) ===== */
 function briefHasGrid(t){ return t==='grid'||t==='checkgrid'; }
+function _briefMake(type){ var f={id:_briefUid(),type:type,label:'',required:false,help:''}; if(briefHasOpts(type))f.options=['Вариант 1']; if(type==='scale')f.scale={min:1,max:5,minLabel:'',maxLabel:''}; if(briefHasGrid(type))f.grid={rows:['Строка 1','Строка 2'],cols:['Столбец 1','Столбец 2']}; return f; }
+function briefInsertAfter(pid,type,afterId){
+  var b=briefGet(pid); b.fields=b.fields||[]; var f=_briefMake(type);
+  var i=afterId?b.fields.findIndex(function(x){return x.id===afterId;}):-1;
+  if(i<0)b.fields.push(f); else b.fields.splice(i+1,0,f);
+  window._BRIEF_ACT[pid]=f.id; briefSaveStructure(pid); briefRerenderEditor(pid);
+  var el=document.querySelector('#bf-editor .bf-list .bf-field.is-active .bf-flabel'); if(el){ el.focus(); try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(_e){} }
+}
+function briefTypeMenu(e,pid,afterId){
+  if(e){e.preventDefault();e.stopPropagation();}
+  var anchor=(e&&e.currentTarget)||(e&&e.target&&e.target.closest('button')); if(!anchor)return;
+  var groups=[{t:'Текст и данные',items:['short','long','number','email','phone','url']},{t:'Выбор',items:['radio','checks','select','scale','grid','checkgrid']},{t:'Дата и файлы',items:['date','time','file']},{t:'Структура',items:['section']}];
+  var nmOf=function(tt){ var x=BRIEF_TYPES.filter(function(z){return z.t===tt;})[0]; return x?x.n:tt; };
+  var html='<div class="bf-tymenu"><div class="bf-tymenu-h">Выберите тип поля</div>';
+  groups.forEach(function(g){ html+='<div class="bf-tymenu-g">'+g.t+'</div><div class="bf-tymenu-row">'; g.items.forEach(function(tt){ html+='<button class="bf-tymenu-i'+(tt==='section'?' sec':'')+'" onclick="briefTypePickAdd(\''+pid+'\',\''+(afterId||'')+'\',\''+tt+'\')">'+nmOf(tt)+'</button>'; }); html+='</div>'; });
+  html+='</div>';
+  if(typeof cpFloat==='function')cpFloat(anchor,html);
+}
+function briefTypePickAdd(pid,afterId,type){ if(typeof cpCloseFloat==='function')cpCloseFloat(); briefInsertAfter(pid,type,afterId||null); }
 function briefOptsList(f){ var o=(f.options||[]).slice(); if(f.shuffle){ for(var i=o.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=o[i]; o[i]=o[j]; o[j]=t; } } return o; }
 
 /* ---- редактор: доп-контролы вариантов (Другое / Перемешивать) ---- */
