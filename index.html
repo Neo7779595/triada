@@ -7607,7 +7607,7 @@ function _clPassFill(pid){
   if(!F.length){ host.innerHTML=sw+'<div class="bpass-none"><div class="bpass-none-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg></div><div class="bpass-none-t">Этот бриф пока пуст</div><div class="bpass-none-s">Агентство ещё добавляет вопросы в этот бриф.</div></div>'; return; }
   if(briefIsFilled(b) && !b._editing){ host.innerHTML=sw+briefPassportWrap(pid); return; }
   var form='<div class="bfc-shell"><div class="bfc-intro"><div class="bfc-intro-t">Заполните «'+_ddH(b.name||'бриф проекта')+'»</div><div class="bfc-intro-s">Эти ответы станут паспортом вашего проекта и помогут команде точнее работать.</div></div>'+briefClientFormHTML(pid,false)+'</div>';
-  host.innerHTML='<div class="bfc-layout"><div class="bfc-col-main">'+sw+form+'</div><aside class="bfc-col-side" id="bfc-side">'+briefClSideHTML(pid,b)+'</aside></div>';
+  host.innerHTML='<div class="bfc-layout"><div class="bfc-col-main">'+sw+form+'</div><aside class="bfc-col-side" id="bfc-side">'+briefClSideHTML(pid,b)+'</aside></div>'; if(typeof briefClBindAutosave==='function')briefClBindAutosave(pid);
 }
 function clCpRender(){
   const cp=window.CL_CP, box=document.getElementById('content-cl'); if(!box)return;
@@ -8796,7 +8796,7 @@ function bxCalGrid(){
     +'<div class="dp-foot"><button type="button" onclick="bxDatePick(\''+tISO+'\')">Сегодня</button><button type="button" class="clr" onclick="bxDatePick(\'\')">Очистить</button></div></div>';
 }
 function bxCalNav(delta){ var b=window._BX; if(!b)return; var m=b.m+delta,y=b.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} b.y=y;b.m=m; var p=document.querySelector('.cp-pop'); if(p)p.innerHTML=bxCalGrid(); }
-function bxDatePick(iso){ var b=window._BX; if(!b)return; if(b.inp)b.inp.value=iso; var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=iso?bxDateFmt(iso):'дд.мм.гггг'; sp.classList.toggle('ph',!iso); } cpCloseFloat(); }
+function bxDatePick(iso){ var b=window._BX; if(!b)return; if(b.inp){b.inp.value=iso; _bxNotify(b.inp);} var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=iso?bxDateFmt(iso):'дд.мм.гггг'; sp.classList.toggle('ph',!iso); } cpCloseFloat(); }
 
 /* ---- Пикер времени ---- */
 function bxTimeOpen(el){
@@ -8813,9 +8813,9 @@ function bxTimeGrid(){
   return '<div class="bxtime"><div class="bxtime-lbl"><span>Часы</span><span>Минуты</span></div><div class="bxtime-cols"><div class="bxtime-col">'+hcol+'</div><div class="bxtime-col">'+mcol+'</div></div>'
     +'<div class="bxtime-foot"><button type="button" onclick="bxTimeClear()">Очистить</button><button type="button" class="pri" onclick="cpCloseFloat()">Готово</button></div></div>';
 }
-function bxTimePick(which,val){ var b=window._BX; if(!b)return; if(which==='h')b.h=val; else b.m=val; var t=_bxPad(b.h)+':'+_bxPad(b.m); if(b.inp)b.inp.value=t; var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=t; sp.classList.remove('ph'); } var p=document.querySelector('.cp-pop'); if(p)p.innerHTML=bxTimeGrid(); bxTimeScroll(); }
+function bxTimePick(which,val){ var b=window._BX; if(!b)return; if(which==='h')b.h=val; else b.m=val; var t=_bxPad(b.h)+':'+_bxPad(b.m); if(b.inp){b.inp.value=t; _bxNotify(b.inp);} var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=t; sp.classList.remove('ph'); } var p=document.querySelector('.cp-pop'); if(p)p.innerHTML=bxTimeGrid(); bxTimeScroll(); }
 function bxTimeScroll(){ setTimeout(function(){ var cols=document.querySelectorAll('.cp-pop .bxtime-col'); Array.prototype.forEach.call(cols,function(col){ var on=col.querySelector('.bxt-i.on'); if(on)col.scrollTop=on.offsetTop-col.clientHeight/2+on.clientHeight/2; }); },0); }
-function bxTimeClear(){ var b=window._BX; if(b&&b.inp)b.inp.value=''; if(b&&b.el){ var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent='--:--'; sp.classList.add('ph'); } } cpCloseFloat(); }
+function bxTimeClear(){ var b=window._BX; if(b&&b.inp){b.inp.value=''; _bxNotify(b.inp);} if(b&&b.el){ var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent='--:--'; sp.classList.add('ph'); } } cpCloseFloat(); }
 
 /* ---- Выпадающий список ---- */
 function bxSelOpen(el,mode){
@@ -8832,7 +8832,7 @@ function bxSelOpen(el,mode){
   }
   h+='</div>'; cpFloat(el,h);
 }
-function bxSelPick(i){ var b=window._BX; if(!b)return; var val=(i<0)?'':((b.opts&&b.opts[i]!=null)?b.opts[i]:''); var inp=b.el.parentNode.querySelector('input[data-fid]'); if(inp)inp.value=val; var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=val||'— выберите —'; sp.classList.toggle('ph',!val); } cpCloseFloat(); }
+function bxSelPick(i){ var b=window._BX; if(!b)return; var val=(i<0)?'':((b.opts&&b.opts[i]!=null)?b.opts[i]:''); var inp=b.el.parentNode.querySelector('input[data-fid]'); if(inp){inp.value=val; _bxNotify(inp);} var sp=b.el.querySelector('.bxfield-val'); if(sp){ sp.textContent=val||'— выберите —'; sp.classList.toggle('ph',!val); } cpCloseFloat(); }
 function bxSelType(i){ var b=window._BX; if(!b)return; var t=BRIEF_TYPES[i]; if(!t)return; var pid=b.el.getAttribute('data-pid'), fid=b.el.getAttribute('data-fid'); cpCloseFloat(); if(typeof briefSetType==='function')briefSetType(pid,fid,t.t); }
 
 
@@ -8999,6 +8999,31 @@ function briefSetFont(pid,k){ var b=briefGet(pid); b.font=k||''; if(k)briefLoadF
 function briefFpPanel(b){ var sel=(typeof briefFontStack==='function'&&briefFontStack(b.font))?briefFontStack(b.font):'var(--font)'; return '<div class="bth-fpreview" id="bth-fp" data-sel="'+_ddA(sel)+'" style="font-family:'+sel+'"><div class="bth-fp-t">Заголовок брифа</div><div class="bth-fp-s">Так текст формы увидит ваш клиент — заголовки, описания и подписи к вопросам.</div><div class="bth-fp-g">Аа Бб Вв Гг · Aa Bb Cc · 0123456789</div></div>'; }
 function briefFpEnter(k){ var el=document.getElementById('bth-fp'); if(!el)return; if(k&&typeof briefLoadFont==='function')briefLoadFont(k); el.style.fontFamily=(k&&typeof briefFontStack==='function'&&briefFontStack(k))?briefFontStack(k):'var(--font)'; }
 function briefFpLeave(){ var el=document.getElementById('bth-fp'); if(!el)return; el.style.fontFamily=el.getAttribute('data-sel')||'var(--font)'; }
+/* ===== БРИФ · автосохранение ответов клиента (не терять при уходе/переходе) ===== */
+function _bxNotify(inp){ try{ if(inp)inp.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+var _briefAutoT=null;
+function briefClAutosaveNow(pid){
+  clearTimeout(_briefAutoT); _briefAutoT=null;
+  var form=document.querySelector('#cl-pass-host .bfc-form'); if(!form)return;
+  var b=(typeof briefGet==='function')?briefGet(pid):null; if(!b)return;
+  var secs=(typeof briefSections==='function')?briefSections(b.fields||[]):null;
+  var step=(window._BRIEF_STEP&&window._BRIEF_STEP[pid])||0;
+  var fs=(secs&&secs[step])?secs[step].fields:(b.fields||[]);
+  if(typeof briefCollectInto==='function')briefCollectInto(pid,form,fs);   // в память (мгновенно)
+  if(typeof briefSaveAnswers==='function')briefSaveAnswers(pid);           // в Supabase (debounce)
+}
+function briefClAutosave(pid){ clearTimeout(_briefAutoT); _briefAutoT=setTimeout(function(){ briefClAutosaveNow(pid); }, 450); }
+function briefClBindAutosave(pid){
+  var host=document.getElementById('cl-pass-host'); if(!host||host._bfAutoBound)return; host._bfAutoBound=1;
+  host.addEventListener('input', function(){ var p=(window.CLP&&window.CLP.id)||pid; if(p)briefClAutosave(p); });
+  host.addEventListener('change', function(){ var p=(window.CLP&&window.CLP.id)||pid; if(p)briefClAutosaveNow(p); });
+}
+function _briefFlushAll(){ try{ if(window.CLP&&window.CLP.id&&document.querySelector('#cl-pass-host .bfc-form')) briefClAutosaveNow(window.CLP.id); }catch(e){} }
+if(typeof document!=='undefined'){
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden')_briefFlushAll(); });
+  window.addEventListener('pagehide',_briefFlushAll);
+}
+
 document.addEventListener('keydown',cpKey);
 
 
