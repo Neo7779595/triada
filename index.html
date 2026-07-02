@@ -6189,7 +6189,9 @@ function _pdDeadlinesHTML(p){
   return insight + kpis + filterBar + list;
 }
 function renderPd(){
-  const p=PROJECTS[pdIdx], d=p._d; let h='';
+  const p=PROJECTS[pdIdx], d=p&&p._d; let h='';
+  if(!p){ var _pb=document.getElementById('pd-body'); if(_pb)_pb.innerHTML='<div class="pk-empty" style="padding:44px 0">Проект не найден.</div>'; return; }
+  try{
   if(pdTabCur==='stages'){
     if(p._stages===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка этапов…</div>'; }
     else {
@@ -6342,7 +6344,8 @@ function renderPd(){
   } else {
     h=(p._history&&p._history.length)?actFeed(p._history):'<div class="pk-empty" style="padding:44px 0">История пуста — события появятся при смене статусов этапов.</div>';
   }
-  const body=document.getElementById('pd-body');
+  }catch(_rpe){ console.error('renderPd tab:',pdTabCur,_rpe); h='<div class="pk-empty" style="padding:44px 0"><div style="font-weight:600;color:var(--txt-2);margin-bottom:6px">Не удалось отобразить эту вкладку</div><div style="font-size:13px">Подробности — в консоли (F12). Попробуйте другую вкладку или обновите страницу.</div></div>'; }
+  const body=document.getElementById('pd-body'); if(!body)return;
   body.innerHTML=`<div class="pd-inner">${h}</div>`;
   if(typeof animateCounters==='function') requestAnimationFrame(()=>animateCounters(body));
   if(typeof bfSizeSplit==='function') requestAnimationFrame(bfSizeSplit);
