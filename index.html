@@ -5770,7 +5770,7 @@ const PD_TABS=[
 ];
 function buildDetail(p){
   const base=stageSetFor(p.svc);
-  const [doneN,totN]=p.stages.split('/').map(s=>parseInt(s.trim())||0);
+  const [doneN,totN]=String(p.stages||'0 / 0').split('/').map(s=>parseInt(s.trim())||0);
   const names=base.slice(0,totN||base.length);
   const today='12 июня 2026';
   const stages=names.map((n,i)=>{
@@ -5969,20 +5969,24 @@ function _tgDeepLink(){
 }
 window._tgDeepLink=_tgDeepLink;
 function openProject(i){
-  pdIdx=i;pdTabCur='stages';
-  const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id;
-  document.getElementById('pd-logo').innerHTML=logoFill(p.logoUrl,p.logo);
-  document.getElementById('pd-name').textContent=p.name;
-  document.getElementById('pd-desc').textContent=p.cat&&p.cat!=='—'?p.cat:'Нет описания';
-  { const _pdt=document.getElementById('pd-team'); if(_pdt) _pdt.innerHTML=(typeof teamStripHTML==='function'?teamStripHTML(p):''); }
-  { const _pdc=document.getElementById('pd-ct'); if(_pdc) _pdc.innerHTML=(typeof contractBadgeHTML==='function'?contractBadgeHTML(p):''); }
-  document.getElementById('pd-pct').textContent=p.pct+'%';
-  document.getElementById('pd-agency').textContent=(document.getElementById('ag-name')?.textContent||'detroyd').toLowerCase();
-  document.getElementById('pd-tabbar').innerHTML=pdTabbar(p);
-  document.getElementById('ov-proj').classList.add('on');
-  renderPd();
-  requestAnimationFrame(()=>{document.getElementById('pd-minibar').style.width=p.pct+'%';});
-  if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).then(()=>{ if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id) renderPd(); });
+  try{
+    pdIdx=i;pdTabCur='stages';
+    const p=PROJECTS[i]; if(!p)return; try{ p._d=p._d||buildDetail(p); }catch(_e){ console.error('buildDetail',_e); p._d=p._d||{stages:[],tasks:[]}; } window._pdProj=p.id;
+    var _S=function(id,v){var e=document.getElementById(id); if(e)e.textContent=v;};
+    var _H=function(id,v){var e=document.getElementById(id); if(e)e.innerHTML=v;};
+    _H('pd-logo',logoFill(p.logoUrl,p.logo));
+    _S('pd-name',p.name);
+    _S('pd-desc',p.cat&&p.cat!=='—'?p.cat:'Нет описания');
+    { const _pdt=document.getElementById('pd-team'); if(_pdt) _pdt.innerHTML=(typeof teamStripHTML==='function'?teamStripHTML(p):''); }
+    { const _pdc=document.getElementById('pd-ct'); if(_pdc) _pdc.innerHTML=(typeof contractBadgeHTML==='function'?contractBadgeHTML(p):''); }
+    _S('pd-pct',(p.pct||0)+'%');
+    _S('pd-agency',(document.getElementById('ag-name')?.textContent||'detroyd').toLowerCase());
+    try{ _H('pd-tabbar',pdTabbar(p)); }catch(_e){ console.error('pdTabbar',_e); }
+    var _ov=document.getElementById('ov-proj'); if(_ov)_ov.classList.add('on');
+    renderPd();
+    requestAnimationFrame(()=>{var mb=document.getElementById('pd-minibar'); if(mb)mb.style.width=(p.pct||0)+'%';});
+    if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).then(()=>{ if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id) renderPd(); });
+  }catch(e){ console.error('openProject',e); try{ var _o=document.getElementById('ov-proj'); if(_o)_o.classList.add('on'); if(typeof renderPd==='function')renderPd(); }catch(_){} }
 }
 function closeProject(){document.getElementById('ov-proj').classList.remove('on');}
 function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));renderPd();if(t==='content'){const _p=PROJECTS[pdIdx];if(_p&&window.LIVE&&window.SB){ if(!_p._cpLoad){_p._cpLoad=1;cpLoadServer(_p);} else if(typeof cpRefreshAppr==='function')cpRefreshAppr(_p); }}}
