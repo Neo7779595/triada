@@ -4133,7 +4133,7 @@ button:active{transform:translateY(.5px) scale(.99)}
     <div class="login-form">
       <div class="field"><input id="lg-login" type="text" placeholder="Логин" aria-label="Логин" autocomplete="username"></div>
       <div class="field"><input id="lg-pass" type="password" placeholder="Пароль" aria-label="Пароль" autocomplete="current-password"></div>
-      <button class="btn btn-primary" onclick="doLogin()">Войти</button>
+      <button class="btn btn-primary" id="lg-btn" onclick="doLogin()">Войти</button>
     </div>
     <div class="login-foot">© 2026 TRIADA SYSTEM GROUP</div>
   </div>
@@ -14399,51 +14399,30 @@ window.CLP = null;
 window.tLoadClient = async () => {
   if (!SB || !ME) return;
   window.CLP = null;
-  // 1) проект(ы) клиента — resilient к направлению связи client_id
-  let rows = null;
-  try {
-    const { data, error } = await SB.from('projects')
-      .select('id,name,logo,logo_url,service,category,status,mrr,created_at')
-      .eq('client_id', ME.id).order('created_at',{ascending:true});
-    if (!error && data && data.length) rows = data;
-  } catch(_e){}
-  if (!rows && ME.client_id){
-    try { const { data } = await SB.from('projects')
-        .select('id,name,logo,logo_url,service,category,status,mrr,created_at')
-        .eq('id', ME.client_id);
-      if (data && data.length) rows = data;
-    } catch(_e){}
-  }
+  // 1) проект(ы) клиента — оба направления связи запрашиваем сразу параллельно (раньше — последовательный fallback)
+  const _safe=q=>Promise.resolve(q).catch(()=>null);
+  const [q1,q2] = await Promise.all([
+    _safe(SB.from('projects').select('id,name,logo,logo_url,service,category,status,mrr,created_at').eq('client_id', ME.id).order('created_at',{ascending:true})),
+    ME.client_id ? _safe(SB.from('projects').select('id,name,logo,logo_url,service,category,status,mrr,created_at').eq('id', ME.client_id)) : Promise.resolve(null)
+  ]);
+  let rows = (q1 && !q1.error && q1.data && q1.data.length) ? q1.data
+           : (q2 && !q2.error && q2.data && q2.data.length) ? q2.data : null;
   if (!rows || !rows.length){ window.CLP = null; return; }
   const p = rows[0], pid = p.id;
-  // 2) этапы — основной select без completed_at; даты завершения догружаем мягко
-  let stages = [];
-  try { const { data } = await SB.from('project_stages')
-      .select('id,name,status,due_date,due_time,idx')
-      .eq('project_id', pid).order('idx',{ascending:true});
-    stages = data || [];
-  } catch(_e){}
-  try { const td = await SB.from('project_stages').select('id,completed_at').eq('project_id', pid);
-    if (!td.error && td.data){ const m={}; td.data.forEach(r=>{ if(r.completed_at) m[r.id]=r.completed_at; }); stages.forEach(s=>{ s.completed_at = m[s.id]||null; }); }
-  } catch(_e){}
-  // 2.1) прогресс по задачам каждого этапа (RPC, только счётчики; мягкая деградация, если функции ещё нет)
-  try { const { data: tp } = await SB.rpc('client_stage_progress', { p_project: pid });
-    if (tp && tp.length){ const m={}; tp.forEach(r=>{ m[r.stage_id]={ total:Number(r.total)||0, done:Number(r.done)||0 }; }); stages.forEach(s=>{ const x=m[s.id]; s.taskTotal=x?x.total:0; s.taskDone=x?x.done:0; }); }
-  } catch(_e){}
-  // 3) отчёты
-  let reports = [];
-  try { const { data } = await SB.from('reports')
-      .select('id,title,kind,payload,published_at')
-      .eq('project_id', pid).order('published_at',{ascending:false});
-    reports = data || [];
-  } catch(_e){}
-  // 4) история смен статусов этапов (лента активности)
-  let history = [];
-  try { const { data } = await SB.from('stage_history')
-      .select('stage_name,old_status,new_status,created_at')
-      .eq('project_id', pid).order('created_at',{ascending:false}).limit(50);
-    history = data || [];
-  } catch(_e){}
+  // 2–4) этапы + даты завершения + прогресс задач (RPC) + отчёты + история — одной параллельной волной
+  //      (раньше это были 5 последовательных сетевых раундов — главный тормоз входа клиента)
+  const [rSt, rTd, rTp, rRp, rHs] = await Promise.all([
+    _safe(SB.from('project_stages').select('id,name,status,due_date,due_time,idx').eq('project_id', pid).order('idx',{ascending:true})),
+    _safe(SB.from('project_stages').select('id,completed_at').eq('project_id', pid)),
+    _safe(SB.rpc('client_stage_progress', { p_project: pid })),
+    _safe(SB.from('reports').select('id,title,kind,payload,published_at').eq('project_id', pid).order('published_at',{ascending:false})),
+    _safe(SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id', pid).order('created_at',{ascending:false}).limit(50))
+  ]);
+  let stages = (rSt && !rSt.error && rSt.data) || [];
+  if (rTd && !rTd.error && rTd.data){ const m={}; rTd.data.forEach(r=>{ if(r.completed_at) m[r.id]=r.completed_at; }); stages.forEach(s=>{ s.completed_at = m[s.id]||null; }); }
+  if (rTp && rTp.data && rTp.data.length){ const m={}; rTp.data.forEach(r=>{ m[r.stage_id]={ total:Number(r.total)||0, done:Number(r.done)||0 }; }); stages.forEach(s=>{ const x=m[s.id]; s.taskTotal=x?x.total:0; s.taskDone=x?x.done:0; }); }
+  let reports = (rRp && !rRp.error && rRp.data) || [];
+  let history = (rHs && !rHs.error && rHs.data) || [];
   // лента активности из истории (тот же трансформ, что в карточке проекта; tAgo доступен здесь, в block1)
   const feed = history.filter(h => !(h.new_status==='wait' && (!h.old_status || h.old_status==='wait'))).map(h => { const k = h.new_status==='done'?'done':h.new_status==='active'?'start':'back';
     const txt = k==='done'?'Команда завершила этап':k==='start'?'Команда начала работу над этапом':'Команда вернула этап в ожидание';
@@ -14453,8 +14432,16 @@ window.tLoadClient = async () => {
     mrr:p.mrr||0, createdAt:p.created_at||null, allProjects:rows, stages, reports, history, feed };
 };
 
-window.tLoadAll = async (role) => {
+function _bgGentleRefresh(){ try{                                                     // фон догрузился: обновляем экран, не мешая пользователю
+  const ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')) return;                     // человек печатает — данные уже в памяти, отрисуются при следующем действии
+  const ov=document.getElementById('ov-proj');
+  if(ov&&ov.classList.contains('on')){ if(window._pdProj)_pwReload(window._pdProj); return; }   // открыта модалка проекта — обновляем только её
+  refreshActive();
+}catch(e){ console.warn('bg refresh',e); } }
+window.tLoadAll = async (role, opts) => {
   if (!SB) return;
+  const _fast=!!(opts&&opts.fast);                                                    // fast: показать кабинет после ядра, остальное — в фоне
   if (role === 'superadmin'){
     const [ag, pr, pf] = await Promise.all([
       SB.from('agencies').select('*').order('created_at'),
@@ -14466,6 +14453,7 @@ window.tLoadAll = async (role) => {
       if (p.role==='client') c.cl[p.agency_id]=(c.cl[p.agency_id]||0)+1; });
     AGENCIES.length = 0; (ag.data||[]).forEach(a => AGENCIES.push(mapAgency(a, c)));
     const nb = document.getElementById('nav-ag-ct'); if (nb) nb.textContent = AGENCIES.length;
+    if(_fast){ loadTariffs().catch(e=>console.warn('tariffs',e)); return; }           // тарифы — в фон
   } else if (role === 'agency_owner' || role === 'member'){
     const [pr, tm, tpl] = await Promise.all([
       SB.from('projects').select('*').order('created_at'),
@@ -14482,7 +14470,12 @@ window.tLoadAll = async (role) => {
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
     window.STAGE_TPL = {}; ((tpl&&tpl.data)||[]).forEach(r=>{ if(Array.isArray(r.stages)) window.STAGE_TPL[r.service]=r.stages.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()); });
     // загрузчики независимы — параллельно вместо 10 последовательных сетевых раундов (в разы быстрее)
-    await Promise.all([ window.tLoadKB(), window.tLoadTools(), window.tLoadDeadlines(), window.tLoadProjectAggregates(), window.tLoadOverview(), window.tLoadCycles(), window.tLoadTeam(), window.tLoadFinance(), window.tLoadTags(), window.tLoadTariffTpl() ]);
+    const _wave2=()=>Promise.all([ window.tLoadKB(), window.tLoadTools(), window.tLoadDeadlines(), window.tLoadProjectAggregates(), window.tLoadOverview(), window.tLoadCycles(), window.tLoadTeam(), window.tLoadFinance(), window.tLoadTags(), window.tLoadTariffTpl() ]);
+    if(_fast){                                                                        // кабинет открывается сейчас; аналитика/финансы/дедлайны догружаются в фоне
+      _wave2().then(()=>loadTariffs()).then(_bgGentleRefresh).catch(e=>console.warn('bg load',e));
+      return;
+    }
+    await _wave2();
   }
   else if (role === 'client'){ await window.tLoadClient(); return; }
   await loadTariffs();
@@ -14570,14 +14563,18 @@ function subscribeRealtime(){
   }catch(e){ console.warn('realtime', e); }
 }
 
-async function routeByProfile(){
-  const { data:{ user } } = await SB.auth.getUser();
+async function routeByProfile(userArg){
+  let user = userArg;
+  if (!user){ const { data:{ session } } = await SB.auth.getSession(); user = session && session.user; }   // локально, без сетевого getUser
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
   ME = data || { role:'member' };
-  if (ME.agency_id){ const { data:ag } = await SB.from('agencies').select('slug,accent,name,logo_url,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single();
-    if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } }
-  await window.tLoadAll(ME.role);
+  const _jobs=[ window.tLoadAll(ME.role, {fast:true}) ];                              // ядро данных — параллельно с инфо агентства
+  if (ME.agency_id){ _jobs.push(
+    SB.from('agencies').select('slug,accent,name,logo_url,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
+      .then(({data:ag})=>{ if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } })
+      .catch(()=>{}) ); }
+  await Promise.all(_jobs);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
   if (ME.role === 'superadmin') enter('general');
   else if (ME.role === 'client') enterClient();
@@ -14589,9 +14586,16 @@ window.tLogin = async () => {
   const email = document.getElementById('lg-login').value.trim();
   const pass = document.getElementById('lg-pass').value;
   if (!email || !pass){ toast('Введи email и пароль'); return; }
-  const { error } = await SB.auth.signInWithPassword({ email, password: pass });
-  if (error){ toast('Вход не удался: ' + error.message); return; }
-  await routeByProfile();
+  const btn=document.getElementById('lg-btn');
+  if(btn&&btn.disabled) return;                                                       // защита от двойного клика
+  const _btnTxt=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.style.opacity='.7'; btn.textContent='Входим…'; }
+  const _btnBack=()=>{ if(btn){ btn.disabled=false; btn.style.opacity=''; btn.textContent=_btnTxt||'Войти'; } };
+  try{
+    const { data, error } = await SB.auth.signInWithPassword({ email, password: pass });
+    if (error){ toast('Вход не удался: ' + error.message); _btnBack(); return; }
+    await routeByProfile(data && data.user);                                          // user уже в ответе — без лишнего запроса getUser
+    _btnBack();
+  }catch(e){ toast('Вход не удался: '+(e.message||e)); _btnBack(); }
 };
 window.tLogout = async () => { if (SB) await SB.auth.signOut(); };
 
@@ -14710,7 +14714,7 @@ window.tToolAdd = async (cat, name, ty, url) => {
 
 if (window.LIVE){
   const lg = document.getElementById('lg-login'); if (lg) lg.setAttribute('placeholder','Email');
-  (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(); })();
+  (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(ses.user); })();
 }
 </script>
 <script>
