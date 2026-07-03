@@ -64,7 +64,57 @@ button{font-family:inherit}
 .login-foot{margin-top:34px;font-family:var(--mono);font-size:10.5px;color:var(--txt-3);letter-spacing:.06em}
 
 /* ========== APP SHELL ========== */
-.app{display:none;grid-template-columns:248px 1fr;min-height:100vh}
+.app{display:none;grid-template-columns:248px 1fr;min-height:100vh;transition:grid-template-columns .32s cubic-bezier(.22,.61,.36,1)}
+.app.side-collapsed{grid-template-columns:68px 1fr}
+/* Сворачивание сайдбара — плавная анимация в стиле Linear/Notion */
+.side{transition:width .32s cubic-bezier(.22,.61,.36,1)}
+.app.side-collapsed .side{width:68px}
+/* Кнопка сворачивания в шапке */
+.side-collapse-btn{position:absolute;top:22px;right:12px;width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--bg-2);color:var(--txt-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s;z-index:2;padding:0}
+.side-collapse-btn:hover{background:var(--bg-3);color:var(--accent);border-color:var(--accent-line);transform:translateX(-1px)}
+.side-collapse-btn svg{width:14px;height:14px;transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.app.side-collapsed .side-collapse-btn svg{transform:rotate(180deg)}
+.app.side-collapsed .side-collapse-btn{right:50%;transform:translateX(50%);top:19px}
+.app.side-collapsed .side-collapse-btn:hover{transform:translateX(50%) scale(1.05)}
+/* Свёрнутое состояние: скрываем всё текстовое, оставляем только иконки */
+.app.side-collapsed .side-badge>div:not(.av),
+.app.side-collapsed .nav-h,
+.app.side-collapsed .nav-i>*:not(svg),
+.app.side-collapsed .metric>div:not(.ic),
+.app.side-collapsed .u-chip>span,
+.app.side-collapsed .side-foot .btn-add>*:not(svg),
+.app.side-collapsed .cl-brand>div:not(.av),
+.app.side-collapsed .cl-prog,
+.app.side-collapsed .u-chip>svg{opacity:0;visibility:hidden;transition:opacity .12s,visibility 0s .12s}
+.side-badge>div:not(.av),.nav-h,.nav-i>*:not(svg),.metric>div:not(.ic),.u-chip>span,.side-foot .btn-add>*:not(svg),.cl-brand>div:not(.av),.cl-prog,.u-chip>svg{transition:opacity .18s ease .08s}
+.app.side-collapsed .side-top{padding:20px 12px 16px;display:flex;justify-content:center}
+.app.side-collapsed .side-badge{gap:0;justify-content:center}
+.app.side-collapsed .cl-brand{gap:0;justify-content:center}
+.app.side-collapsed .nav{padding:12px 10px}
+.app.side-collapsed .nav-h{height:0;padding:0;margin:0;overflow:hidden}
+.app.side-collapsed .nav-i{justify-content:center;padding:11px 0;gap:0;position:relative}
+.app.side-collapsed .nav-i.on::before{left:0}
+.app.side-collapsed .nav-i .ct,.app.side-collapsed .nav-i .soon,.app.side-collapsed .dot-n{position:absolute;top:6px;right:8px;margin:0;font-size:9px;padding:0 4px;min-width:14px;height:14px;line-height:14px;text-align:center}
+.app.side-collapsed .metrics-rail{padding:10px 10px}
+.app.side-collapsed .metric{padding:11px 0;justify-content:center}
+.app.side-collapsed .side-foot{padding:10px}
+.app.side-collapsed .side-foot .btn-add{padding:11px 0;margin-bottom:8px}
+.app.side-collapsed .u-chip{justify-content:center;padding:8px 0}
+/* Тултипы для свёрнутых элементов — элегантно вылетают справа */
+.app.side-collapsed .nav-i[data-tip]:hover::after,
+.app.side-collapsed .u-chip[data-tip]:hover::after,
+.app.side-collapsed .metric[data-tip]:hover::after,
+.app.side-collapsed .side-badge[data-tip]:hover::after,
+.app.side-collapsed .cl-brand[data-tip]:hover::after,
+.app.side-collapsed .btn-add[data-tip]:hover::after{
+  content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);
+  background:var(--bg-1);color:var(--txt);border:1px solid var(--line-2);border-radius:7px;padding:6px 11px;
+  font-size:12px;font-weight:500;white-space:nowrap;pointer-events:none;z-index:100;
+  box-shadow:0 8px 24px rgba(0,0,0,.3);letter-spacing:.01em;
+  animation:sideTipIn .14s ease-out}
+.app.side-collapsed .btn-add[data-tip]:hover::after{color:var(--accent-ink)}
+@keyframes sideTipIn{from{opacity:0;transform:translateY(-50%) translateX(-4px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
+.side{position:sticky}
 .app.on{display:grid}
 .side{background:var(--bg-side);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .side-top{padding:20px 18px 16px;border-bottom:1px solid var(--line)}
@@ -4297,8 +4347,9 @@ button:active{transform:translateY(.5px) scale(.99)}
 <div class="app" id="app">
   <!-- sidebar -->
   <aside class="side">
-    <div class="side-top">
-      <div class="side-badge">
+    <div class="side-top" style="position:relative">
+      <button class="side-collapse-btn" onclick="toggleSide(event)" title="Свернуть/развернуть боковую панель (Ctrl+B)" aria-label="Свернуть боковую панель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <div class="side-badge" data-tip="Генеральный кабинет">
         <div class="av">T</div>
         <div>
           <div class="nm">TRIADA</div>
@@ -4308,16 +4359,25 @@ button:active{transform:translateY(.5px) scale(.99)}
     </div>
     <nav class="nav" id="nav-general">
       <div class="nav-h">Платформа</div>
-      <div class="nav-i on" data-gm="agencies" onclick="genNav('agencies')">
+      <div class="nav-i on" data-tip="Агентства 0" data-gm="agencies" onclick="genNav('agencies')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
         Агентства <span class="ct" id="nav-ag-ct">0</span>
       </div>
-      <div class="nav-i" data-gm="analytics" onclick="genNav('analytics')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Аналитика</div>
-      <div class="nav-i" data-gm="tariffs" onclick="genNav('tariffs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Тарифы</div>
-      <div class="nav-i" data-gm="settings" onclick="genNav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 005 15a1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1A1.6 1.6 0 005 8.6 1.6 1.6 0 004.7 6.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6 1.6 1.6 0 0110.4 3a2 2 0 014 0 1.6 1.6 0 002.7.7l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00.7 2.7H21a2 2 0 010 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg>Настройки</div>
+      <div class="nav-i" data-tip="';
+  const rows=stages.map((s,i)=>{
+    const cls=s.status==='done'?'done':s.status==='active'?'active':'';
+    const isDone=s.status==='done', isActive=s.status==='active';
+    const dt=isDone
+      ? (s.completed_at?_dDate(String(s.completed_at).slice(0,10)):(s.due_date?_dDate(s.due_date):''))
+      : (s.due_date?_dDate(s.due_date):'');
+    let badges;
+    if(isDone){
+      badges=`" data-gm="analytics" onclick="genNav('analytics')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Аналитика</div>
+      <div class="nav-i" data-tip="Тарифы" data-gm="tariffs" onclick="genNav('tariffs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Тарифы</div>
+      <div class="nav-i" data-tip="Настройки" data-gm="settings" onclick="genNav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 005 15a1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1A1.6 1.6 0 005 8.6 1.6 1.6 0 004.7 6.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6 1.6 1.6 0 0110.4 3a2 2 0 014 0 1.6 1.6 0 002.7.7l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00.7 2.7H21a2 2 0 010 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg>Настройки</div>
     </nav>
     <div class="side-foot">
-      <div class="u-chip" onclick="logout()" style="justify-content:space-between">
+      <div class="u-chip" data-tip="Выйти" onclick="logout()" style="justify-content:space-between">
         <span style="display:flex;align-items:center;gap:9px"><span class="d"></span>Выйти</span>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </div>
@@ -4340,8 +4400,9 @@ button:active{transform:translateY(.5px) scale(.99)}
 <!-- ============ ОКНО 3 · АГЕНТСКИЙ КАБИНЕТ ============ -->
 <div class="app" id="app-ag">
   <aside class="side">
-    <div class="side-top">
-      <div class="side-badge">
+    <div class="side-top" style="position:relative">
+      <button class="side-collapse-btn" onclick="toggleSide(event)" title="Свернуть/развернуть боковую панель (Ctrl+B)" aria-label="Свернуть боковую панель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <div class="side-badge" data-tip="Кабинет агентства">
         <div class="av" id="ag-av">D</div>
         <div>
           <div class="nm" id="ag-name">DETROYD</div>
@@ -4351,24 +4412,24 @@ button:active{transform:translateY(.5px) scale(.99)}
     </div>
     <nav class="nav">
       <div class="nav-h">Навигация</div>
-      <div class="nav-i on" data-m="projects" onclick="agNav('projects')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/></svg>Проекты <span class="ct" id="ag-proj-ct">4</span></div>
-      <div class="nav-i" data-m="deadlines" onclick="agNav('deadlines')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Дедлайны</div>
-      <div class="nav-i" data-m="overview" onclick="agNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Сводка</div>
-      <div class="nav-i" data-m="cycles" onclick="agNav('cycles')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Циклы</div>
-      <div class="nav-i" data-m="finance" onclick="agNav('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Финансы</div>
-      <div class="nav-i" data-m="team" onclick="agNav('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/></svg>Команда</div>
-      <div class="nav-i" data-m="kb" onclick="agNav('kb')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>База знаний</div>
-      <div class="nav-i" data-m="tools" onclick="agNav('tools')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Инструменты</div>
+      <div class="nav-i on" data-tip="Проекты 4" data-m="projects" onclick="agNav('projects')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/></svg>Проекты <span class="ct" id="ag-proj-ct">4</span></div>
+      <div class="nav-i" data-tip="Дедлайны" data-m="deadlines" onclick="agNav('deadlines')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Дедлайны</div>
+      <div class="nav-i" data-tip="Сводка" data-m="overview" onclick="agNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Сводка</div>
+      <div class="nav-i" data-tip="Циклы" data-m="cycles" onclick="agNav('cycles')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Циклы</div>
+      <div class="nav-i" data-tip="Финансы" data-m="finance" onclick="agNav('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Финансы</div>
+      <div class="nav-i" data-tip="Команда" data-m="team" onclick="agNav('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/></svg>Команда</div>
+      <div class="nav-i" data-tip="База знаний" data-m="kb" onclick="agNav('kb')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>База знаний</div>
+      <div class="nav-i" data-tip="Инструменты" data-m="tools" onclick="agNav('tools')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Инструменты</div>
     </nav>
     <div class="metrics-rail">
-      <div class="metric"><div><div class="v" id="m-proj-act">4</div><div class="l">Активные</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div></div>
-      <div class="metric"><div><div class="v" id="m-proj-done">1</div><div class="l">Завершённые</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div></div>
-      <div class="metric"><div><div class="v" id="m-proj-all">5</div><div class="l">Всего было</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg></div></div>
-      <div class="metric"><div><div class="v">&lt;1 мес</div><div class="l">Средний LTV</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div></div>
+      <div class="metric" data-tip="Активные"><div><div class="v" id="m-proj-act">4</div><div class="l">Активные</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div></div>
+      <div class="metric" data-tip="Завершённые"><div><div class="v" id="m-proj-done">1</div><div class="l">Завершённые</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div></div>
+      <div class="metric" data-tip="Всего было"><div><div class="v" id="m-proj-all">5</div><div class="l">Всего было</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg></div></div>
+      <div class="metric" data-tip="Средний LTV"><div><div class="v">&lt;1 мес</div><div class="l">Средний LTV</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div></div>
     </div>
     <div class="side-foot">
-      <button class="btn-add" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openNewProject()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый проект</button>
-      <div class="u-chip" onclick="logout()" style="justify-content:space-between">
+      <button class="btn-add" data-tip="Новый проект" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openNewProject()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый проект</button>
+      <div class="u-chip" data-tip="Выйти" onclick="logout()" style="justify-content:space-between">
         <span style="display:flex;align-items:center;gap:9px"><span class="d"></span>Выйти</span>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </div>
@@ -4390,20 +4451,21 @@ button:active{transform:translateY(.5px) scale(.99)}
 <!-- ============ ОКНО 4 · КЛИЕНТСКИЙ КАБИНЕТ ============ -->
 <div class="app" id="app-cl">
   <aside class="side">
-    <div class="side-top">
-      <div class="cl-brand">
+    <div class="side-top" style="position:relative">
+      <button class="side-collapse-btn" onclick="toggleSide(event)" title="Свернуть/развернуть боковую панель (Ctrl+B)" aria-label="Свернуть боковую панель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <div class="cl-brand" data-tip="Кабинет клиента">
         <div class="av">U</div>
         <div><div class="nm">Uzbek Doner</div><div class="on">Онлайн</div></div>
       </div>
     </div>
     <nav class="nav">
       <div class="nav-h">Навигация</div>
-      <div class="nav-i on" data-cm="overview" onclick="clNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Обзор</div>
-      <div class="nav-i" data-cm="stages" onclick="clNav('stages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Этапы <span class="ct">2/6</span></div>
-      <div class="nav-i" data-cm="reports" onclick="clNav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6"/></svg>Отчёты <span class="ct">3</span></div>
-      <div class="nav-i" data-cm="content" onclick="clNav('content')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>Контент-план</div>
-      <div class="nav-i" data-cm="passport" onclick="clNav('passport')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Паспорт проекта</div>
-      <div class="nav-i" data-cm="updates" onclick="clNav('updates')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Обновления <span class="dot-n"></span></div>
+      <div class="nav-i on" data-tip="Обзор" data-cm="overview" onclick="clNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Обзор</div>
+      <div class="nav-i" data-tip="Этапы 2/6" data-cm="stages" onclick="clNav('stages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Этапы <span class="ct">2/6</span></div>
+      <div class="nav-i" data-tip="Отчёты 3" data-cm="reports" onclick="clNav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6"/></svg>Отчёты <span class="ct">3</span></div>
+      <div class="nav-i" data-tip="Контент-план" data-cm="content" onclick="clNav('content')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>Контент-план</div>
+      <div class="nav-i" data-tip="Паспорт проекта" data-cm="passport" onclick="clNav('passport')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Паспорт проекта</div>
+      <div class="nav-i" data-tip="Обновления" data-cm="updates" onclick="clNav('updates')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Обновления <span class="dot-n"></span></div>
     </nav>
     <div class="flex1"></div>
     <div class="cl-prog">
@@ -4411,7 +4473,7 @@ button:active{transform:translateY(.5px) scale(.99)}
       <div class="bar"><i style="width:33%"></i></div>
     </div>
     <div class="side-foot">
-      <div class="u-chip" onclick="logout()" style="justify-content:space-between">
+      <div class="u-chip" data-tip="Выйти" onclick="logout()" style="justify-content:space-between">
         <span style="display:flex;align-items:center;gap:9px"><span class="d"></span>Выйти</span>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </div>
@@ -4642,7 +4704,31 @@ function _initCounters(){
   });
 }
 
-function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
+function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); applySideState(); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
+/* ——— Сворачивание боковой панели: премиальная плавная анимация, сохранение состояния ——— */
+function toggleSide(ev){
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  const app=document.querySelector('.app.on'); if(!app) return;
+  const isCollapsed=app.classList.toggle('side-collapsed');
+  try{ localStorage.setItem('side_collapsed', isCollapsed?'1':'0'); }catch(_e){}
+  // На мобильных сайдбар оверлейный — сворачивание не имеет смысла
+  if(window.innerWidth<=760) app.classList.remove('side-collapsed');
+}
+function applySideState(){
+  document.querySelectorAll('.app').forEach(a=>a.classList.remove('side-collapsed'));
+  if(window.innerWidth<=760) return;                                                  // мобилка: рельс не нужен
+  let saved='0'; try{ saved=localStorage.getItem('side_collapsed')||'0'; }catch(_e){}
+  if(saved==='1'){ const app=document.querySelector('.app.on'); if(app) app.classList.add('side-collapsed'); }
+}
+document.addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='b' && !e.altKey && !e.shiftKey){
+    const app=document.querySelector('.app.on'); if(!app) return;
+    const ae=document.activeElement;
+    if(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable)) return;   // не мешаем набору
+    e.preventDefault(); toggleSide();
+  }
+});
+window.addEventListener('resize', ()=>{ if(window.innerWidth<=760) document.querySelectorAll('.app.side-collapsed').forEach(a=>a.classList.remove('side-collapsed')); else applySideState(); });
 function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast('Supabase не настроен: вставь публичный ключ в SUPA_KEY (внизу файла)'); }
 function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
@@ -5037,6 +5123,7 @@ const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overvie
 function enterAgency(){
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('app-ag').classList.add('on');
+  applySideState();
   _syncUchip();
   (function(){ const me=(window.tMe&&window.tMe())||{}; const nm=me.agencyName||'DETROYD';
     const ne=document.getElementById('ag-name'); if(ne) ne.textContent=nm; })();
@@ -13244,6 +13331,7 @@ const ACT_IC={start:'<path d="M9 6.5v11l9-5.5z" fill="currentColor"/>',done:'<pa
 function enterClient(){
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('app-cl').classList.add('on');
+  applySideState();
   clNav('overview');
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-cl .side')));
 }
