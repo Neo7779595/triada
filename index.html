@@ -64,7 +64,81 @@ button{font-family:inherit}
 .login-foot{margin-top:34px;font-family:var(--mono);font-size:10.5px;color:var(--txt-3);letter-spacing:.06em}
 
 /* ========== APP SHELL ========== */
-.app{display:none;grid-template-columns:248px 1fr;min-height:100vh}
+.app{display:none;grid-template-columns:248px 1fr;min-height:100vh;transition:grid-template-columns .32s cubic-bezier(.22,.61,.36,1)}
+/* ========== СВОРАЧИВАНИЕ САЙДБАРА · в стиле Claude ========== */
+.app{transition:grid-template-columns .22s cubic-bezier(.4,0,.2,1)}
+.side{transition:width .22s cubic-bezier(.4,0,.2,1)}
+.app.side-collapsed{grid-template-columns:64px 1fr}
+.app.side-collapsed .side{width:64px;overflow:hidden}
+/* Всё текстовое — display:none, никаких фантомов */
+.app.side-collapsed .nav-h,
+.app.side-collapsed .metrics-rail,
+.app.side-collapsed .cl-prog,
+.app.side-collapsed .side-badge>div:not(.av),
+.app.side-collapsed .cl-brand>div:not(.av),
+.app.side-collapsed .nav-i>*:not(svg),
+.app.side-collapsed .u-chip>*:not(.d),
+.app.side-collapsed .side-foot .btn-add>*:not(svg){display:none !important}
+/* Шапка: только иконка бренда, идеально по центру */
+.app.side-collapsed .side-top{padding:14px 0;display:flex;justify-content:center;border-bottom:1px solid var(--line)}
+.app.side-collapsed .side-badge,
+.app.side-collapsed .cl-brand{gap:0;justify-content:center;display:flex}
+.app.side-collapsed .side-badge .av,
+.app.side-collapsed .cl-brand .av{width:32px;height:32px;font-size:14px;border-radius:8px}
+/* Навигация: узкий рельс, иконки в квадратных «плитках» 40×40, идеально по центру */
+.app.side-collapsed .nav{padding:12px 0}
+.app.side-collapsed .nav-i{
+  width:40px;height:40px;margin:2px auto;padding:0;gap:0;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:8px;position:relative}
+.app.side-collapsed .nav-i svg{width:18px;height:18px}
+.app.side-collapsed .nav-i.on::before{display:none}                                  /* убираем полоску слева — вся плитка подсвечена */
+.app.side-collapsed .nav-i.on{background:var(--accent-dim);color:var(--accent)}
+.app.side-collapsed .nav-i .ct{
+  position:absolute;top:-2px;right:-2px;
+  font-size:9px;padding:0 4px;min-width:14px;height:14px;line-height:14px;
+  margin:0;background:var(--accent);color:var(--accent-ink);font-weight:700;
+  border-radius:7px;border:2px solid var(--bg-side)}
+.app.side-collapsed .nav-i .dot-n{position:absolute;top:6px;right:8px}
+/* Футер: «Новый проект» превращается в квадратную кнопку с плюсом */
+.app.side-collapsed .side-foot{padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.app.side-collapsed .side-foot .btn-add{
+  width:40px;height:40px;padding:0;margin:0 !important;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:8px;gap:0}
+.app.side-collapsed .side-foot .btn-add svg{width:20px;height:20px;stroke-width:2.5}
+.app.side-collapsed .u-chip{
+  width:40px;height:40px;padding:0;margin:0;gap:0;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:8px;border:1px solid var(--line-2)}
+.app.side-collapsed .u-chip .d{margin:0}
+/* КНОПКА СВОРАЧИВАНИЯ · плавно переезжает вместе с ребром */
+.side-collapse-btn{
+  display:none;                                                                       /* показывается только когда открыт кабинет */
+  position:fixed;top:20px;
+  width:24px;height:24px;border-radius:6px;
+  border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;
+  z-index:1000;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+  transition:background .15s,color .15s,border-color .15s,left .22s cubic-bezier(.4,0,.2,1),transform .12s}
+.side-collapse-btn{left:232px}                                                       /* при 248px панели — 16px от ребра */
+.app.side-collapsed .side-collapse-btn{left:48px}                                    /* при 64px панели — 16px от ребра */
+.side-collapse-btn:hover{background:var(--bg-2);color:var(--accent);border-color:var(--accent-line);transform:scale(1.06)}
+.side-collapse-btn svg{width:14px;height:14px;transition:transform .22s cubic-bezier(.4,0,.2,1)}
+.app.side-collapsed .side-collapse-btn svg{transform:rotate(180deg)}
+/* ТУЛТИПЫ · выезжают справа от иконок */
+.app.side-collapsed .nav-i[data-tip]:hover::after,
+.app.side-collapsed .u-chip[data-tip]:hover::after,
+.app.side-collapsed .side-badge[data-tip]:hover::after,
+.app.side-collapsed .cl-brand[data-tip]:hover::after,
+.app.side-collapsed .btn-add[data-tip]:hover::after{
+  content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);
+  background:var(--bg-1);color:var(--txt);border:1px solid var(--line-2);border-radius:6px;padding:6px 10px;
+  font-size:12px;font-weight:500;white-space:nowrap;pointer-events:none;z-index:1001;
+  box-shadow:0 6px 20px rgba(0,0,0,.5);letter-spacing:.01em;
+  animation:sideTipIn .12s ease-out}
+@keyframes sideTipIn{from{opacity:0;transform:translateY(-50%) translateX(-4px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
 .app.on{display:grid}
 .side{background:var(--bg-side);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .side-top{padding:20px 18px 16px;border-bottom:1px solid var(--line)}
@@ -4268,12 +4342,17 @@ button:active{transform:translateY(.5px) scale(.99)}
 @keyframes pjhDraw{from{stroke-dashoffset:100}}
 @keyframes pjhRise{from{transform:scaleY(0)}}
 .pjh-spark{stroke-dasharray:100;stroke-dashoffset:0;animation:pjhDraw 1.1s cubic-bezier(.16,1,.3,1) .1s both}
+.pjh-spark-dot{animation:pjhDot 1.1s cubic-bezier(.16,1,.3,1) both}
+.pjh-spark-dot::after{content:""}
+@keyframes pjhDot{0%,72%{opacity:0;r:0}88%{opacity:1;r:4.5}100%{opacity:1;r:3}}
+.pjh:hover .pjh-spark-dot{animation:pjhDotPulse 1.6s ease-in-out infinite}
+@keyframes pjhDotPulse{0%,100%{r:3}50%{r:4.5}}
 .pjh-barr{transform-box:fill-box;transform-origin:bottom;animation:pjhRise .7s cubic-bezier(.16,1,.3,1) both}
 @media(max-width:1180px){.pjh{grid-template-columns:156px 1fr;grid-template-areas:"id meta" "cards cards";row-gap:22px;min-height:0}.pjh-id{grid-area:id}.pjh-meta{grid-area:meta}.pjh-metrics{grid-area:cards;grid-template-columns:repeat(4,1fr)}}
 @media(max-width:900px){.pjh-metrics{grid-template-columns:1fr 1fr}}
 @media(max-width:720px){.pjh{grid-template-columns:1fr;grid-template-areas:"id" "meta" "cards"}.pjh-metrics{grid-template-columns:1fr 1fr}}
 @media(max-width:460px){.pjh-metrics{grid-template-columns:1fr}}
-@media(prefers-reduced-motion:reduce){.pjh-spark,.pjh-barr{animation:none}}
+@media(prefers-reduced-motion:reduce){.pjh-spark,.pjh-barr,.pjh-spark-dot{animation:none}}
 </style>
 </head>
 <body>
@@ -4298,7 +4377,7 @@ button:active{transform:translateY(.5px) scale(.99)}
   <!-- sidebar -->
   <aside class="side">
     <div class="side-top">
-      <div class="side-badge">
+      <div class="side-badge" data-tip="Генеральный кабинет">
         <div class="av">T</div>
         <div>
           <div class="nm">TRIADA</div>
@@ -4308,16 +4387,25 @@ button:active{transform:translateY(.5px) scale(.99)}
     </div>
     <nav class="nav" id="nav-general">
       <div class="nav-h">Платформа</div>
-      <div class="nav-i on" data-gm="agencies" onclick="genNav('agencies')">
+      <div class="nav-i on" data-tip="Агентства 0" data-gm="agencies" onclick="genNav('agencies')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
         Агентства <span class="ct" id="nav-ag-ct">0</span>
       </div>
-      <div class="nav-i" data-gm="analytics" onclick="genNav('analytics')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Аналитика</div>
-      <div class="nav-i" data-gm="tariffs" onclick="genNav('tariffs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Тарифы</div>
-      <div class="nav-i" data-gm="settings" onclick="genNav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 005 15a1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1A1.6 1.6 0 005 8.6 1.6 1.6 0 004.7 6.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6 1.6 1.6 0 0110.4 3a2 2 0 014 0 1.6 1.6 0 002.7.7l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00.7 2.7H21a2 2 0 010 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg>Настройки</div>
+      <div class="nav-i" data-tip="';
+  const rows=stages.map((s,i)=>{
+    const cls=s.status==='done'?'done':s.status==='active'?'active':'';
+    const isDone=s.status==='done', isActive=s.status==='active';
+    const dt=isDone
+      ? (s.completed_at?_dDate(String(s.completed_at).slice(0,10)):(s.due_date?_dDate(s.due_date):''))
+      : (s.due_date?_dDate(s.due_date):'');
+    let badges;
+    if(isDone){
+      badges=`" data-gm="analytics" onclick="genNav('analytics')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Аналитика</div>
+      <div class="nav-i" data-tip="Тарифы" data-gm="tariffs" onclick="genNav('tariffs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>Тарифы</div>
+      <div class="nav-i" data-tip="Настройки" data-gm="settings" onclick="genNav('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7.7 1.6 1.6 0 01-3.2 0 1.6 1.6 0 00-2.7-.7l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 005 15a1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1A1.6 1.6 0 005 8.6 1.6 1.6 0 004.7 6.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6 1.6 1.6 0 0110.4 3a2 2 0 014 0 1.6 1.6 0 002.7.7l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00.7 2.7H21a2 2 0 010 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg>Настройки</div>
     </nav>
     <div class="side-foot">
-      <div class="u-chip" onclick="logout()" style="justify-content:space-between">
+      <div class="u-chip" data-tip="Выйти" onclick="logout()" style="justify-content:space-between">
         <span style="display:flex;align-items:center;gap:9px"><span class="d"></span>Выйти</span>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </div>
@@ -4341,7 +4429,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <div class="app" id="app-ag">
   <aside class="side">
     <div class="side-top">
-      <div class="side-badge">
+      <div class="side-badge" data-tip="Кабинет агентства">
         <div class="av" id="ag-av">D</div>
         <div>
           <div class="nm" id="ag-name">DETROYD</div>
@@ -4351,24 +4439,24 @@ button:active{transform:translateY(.5px) scale(.99)}
     </div>
     <nav class="nav">
       <div class="nav-h">Навигация</div>
-      <div class="nav-i on" data-m="projects" onclick="agNav('projects')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/></svg>Проекты <span class="ct" id="ag-proj-ct">4</span></div>
-      <div class="nav-i" data-m="deadlines" onclick="agNav('deadlines')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Дедлайны</div>
-      <div class="nav-i" data-m="overview" onclick="agNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Сводка</div>
-      <div class="nav-i" data-m="cycles" onclick="agNav('cycles')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Циклы</div>
-      <div class="nav-i" data-m="finance" onclick="agNav('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Финансы</div>
-      <div class="nav-i" data-m="team" onclick="agNav('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/></svg>Команда</div>
-      <div class="nav-i" data-m="kb" onclick="agNav('kb')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>База знаний</div>
-      <div class="nav-i" data-m="tools" onclick="agNav('tools')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Инструменты</div>
+      <div class="nav-i on" data-tip="Проекты 4" data-m="projects" onclick="agNav('projects')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/></svg>Проекты <span class="ct" id="ag-proj-ct">4</span></div>
+      <div class="nav-i" data-tip="Дедлайны" data-m="deadlines" onclick="agNav('deadlines')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Дедлайны</div>
+      <div class="nav-i" data-tip="Сводка" data-m="overview" onclick="agNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Сводка</div>
+      <div class="nav-i" data-tip="Циклы" data-m="cycles" onclick="agNav('cycles')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Циклы</div>
+      <div class="nav-i" data-tip="Финансы" data-m="finance" onclick="agNav('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Финансы</div>
+      <div class="nav-i" data-tip="Команда" data-m="team" onclick="agNav('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/></svg>Команда</div>
+      <div class="nav-i" data-tip="База знаний" data-m="kb" onclick="agNav('kb')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>База знаний</div>
+      <div class="nav-i" data-tip="Инструменты" data-m="tools" onclick="agNav('tools')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Инструменты</div>
     </nav>
     <div class="metrics-rail">
-      <div class="metric"><div><div class="v" id="m-proj-act">4</div><div class="l">Активные</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div></div>
-      <div class="metric"><div><div class="v" id="m-proj-done">1</div><div class="l">Завершённые</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div></div>
-      <div class="metric"><div><div class="v" id="m-proj-all">5</div><div class="l">Всего было</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg></div></div>
-      <div class="metric"><div><div class="v">&lt;1 мес</div><div class="l">Средний LTV</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div></div>
+      <div class="metric" data-tip="Активные"><div><div class="v" id="m-proj-act">4</div><div class="l">Активные</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div></div>
+      <div class="metric" data-tip="Завершённые"><div><div class="v" id="m-proj-done">1</div><div class="l">Завершённые</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div></div>
+      <div class="metric" data-tip="Всего было"><div><div class="v" id="m-proj-all">5</div><div class="l">Всего было</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18v13H3zM8 7V4h8v3"/></svg></div></div>
+      <div class="metric" data-tip="Средний LTV"><div><div class="v">&lt;1 мес</div><div class="l">Средний LTV</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div></div>
     </div>
     <div class="side-foot">
-      <button class="btn-add" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openNewProject()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый проект</button>
-      <div class="u-chip" onclick="logout()" style="justify-content:space-between">
+      <button class="btn-add" data-tip="Новый проект" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openNewProject()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый проект</button>
+      <div class="u-chip" data-tip="Выйти" onclick="logout()" style="justify-content:space-between">
         <span style="display:flex;align-items:center;gap:9px"><span class="d"></span>Выйти</span>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </div>
@@ -4391,19 +4479,19 @@ button:active{transform:translateY(.5px) scale(.99)}
 <div class="app" id="app-cl">
   <aside class="side">
     <div class="side-top">
-      <div class="cl-brand">
+      <div class="cl-brand" data-tip="Кабинет клиента">
         <div class="av">U</div>
         <div><div class="nm">Uzbek Doner</div><div class="on">Онлайн</div></div>
       </div>
     </div>
     <nav class="nav">
       <div class="nav-h">Навигация</div>
-      <div class="nav-i on" data-cm="overview" onclick="clNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Обзор</div>
-      <div class="nav-i" data-cm="stages" onclick="clNav('stages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Этапы <span class="ct">2/6</span></div>
-      <div class="nav-i" data-cm="reports" onclick="clNav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6"/></svg>Отчёты <span class="ct">3</span></div>
-      <div class="nav-i" data-cm="content" onclick="clNav('content')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>Контент-план</div>
-      <div class="nav-i" data-cm="passport" onclick="clNav('passport')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Паспорт проекта</div>
-      <div class="nav-i" data-cm="updates" onclick="clNav('updates')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Обновления <span class="dot-n"></span></div>
+      <div class="nav-i on" data-tip="Обзор" data-cm="overview" onclick="clNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Обзор</div>
+      <div class="nav-i" data-tip="Этапы 2/6" data-cm="stages" onclick="clNav('stages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Этапы <span class="ct">2/6</span></div>
+      <div class="nav-i" data-tip="Отчёты 3" data-cm="reports" onclick="clNav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6"/></svg>Отчёты <span class="ct">3</span></div>
+      <div class="nav-i" data-tip="Контент-план" data-cm="content" onclick="clNav('content')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>Контент-план</div>
+      <div class="nav-i" data-tip="Паспорт проекта" data-cm="passport" onclick="clNav('passport')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Паспорт проекта</div>
+      <div class="nav-i" data-tip="Обновления" data-cm="updates" onclick="clNav('updates')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Обновления <span class="dot-n"></span></div>
     </nav>
     <div class="flex1"></div>
     <div class="cl-prog">
@@ -4411,7 +4499,7 @@ button:active{transform:translateY(.5px) scale(.99)}
       <div class="bar"><i style="width:33%"></i></div>
     </div>
     <div class="side-foot">
-      <div class="u-chip" onclick="logout()" style="justify-content:space-between">
+      <div class="u-chip" data-tip="Выйти" onclick="logout()" style="justify-content:space-between">
         <span style="display:flex;align-items:center;gap:9px"><span class="d"></span>Выйти</span>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </div>
@@ -4642,9 +4730,51 @@ function _initCounters(){
   });
 }
 
-function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
+function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); applySideState(); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
+/* ——— Сворачивание боковой панели: премиальная плавная анимация, сохранение состояния ——— */
+function toggleSide(ev){
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  const app=document.querySelector('.app.on'); if(!app) return;
+  const isCollapsed=app.classList.toggle('side-collapsed');
+  try{ localStorage.setItem('side_collapsed', isCollapsed?'1':'0'); }catch(_e){}
+  if(window.innerWidth<=760) app.classList.remove('side-collapsed');                  // на мобильных сайдбар оверлейный
+  _showSideBtn();
+}
+function _injectSideBtn(){
+  if(document.getElementById('side-collapse-btn')) return;
+  const b=document.createElement('button');
+  b.id='side-collapse-btn'; b.className='side-collapse-btn'; b.type='button';
+  b.title='Свернуть боковую панель (Ctrl+B)';
+  b.setAttribute('aria-label','Свернуть боковую панель');
+  b.onclick=toggleSide;
+  b.style.display='none';                                                             // по умолчанию скрыта — покажется только при входе в кабинет
+  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>';
+  document.body.appendChild(b);
+}
+function _showSideBtn(){
+  _injectSideBtn();
+  const b=document.getElementById('side-collapse-btn'); if(!b) return;
+  const anyApp=document.querySelector('.app.on');
+  b.style.display=(anyApp && window.innerWidth>760)?'flex':'none';                    // на логине и мобилке — прячем
+}
+function applySideState(){
+  _showSideBtn();
+  document.querySelectorAll('.app').forEach(a=>a.classList.remove('side-collapsed'));
+  if(window.innerWidth<=760) return;                                                  // мобилка: рельс не нужен
+  let saved='0'; try{ saved=localStorage.getItem('side_collapsed')||'0'; }catch(_e){}
+  if(saved==='1'){ const app=document.querySelector('.app.on'); if(app) app.classList.add('side-collapsed'); }
+}
+document.addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='b' && !e.altKey && !e.shiftKey){
+    const app=document.querySelector('.app.on'); if(!app) return;
+    const ae=document.activeElement;
+    if(ae && (ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.isContentEditable)) return;   // не мешаем набору
+    e.preventDefault(); toggleSide();
+  }
+});
+window.addEventListener('resize', ()=>{ if(window.innerWidth<=760) document.querySelectorAll('.app.side-collapsed').forEach(a=>a.classList.remove('side-collapsed')); else applySideState(); });
 function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast('Supabase не настроен: вставь публичный ключ в SUPA_KEY (внизу файла)'); }
-function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
+function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); const _sb=document.getElementById('side-collapse-btn'); if(_sb)_sb.style.display='none'; document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
 
 /* ——— GENERAL CABINET ——— */
@@ -5037,6 +5167,7 @@ const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overvie
 function enterAgency(){
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('app-ag').classList.add('on');
+  applySideState();
   _syncUchip();
   (function(){ const me=(window.tMe&&window.tMe())||{}; const nm=me.agencyName||'DETROYD';
     const ne=document.getElementById('ag-name'); if(ne) ne.textContent=nm; })();
@@ -5769,9 +5900,54 @@ function _gaugeSVG(score,color,dim){ const sc=Math.min(Math.max(score,0),100),r=
   if(dim) return `<svg viewBox="0 0 80 50" width="78" height="48"><path d="${bg}" fill="none" stroke="var(--bg-3)" stroke-width="6" stroke-linecap="round"/><text x="40" y="35" text-anchor="middle" fill="var(--txt-3)" font-size="14" font-family="ui-monospace,monospace">?</text></svg>`;
   return `<svg viewBox="0 0 80 50" width="78" height="48"><path d="${bg}" fill="none" stroke="var(--bg-3)" stroke-width="6" stroke-linecap="round"/><path d="${bg}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${Ln.toFixed(1)}" stroke-dashoffset="${(Ln*(1-sc/100)).toFixed(1)}"/><line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--txt)" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="2.6" fill="var(--txt)"/></svg>`; }
 function _pipeBar(pp){ const seg=(n,cls)=> n>0?`<i class="${cls}" style="flex:${n}"></i>`:''; return `<div class="pt-pipe-bar">${pp.total>0?(seg(pp.done,'sg-done')+seg(pp.active,'sg-active')+seg(pp.wait,'sg-wait')):'<i class="sg-wait" style="flex:1"></i>'}</div>`; }
-const _hSpark=(col,area)=>`<svg class="pjh-svg" viewBox="0 0 220 52" preserveAspectRatio="none" aria-hidden="true"><line class="pjh-grid" x1="0" y1="17" x2="220" y2="17"/><line class="pjh-grid" x1="0" y1="35" x2="220" y2="35"/><path d="M0,40 L20,27 L40,20 L60,25 L80,15 L100,27 L120,21 L140,32 L160,28 L180,39 L200,42 L220,42 L220,52 L0,52 Z" fill="${area}"/><path class="pjh-spark" pathLength="100" d="M0,40 L20,27 L40,20 L60,25 L80,15 L100,27 L120,21 L140,32 L160,28 L180,39 L200,42 L220,42" fill="none" style="stroke:${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="220" cy="42" r="3" style="fill:${col}"/></svg>`;
+function _seedRand(seed){ let s=seed>>>0||1; return ()=>{ s^=s<<13;s>>>=0;s^=s>>17;s^=s<<5;s>>>=0; return s/4294967296; }; }
+function _strSeed(str){ let h=2166136261>>>0; const s=String(str||''); for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function _smoothPath(pts){ // кубическая сглаженная кривая через точки [{x,y}]
+  if(pts.length<2) return '';
+  let d='M'+pts[0].x+','+pts[0].y.toFixed(1);
+  for(let i=0;i<pts.length-1;i++){ const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+    const c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6, c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
+    d+=' C'+c1x.toFixed(1)+','+c1y.toFixed(1)+' '+c2x.toFixed(1)+','+c2y.toFixed(1)+' '+p2.x+','+p2.y.toFixed(1); }
+  return d;
+}
+const _hSpark=(col,area,seed,trend)=>{
+  // Уникальная кривая для каждого проекта: форма из seed, наклон из trend (0..1 — «здоровье»)
+  const rnd=_seedRand(_strSeed(seed)||7), N=12, W=220, top=8, bot=46;
+  trend=(trend==null?0.5:Math.min(1,Math.max(0,trend)));
+  const pts=[]; let val=0.35+rnd()*0.25;
+  for(let i=0;i<N;i++){
+    const drift=(trend-0.5)*0.9*(i/(N-1));                                            // общий тренд вверх/вниз
+    const noise=(rnd()-0.5)*0.42;                                                     // «дыхание» линии
+    val=Math.min(1,Math.max(0.06, val*0.55 + (0.4+drift)*0.45 + noise*0.5));
+    const x=Math.round(i/(N-1)*W), y=bot-(bot-top)*val;
+    pts.push({x,y});
+  }
+  const line=_smoothPath(pts);
+  const last=pts[pts.length-1];
+  const areaD=line+` L${W},${bot+8} L0,${bot+8} Z`;
+  const gid='sg'+(_strSeed(seed)%99999);
+  return `<svg class="pjh-svg" viewBox="0 0 220 52" preserveAspectRatio="none" aria-hidden="true">`
+    +`<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>`
+    +`<line class="pjh-grid" x1="0" y1="17" x2="220" y2="17"/><line class="pjh-grid" x1="0" y1="35" x2="220" y2="35"/>`
+    +`<path d="${areaD}" fill="url(#${gid})"/>`
+    +`<path class="pjh-spark" pathLength="100" d="${line}" fill="none" style="stroke:${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
+    +`<circle class="pjh-spark-dot" cx="${last.x}" cy="${last.y.toFixed(1)}" r="3" style="fill:${col}"/></svg>`;
+};
 const _hRing=(pct,col,empty)=>{const r=23,c=2*Math.PI*r,off=c*(1-Math.min(100,Math.max(0,parseFloat(pct)||0))/100);return empty?`<svg class="pjh-svg" viewBox="0 0 220 58" aria-hidden="true"><circle cx="110" cy="29" r="26" fill="none" style="stroke:var(--line)" stroke-width="1" stroke-dasharray="2 5"/><circle cx="110" cy="29" r="${r}" fill="none" style="stroke:var(--bg-3)" stroke-width="6"/><text x="110" y="34" text-anchor="middle" style="font-family:var(--mono);fill:var(--txt-3)" font-size="15" font-weight="600">—</text></svg>`:`<svg class="pjh-svg" viewBox="0 0 220 58" aria-hidden="true"><circle cx="110" cy="29" r="${r}" fill="none" style="stroke:var(--bg-3)" stroke-width="6"/><circle cx="110" cy="29" r="${r}" fill="none" style="stroke:${col}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 110 29)"/></svg>`;};
-const _hBars=(pct,col)=>{const N=11,act=Math.round(Math.min(100,Math.max(0,pct))/100*N),H=[.5,.7,.4,.82,.6,.9,.72,.5,.34,.2,.12];let s='';for(let i=0;i<N;i++){const h=Math.round(H[i]*40)+2,y=50-h,cc=i<act?col:'var(--txt-3)';s+=`<rect class="pjh-barr" style="animation-delay:${(i*0.04).toFixed(2)}s;fill:${cc}" x="${i*20}" y="${y}" width="12" height="${h}" rx="3"/>`;}return `<svg class="pjh-svg" viewBox="0 0 220 52" aria-hidden="true"><line class="pjh-grid" x1="0" y1="50" x2="220" y2="50"/>${s}</svg>`;};
+const _hBars=(pct,col,seed)=>{
+  // Высоты уникальны для проекта (seed), закрашено ровно pct% столбцов слева направо
+  const N=11, rnd=_seedRand(_strSeed(seed)||13);
+  const act=Math.round(Math.min(100,Math.max(0,pct))/100*N);
+  let s='';
+  for(let i=0;i<N;i++){
+    const base=0.25+rnd()*0.7;                                                        // индивидуальный рельеф
+    const wave=0.12*Math.sin(i*0.9+(_strSeed(seed)%6));                               // лёгкая волна поверх
+    const hv=Math.min(1,Math.max(0.12,base+wave));
+    const h=Math.round(hv*40)+2, y=50-h, cc=i<act?col:'var(--txt-3)';
+    s+=`<rect class="pjh-barr" style="animation-delay:${(i*0.045).toFixed(2)}s;fill:${cc}" x="${i*20}" y="${y}" width="12" height="${h}" rx="3"/>`;
+  }
+  return `<svg class="pjh-svg" viewBox="0 0 220 52" aria-hidden="true"><line class="pjh-grid" x1="0" y1="50" x2="220" y2="50"/>${s}</svg>`;
+};
 const _hDeadline=(dueDays,col,empty)=>{const W=220,cy=16;if(empty)return `<svg class="pjh-svg" viewBox="0 0 220 40" aria-hidden="true"><line x1="6" y1="${cy}" x2="214" y2="${cy}" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 6"/><text x="110" y="35" text-anchor="middle" class="pjh-axis">срок не задан</text></svg>`;const flag=Math.round(W*0.66),over=dueDays<0;const now=over?Math.min(W-6,flag+Math.round(Math.min(30,-dueDays)/30*(W-flag-6))):Math.max(6,Math.round(flag*(1-Math.min(1,dueDays/30))));const preEnd=Math.min(now,flag);const overSeg=over?`<line x1="${flag}" y1="${cy}" x2="${now}" y2="${cy}" style="stroke:${col}" stroke-width="8" stroke-linecap="round"/>`:'';const preCol=over?'var(--txt-3)':col;return `<svg class="pjh-svg" viewBox="0 0 220 40" aria-hidden="true"><line x1="6" y1="${cy}" x2="214" y2="${cy}" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round"/><line x1="6" y1="${cy}" x2="${preEnd}" y2="${cy}" style="stroke:${preCol}" stroke-width="8" stroke-linecap="round"/>${overSeg}<line x1="${flag}" y1="${cy-9}" x2="${flag}" y2="${cy+9}" style="stroke:var(--txt-2)" stroke-width="2"/><path d="M${flag},${cy-9} l7,3 l-7,3 z" style="fill:var(--txt-2)"/><circle cx="${now}" cy="${cy}" r="5" style="fill:${col}"/><circle cx="${now}" cy="${cy}" r="5" fill="none" style="stroke:var(--bg-1)" stroke-width="2"/><text x="${flag}" y="35" text-anchor="middle" class="pjh-axis">дедлайн</text></svg>`;};
 const _hGauge=(pct,col,dim)=>{const f=Math.min(100,Math.max(0,pct));return dim?`<svg class="pjh-svg" viewBox="0 0 200 64" aria-hidden="true"><path d="M18,60 A94,94 0 0 1 182,60" fill="none" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round"/><text x="100" y="46" text-anchor="middle" style="font-family:var(--mono);fill:var(--txt-3)" font-size="15">?</text></svg>`:`<svg class="pjh-svg" viewBox="0 0 200 64" aria-hidden="true"><path d="M18,60 A94,94 0 0 1 182,60" fill="none" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round"/><path pathLength="100" style="stroke:${col};stroke-dasharray:${f.toFixed(0)} 100" d="M18,60 A94,94 0 0 1 182,60" fill="none" stroke-width="8" stroke-linecap="round"/></svg>`;};
 function _pjhFit(){ requestAnimationFrame(function(){ var els=document.querySelectorAll('.pjh-name-t'); for(var i=0;i<els.length;i++){ var el=els[i]; var fs=15; el.style.fontSize=fs+'px'; var g=0; while(el.scrollWidth>el.clientWidth+0.5 && fs>11 && g<20){ fs-=0.5; el.style.fontSize=fs+'px'; g++; } } }); }
@@ -5861,7 +6037,7 @@ const _projCard=(p)=>{
             <div class="pjh-top"><span class="pjh-lbl">Срок жизни</span>${life.frozen?'<span class="pjh-tg">завершён</span>':''}</div>
             <div class="pjh-val">${_ptBig(_lifeDur(life.cur/30.44))}</div>
             <div class="pjh-cs"><span class="pjh-d" style="background:${_lifeCol}"></span>${life.frozen?'активность остановлена':(life.prev>0?('ранее: '+life.prev+' дн'):'с запуска')}</div>
-            <div class="pjh-chart">${_hSpark(_lifeCol,_lifeArea)}</div>
+            <div class="pjh-chart">${_hSpark(_lifeCol,_lifeArea,p.id||p.name,life.frozen?0.3:(1-Math.min(1,(p._lastActDays||0)/21))*0.6+Math.min(1,(p.pct||0)/100)*0.4)}</div>
           </div>
           <div class="pjh-card">
             <div class="pjh-top"><span class="pjh-lbl">Дедлайн</span></div>
@@ -5873,7 +6049,7 @@ const _projCard=(p)=>{
             <div class="pjh-top"><span class="pjh-lbl">Темп</span></div>
             <div class="pjh-val pjh-val-sm" style="color:${paceC}">${paceMain}</div>
             <div class="pjh-cs"><span class="pjh-d" style="background:${paceC}"></span>${paceSub}</div>
-            <div class="pjh-chart">${_hBars(_paceW,paceC)}</div>
+            <div class="pjh-chart">${_hBars(_paceW,paceC,(p.id||p.name)+'pace')}</div>
           </div>
           <div class="pjh-card">
             <div class="pjh-top"><span class="pjh-lbl">Сложность</span>${cx.hasData?`<span class="pjh-tg">n=${cx.n} цикл.</span>`:''}</div>
@@ -13244,6 +13420,7 @@ const ACT_IC={start:'<path d="M9 6.5v11l9-5.5z" fill="currentColor"/>',done:'<pa
 function enterClient(){
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('app-cl').classList.add('on');
+  applySideState();
   clNav('overview');
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-cl .side')));
 }
