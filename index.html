@@ -2378,6 +2378,37 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-col-h{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-2);padding:15px 15px 12px}
 .pk-col-h .dot{width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 3px color-mix(in srgb,var(--pk-accent) 24%,transparent)}
 .pk-col-h .ct{margin-left:auto;font-family:var(--mono);background:var(--bg-3);color:var(--txt);min-width:24px;text-align:center;padding:2px 8px;border-radius:7px;font-size:11px;font-weight:600}
+.pk-hadd{display:flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border-radius:7px;background:var(--bg-3);border:1px solid var(--line-2);color:var(--txt-2);cursor:pointer;transition:.15s var(--ease)}
+.pk-hadd svg{width:15px;height:15px}
+.pk-hadd:hover{background:color-mix(in srgb,var(--pk-accent) 22%,var(--bg-3));border-color:var(--pk-accent);color:var(--txt)}
+.pk-sub{margin-top:9px}
+.pk-subpb{height:5px;border-radius:4px;background:var(--bg-3);overflow:hidden}
+.pk-subpb>i{display:block;height:100%;border-radius:4px;background:var(--pk-accent);transition:width .25s var(--ease)}
+.pk-subpb.full>i{background:var(--pos,#37E6C8)}
+.pk-subct{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;font-weight:600;color:var(--txt-2);font-family:var(--mono)}
+.pk-subct svg{width:13px;height:13px}
+.subwrap{border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--bg-1)}
+.sublist{display:flex;flex-direction:column;gap:6px}
+.subempty{font-size:12px;color:var(--txt-3);padding:2px 2px 4px}
+.subpb{height:6px;border-radius:4px;background:var(--bg-3);overflow:hidden}
+.subpb>i{display:block;height:100%;border-radius:4px;background:var(--accent);transition:width .25s var(--ease)}
+.subpb.full>i{background:var(--pos,#37E6C8)}
+.subhdr{font-size:11px;font-weight:600;color:var(--txt-2);font-family:var(--mono);margin:5px 0 3px}
+.subrow{display:flex;align-items:center;gap:9px}
+.subchk{flex-shrink:0;width:20px;height:20px;border-radius:6px;border:1.6px solid var(--line-2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:transparent;transition:.15s var(--ease);padding:0}
+.subchk svg{width:13px;height:13px}
+.subchk.on{background:var(--accent);border-color:var(--accent);color:#0A0B0D}
+.subtxt{flex:1;font-size:13px;color:var(--txt);word-break:break-word}
+.subtxt.done{text-decoration:line-through;color:var(--txt-3)}
+.subdel{flex-shrink:0;width:22px;height:22px;border-radius:6px;border:none;background:transparent;color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.6;transition:.15s var(--ease);padding:0}
+.subdel svg{width:14px;height:14px}
+.subdel:hover{opacity:1;color:var(--neg,#ff6b6b);background:var(--bg-3)}
+.subadd{display:flex;gap:7px;margin-top:9px}
+.subadd input{flex:1;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);font-family:var(--font)}
+.subadd input:focus{outline:none;border-color:var(--accent)}
+.subaddbtn{flex-shrink:0;width:36px;border-radius:8px;border:1px solid var(--line-2);background:var(--bg-3);color:var(--txt-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s var(--ease)}
+.subaddbtn svg{width:16px;height:16px}
+.subaddbtn:hover{background:var(--accent);border-color:var(--accent);color:#0A0B0D}
 .pk-body{flex:1;display:flex;flex-direction:column;gap:10px;padding:0 12px 14px;min-height:70px;max-height:max(320px,calc(100vh - 348px));overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
 .pk-body::-webkit-scrollbar{width:10px}
 .pk-body::-webkit-scrollbar-track{background:transparent}
@@ -6106,6 +6137,7 @@ async function pdNewTask(st){
   const _stLbl=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
   const stArr=stages.map(s=>[s.id, _stLbl(s)]);
   const _defSt=(stages.find(s=>s.status==='active')||stages[0]).id;
+  window._pdSub=[];
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
     <div class="modal-b">
@@ -6113,19 +6145,23 @@ async function pdNewTask(st){
       <div class="fld"><label>Этап <span style="color:var(--neg)">*</span></label>${selField('pd2-stg', stArr, _defSt)}</div>
       <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate','')}${timeField('pd2-ttime','')}</div></div>
+      ${_subFldHtml()}
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddTask()">Создать</button></div></div>`);
+  pdSubRender();
 }
 function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи задачу');return;}
   const stage_id=_v('pd2-stg'); if(!stage_id){toast('Выбери этап');return;}
   const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
-  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx}); }
+  const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
+  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx,subtasks}); }
 function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
 async function pdTaskEdit(id){
   const p=PROJECTS[pdIdx];
   if(p._tasks===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);          // задач ещё нет — дождаться первой загрузки
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе открываем мгновенно, освежаем в фоне
   const t=(p._tasks||[]).find(x=>x.id===id); if(!t){toast('Задача не найдена');return;}
+  window._pdSub=(Array.isArray(t.subtasks)?t.subtasks:[]).map(s=>({id:(s&&s.id)||_subUid(),title:(s&&s.title)||'',done:!!(s&&s.done)}));
   const _stLbl2=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
   let stArr=(p._stages||[]).map(s=>[s.id,_stLbl2(s)]);
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
@@ -6135,11 +6171,22 @@ async function pdTaskEdit(id){
       <div class="fld"><label>Этап</label>${selField('pd2-stg', stArr, t.stage_id||'')}</div>
       <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate', t.due_date||'')}${timeField('pd2-ttime', t.due_time||'')}</div></div>
+      ${_subFldHtml()}
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveTask('${id}')">Сохранить</button></div></div>`);
+  pdSubRender();
 }
 function pdSaveTask(id){ const title=_v('pd2-ttl'); if(!title){toast('Введи название');return;}
-  if(window.tTaskUpdate) window.tTaskUpdate(id,{title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null}); }
+  const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
+  if(window.tTaskUpdate) window.tTaskUpdate(id,{title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,subtasks}); }
+function _subUid(){ return 's'+Math.random().toString(36).slice(2,9); }
+function _subFldHtml(){ return `<div class="fld"><label>Подзадачи</label><div class="subwrap"><div id="pd2-sub" class="sublist"></div><div class="subadd"><input id="pd2-subnew" placeholder="Новая подзадача…" onkeydown="pdSubKey(event)"><button type="button" class="subaddbtn" onclick="pdSubAdd()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div></div>`; }
+function pdSubRender(){ const box=document.getElementById('pd2-sub'); if(!box) return; const arr=window._pdSub||[]; const done=arr.filter(s=>s.done).length, tot=arr.length, pct=tot?Math.round(done/tot*100):0;
+  box.innerHTML=(tot?`<div class="subpb ${done===tot?'full':''}"><i style="width:${pct}%"></i></div><div class="subhdr">${done} из ${tot} · ${pct}%</div>`:'<div class="subempty">Пока нет подзадач</div>')+arr.map((s,i)=>`<div class="subrow"><button type="button" class="subchk ${s.done?'on':''}" onclick="pdSubToggle(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button><span class="subtxt ${s.done?'done':''}">${_ddH(s.title)}</span><button type="button" class="subdel" title="Удалить" onclick="pdSubDel(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join(''); }
+function pdSubAdd(){ const inp=document.getElementById('pd2-subnew'); if(!inp)return; const v=(inp.value||'').trim(); if(!v){inp.focus();return;} (window._pdSub=window._pdSub||[]).push({id:_subUid(),title:v,done:false}); inp.value=''; pdSubRender(); inp.focus(); }
+function pdSubToggle(i){ const a=window._pdSub||[]; if(a[i]){a[i].done=!a[i].done; pdSubRender();} }
+function pdSubDel(i){ const a=window._pdSub||[]; if(i>=0&&i<a.length){a.splice(i,1); pdSubRender();} }
+function pdSubKey(e){ if(e.key==='Enter'){e.preventDefault(); pdSubAdd();} }
 const PD_MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 function _dDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+PD_MON[d.getMonth()]; }
 function _dDateFull(iso){ if(!iso) return '—'; const d=new Date(iso); return d.getDate()+' '+PD_MON[d.getMonth()]+' '+d.getFullYear(); }
@@ -6298,6 +6345,8 @@ function renderPd(){
         if(_isDone&&!_collapsed&&PK_DONE==='recent'&&_total>PK_DONE_LIMIT) arr=_all.slice(-PK_DONE_LIMIT);
         const cards=_collapsed?`<button class="pk-showbtn" onclick="event.stopPropagation();pkDoneSet('recent')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Показать последние ${PK_DONE_LIMIT} задач${_total>PK_DONE_LIMIT?' · '+_total:''}</button>`:(arr.length?arr.map((c,i)=>{
           const w=_who(c.assignee_id), stg=(p._stages||[]).find(x=>x.id===c.stage_id);
+          const _sub=Array.isArray(c.subtasks)?c.subtasks:[], _sdone=_sub.filter(s=>s&&s.done).length, _spct=_sub.length?Math.round(_sdone/_sub.length*100):0;
+          const subHtml=_sub.length?`<div class="pk-sub"><div class="pk-subpb ${_sdone===_sub.length?'full':''}"><i style="width:${_spct}%"></i></div><span class="pk-subct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>${_sdone}/${_sub.length}</span></div>`:'';
           const over=c.due_date && c.status!=='done' && new Date(c.due_date) < new Date(new Date().toDateString());
           const due=c.due_date?`<span class="pk-due ${over?'over':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${_dDate(c.due_date)}${c.due_time?' · '+_dTime(c.due_time):''}</span>`:'';
           const adv=st!=='done'?`<button class="pk-adv" title="Продвинуть дальше" onclick="event.stopPropagation();pkAdvance('${c.id}','${c.status}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 18l6-6-6-6"/></svg></button>`:`<span class="pk-done-ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg></span>`;
@@ -6323,13 +6372,14 @@ function renderPd(){
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
               ${rtimer}
+              ${subHtml}
               <div class="pk-foot"><span class="pk-av" style="background:${w.c}">${logoFill(w.avatar,(w.n[0]||'?').toUpperCase())}</span><span class="pk-who">${_ddH(w.n)}</span>${due}${adv}</div>
             </div>`;
         }).join(''):`<div class="pk-empty3"><div class="ic">${emptyIc}</div><div class="t">${emptyMsg}</div></div>`);
         const _tog=_isDone?`<button class="pk-coltog" title="${_collapsed?'Показать':'Скрыть'} задачи" onclick="event.stopPropagation();pkDoneSet('${_collapsed?'recent':'hidden'}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="${_collapsed?'':'open'}"><path d="M6 9l6 6 6-6"/></svg></button>`:'';
         const _footer=(_isDone&&!_collapsed&&_total>PK_DONE_LIMIT)?`<div class="pk-colmore-wrap"><button class="pk-colmore" onclick="event.stopPropagation();pkDoneSet('${PK_DONE==='all'?'recent':'all'}')">${PK_DONE==='all'?'Свернуть до '+PK_DONE_LIMIT:'Показать все · '+_total}</button></div>`:'';
         return `<div class="pk-col${_collapsed?' collapsed':''}" data-st="${st}" style="--pk-accent:${color}" ondragover="pkOver(event)" ondragleave="pkLeave(event)" ondrop="pkDrop(event,'${st}')">
-            <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${_total}</span>${_tog}</div>
+            <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${_total}</span>${st!=='done'?`<button class="pk-hadd" title="Добавить задачу" onclick="event.stopPropagation();pdNewTask('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>`:''}${_tog}</div>
             <div class="pk-body">${cards}</div>
             ${_footer}
             <div class="pk-add-zone">
