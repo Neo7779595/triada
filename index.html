@@ -1288,6 +1288,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-imp-rt .s{font-weight:400;font-size:11px;color:var(--txt-3);margin-left:8px}
 .smm-imp-tbl td.chk{width:26px;text-align:center}
 .smm-imp-tbl td.chk input{width:14px;height:14px;accent-color:var(--accent);cursor:pointer}
+.smm-imp-ro td{color:var(--txt-2);font-size:12px;padding:8px 10px;white-space:nowrap}
+.smm-imp-ro td.idx{width:26px;color:var(--txt-3)}
+.smm-imp-ro td.pt{max-width:260px;overflow:hidden;text-overflow:ellipsis;color:var(--txt)}
 .smm-mod-drop .ic{width:42px;height:42px;border-radius:10px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
 .smm-mod-drop .ic svg{width:20px;height:20px;stroke:var(--txt-3);fill:none;stroke-width:1.6}
 .smm-mod-drop .t1{font-size:13px;color:var(--txt-2);margin-bottom:5px}
@@ -9852,20 +9855,31 @@ async function smmImpRun(){
 const SMM_IMP_FIELDS=[['total_reach','Всего охват'],['total_views','Всего просмотров'],['posts_reach','Охват постов'],['posts_views','Просмотры постов'],['posts_count','Кол-во постов'],['stories_count','Кол-во сторис'],['subscribers_current','Подписчики'],['followers_growth','Прирост']];
 function smmImpReviewHTML(){
   const mg=_smmImp.res.merged||{}, cf=mg.confidence||{}, iv=v=>(v==null?'':v);
+  const posts=Array.isArray(mg.posts)?mg.posts:[];
+  // посты с отдельных скриншотов суммируются в агрегаты блока «Посты», если модель не увидела готовых сумм
+  const _psum=f=>posts.reduce((s,p)=>s+(+p[f]||0),0);
+  const pre={ posts_views:(mg.posts_views!=null?mg.posts_views:(posts.length?_psum('views'):null)),
+              posts_reach:(mg.posts_reach!=null?mg.posts_reach:(posts.length?_psum('reach'):null)),
+              posts_count:(mg.posts_count!=null?mg.posts_count:(posts.length?posts.length:null)) };
   const fld=([k,lab])=>{ const low=cf[k]!=null&&cf[k]<0.8;
-    return '<div class="smm-fc'+(low?' smm-lowconf':'')+'"><label>'+lab+(low?'<span class="smm-fc-badge warn">проверьте</span>':'')+'</label><input type="text" inputmode="decimal" id="simp-'+k+'" value="'+iv(mg[k])+'" placeholder="—"></div>'; };
+    const val=(k in pre)?pre[k]:mg[k];
+    return '<div class="smm-fc'+(low?' smm-lowconf':'')+'"><label>'+lab+(low?'<span class="smm-fc-badge warn">проверьте</span>':((k in pre)&&posts.length&&mg[k]==null&&pre[k]!=null?'<span class="smm-fc-badge auto">сумма постов</span>':''))+'</label><input type="text" inputmode="decimal" id="simp-'+k+'" value="'+iv(val)+'" placeholder="—"></div>'; };
   const reels=Array.isArray(mg.reels)?mg.reels:[];
   const rows=reels.map((r,i)=>'<tr><td class="chk"><input type="checkbox" id="simp-r-on-'+i+'" checked></td>'
     +'<td><input class="title-in" id="simp-r-title-'+i+'" value="'+smmAttr(r.title||('Reel #'+(i+1)))+'"></td>'
     +['views','reach','likes','comments','saves','shares'].map(f=>'<td><input type="text" inputmode="decimal" id="simp-r-'+f+'-'+i+'" value="'+iv(r[f])+'"></td>').join('')+'</tr>').join('');
+  const prow=posts.map((p,i)=>'<tr><td class="idx">'+(i+1)+'</td><td class="pt">'+_ddH(p.title||('Пост #'+(i+1)))+'</td>'
+    +['views','reach','likes','comments','saves','shares'].map(f=>'<td>'+(p[f]==null?'—':(+p[f]).toLocaleString('ru-RU'))+'</td>').join('')+'</tr>').join('');
   const warns=smmImpWarns(mg,reels);
   return '<div class="smm-imp-note">Проверьте цифры — поля с меткой «проверьте» модель читала с меньшей уверенностью. Значения можно править прямо здесь.</div>'
     +(warns.length?'<div class="smm-imp-warns">'+warns.map(w=>'<div class="smm-imp-warn">⚠ '+w+'</div>').join('')+'</div>':'')
     +(mg.period?'<div class="smm-imp-period">Период на скриншотах: <b>'+_ddH(String(mg.period))+'</b></div>':'')
     +'<div class="smm-fgrid" style="margin-bottom:14px">'+SMM_IMP_FIELDS.map(fld).join('')+'</div>'
-    +(reels.length?'<div class="smm-imp-rt">Reels · '+reels.length+' <span class="s">рубрики и обложки назначите после импорта</span></div>'
-      +'<div class="smm-reels-wrap"><table class="smm-reels smm-imp-tbl"><thead><tr><th></th><th>Заголовок</th><th>Просм.</th><th>Охват</th><th>Лайки</th><th>Комм.</th><th>Сохр.</th><th>Реп.</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-      :'<div class="smm-rempty">Reels на скриншотах не найдены</div>')
+    +(posts.length?'<div class="smm-imp-rt">Посты · '+posts.length+' <span class="s">суммируются в поля «Посты» выше — сами строки в отчёт не добавляются</span></div>'
+      +'<div class="smm-reels-wrap"><table class="smm-reels smm-imp-tbl smm-imp-ro"><thead><tr><th>#</th><th>Публикация</th><th>Просм.</th><th>Охват</th><th>Лайки</th><th>Комм.</th><th>Сохр.</th><th>Реп.</th></tr></thead><tbody>'+prow+'</tbody></table></div>':'')
+    +(reels.length?'<div class="smm-imp-rt">Reels · '+reels.length+' <span class="s">добавятся строками — рубрики и обложки назначите после импорта</span></div>'
+      +'<div class="smm-reels-wrap"><table class="smm-reels smm-imp-tbl"><thead><tr><th></th><th>Заголовок</th><th>Просм.</th><th>Охват</th><th>Лайки</th><th>Комм.</th><th>Сохр.</th><th>Реп.</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'')
+    +(!reels.length&&!posts.length?'<div class="smm-rempty">Отдельные публикации на скриншотах не найдены</div>':'')
     +'<div class="smm-mod-foot"><button class="smm-mod-cancel" onclick="_smmImp.res=null;smmImpRender()">← Назад</button>'
     +'<button class="smm-mod-add" onclick="smmImpApply()">Применить в отчёт</button></div>';
 }
