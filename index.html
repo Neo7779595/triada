@@ -6096,19 +6096,21 @@ async function pdNewTask(st){
   const p=PROJECTS[pdIdx];
   if(p._stages===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);        // этапов ещё нет — дождаться первой загрузки
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе модалка открывается мгновенно, данные освежаются в фоне
-  const active=(p._stages||[]).filter(s=>s.status==='active');
-  if(!active.length){
+  const stages=(p._stages||[]);
+  if(!stages.length){
     pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
-      <div class="modal-b"><div class="modph" style="padding:26px 0"><h3>Нет активных этапов</h3><p>Задачу можно привязать только к активному этапу. Переведи этап в статус «В работе» во вкладке «Этапы».</p></div></div>
+      <div class="modal-b"><div class="modph" style="padding:26px 0"><h3>Нет этапов</h3><p>Сначала добавь хотя бы один этап во вкладке «Этапы», затем создавай задачи.</p></div></div>
       <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div></div>`);
     return;
   }
-  const stArr=active.map(s=>[s.id, s.name]);
+  const _stLbl=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
+  const stArr=stages.map(s=>[s.id, _stLbl(s)]);
+  const _defSt=(stages.find(s=>s.status==='active')||stages[0]).id;
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
-      <div class="fld"><label>Этап <span style="color:var(--neg)">*</span> · только активные</label>${selField('pd2-stg', stArr, stArr.length?stArr[0][0]:'')}</div>
+      <div class="fld"><label>Этап <span style="color:var(--neg)">*</span></label>${selField('pd2-stg', stArr, _defSt)}</div>
       <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate','')}${timeField('pd2-ttime','')}</div></div>
     </div>
@@ -6124,8 +6126,8 @@ async function pdTaskEdit(id){
   if(p._tasks===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);          // задач ещё нет — дождаться первой загрузки
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе открываем мгновенно, освежаем в фоне
   const t=(p._tasks||[]).find(x=>x.id===id); if(!t){toast('Задача не найдена');return;}
-  let stArr=(p._stages||[]).filter(s=>s.status==='active').map(s=>[s.id,s.name]);
-  if(t.stage_id && !stArr.some(x=>x[0]===t.stage_id)){ const cur=(p._stages||[]).find(s=>s.id===t.stage_id); if(cur) stArr.unshift([cur.id,cur.name+' · завершён']); }
+  const _stLbl2=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
+  let stArr=(p._stages||[]).map(s=>[s.id,_stLbl2(s)]);
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Редактировать задачу</h3><p>${p.name} · Операционка</p></div>
     <div class="modal-b">
@@ -13846,7 +13848,7 @@ window.tStageDel = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('С
   else await _pwReload(curProjId()); } catch(e){
     if(_p&&_st){ _p._stages.splice(Math.min(Math.max(_ix,0),_p._stages.length),0,_st); _pkRerender(); }        // откат
     toast('Ошибка: '+(e.message||e)); } };
-window.tStageSeed = async (projectId,names) => { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
+window.tStageSeed = async (projectId,names) => { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:'wait',idx:i}));
   const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId)||null;
   const _had=!!(_p&&_p._stages);
   const _tmps=rows.map(r=>Object.assign({id:'tmp_'+Math.random().toString(36).slice(2,10)},r));
