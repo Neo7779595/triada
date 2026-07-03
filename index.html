@@ -6364,10 +6364,14 @@ function renderPd(){
   const body=document.getElementById('pd-body');
   const _same=(window._pdLastTab===pdTabCur)&&(window._pdLastProj===p.id);   // ререндер той же вкладки: без повторной анимации входа и без сброса скролла
   window._pdLastTab=pdTabCur; window._pdLastProj=p.id;
-  const _sc={}; let _pageSc=0;
-  if(_same){ _pageSc=body.scrollTop; body.querySelectorAll('.pk-col').forEach(c=>{ const b=c.querySelector('.pk-body'); if(b)_sc[c.dataset.st]=b.scrollTop; }); }
+  const _sc={}; let _pageSc=0, _cpSc=null;
+  if(_same){ _pageSc=body.scrollTop;
+    body.querySelectorAll('.pk-col').forEach(c=>{ const b=c.querySelector('.pk-body'); if(b)_sc[c.dataset.st]=b.scrollTop; });
+    const _cs=body.querySelector('.cp-scroll'); if(_cs)_cpSc={t:_cs.scrollTop,l:_cs.scrollLeft}; }               // таблица контент-плана не прыгает при правке ячеек
   body.innerHTML=`<div class="pd-inner${_same?' norise':''}">${h}</div>`;
-  if(_same){ body.scrollTop=_pageSc; body.querySelectorAll('.pk-col').forEach(c=>{ const b=c.querySelector('.pk-body'); if(b&&_sc[c.dataset.st]!=null)b.scrollTop=_sc[c.dataset.st]; }); }
+  if(_same){ body.scrollTop=_pageSc;
+    body.querySelectorAll('.pk-col').forEach(c=>{ const b=c.querySelector('.pk-body'); if(b&&_sc[c.dataset.st]!=null)b.scrollTop=_sc[c.dataset.st]; });
+    const _cs2=body.querySelector('.cp-scroll'); if(_cs2&&_cpSc){ _cs2.scrollTop=_cpSc.t; _cs2.scrollLeft=_cpSc.l; } }
   if(typeof pkTickUpdate==='function') pkTickUpdate();   // таймеры показывают актуальное время сразу, а не через секунду
   if(!_same&&typeof animateCounters==='function') requestAnimationFrame(()=>animateCounters(body));
   if(typeof bfSizeSplit==='function') requestAnimationFrame(bfSizeSplit);
@@ -7294,7 +7298,7 @@ async function cpLoadServer(p){
     p._cpShared={}; if(r2&&r2.data){ r2.data.forEach(function(x){ p._cpShared[x.sheet_id]={at:x.shared_at,hash:cpHash(JSON.stringify(x.data||{}))}; }); }
     const r3=await window.SB.from('content_approvals').select('sheet_id,row_id,status,comment').eq('project_id',pid);
     p._cpAppr={}; if(r3&&r3.data){ r3.data.forEach(function(x){ p._cpAppr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; }); }
-    if(pdTabCur==='content') renderPd();
+    if(pdTabCur==='content' && !(typeof cpEd!=='undefined'&&cpEd)) renderPd();
   }catch(e){ console.warn('cp load',e); }
 }
 async function cpSendSheet(){
@@ -7855,7 +7859,7 @@ function cpActive(){ if(pdTabCur!=='content'||cpEd)return false; const ae=docume
 function cpOnCopy(e){ if(!cpActive())return; try{ e.clipboardData.setData('text/plain',cpTSV()); e.preventDefault(); }catch(_e){} }
 function cpOnCut(e){ if(!cpActive())return; try{ e.clipboardData.setData('text/plain',cpTSV()); e.preventDefault(); cpClearSel(); }catch(_e){} }
 function cpOnPaste(e){ if(!cpActive())return; try{ const t=(e.clipboardData||window.clipboardData).getData('text'); e.preventDefault(); cpPasteTSV(t); }catch(_e){} }
-async function cpRefreshAppr(p){ if(!(window.LIVE&&window.SB))return; try{ const pid=p.id; const r2=await window.SB.from('content_shares').select('sheet_id,shared_at,data').eq('project_id',pid); p._cpShared={}; if(r2&&r2.data)r2.data.forEach(function(x){ p._cpShared[x.sheet_id]={at:x.shared_at,hash:cpHash(JSON.stringify(x.data||{}))}; }); const r3=await window.SB.from('content_approvals').select('sheet_id,row_id,status,comment').eq('project_id',pid); p._cpAppr={}; if(r3&&r3.data)r3.data.forEach(function(x){ p._cpAppr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; }); if(pdTabCur==='content')renderPd(); }catch(e){ console.warn('cp refresh',e); } }
+async function cpRefreshAppr(p){ if(!(window.LIVE&&window.SB))return; try{ const pid=p.id; const r2=await window.SB.from('content_shares').select('sheet_id,shared_at,data').eq('project_id',pid); p._cpShared={}; if(r2&&r2.data)r2.data.forEach(function(x){ p._cpShared[x.sheet_id]={at:x.shared_at,hash:cpHash(JSON.stringify(x.data||{}))}; }); const r3=await window.SB.from('content_approvals').select('sheet_id,row_id,status,comment').eq('project_id',pid); p._cpAppr={}; if(r3&&r3.data)r3.data.forEach(function(x){ p._cpAppr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; }); if(pdTabCur==='content' && !(typeof cpEd!=='undefined'&&cpEd))renderPd(); }catch(e){ console.warn('cp refresh',e); } }
 document.addEventListener('copy',cpOnCopy);
 document.addEventListener('cut',cpOnCut);
 document.addEventListener('paste',cpOnPaste);
@@ -9543,6 +9547,7 @@ async function smmClose(){
   if(!_smmRO && _smmDirty) await smmSave(false);
   document.getElementById('ov-smm').classList.remove('on');
   _smmCur=null; _smmMeta=null; _smmDirty=false; _smmRO=false;
+  if(typeof renderPd==='function' && document.getElementById('ov-proj').classList.contains('on')) renderPd();   // карточки отчётов сразу с свежими цифрами
 }
 async function smmTab(t){
   if(t==='lb')_smmLbAnim=true; _smmTab=t; smmRender();
@@ -9806,7 +9811,7 @@ async function smmSave(viaButton){
   const payload=JSON.parse(JSON.stringify(_smmCur));
   delete payload._legacy;
   aggregateRubricsFromReels(payload);
-  if(window.tReportUpdate){ await window.tReportUpdate(_smmMeta.id,{payload}); _smmDirty=false; _smmLbData=null; }
+  if(window.tReportUpdate){ await window.tReportUpdate(_smmMeta.id,{payload},{silent:!viaButton}); _smmDirty=false; _smmLbData=null; }
   else if(viaButton){ toast('Нужен бэкенд (Supabase не подключён)'); }
 }
 
@@ -13508,7 +13513,10 @@ let _pwBusy=false, _pwPending=null;
 async function _pwReloadCore(projectId){
   if (window.tLoadProjectWork){ await window.tLoadProjectWork(projectId);
     const ov=document.getElementById('ov-proj');
-    if (typeof renderPd==='function' && ov && ov.classList.contains('on')) renderPd(); }
+    const _cpBusy=(typeof pdTabCur!=='undefined'&&pdTabCur==='content'&&typeof cpEd!=='undefined'&&cpEd);      // идёт правка ячейки контент-плана
+    const _ae=document.activeElement;
+    const _typing=_ae&&ov&&ov.contains(_ae)&&(_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA');                 // пользователь печатает в модалке
+    if (typeof renderPd==='function' && ov && ov.classList.contains('on') && !_cpBusy && !_typing) renderPd(); }
 }
 async function _pwReload(projectId){
   if(_pwBusy){ _pwPending=projectId; return; }   // сериализация: параллельные перезагрузки схлопываются в одну
@@ -13525,15 +13533,18 @@ window.tLoadProjectWork = async (projectId) => {
     SB.from('reports').select('*').eq('project_id',projectId).order('published_at',{ascending:false}),
     SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40),
     SB.from('project_cycles').select('id,cycle_no,period_start,period_end,snapshot,archived_at').eq('project_id',projectId).order('cycle_no',{ascending:false}) ]);
-  p._stages = st.data||[];
+  { const _prevSt=p._stages||[]; p._stages = st.data||[];
+    _prevSt.forEach(x=>{ if(x&&String(x.id).indexOf('tmp_')===0) p._stages.push(x); }); }        // не теряем этапы, ждущие подтверждения сервера
   p._cycles = cy.data||[];
   { // защита от гонки: недавние оптимистичные изменения таймеров не перетираем устаревшими данными из БД
     const fresh=tk.data||[]; const prev=p._tasks||[]; const pby={}; prev.forEach(x=>{ if(x&&x.id!=null) pby[x.id]=x; }); const NM=Date.now();
     p._tasks = fresh.map(fr=>{ const o=pby[fr.id];
       if(o && o._mvTs && (NM-o._mvTs)<10000){ return Object.assign({}, fr, {status:o.status, timer_started:o.timer_started, review_started:o.review_started, time_spent:o.time_spent, review_spent:o.review_spent, _mvTs:o._mvTs}); }
       return fr; });
+    prev.forEach(x=>{ if(x&&String(x.id).indexOf('tmp_')===0) p._tasks.push(x); });              // не теряем задачи, ждущие подтверждения сервера
   }
-  p._reports = rp.data||[];
+  { const _prevRp=p._reports||[]; p._reports = rp.data||[];
+    _prevRp.forEach(x=>{ if(x&&String(x.id).indexOf('tmp_')===0) p._reports.unshift(x); }); }    // не теряем отчёты, ждущие подтверждения сервера
   p._history = (hs.data||[]).filter(h => !(h.new_status==='wait' && (!h.old_status || h.old_status==='wait'))).map(h => { const k = h.new_status==='done'?'done':h.new_status==='active'?'start':'back';
     const txt = k==='done'?'Этап завершён':k==='start'?'Команда начала этап':'Этап возвращён в ожидание';
     return { txt, tag:h.stage_name||'—', t:tAgo(h.created_at), k }; });
@@ -13580,7 +13591,7 @@ window.tSaveStageTemplate = async (service, stages) => { try {
   window.STAGE_TPL=window.STAGE_TPL||{}; window.STAGE_TPL[service]=stages;
   toast('Шаблон сохранён'); if(typeof tplRenderSvcs==='function') tplRenderSvcs();
 } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageSave = async (id,patch) => { try {
+window.tStageSave = async (id,patch) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — этап ещё сохраняется'); return; } try {
   const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); const _old=_st&&_st.status;
   const _bak=_st?Object.assign({},_st):null;
   if(_st){ Object.assign(_st,patch); window._localTaskWriteTs=Date.now();            // этап обновляется на экране мгновенно
@@ -13600,13 +13611,43 @@ window.tStageSave = async (id,patch) => { try {
   }
   if(typeof pd2Close==='function')pd2Close(); toast('Этап обновлён'); await _pwReload(curProjId());
   if(window._cmPending){ const _cpid=window._cmPending; window._cmPending=null; const _cp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===_cpid); if(_cp && _cp.status!=='done' && typeof openCompletionModal==='function') setTimeout(()=>openCompletionModal(_cpid),350); } } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageAdd = async (projectId,row) => { try { const {error}=await SB.from('project_stages').insert({project_id:projectId,...row}); if(error)throw error;
-  if(typeof pd2Close==='function')pd2Close(); toast('Этап создан'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageDel = async (id) => { try { const {error}=await SB.from('project_stages').delete().eq('id',id); if(error)throw error;
-  if(typeof pd2Close==='function')pd2Close(); toast('Этап удалён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
-  const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); return true; } catch(e){ toast('Ошибка: '+(e.message||e)); return false; } };
+window.tStageAdd = async (projectId,row) => {
+  // оптимистично: этап появляется мгновенно, сервер подтверждает в фоне
+  const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId)||null;
+  const _tmp=Object.assign({id:'tmp_'+Math.random().toString(36).slice(2,10),project_id:projectId},row);
+  const _had=!!(_p&&_p._stages);
+  if(_had){ _p._stages.push(_tmp); window._localTaskWriteTs=Date.now(); }
+  if(typeof pd2Close==='function')pd2Close(); _pkRerender();
+  try { const {data,error}=await SB.from('project_stages').insert({project_id:projectId,...row}).select('*').single(); if(error)throw error;
+  if(_had){ const _i=_p._stages.indexOf(_tmp);                                       // подменяем временный этап реальной строкой
+    if(data){ if(_i>=0)_p._stages[_i]=data; else if(!_p._stages.some(s=>s.id===data.id))_p._stages.push(data); } else if(_i>=0)_p._stages.splice(_i,1);
+    window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  toast('Этап создан'); if(!_had) await _pwReload(projectId); } catch(e){
+    if(_had){ const _i=_p._stages.indexOf(_tmp); if(_i>=0)_p._stages.splice(_i,1); _pkRerender(); }   // откат
+    toast('Ошибка: '+(e.message||e)); } };
+window.tStageDel = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — этап ещё сохраняется'); return; }
+  const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); let _ix=-1;
+  if(_p&&_st){ _ix=_p._stages.indexOf(_st); _p._stages.splice(_ix,1); window._localTaskWriteTs=Date.now(); }   // этап исчезает мгновенно
+  if(typeof pd2Close==='function')pd2Close(); _pkRerender();
+  try { const {error}=await SB.from('project_stages').delete().eq('id',id); if(error)throw error;
+  toast('Этап удалён');
+  if(_p&&_st) _pwReload(curProjId());                                                // фоновая сверка: сервер мог каскадно удалить задачи этапа
+  else await _pwReload(curProjId()); } catch(e){
+    if(_p&&_st){ _p._stages.splice(Math.min(Math.max(_ix,0),_p._stages.length),0,_st); _pkRerender(); }        // откат
+    toast('Ошибка: '+(e.message||e)); } };
+window.tStageSeed = async (projectId,names) => { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
+  const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId)||null;
+  const _had=!!(_p&&_p._stages);
+  const _tmps=rows.map(r=>Object.assign({id:'tmp_'+Math.random().toString(36).slice(2,10)},r));
+  if(_had){ _p._stages.push.apply(_p._stages,_tmps); window._localTaskWriteTs=Date.now(); _pkRerender(); }      // весь набор виден сразу
+  try { const {data,error}=await SB.from('project_stages').insert(rows).select('*'); if(error)throw error;
+  if(_had){ _tmps.forEach(t=>{ const _i=_p._stages.indexOf(t); if(_i>=0)_p._stages.splice(_i,1); });            // подмена временных реальными
+    (data||[]).forEach(r=>{ if(!_p._stages.some(s=>s.id===r.id))_p._stages.push(r); }); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  toast('Этапы созданы'); if(!_had) await _pwReload(projectId); return true; } catch(e){
+    if(_had){ _tmps.forEach(t=>{ const _i=_p._stages.indexOf(t); if(_i>=0)_p._stages.splice(_i,1); }); _pkRerender(); }   // откат
+    toast('Ошибка: '+(e.message||e)); return false; } };
 window.tTaskAdd = async (projectId,row) => {
+  if(row && String(row.stage_id||'').indexOf('tmp_')===0){ toast('Секунду — этап ещё сохраняется, попробуйте снова'); return; }
   const _now=new Date().toISOString();
   if(row && row.status==='active' && !row.timer_started) row.timer_started=_now;    // автостарт рабочего таймера
   if(row && row.status==='review' && !row.review_started) row.review_started=_now;   // автостарт таймера утверждения
@@ -13624,7 +13665,7 @@ window.tTaskAdd = async (projectId,row) => {
   }
   if(error)throw error;
   if(_p&&_p._tasks){ const _i=_p._tasks.indexOf(_tmp);                               // подменяем временную карточку реальной строкой из БД
-    if(data){ const _real=Object.assign({},data,{_mvTs:Date.now()}); if(_i>=0)_p._tasks[_i]=_real; else _p._tasks.push(_real); }
+    if(data){ const _real=Object.assign({},data,{_mvTs:Date.now()}); if(_i>=0)_p._tasks[_i]=_real; else if(!_p._tasks.some(x=>x.id===data.id))_p._tasks.push(_real); }
     else if(_i>=0)_p._tasks.splice(_i,1);
     window._localTaskWriteTs=Date.now(); _pkRerender(); }
   if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
@@ -13797,17 +13838,40 @@ window.tProjectUpdate = async (id,patch) => { try { const {error}=await SB.from(
   if(typeof pd2Close==='function')pd2Close(); toast('Проект обновлён'); await window.tLoadAll(ME.role); if(typeof renderProjects==='function')renderProjects(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tProjectDelete = async (id) => { try { try{ await SB.from('content_shares').delete().eq('project_id',id); }catch(_e){} try{ await SB.from('content_approvals').delete().eq('project_id',id); }catch(_e){} try{ await SB.from('content_plans').delete().eq('project_id',id); }catch(_e){} const {error}=await SB.from('projects').delete().eq('id',id); if(error)throw error;
   if(typeof pd2Close==='function')pd2Close(); if(typeof closeProject==='function')closeProject(); toast('Проект удалён'); await window.tLoadAll(ME.role); if(typeof renderProjects==='function')renderProjects(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tReportAdd = async (projectId,row) => { try { const {error}=await SB.from('reports').insert({project_id:projectId,...row}); if(error)throw error;
-  tgNotify(projectId,'report_published',{title: (row&&row.title) || (row&&row.kind==='SMM'?'SMM отчёт':'Facebook Ads отчёт')});
-  if(typeof pd2Close==='function')pd2Close(); toast('Отчёт опубликован'); await _pwReload(projectId);
+window.tReportAdd = async (projectId,row) => {
+  // оптимистично: отчёт появляется в списке мгновенно, вкладка переключается сразу
+  const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId)||null;
+  const _had=!!(_p&&_p._reports);
+  const _tmp=Object.assign({id:'tmp_'+Math.random().toString(36).slice(2,10),project_id:projectId,published_at:new Date().toISOString()},row);
+  if(_had) _p._reports.unshift(_tmp);
+  if(typeof pd2Close==='function')pd2Close();
   if(typeof pdTabCur!=='undefined') pdTabCur=(row&&row.kind==='SMM')?'smm':'reports';
   const pp=(typeof PROJECTS!=='undefined'?PROJECTS:[])[typeof pdIdx!=='undefined'?pdIdx:-1];
   if(pp && document.getElementById('pd-tabbar')) document.getElementById('pd-tabbar').innerHTML=pdTabbar(pp);
-  if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tReportDel = async (id) => { try { const {error}=await SB.from('reports').delete().eq('id',id); if(error)throw error;
-  toast('Отчёт удалён'); await _pwReload(curProjId()); if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tReportUpdate = async (id, patch) => { try { const {error}=await SB.from('reports').update(patch).eq('id',id); if(error)throw error;
-  toast('Отчёт обновлён'); await _pwReload(curProjId()); if(typeof renderPd==='function') renderPd(); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  _pkRerender();
+  try { const {data,error}=await SB.from('reports').insert({project_id:projectId,...row}).select('*').single(); if(error)throw error;
+  if(_had){ const _i=_p._reports.indexOf(_tmp);                                       // подмена временного отчёта реальной строкой
+    if(data){ if(_i>=0)_p._reports[_i]=data; else if(!_p._reports.some(x=>x.id===data.id))_p._reports.unshift(data); } else if(_i>=0)_p._reports.splice(_i,1);
+    _pkRerender(); }
+  tgNotify(projectId,'report_published',{title: (row&&row.title) || (row&&row.kind==='SMM'?'SMM отчёт':'Facebook Ads отчёт')});
+  toast('Отчёт опубликован'); if(!_had){ await _pwReload(projectId); if(typeof renderPd==='function') renderPd(); } } catch(e){
+    if(_had){ const _i=_p._reports.indexOf(_tmp); if(_i>=0)_p._reports.splice(_i,1); _pkRerender(); }           // откат
+    toast('Ошибка: '+(e.message||e)); } };
+window.tReportDel = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — отчёт ещё сохраняется'); return; }
+  const _p=_tgCurProj(); const _r=(_p&&_p._reports||[]).find(x=>x.id===id); let _ix=-1;
+  if(_p&&_r){ _ix=_p._reports.indexOf(_r); _p._reports.splice(_ix,1); _pkRerender(); }                          // исчезает мгновенно
+  try { const {error}=await SB.from('reports').delete().eq('id',id); if(error)throw error;
+  toast('Отчёт удалён'); if(!(_p&&_r)){ await _pwReload(curProjId()); if(typeof renderPd==='function') renderPd(); } } catch(e){
+    if(_p&&_r){ _p._reports.splice(Math.min(Math.max(_ix,0),_p._reports.length),0,_r); _pkRerender(); }         // откат
+    toast('Ошибка: '+(e.message||e)); } };
+window.tReportUpdate = async (id, patch, opts) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — отчёт ещё сохраняется'); return; }
+  const _silent=!!(opts&&opts.silent);                                                // автосейв SMM: без тостов и перезагрузок
+  const _p=_tgCurProj(); const _r=(_p&&_p._reports||[]).find(x=>x.id===id); const _bak=_r?Object.assign({},_r):null;
+  if(_r) Object.assign(_r,patch);                                                     // локально мгновенно
+  try { const {error}=await SB.from('reports').update(patch).eq('id',id); if(error)throw error;
+  if(!_silent){ toast('Отчёт обновлён'); _pkRerender(); } } catch(e){
+    if(_r&&_bak) Object.assign(_r,_bak);                                              // откат
+    toast('Ошибка: '+(e.message||e)); } };
 window.tLoadProjectAggregates = async () => {
   if (!SB) return;
   const today=new Date(); today.setHours(0,0,0,0);
@@ -14499,7 +14563,7 @@ function subscribeRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'project_stages'},onRtWork)
       .on('postgres_changes',{event:'*',schema:'public',table:'stage_history'},onRtWork)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_tasks'},onRtWork)
-      .on('postgres_changes',{event:'*',schema:'public',table:'reports'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'reports'},onRtWork)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_tags'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_briefs'},onBriefRt)
       .subscribe();
