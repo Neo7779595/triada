@@ -2228,6 +2228,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-inner{max-width:2400px;margin:0 auto;animation:pdFade .16s ease both}
 @keyframes pdFade{from{opacity:.4}to{opacity:1}}
 .pd-scroll>.pd-inner>*{animation:riseIn .5s var(--ease-out) both}
+.pd-inner.norise{animation:none}
+.pd-scroll>.pd-inner.norise>*{animation:none}
 /* hero */
 .pd-hero{background:var(--bg-1);border:1px solid var(--line);border-radius:16px;padding:32px 40px;position:relative;overflow:hidden}
 .pd-hero::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,var(--line-2),transparent 50%)}
@@ -5985,6 +5987,7 @@ function _tgDeepLink(){
 window._tgDeepLink=_tgDeepLink;
 function openProject(i){
   pdIdx=i;pdTabCur='stages';
+  window._pdLastTab=null; window._pdLastProj=null;   // первая отрисовка модалки — с анимацией входа
   const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id;
   document.getElementById('pd-logo').innerHTML=logoFill(p.logoUrl,p.logo);
   document.getElementById('pd-name').textContent=p.name;
@@ -6069,7 +6072,8 @@ let pdNewSt='wait';
 async function pdNewTask(st){
   pdNewSt=st||'wait';
   const p=PROJECTS[pdIdx];
-  if(window.tLoadProjectWork) await window.tLoadProjectWork(p.id);   // активные этапы в реальном времени
+  if(p._stages===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);        // этапов ещё нет — дождаться первой загрузки
+  else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе модалка открывается мгновенно, данные освежаются в фоне
   const active=(p._stages||[]).filter(s=>s.status==='active');
   if(!active.length){
     pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
@@ -6095,7 +6099,8 @@ function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи з
 function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
 async function pdTaskEdit(id){
   const p=PROJECTS[pdIdx];
-  if(window.tLoadProjectWork) await window.tLoadProjectWork(p.id);
+  if(p._tasks===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);          // задач ещё нет — дождаться первой загрузки
+  else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе открываем мгновенно, освежаем в фоне
   const t=(p._tasks||[]).find(x=>x.id===id); if(!t){toast('Задача не найдена');return;}
   let stArr=(p._stages||[]).filter(s=>s.status==='active').map(s=>[s.id,s.name]);
   if(t.stage_id && !stArr.some(x=>x[0]===t.stage_id)){ const cur=(p._stages||[]).find(s=>s.id===t.stage_id); if(cur) stArr.unshift([cur.id,cur.name+' · завершён']); }
@@ -6289,7 +6294,7 @@ function renderPd(){
           } else if(rel>0){
             rtimer=`<div class="pk-timer review mini"><span class="ic">${eyeic}</span><span class="pk-time" id="rtmr-${c.id}">${pkFmtDur(rel)}</span></div>`;
           }
-          return `<div class="pk-card" draggable="true" data-tkid="${c.id}" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)" style="animation-delay:${(i*0.045).toFixed(2)}s">
+          return `<div class="pk-card" draggable="true" data-tkid="${c.id}" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)">
               <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
@@ -6357,8 +6362,14 @@ function renderPd(){
     h=(p._history&&p._history.length)?actFeed(p._history):'<div class="pk-empty" style="padding:44px 0">История пуста — события появятся при смене статусов этапов.</div>';
   }
   const body=document.getElementById('pd-body');
-  body.innerHTML=`<div class="pd-inner">${h}</div>`;
-  if(typeof animateCounters==='function') requestAnimationFrame(()=>animateCounters(body));
+  const _same=(window._pdLastTab===pdTabCur)&&(window._pdLastProj===p.id);   // ререндер той же вкладки: без повторной анимации входа и без сброса скролла
+  window._pdLastTab=pdTabCur; window._pdLastProj=p.id;
+  const _sc={}; let _pageSc=0;
+  if(_same){ _pageSc=body.scrollTop; body.querySelectorAll('.pk-col').forEach(c=>{ const b=c.querySelector('.pk-body'); if(b)_sc[c.dataset.st]=b.scrollTop; }); }
+  body.innerHTML=`<div class="pd-inner${_same?' norise':''}">${h}</div>`;
+  if(_same){ body.scrollTop=_pageSc; body.querySelectorAll('.pk-col').forEach(c=>{ const b=c.querySelector('.pk-body'); if(b&&_sc[c.dataset.st]!=null)b.scrollTop=_sc[c.dataset.st]; }); }
+  if(typeof pkTickUpdate==='function') pkTickUpdate();   // таймеры показывают актуальное время сразу, а не через секунду
+  if(!_same&&typeof animateCounters==='function') requestAnimationFrame(()=>animateCounters(body));
   if(typeof bfSizeSplit==='function') requestAnimationFrame(bfSizeSplit);
 }
 
@@ -13571,7 +13582,11 @@ window.tSaveStageTemplate = async (service, stages) => { try {
 } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageSave = async (id,patch) => { try {
   const _p=_tgCurProj(); const _st=(_p&&_p._stages||[]).find(s=>s.id===id); const _old=_st&&_st.status;
-  const {error}=await SB.from('project_stages').update(patch).eq('id',id); if(error)throw error;
+  const _bak=_st?Object.assign({},_st):null;
+  if(_st){ Object.assign(_st,patch); window._localTaskWriteTs=Date.now();            // этап обновляется на экране мгновенно
+    if(typeof pd2Close==='function')pd2Close(); _pkRerender(); }
+  const {error}=await SB.from('project_stages').update(patch).eq('id',id);
+  if(error){ if(_st&&_bak){ Object.assign(_st,_bak); _pkRerender(); } throw error; }  // откат при ошибке
   if(patch.status && _st && patch.status!==_old){
     const pid=_st.project_id||curProjId();
     const _note=(patch.note!==undefined)?patch.note:_st.note;
@@ -13591,22 +13606,36 @@ window.tStageDel = async (id) => { try { const {error}=await SB.from('project_st
   if(typeof pd2Close==='function')pd2Close(); toast('Этап удалён'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageSeed = async (projectId,names) => { try { const rows=names.map((n,i)=>({project_id:projectId,name:n,status:i===0?'active':'wait',idx:i}));
   const {error}=await SB.from('project_stages').insert(rows); if(error)throw error; toast('Этапы созданы'); await _pwReload(projectId); return true; } catch(e){ toast('Ошибка: '+(e.message||e)); return false; } };
-window.tTaskAdd = async (projectId,row) => { try {
+window.tTaskAdd = async (projectId,row) => {
   const _now=new Date().toISOString();
   if(row && row.status==='active' && !row.timer_started) row.timer_started=_now;    // автостарт рабочего таймера
   if(row && row.status==='review' && !row.review_started) row.review_started=_now;   // автостарт таймера утверждения
-  let {error}=await SB.from('project_tasks').insert({project_id:projectId,...row});
+  // оптимистичная вставка: карточка (и её таймер) появляются мгновенно, сервер подтверждает в фоне
+  const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===projectId)||null;
+  const _tmp=Object.assign({id:'tmp_'+Math.random().toString(36).slice(2,10),project_id:projectId,time_spent:0,review_spent:0,_mvTs:Date.now()},row);
+  if(_p&&_p._tasks){ _p._tasks.push(_tmp); window._localTaskWriteTs=Date.now(); _pkRerender(); }
+  if(typeof pd2Close==='function')pd2Close();
+  try {
+  let {data,error}=await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
   if(error && /review_/.test(error.message||'')){                                    // колонок review_* ещё нет (миграция 08 не применена)
     const {review_started,review_spent,...row2}=row||{};
-    const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}); error=r2.error;
+    const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}).select('*').single(); error=r2.error; data=r2.data;
     if(!error) toast('Задача создана. Таймер утверждения отключён — примените SQL-миграцию 08');
   }
   if(error)throw error;
+  if(_p&&_p._tasks){ const _i=_p._tasks.indexOf(_tmp);                               // подменяем временную карточку реальной строкой из БД
+    if(data){ const _real=Object.assign({},data,{_mvTs:Date.now()}); if(_i>=0)_p._tasks[_i]=_real; else _p._tasks.push(_real); }
+    else if(_i>=0)_p._tasks.splice(_i,1);
+    window._localTaskWriteTs=Date.now(); _pkRerender(); }
   if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
-  if(typeof pd2Close==='function')pd2Close(); toast('Задача создана'); await _pwReload(projectId); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  toast('Задача создана');
+  if(!(_p&&_p._tasks)) await _pwReload(projectId);                                   // локального списка не было — полная загрузка
+  } catch(e){
+    if(_p&&_p._tasks){ const _i=_p._tasks.indexOf(_tmp); if(_i>=0)_p._tasks.splice(_i,1); _pkRerender(); }   // откат временной карточки
+    toast('Ошибка: '+(e.message||e)); } };
 let _pkRaf=0;
 function _pkRerender(){ if(_pkRaf) return; _pkRaf=requestAnimationFrame(()=>{ _pkRaf=0; try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }); }
-window.tTaskMove = async (id,status) => { const t=_findTask(id); try {
+window.tTaskMove = async (id,status) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); try {
     const patch={status}; const now=new Date().toISOString(); let _wlog=null;
     if(t){ const nowMs=Date.now();
       if(t.timer_started && t.status==='active'){ const _s=Math.max(0,Math.round((nowMs-new Date(t.timer_started).getTime())/1000)); if(_s>0) _wlog={project_id:t.project_id,task_id:t.id,member_id:t.assignee_id,started_at:t.timer_started,sec:_s}; }
@@ -13625,24 +13654,37 @@ window.tTaskMove = async (id,status) => { const t=_findTask(id); try {
     if(_wlog) _logWork(_wlog);
     if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); }   // запись подтверждена — держим локальное состояние; реалтайм-эхо не перезагружаем (без гонки)
   } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
-window.tTaskDel = async (id) => { try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
-  toast('Задача удалена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tTaskUpdate = async (id,patch) => { try {
+window.tTaskDel = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; }
+  // оптимистичное удаление: карточка исчезает мгновенно, при ошибке возвращается на место
+  const _t=_findTask(id); let _p=null,_ix=-1;
+  if(_t){ _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>(x._tasks||[]).indexOf(_t)>=0)||null;
+    if(_p){ _ix=_p._tasks.indexOf(_t); _p._tasks.splice(_ix,1); window._localTaskWriteTs=Date.now(); _pkRerender(); } }
+  try { const {error}=await SB.from('project_tasks').delete().eq('id',id); if(error)throw error;
+  toast('Задача удалена'); if(!_p) await _pwReload(curProjId()); } catch(e){
+    if(_p&&_t){ _p._tasks.splice(Math.min(Math.max(_ix,0),_p._tasks.length),0,_t); _pkRerender(); }           // откат
+    toast('Ошибка: '+(e.message||e)); } };
+window.tTaskUpdate = async (id,patch) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } try {
   const _pu=_tgCurProj(); const _tu=(_pu&&_pu._tasks||[]).find(t=>t.id===id); const _oldAsg=_tu&&_tu.assignee_id;
-  const {error}=await SB.from('project_tasks').update(patch).eq('id',id); if(error)throw error;
+  const _bak=_tu?Object.assign({},_tu):null;
+  if(_tu){ Object.assign(_tu,patch); _tu._mvTs=Date.now(); window._localTaskWriteTs=Date.now();               // правки видны мгновенно
+    if(typeof pd2Close==='function')pd2Close(); _pkRerender(); }
+  const {error}=await SB.from('project_tasks').update(patch).eq('id',id);
+  if(error){ if(_tu&&_bak){ Object.assign(_tu,_bak); _pkRerender(); } throw error; }                          // откат при ошибке
   if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
-  if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); } catch(e){ toast('Ошибка: '+(e.message||e)); } };
+  if(_tu){ _tu._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); toast('Задача обновлена'); }
+  else { if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); }
+  } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 function _findTask(id){ const ps=(typeof PROJECTS!=='undefined'?PROJECTS:[]); for(const p of ps){ const t=(p._tasks||[]).find(x=>x.id===id); if(t) return t; } return null; }
 function _logWork(o){
   if(!o || !o.member_id || !(o.sec>0) || typeof SB==='undefined' || !SB) return;
   try{ SB.from('time_logs').insert({ project_id:o.project_id||null, task_id:o.task_id||null, member_id:o.member_id, kind:'work', seconds:Math.round(o.sec), started_at:o.started_at||null }).then(r=>{ if(r&&r.error) console.warn('time_log',r.error.message); }); }catch(_e){}
 }
-window.tTimerPause = async (id) => { const t=_findTask(id); try { const _wst=(t&&t.timer_started)||null; const _wsecLog=_wst?Math.max(0,Math.round((Date.now()-new Date(_wst).getTime())/1000)):0; let spent=(t&&t.time_spent)||0; if(_wst) spent+=_wsecLog;
+window.tTimerPause = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); try { const _wst=(t&&t.timer_started)||null; const _wsecLog=_wst?Math.max(0,Math.round((Date.now()-new Date(_wst).getTime())/1000)):0; let spent=(t&&t.time_spent)||0; if(_wst) spent+=_wsecLog;
   if(t){ t.time_spent=spent; t.timer_started=null; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }  // мгновенная пауза
   const {error}=await SB.from('project_tasks').update({time_spent:spent,timer_started:null}).eq('id',id); if(error)throw error;
   if(t && _wsecLog>0) _logWork({project_id:t.project_id,task_id:t.id,member_id:t.assignee_id,started_at:_wst,sec:_wsecLog});
   if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); } } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
-window.tTimerResume = async (id) => { const t=_findTask(id); try { const now=new Date().toISOString(); if(t){ t.timer_started=now; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }  // мгновенное продолжение
+window.tTimerResume = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); try { const now=new Date().toISOString(); if(t){ t.timer_started=now; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }  // мгновенное продолжение
   const {error}=await SB.from('project_tasks').update({timer_started:now}).eq('id',id); if(error)throw error;
   if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); } } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
 
@@ -14365,10 +14407,18 @@ window.tLoadAll = async (role) => {
       SB.from('projects').select('*').order('created_at'),
       SB.from('profiles').select('*').eq('role','member').order('created_at'),
       SB.from('stage_templates').select('service,stages') ]);
-    PROJECTS.length = 0; (pr.data||[]).forEach(p => PROJECTS.push(mapProject(p)));
+    { // слияние по id: сохраняем загруженные _tasks/_stages/_reports/_cp и identity объектов —
+      // иначе каждая фоновая перезагрузка «ослепляла» открытый канбан (карточки переставали двигаться)
+      const _prev={}; PROJECTS.forEach(p=>{ if(p&&p.id!=null) _prev[p.id]=p; });
+      PROJECTS.length = 0;
+      (pr.data||[]).forEach(p => { const np=mapProject(p), old=_prev[np.id];
+        if(old){ Object.assign(old,np); PROJECTS.push(old); } else PROJECTS.push(np); });
+      if (typeof pdIdx!=='undefined' && window._pdProj){ const _i=PROJECTS.findIndex(x=>x.id===window._pdProj); if(_i>=0) pdIdx=_i; }   // открытая модалка смотрит на тот же проект
+    }
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
     window.STAGE_TPL = {}; ((tpl&&tpl.data)||[]).forEach(r=>{ if(Array.isArray(r.stages)) window.STAGE_TPL[r.service]=r.stages.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()); });
-    await window.tLoadKB(); await window.tLoadTools(); await window.tLoadDeadlines(); await window.tLoadProjectAggregates(); await window.tLoadOverview(); await window.tLoadCycles(); await window.tLoadTeam(); await window.tLoadFinance(); await window.tLoadTags(); await window.tLoadTariffTpl();
+    // загрузчики независимы — параллельно вместо 10 последовательных сетевых раундов (в разы быстрее)
+    await Promise.all([ window.tLoadKB(), window.tLoadTools(), window.tLoadDeadlines(), window.tLoadProjectAggregates(), window.tLoadOverview(), window.tLoadCycles(), window.tLoadTeam(), window.tLoadFinance(), window.tLoadTags(), window.tLoadTariffTpl() ]);
   }
   else if (role === 'client'){ await window.tLoadClient(); return; }
   await loadTariffs();
@@ -14401,6 +14451,43 @@ function onBriefRt(payload){
   clearTimeout(window._briefRtT);
   window._briefRtT=setTimeout(function(){ try{ briefApplyRemote(pid); }catch(_e){} },250);
 }
+/* ---- realtime задач и этапов: точечная синхронизация вместо полной перезагрузки приложения ----
+   Раньше каждое движение карточки (своё или коллеги) запускало tLoadAll: ~15 сетевых запросов,
+   пересборку всех разделов и модалки — отсюда «задержки» и мигание операционки. */
+let _rtWT;
+async function _rtWorkSync(){
+  try{
+    const _cl=document.getElementById('app-cl');
+    if(_cl && _cl.classList.contains('on')){                                            // клиентский кабинет: обновляем данные клиента и активный раздел
+      await window.tLoadClient();
+      const _cn=document.querySelector('#app-cl .nav-i.on');
+      if(typeof clNav==='function') clNav(_cn?_cn.dataset.cm:'overview');
+      return;
+    }
+    const jobs=[ window.tLoadProjectAggregates() ];                                     // прогресс/просрочки на карточках проектов
+    const _ovOpen = window._pdProj && document.getElementById('ov-proj').classList.contains('on');
+    if (_ovOpen) jobs.push(_pwReload(window._pdProj));                                  // открытый проект — свежие задачи/этапы (сам перерисует канбан)
+    const ag=document.getElementById('app-ag');
+    const _n=(ag&&ag.classList.contains('on'))?document.querySelector('#app-ag .nav-i.on'):null;
+    const m=_n?_n.dataset.m:null;
+    if(m==='deadlines') jobs.push(window.tLoadDeadlines());
+    else if(m==='overview') jobs.push(window.tLoadOverview());
+    else if(m==='cycles') jobs.push(window.tLoadCycles());
+    else if(m==='team') jobs.push(window.tLoadTeam());
+    else if(m==='finance') jobs.push(window.tLoadFinance());
+    await Promise.all(jobs);
+    if(m==='projects'&&typeof paintProjList==='function') paintProjList();
+    else if(m==='deadlines'&&typeof renderDeadlines==='function') renderDeadlines();
+    else if(m==='overview'&&typeof renderOverview==='function') renderOverview();
+    else if(m==='cycles'&&typeof renderCycles==='function') renderCycles();
+    else if(m==='team'&&typeof renderTeam==='function') renderTeam();
+    else if(m==='finance'&&typeof renderFinance==='function') renderFinance();
+  }catch(e){ console.warn('rt-work', e); }
+}
+function onRtWork(){
+  if (window._localTaskWriteTs && (Date.now()-window._localTaskWriteTs)<4000){ clearTimeout(_rtWT); _rtWT=setTimeout(onRtWork,1500); return; }   // эхо своих правок — не дёргаем сеть
+  clearTimeout(_rtWT); _rtWT=setTimeout(_rtWorkSync,350);
+}
 function subscribeRealtime(){
   try{
     SB.channel('triada-rt')
@@ -14409,9 +14496,9 @@ function subscribeRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'kb_materials'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'tools'},onRt)
-      .on('postgres_changes',{event:'*',schema:'public',table:'project_stages'},onRt)
-      .on('postgres_changes',{event:'*',schema:'public',table:'stage_history'},onRt)
-      .on('postgres_changes',{event:'*',schema:'public',table:'project_tasks'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'project_stages'},onRtWork)
+      .on('postgres_changes',{event:'*',schema:'public',table:'stage_history'},onRtWork)
+      .on('postgres_changes',{event:'*',schema:'public',table:'project_tasks'},onRtWork)
       .on('postgres_changes',{event:'*',schema:'public',table:'reports'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_tags'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_briefs'},onBriefRt)
