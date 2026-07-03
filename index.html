@@ -2382,11 +2382,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-hadd svg{width:17px;height:17px}
 .pk-hadd:hover{background:var(--pk-accent);border-color:var(--pk-accent);color:#0A0B0D;transform:translateY(-1px);box-shadow:0 5px 14px -5px var(--pk-accent)}
 .pk-sub{margin-top:9px}
-.pk-subpb{height:5px;border-radius:4px;background:var(--bg-3);overflow:hidden}
+.pk-subtog{display:block;width:100%;text-align:left;background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit}
+.pk-subpb{display:block;height:5px;border-radius:4px;background:var(--bg-3);overflow:hidden}
 .pk-subpb>i{display:block;height:100%;border-radius:4px;background:var(--pk-accent);transition:width .25s var(--ease)}
 .pk-subpb.full>i{background:var(--pos,#37E6C8)}
-.pk-subct{display:inline-flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;font-weight:600;color:var(--txt-2);font-family:var(--mono)}
-.pk-subct svg{width:13px;height:13px}
+.pk-subct{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;font-weight:600;color:var(--txt-2);font-family:var(--mono)}
+.pk-subct .chk{width:13px;height:13px}
+.pk-subct .chev{width:14px;height:14px;margin-left:auto;transition:transform .2s var(--ease)}
+.pk-subct .chev.open{transform:rotate(180deg)}
+.pk-subtog:hover .pk-subct{color:var(--txt)}
+.pk-sublist{display:flex;flex-direction:column;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.pk-subrow{display:flex;align-items:center;gap:8px}
+.pk-subck{flex-shrink:0;width:18px;height:18px;border-radius:5px;border:1.6px solid var(--line-2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:transparent;transition:.15s var(--ease);padding:0}
+.pk-subck svg{width:11px;height:11px}
+.pk-subck.on{background:var(--accent);border-color:var(--accent);color:#0A0B0D}
+.pk-subck:hover{border-color:var(--accent)}
+.pk-subtx{flex:1;font-size:12px;line-height:1.3;color:var(--txt-2);word-break:break-word}
+.pk-subtx.done{text-decoration:line-through;color:var(--txt-3)}
 .subwrap{border:1px solid var(--line);border-radius:10px;padding:9px;background:var(--bg-1)}
 .sublist{display:flex;flex-direction:column;gap:6px}
 .subempty{font-size:12px;color:var(--txt-3);padding:2px 2px 4px}
@@ -6187,6 +6199,9 @@ function pdSubAdd(){ const inp=document.getElementById('pd2-subnew'); if(!inp)re
 function pdSubToggle(i){ const a=window._pdSub||[]; if(a[i]){a[i].done=!a[i].done; pdSubRender();} }
 function pdSubDel(i){ const a=window._pdSub||[]; if(i>=0&&i<a.length){a.splice(i,1); pdSubRender();} }
 function pdSubKey(e){ if(e.key==='Enter'){e.preventDefault(); pdSubAdd();} }
+window._pkSubOpen=window._pkSubOpen||new Set();
+function pkSubOpen(id){ if(!window._pkSubOpen)window._pkSubOpen=new Set(); if(window._pkSubOpen.has(id))window._pkSubOpen.delete(id); else window._pkSubOpen.add(id); _pkRerender(); }
+function pkSubCheck(id,idx){ const t=_findTask(id); if(!t)return; const arr=(Array.isArray(t.subtasks)?t.subtasks:[]).map(x=>({id:(x&&x.id)||_subUid(),title:(x&&x.title)||'',done:!!(x&&x.done)})); if(idx<0||idx>=arr.length)return; arr[idx].done=!arr[idx].done; if(window.tTaskUpdate)window.tTaskUpdate(id,{subtasks:arr}); }
 const PD_MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 function _dDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); return d.getDate()+' '+PD_MON[d.getMonth()]; }
 function _dDateFull(iso){ if(!iso) return '—'; const d=new Date(iso); return d.getDate()+' '+PD_MON[d.getMonth()]+' '+d.getFullYear(); }
@@ -6346,7 +6361,9 @@ function renderPd(){
         const cards=_collapsed?`<button class="pk-showbtn" onclick="event.stopPropagation();pkDoneSet('recent')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Показать последние ${PK_DONE_LIMIT} задач${_total>PK_DONE_LIMIT?' · '+_total:''}</button>`:(arr.length?arr.map((c,i)=>{
           const w=_who(c.assignee_id), stg=(p._stages||[]).find(x=>x.id===c.stage_id);
           const _sub=Array.isArray(c.subtasks)?c.subtasks:[], _sdone=_sub.filter(s=>s&&s.done).length, _spct=_sub.length?Math.round(_sdone/_sub.length*100):0;
-          const subHtml=_sub.length?`<div class="pk-sub"><div class="pk-subpb ${_sdone===_sub.length?'full':''}"><i style="width:${_spct}%"></i></div><span class="pk-subct"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>${_sdone}/${_sub.length}</span></div>`:'';
+          const _sopen=!!(window._pkSubOpen&&window._pkSubOpen.has(c.id));
+          const _srows=_sopen?`<div class="pk-sublist">`+_sub.map((s,si)=>`<div class="pk-subrow"><button type="button" class="pk-subck ${s&&s.done?'on':''}" title="Отметить" onclick="event.stopPropagation();pkSubCheck('${c.id}',${si})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button><span class="pk-subtx ${s&&s.done?'done':''}">${_ddH((s&&s.title)||'')}</span></div>`).join('')+`</div>`:'';
+          const subHtml=_sub.length?`<div class="pk-sub"><button type="button" class="pk-subtog" onclick="event.stopPropagation();pkSubOpen('${c.id}')"><span class="pk-subpb ${_sdone===_sub.length?'full':''}"><i style="width:${_spct}%"></i></span><span class="pk-subct"><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>${_sdone}/${_sub.length}<svg class="chev ${_sopen?'open':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></span></button>${_srows}</div>`:'';
           const over=c.due_date && c.status!=='done' && new Date(c.due_date) < new Date(new Date().toDateString());
           const due=c.due_date?`<span class="pk-due ${over?'over':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${_dDate(c.due_date)}${c.due_time?' · '+_dTime(c.due_time):''}</span>`:'';
           const adv=st!=='done'?`<button class="pk-adv" title="Продвинуть дальше" onclick="event.stopPropagation();pkAdvance('${c.id}','${c.status}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 18l6-6-6-6"/></svg></button>`:`<span class="pk-done-ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg></span>`;
