@@ -69,13 +69,20 @@ button{font-family:inherit}
 /* Сворачивание сайдбара — плавная анимация в стиле Linear/Notion */
 .side{transition:width .32s cubic-bezier(.22,.61,.36,1)}
 .app.side-collapsed .side{width:68px}
-/* Кнопка сворачивания в шапке */
-.side-collapse-btn{position:absolute;top:22px;right:12px;width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--bg-2);color:var(--txt-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.16s;z-index:2;padding:0}
-.side-collapse-btn:hover{background:var(--bg-3);color:var(--accent);border-color:var(--accent-line);transform:translateX(-1px)}
-.side-collapse-btn svg{width:14px;height:14px;transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+/* Кнопка сворачивания сайдбара — сидит на правом ребре, как в Notion/Linear */
+.side{position:sticky;top:0;height:100vh;overflow:visible}
+#app-cl .side{overflow:visible}
+.side-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:visible;display:flex;flex-direction:column}
+.side-collapse-btn{
+  position:absolute;top:24px;right:-13px;width:26px;height:26px;border-radius:50%;
+  border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;
+  transition:background .16s, color .16s, border-color .16s, box-shadow .18s;
+  z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.35), 0 0 0 4px var(--bg)}
+.side-collapse-btn:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 4px 14px rgba(55,230,200,.35), 0 0 0 4px var(--bg)}
+.side-collapse-btn:hover svg{stroke-width:2.6}
+.side-collapse-btn svg{width:12px;height:12px;transition:transform .28s cubic-bezier(.22,.61,.36,1)}
 .app.side-collapsed .side-collapse-btn svg{transform:rotate(180deg)}
-.app.side-collapsed .side-collapse-btn{right:50%;transform:translateX(50%);top:19px}
-.app.side-collapsed .side-collapse-btn:hover{transform:translateX(50%) scale(1.05)}
 /* Свёрнутое состояние: скрываем всё текстовое, оставляем только иконки */
 .app.side-collapsed .side-badge>div:not(.av),
 .app.side-collapsed .nav-h,
@@ -114,7 +121,6 @@ button{font-family:inherit}
   animation:sideTipIn .14s ease-out}
 .app.side-collapsed .btn-add[data-tip]:hover::after{color:var(--accent-ink)}
 @keyframes sideTipIn{from{opacity:0;transform:translateY(-50%) translateX(-4px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
-.side{position:sticky}
 .app.on{display:grid}
 .side{background:var(--bg-side);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .side-top{padding:20px 18px 16px;border-bottom:1px solid var(--line)}
@@ -4347,8 +4353,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <div class="app" id="app">
   <!-- sidebar -->
   <aside class="side">
-    <div class="side-top" style="position:relative">
-      <button class="side-collapse-btn" onclick="toggleSide(event)" title="Свернуть/развернуть боковую панель (Ctrl+B)" aria-label="Свернуть боковую панель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <div class="side-top">
       <div class="side-badge" data-tip="Генеральный кабинет">
         <div class="av">T</div>
         <div>
@@ -4400,8 +4405,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <!-- ============ ОКНО 3 · АГЕНТСКИЙ КАБИНЕТ ============ -->
 <div class="app" id="app-ag">
   <aside class="side">
-    <div class="side-top" style="position:relative">
-      <button class="side-collapse-btn" onclick="toggleSide(event)" title="Свернуть/развернуть боковую панель (Ctrl+B)" aria-label="Свернуть боковую панель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <div class="side-top">
       <div class="side-badge" data-tip="Кабинет агентства">
         <div class="av" id="ag-av">D</div>
         <div>
@@ -4451,8 +4455,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <!-- ============ ОКНО 4 · КЛИЕНТСКИЙ КАБИНЕТ ============ -->
 <div class="app" id="app-cl">
   <aside class="side">
-    <div class="side-top" style="position:relative">
-      <button class="side-collapse-btn" onclick="toggleSide(event)" title="Свернуть/развернуть боковую панель (Ctrl+B)" aria-label="Свернуть боковую панель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <div class="side-top">
       <div class="cl-brand" data-tip="Кабинет клиента">
         <div class="av">U</div>
         <div><div class="nm">Uzbek Doner</div><div class="on">Онлайн</div></div>
@@ -4714,7 +4717,18 @@ function toggleSide(ev){
   // На мобильных сайдбар оверлейный — сворачивание не имеет смысла
   if(window.innerWidth<=760) app.classList.remove('side-collapsed');
 }
+function _injectSideBtn(side){
+  if(!side||side.querySelector(':scope>.side-collapse-btn')) return;
+  const b=document.createElement('button');
+  b.className='side-collapse-btn'; b.type='button';
+  b.title='Свернуть боковую панель (Ctrl+B)';
+  b.setAttribute('aria-label','Свернуть боковую панель');
+  b.onclick=toggleSide;
+  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>';
+  side.appendChild(b);                                                                // абсолютно позиционируется относительно .side
+}
 function applySideState(){
+  document.querySelectorAll('.app .side').forEach(_injectSideBtn);                    // гарантирую наличие кнопки во всех кабинетах
   document.querySelectorAll('.app').forEach(a=>a.classList.remove('side-collapsed'));
   if(window.innerWidth<=760) return;                                                  // мобилка: рельс не нужен
   let saved='0'; try{ saved=localStorage.getItem('side_collapsed')||'0'; }catch(_e){}
