@@ -9819,14 +9819,35 @@ async function smmImpRun(){
   if(!(window.LIVE&&window.SB)){ toast('Импорт работает в онлайн-режиме (Supabase)'); return; }
   _smmImp.busy=true; smmImpRender();
   try{
-    const {data,error}=await SB.functions.invoke('smm-extract',{ body:{ images:_smmImp.files.map(f=>({data:f.b64,media_type:f.mt})) } });
-    if(error)throw new Error(error.message||'функция недоступна');
+    const body={ images:_smmImp.files.map(f=>({data:f.b64,media_type:f.mt})) };
+    // имя функции в URL чувствительно к регистру — перебираем частые варианты и запоминаем рабочий
+    const cached=localStorage.getItem('smm_fn_name');
+    const NAMES=Array.from(new Set([cached,'smm-extract','Smm-extract-','Smm-extract','smm-extract-','SMM-extract'].filter(Boolean)));
+    let data=null, lastErr=null;
+    for(const nm of NAMES){
+      const r=await SB.functions.invoke(nm,{ body });
+      if(!r.error){ data=r.data; localStorage.setItem('smm_fn_name',nm); lastErr=null; break; }
+      lastErr=r.error;
+      const st=r.error&&r.error.context&&r.error.context.status;
+      if(st===404||/not.?found/i.test(String(r.error.message||''))) continue;         // имя не совпало — пробуем следующий вариант
+      // достаём текст ошибки самой функции: json → текст → как есть
+      try{
+        const ctx=r.error.context;
+        if(ctx&&typeof ctx.text==='function'){
+          const raw=await ctx.clone().text().catch(()=>ctx.text());
+          if(raw){ let m=raw; try{ const j=JSON.parse(raw); if(j&&j.error)m=j.error; }catch(_j){}
+            lastErr=new Error(String(m).slice(0,300)); }
+        }
+      }catch(_e){}
+      break;
+    }
+    if(!data&&lastErr) throw (lastErr instanceof Error?lastErr:new Error(lastErr.message||'функция недоступна'));
     if(data&&data.error)throw new Error(data.error);
     if(!data||!data.merged)throw new Error('пустой ответ распознавания');
     _smmImp.res=data; _smmImp.busy=false; smmImpRender();
   }catch(e){ _smmImp.busy=false; smmImpRender(); console.error('smm-extract',e);
     const msg=String(e.message||e);
-    toast(/not.?found|404|Failed to send|relay/i.test(msg)?'Функция smm-extract не задеплоена в Supabase — см. инструкцию к файлу smm-extract.ts':'Распознавание не удалось: '+msg); }
+    toast(/not.?found|404|Failed to send|relay/i.test(msg)?'Функция smm-extract не найдена в Supabase — проверьте имя (должно быть ровно smm-extract) и деплой':'Распознавание не удалось: '+msg); }
 }
 const SMM_IMP_FIELDS=[['total_reach','Всего охват'],['total_views','Всего просмотров'],['posts_reach','Охват постов'],['posts_views','Просмотры постов'],['posts_count','Кол-во постов'],['stories_count','Кол-во сторис'],['subscribers_current','Подписчики'],['followers_growth','Прирост']];
 function smmImpReviewHTML(){
