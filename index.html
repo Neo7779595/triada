@@ -65,11 +65,12 @@ button{font-family:inherit}
 
 /* ========== APP SHELL ========== */
 .app{display:none;grid-template-columns:248px 1fr;min-height:100vh;transition:grid-template-columns .32s cubic-bezier(.22,.61,.36,1)}
-/* ========== СВОРАЧИВАНИЕ САЙДБАРА · чисто и быстро ========== */
-.app.side-collapsed{grid-template-columns:72px 1fr}
-.app,.side{transition:none}                                                          /* никакой анимации ширины — переключение мгновенное как в Notion/Linear */
-.app.side-collapsed .side{width:72px}
-/* Скрываем всё лишнее — через display:none, чтобы не оставалось "фантомов" */
+/* ========== СВОРАЧИВАНИЕ САЙДБАРА · в стиле Claude ========== */
+.app{transition:grid-template-columns .22s cubic-bezier(.4,0,.2,1)}
+.side{transition:width .22s cubic-bezier(.4,0,.2,1)}
+.app.side-collapsed{grid-template-columns:64px 1fr}
+.app.side-collapsed .side{width:64px;overflow:hidden}
+/* Всё текстовое — display:none, никаких фантомов */
 .app.side-collapsed .nav-h,
 .app.side-collapsed .metrics-rail,
 .app.side-collapsed .cl-prog,
@@ -78,41 +79,65 @@ button{font-family:inherit}
 .app.side-collapsed .nav-i>*:not(svg),
 .app.side-collapsed .u-chip>*:not(.d),
 .app.side-collapsed .side-foot .btn-add>*:not(svg){display:none !important}
-/* Свёрнутые контейнеры — центрируем содержимое */
-.app.side-collapsed .side-top{padding:16px 0;display:flex;justify-content:center;border-bottom:1px solid var(--line)}
-.app.side-collapsed .side-badge,.app.side-collapsed .cl-brand{gap:0;justify-content:center}
-.app.side-collapsed .nav{padding:14px 12px}
-.app.side-collapsed .nav-i{justify-content:center;padding:11px 0;gap:0;position:relative}
-.app.side-collapsed .nav-i.on::before{left:-4px}
-.app.side-collapsed .nav-i .ct{position:absolute;top:2px;right:6px;font-size:9px;padding:0 5px;min-width:16px;height:14px;line-height:14px;margin:0}
-.app.side-collapsed .side-foot{padding:12px}
-.app.side-collapsed .side-foot .btn-add{padding:11px 0;justify-content:center;margin-bottom:8px}
-.app.side-collapsed .u-chip{justify-content:center;padding:8px 0;gap:0}
-/* КНОПКА СВОРАЧИВАНИЯ · всегда видна, на ребре, круглая */
+/* Шапка: только иконка бренда, идеально по центру */
+.app.side-collapsed .side-top{padding:14px 0;display:flex;justify-content:center;border-bottom:1px solid var(--line)}
+.app.side-collapsed .side-badge,
+.app.side-collapsed .cl-brand{gap:0;justify-content:center;display:flex}
+.app.side-collapsed .side-badge .av,
+.app.side-collapsed .cl-brand .av{width:32px;height:32px;font-size:14px;border-radius:8px}
+/* Навигация: узкий рельс, иконки в квадратных «плитках» 40×40, идеально по центру */
+.app.side-collapsed .nav{padding:12px 0}
+.app.side-collapsed .nav-i{
+  width:40px;height:40px;margin:2px auto;padding:0;gap:0;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:8px;position:relative}
+.app.side-collapsed .nav-i svg{width:18px;height:18px}
+.app.side-collapsed .nav-i.on::before{display:none}                                  /* убираем полоску слева — вся плитка подсвечена */
+.app.side-collapsed .nav-i.on{background:var(--accent-dim);color:var(--accent)}
+.app.side-collapsed .nav-i .ct{
+  position:absolute;top:-2px;right:-2px;
+  font-size:9px;padding:0 4px;min-width:14px;height:14px;line-height:14px;
+  margin:0;background:var(--accent);color:var(--accent-ink);font-weight:700;
+  border-radius:7px;border:2px solid var(--bg-side)}
+.app.side-collapsed .nav-i .dot-n{position:absolute;top:6px;right:8px}
+/* Футер: «Новый проект» превращается в квадратную кнопку с плюсом */
+.app.side-collapsed .side-foot{padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.app.side-collapsed .side-foot .btn-add{
+  width:40px;height:40px;padding:0;margin:0 !important;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:8px;gap:0}
+.app.side-collapsed .side-foot .btn-add svg{width:20px;height:20px;stroke-width:2.5}
+.app.side-collapsed .u-chip{
+  width:40px;height:40px;padding:0;margin:0;gap:0;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:8px;border:1px solid var(--line-2)}
+.app.side-collapsed .u-chip .d{margin:0}
+/* КНОПКА СВОРАЧИВАНИЯ · плавно переезжает вместе с ребром */
 .side-collapse-btn{
-  position:fixed;top:22px;left:236px;                                                /* при развёрнутой панели (248px) выступает наполовину */
-  width:28px;height:28px;border-radius:50%;
+  display:none;                                                                       /* показывается только когда открыт кабинет */
+  position:fixed;top:20px;
+  width:24px;height:24px;border-radius:6px;
   border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);
   cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;
   z-index:1000;
-  box-shadow:0 4px 14px rgba(0,0,0,.4), 0 0 0 3px var(--bg);
-  transition:background .15s,color .15s,border-color .15s,left .18s cubic-bezier(.22,.61,.36,1)}
-.side-collapse-btn:hover{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 4px 18px rgba(55,230,200,.5), 0 0 0 3px var(--bg)}
-.side-collapse-btn svg{width:13px;height:13px;transition:transform .2s ease}
-.app.side-collapsed .side-collapse-btn{left:60px}                                    /* при свёрнутой панели (72px) */
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+  transition:background .15s,color .15s,border-color .15s,left .22s cubic-bezier(.4,0,.2,1),transform .12s}
+.side-collapse-btn{left:232px}                                                       /* при 248px панели — 16px от ребра */
+.app.side-collapsed .side-collapse-btn{left:48px}                                    /* при 64px панели — 16px от ребра */
+.side-collapse-btn:hover{background:var(--bg-2);color:var(--accent);border-color:var(--accent-line);transform:scale(1.06)}
+.side-collapse-btn svg{width:14px;height:14px;transition:transform .22s cubic-bezier(.4,0,.2,1)}
 .app.side-collapsed .side-collapse-btn svg{transform:rotate(180deg)}
-/* ТУЛТИПЫ · вылетают справа от иконок */
+/* ТУЛТИПЫ · выезжают справа от иконок */
 .app.side-collapsed .nav-i[data-tip]:hover::after,
 .app.side-collapsed .u-chip[data-tip]:hover::after,
 .app.side-collapsed .side-badge[data-tip]:hover::after,
 .app.side-collapsed .cl-brand[data-tip]:hover::after,
 .app.side-collapsed .btn-add[data-tip]:hover::after{
-  content:attr(data-tip);position:absolute;left:calc(100% + 14px);top:50%;transform:translateY(-50%);
-  background:var(--bg-1);color:var(--txt);border:1px solid var(--line-2);border-radius:8px;padding:7px 12px;
+  content:attr(data-tip);position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);
+  background:var(--bg-1);color:var(--txt);border:1px solid var(--line-2);border-radius:6px;padding:6px 10px;
   font-size:12px;font-weight:500;white-space:nowrap;pointer-events:none;z-index:1001;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);letter-spacing:.01em;
-  animation:sideTipIn .14s ease-out}
-.app.side-collapsed .btn-add[data-tip]:hover::after{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+  box-shadow:0 6px 20px rgba(0,0,0,.5);letter-spacing:.01em;
+  animation:sideTipIn .12s ease-out}
 @keyframes sideTipIn{from{opacity:0;transform:translateY(-50%) translateX(-4px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
 .app.on{display:grid}
 .side{background:var(--bg-side);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
@@ -4707,16 +4732,17 @@ function toggleSide(ev){
   const app=document.querySelector('.app.on'); if(!app) return;
   const isCollapsed=app.classList.toggle('side-collapsed');
   try{ localStorage.setItem('side_collapsed', isCollapsed?'1':'0'); }catch(_e){}
-  // На мобильных сайдбар оверлейный — сворачивание не имеет смысла
-  if(window.innerWidth<=760) app.classList.remove('side-collapsed');
+  if(window.innerWidth<=760) app.classList.remove('side-collapsed');                  // на мобильных сайдбар оверлейный
+  _showSideBtn();
 }
 function _injectSideBtn(){
-  if(document.getElementById('side-collapse-btn')) return;                             // одна на всё приложение
+  if(document.getElementById('side-collapse-btn')) return;
   const b=document.createElement('button');
   b.id='side-collapse-btn'; b.className='side-collapse-btn'; b.type='button';
   b.title='Свернуть боковую панель (Ctrl+B)';
   b.setAttribute('aria-label','Свернуть боковую панель');
   b.onclick=toggleSide;
+  b.style.display='none';                                                             // по умолчанию скрыта — покажется только при входе в кабинет
   b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>';
   document.body.appendChild(b);
 }
@@ -4743,7 +4769,7 @@ document.addEventListener('keydown', e=>{
 });
 window.addEventListener('resize', ()=>{ if(window.innerWidth<=760) document.querySelectorAll('.app.side-collapsed').forEach(a=>a.classList.remove('side-collapsed')); else applySideState(); });
 function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast('Supabase не настроен: вставь публичный ключ в SUPA_KEY (внизу файла)'); }
-function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
+function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); const _sb=document.getElementById('side-collapse-btn'); if(_sb)_sb.style.display='none'; document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
 
 /* ——— GENERAL CABINET ——— */
