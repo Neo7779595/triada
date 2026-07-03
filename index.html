@@ -1269,6 +1269,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .smm-mod-h{font-size:17px;font-weight:600;color:var(--txt);letter-spacing:-.01em;margin-bottom:20px}
 .smm-mod-drop{border:1.5px dashed var(--line-2);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:18px}
 .smm-mod-drop:hover{border-color:var(--accent-line);background:rgba(55,230,200,.02)}
+.smm-mod-drop.drag{border-color:var(--accent);background:rgba(55,230,200,.06);transform:scale(1.01)}
 .smm-mod-drop .ic{width:42px;height:42px;border-radius:10px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
 .smm-mod-drop .ic svg{width:20px;height:20px;stroke:var(--txt-3);fill:none;stroke-width:1.6}
 .smm-mod-drop .t1{font-size:13px;color:var(--txt-2);margin-bottom:5px}
@@ -4877,7 +4878,7 @@ let PROJECTS = [
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
 let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all',agCplx='all';
-let PROJECT_TAGS={category:[],service:[],tariff:[],dept:[]};
+let PROJECT_TAGS={category:[],service:[],tariff:[],dept:[],rubric:[]};
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты'};
 
 function enterAgency(){
@@ -9516,21 +9517,9 @@ function smmComputeGeneral(){
   m.content_total = (m.reels_count||0)+(N(m.posts_count)||0)+(N(m.stories_count)||0);
 }
 function smmGenNum(k,zero){ const m=_smmCur.metrics; return m[k]==null?(zero||'—'):Number(m[k]).toLocaleString('ru-RU'); }
-function smmGeneralHTML(){
-  const m=_smmCur.metrics, iv=v=>(v==null||v==='')?'':v;
-  const auto=(lab,key,zero)=>'<div class="smm-fc smm-fc-ro"><label>'+lab+'<span class="smm-fc-badge auto">авто</span></label><div class="smm-fc-val" id="gv-'+key+'">'+smmGenNum(key,zero)+'</div></div>';
-  const calc=(lab,key)=>'<div class="smm-fc smm-fc-ro"><label>'+lab+'<span class="smm-fc-badge calc">остаток</span></label><div class="smm-fc-val" id="gv-'+key+'">'+smmGenNum(key)+'</div></div>';
-  const inp=(lab,key,ph)=>'<div class="smm-fc"><label>'+lab+'</label><input type="text" inputmode="decimal" value="'+iv(m[key])+'" placeholder="'+(ph||'0')+'" oninput="smmSetGen(\''+key+'\',this.value)"></div>';
-  const grp=(title,tag,cards)=>'<div class="smm-subgrp"><div class="smm-sub-h">'+title+(tag?'<span class="smm-sub-tag">'+tag+'</span>':'')+'</div><div class="smm-fgrid">'+cards+'</div></div>';
-  return grp('Reels','авто из добавленных рилсов', auto('Кол-во','reels_count','0')+auto('Просмотры','reels_views')+auto('Охват','reels_reach'))
-    + grp('Посты','', inp('Кол-во','posts_count')+inp('Просмотры','posts_views')+inp('Охват','posts_reach'))
-    + grp('Сторис','просмотры и охват — остаток от профиля', inp('Кол-во','stories_count')+calc('Просмотры','stories_views')+calc('Охват','stories_reach'))
-    + grp('Профиль за месяц','всего из статистики Instagram', inp('Всего просмотров','total_views')+inp('Всего охват','total_reach')+auto('Всего контента','content_total','0')+inp('Креативы','ad_creatives'))
-    + grp('Аудитория','', inp('Подписчики','subscribers_current')+inp('Прирост','followers')+inp('Прирост пред.','followers_prev')+inp('Частота','frequency'));
-}
 function smmGenVals(){
   ['reels_count','reels_views','reels_reach','stories_views','stories_reach','content_total'].forEach(k=>{
-    const el=document.getElementById('gv-'+k); if(el) el.textContent=smmGenNum(k, (k==='reels_count'||k==='content_total')?'0':'—');
+    document.querySelectorAll('[data-gv="'+k+'"]').forEach(el=>{ el.textContent=smmGenNum(k, (k==='reels_count'||k==='content_total')?'0':'—'); });
   });
 }
 function smmSetGen(key,val){ _smmCur.metrics[key]=smmNumOf(val); smmMark(); smmComputeGeneral(); smmGenVals(); }
@@ -9596,16 +9585,33 @@ let _smmReelView='list', _smmModalIdx=-1;
 function smmRenderData(){
   smmComputeMetrics();
   smmComputeGeneral();
+  const es=(n,tt,note,body,id)=>'<div class="smm-es"'+(id?' id="'+id+'"':'')+'><div class="smm-es-h"><span class="n">'+n+'</span><span class="tt">'+tt+'</span><span class="sp"></span>'+(note?'<span class="smm-es-note">'+note+'</span>':'')+'</div>'+body+'</div>';
   return '<div class="smm-edit">'
     +'<div class="smm-edit-title">Ввод данных</div>'
     +'<div class="smm-edit-sub">'+(_smmCur.period?_ddH(_smmCur.period):'период не указан')+' · '+_smmCur.reels.length+' reels · '+_smmCur.rubrics.length+' рубрик</div>'
-    +'<div class="smm-es" id="smm-gen"><div class="smm-es-h"><span class="n">01</span><span class="tt">Показатели</span><span class="sp"></span><span class="smm-es-note">Reels и итоги — авто</span></div>'
-    +smmGeneralHTML()+'</div>'
-    +'<div class="smm-es"><div class="smm-es-h"><span class="n">02</span><span class="tt">Метрики</span><span class="sp"></span><span class="smm-es-note">считаются из Reels</span></div>'
-    +'<div class="smm-mgrid" id="smm-mgrid">'+smmMetricCardsHTML(SMM_METRIC_DEFS)+'</div></div>'
+    +es('01','Охват','всего — из статистики Instagram · сторис — остаток', smmReachBlockHTML())
+    +es('02','Просмотры','всего — из статистики Instagram · сторис — остаток', smmViewsBlockHTML())
     +'<div class="smm-es" id="smm-reels-ed">'+smmReelsEditHTML()+'</div>'
+    +es('04','Сторис','просмотры и охват считаются как остаток от профиля', smmStoriesBlockHTML())
+    +es('05','Аудитория и метрики','ER · LR · TR · SHR · SR считаются из Reels', smmAudienceBlockHTML()+'<div class="smm-mgrid" id="smm-mgrid" style="margin-top:14px">'+smmMetricCardsHTML(SMM_METRIC_DEFS)+'</div>')
     +'<div class="smm-es" id="smm-rub-sec">'+smmRubricsSectionHTML()+'</div>'
     +'</div>';
+}
+/* ——— хелперы карточек ввода: одна метрика может показываться в нескольких блоках (data-gv) ——— */
+function _smmAutoCard(lab,key,zero){ return '<div class="smm-fc smm-fc-ro"><label>'+lab+'<span class="smm-fc-badge auto">авто</span></label><div class="smm-fc-val" data-gv="'+key+'">'+smmGenNum(key,zero)+'</div></div>'; }
+function _smmCalcCard(lab,key){ return '<div class="smm-fc smm-fc-ro"><label>'+lab+'<span class="smm-fc-badge calc">остаток</span></label><div class="smm-fc-val" data-gv="'+key+'">'+smmGenNum(key)+'</div></div>'; }
+function _smmInpCard(lab,key,ph){ const m=_smmCur.metrics, v=(m[key]==null||m[key]==='')?'':m[key]; return '<div class="smm-fc"><label>'+lab+'</label><input type="text" inputmode="decimal" value="'+v+'" placeholder="'+(ph||'0')+'" oninput="smmSetGen(\''+key+'\',this.value)"></div>'; }
+function smmReachBlockHTML(){
+  return '<div class="smm-fgrid">'+_smmInpCard('Всего охват','total_reach')+_smmAutoCard('Reels','reels_reach')+_smmInpCard('Посты','posts_reach')+_smmCalcCard('Сторис','stories_reach')+'</div>';
+}
+function smmViewsBlockHTML(){
+  return '<div class="smm-fgrid">'+_smmInpCard('Всего просмотров','total_views')+_smmAutoCard('Reels','reels_views')+_smmInpCard('Посты','posts_views')+_smmCalcCard('Сторис','stories_views')+'</div>';
+}
+function smmStoriesBlockHTML(){
+  return '<div class="smm-fgrid">'+_smmInpCard('Кол-во сторис','stories_count')+_smmCalcCard('Просмотры','stories_views')+_smmCalcCard('Охват','stories_reach')+'</div>';
+}
+function smmAudienceBlockHTML(){
+  return '<div class="smm-fgrid">'+_smmInpCard('Подписчики','subscribers_current')+_smmInpCard('Прирост','followers')+_smmInpCard('Прирост пред.','followers_prev')+_smmInpCard('Частота','frequency')+_smmInpCard('Креативы','ad_creatives')+_smmAutoCard('Всего контента','content_total','0')+'</div>';
 }
 function smmFieldCardsHTML(fields){
   const m=_smmCur.metrics, iv=v=>v==null?'':v;
@@ -9632,10 +9638,12 @@ function smmReelsEditHTML(){
     : (_smmCur.reels.length
         ? '<div class="smm-rlist">'+smmReelsListHTML()+'</div>'
         : '<div class="smm-rempty">Reels пока нет — нажмите «Добавить Reel»</div>');
-  return '<div class="smm-es-h"><span class="n">03</span><span class="tt">Reels · макс. 20</span><span class="sp"></span>'
+  return '<div class="smm-es-h"><span class="n">03</span><span class="tt">Посты и Reels</span><span class="sp"></span>'
     +'<div class="smm-vtog"><button class="'+(view==='list'?'on':'')+'" onclick="smmSetReelView(\'list\')">список</button><button class="'+(view==='table'?'on':'')+'" onclick="smmSetReelView(\'table\')">таблица</button></div>'
     +'<button class="smm-mini-btn" onclick="smmPasteToggle()">вставить из Excel</button>'
     +'<button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmReelModalOpen(-1)">+ Добавить Reel</button></div>'
+    +'<div class="smm-fgrid" style="margin-bottom:14px">'+_smmInpCard('Кол-во постов','posts_count')+_smmAutoCard('Кол-во Reels','reels_count','0')+'</div>'
+    +smmRubDatalist()
     +'<div id="smm-paste-box" style="display:none;margin-bottom:16px"><textarea class="smm-paste" id="smm-paste-ta" placeholder="Вставьте из таблицы (Tab-разделитель, по строке на Reel):&#10;заголовок⇥просмотры⇥охват⇥лайки⇥комм⇥сохр⇥репосты⇥рубрика"></textarea>'
     +'<div style="margin-top:8px;display:flex;gap:10px;align-items:center"><button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmPasteImport()">Добавить</button><span id="smm-paste-res" style="font-size:11px;color:var(--pos);font-family:var(--mono)"></span></div></div>'
     +body;
@@ -9654,14 +9662,15 @@ function smmReelModalOpen(i){
   _smmModalIdx=i;
   const r = i>=0 ? _smmCur.reels[i] : {title:'',link:'',cover:'',rubric:'',views:null,reach:null,likes:null,comments:null,saves:null,shares:null};
   const iv=v=>v==null?'':v;
-  const rubNames=Array.from(new Set(_smmCur.rubrics.map(x=>x.name).concat(_smmCur.reels.map(x=>x.rubric).filter(Boolean))));
+  const _agRubs=(typeof PROJECT_TAGS!=='undefined'&&Array.isArray(PROJECT_TAGS.rubric))?PROJECT_TAGS.rubric:[];   // справочник рубрик агентства — общий для всех отчётов
+  const rubNames=Array.from(new Set(_smmCur.rubrics.map(x=>x.name).concat(_smmCur.reels.map(x=>x.rubric).filter(Boolean)).concat(_agRubs))).sort((a,b)=>a.localeCompare(b,'ru'));
   const _rub=r.rubric||'';
   const cselList=[{v:'',t:'— без рубрики —'}].concat(rubNames.map(n=>({v:n,t:n})));
   const cselOpts=cselList.map(o=>'<div class="smm-csel-opt'+(_rub===o.v?' on':'')+'" data-v="'+smmAttr(o.v)+'" onclick="smmCselPick(this)">'+_ddH(o.t)+'</div>').join('');
   const mf=(lab,field,ph)=>'<div class="smm-mod-f"><label class="smm-mod-l">'+lab+'</label><input type="text" inputmode="decimal" id="srm-'+field+'" value="'+iv(r[field])+'" placeholder="'+(ph||'0')+'"></div>';
   const html='<div class="smm-mov" onclick="if(event.target===this)smmReelModalClose()"><div class="smm-mod">'
     +'<div class="smm-mod-h">'+(i>=0?'Редактировать REEL':'Добавить REEL')+'</div>'
-    +'<div class="smm-mod-drop" id="srm-drop" onclick="document.getElementById(\'srm-cover-file\').click()"><img class="smm-cover-prev" id="srm-cover-prev" alt="" src="'+(r.cover?smmAttr(r.cover):'')+'" style="display:'+(r.cover?'block':'none')+'"><div class="ic" id="srm-drop-ic" style="display:'+(r.cover?'none':'flex')+'"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="t1" id="srm-cover-label">'+(r.cover?'Обложка загружена ✓':'Перетащи обложку или нажми')+'</div><div class="t2">JPG · PNG · WEBP · до 5 MB</div><input type="file" id="srm-cover-file" accept="image/*" style="display:none" onchange="smmReelCoverPick(this)"></div>'
+    +'<div class="smm-mod-drop" id="srm-drop" onclick="document.getElementById(\'srm-cover-file\').click()" ondragover="smmCoverOver(event)" ondragleave="smmCoverLeave(event)" ondrop="smmCoverDrop(event)"><img class="smm-cover-prev" id="srm-cover-prev" alt="" src="'+(r.cover?smmAttr(r.cover):'')+'" style="display:'+(r.cover?'block':'none')+'"><div class="ic" id="srm-drop-ic" style="display:'+(r.cover?'none':'flex')+'"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="t1" id="srm-cover-label">'+(r.cover?'Обложка загружена ✓':'Перетащи, вставь (Ctrl+V) или нажми')+'</div><div class="t2">JPG · PNG · WEBP — сожмётся автоматически</div><input type="file" id="srm-cover-file" accept="image/*" style="display:none" onchange="smmReelCoverPick(this)"></div>'
     +'<div class="smm-mod-f"><label class="smm-mod-l">Ссылка на Reel<span class="opt">необязательно</span></label><input type="text" id="srm-link" value="'+smmAttr(r.link)+'" placeholder="https://www.instagram.com/reel/..."></div>'
     +'<div class="smm-mod-f"><label class="smm-mod-l">Описание / заголовок</label><input type="text" id="srm-title" value="'+smmAttr(r.title)+'" placeholder="Краткое описание контента"></div>'
     +'<div class="smm-mod-f"><label class="smm-mod-l">Рубрика<span class="opt">необязательно</span></label><div class="smm-mod-rub"><div class="smm-csel" id="srm-csel"><input type="hidden" id="srm-rubric" value="'+smmAttr(_rub)+'"><button type="button" class="smm-csel-btn" onclick="smmCselToggle(event)"><span class="smm-csel-lbl" id="srm-csel-lbl">'+(_rub?_ddH(_rub):'— без рубрики —')+'</span><svg class="smm-csel-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button><div class="smm-csel-pop" id="srm-csel-pop">'+cselOpts+'</div></div><button class="smm-mod-newbtn" onclick="smmReelRubNew()">+ Новая</button></div></div>'
@@ -9671,38 +9680,71 @@ function smmReelModalOpen(i){
     +'<div class="smm-mod-foot"><button class="smm-mod-cancel" onclick="smmReelModalClose()">Отмена</button><button class="smm-mod-add" onclick="smmReelModalSave()">'+(i>=0?'Сохранить':'Добавить')+'</button></div>'
     +'</div></div>';
   const host=document.createElement('div'); host.id='smm-modal-host'; host.innerHTML=html; document.body.appendChild(host);
+  document.addEventListener('paste', smmCoverPaste);                                  // Ctrl+V скриншота = обложка
 }
-function smmReelModalClose(){ const h=document.getElementById('smm-modal-host'); if(h) h.remove(); }
+function smmReelModalClose(){ const h=document.getElementById('smm-modal-host'); if(h) h.remove(); document.removeEventListener('paste', smmCoverPaste); }
 function smmCselToggle(e){ if(e){ e.preventDefault(); e.stopPropagation(); } const c=document.getElementById('srm-csel'); if(!c) return;
   const open=c.classList.toggle('open');
   if(open){ const close=ev=>{ if(!c.contains(ev.target)){ c.classList.remove('open'); document.removeEventListener('mousedown',close); } }; setTimeout(()=>document.addEventListener('mousedown',close),0); }
 }
 function smmCselSet(v){ const inp=document.getElementById('srm-rubric'); if(inp) inp.value=v; const lbl=document.getElementById('srm-csel-lbl'); if(lbl) lbl.textContent=v||'— без рубрики —'; const pop=document.getElementById('srm-csel-pop'); if(pop) pop.querySelectorAll('.smm-csel-opt').forEach(o=>o.classList.toggle('on',(o.getAttribute('data-v')||'')===v)); }
 function smmCselPick(el){ smmCselSet(el.getAttribute('data-v')||''); const c=document.getElementById('srm-csel'); if(c) c.classList.remove('open'); }
-async function smmReelCoverPick(input){
-  const file=input.files&&input.files[0]; if(!file) return;
+async function smmCompressImage(file, maxSide, quality){                              // сжатие обложки: быстрее аплоад, легче payload
+  maxSide=maxSide||480; quality=quality||0.82;
+  const img=await new Promise((res,rej)=>{ const u=URL.createObjectURL(file); const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=u; });
+  const k=Math.min(1, maxSide/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+  const w=Math.max(1,Math.round((img.naturalWidth||1)*k)), h=Math.max(1,Math.round((img.naturalHeight||1)*k));
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  cv.getContext('2d').drawImage(img,0,0,w,h);
+  let blob=await new Promise(res=>cv.toBlob(res,'image/webp',quality));
+  if(!blob) blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',quality));         // Safari без webp-энкодера
+  return blob||file;
+}
+async function smmReelCoverFile(file){
+  if(!file) return;
   if(!file.type.startsWith('image/')){ toast('Только изображения (JPG, PNG, WEBP)'); return; }
-  if(file.size>5*1024*1024){ toast('Файл больше 5 MB'); return; }
+  if(file.size>15*1024*1024){ toast('Файл больше 15 MB'); return; }
+  const input=document.getElementById('srm-cover-file'); if(!input) return;
   const label=document.getElementById('srm-cover-label');
   const prev=document.getElementById('srm-cover-prev');
   const ic=document.getElementById('srm-drop-ic');
   try{ const local=URL.createObjectURL(file); if(prev){ prev.src=local; prev.style.display='block'; } if(ic) ic.style.display='none'; }catch(_e){}
-  if(label) label.textContent='Загрузка обложки…';
-  if(!window.SB || !SB.storage){ const rd=new FileReader(); rd.onload=e=>{ input._cover=e.target.result; if(label) label.textContent='Обложка готова ✓'; }; rd.readAsDataURL(file); return; }
+  if(label) label.textContent='Обработка обложки…';
+  let small=file; try{ small=await smmCompressImage(file); }catch(_e){}
+  if(!window.SB || !SB.storage){                                                      // офлайн-фолбэк: компактный dataURL в payload
+    const rd=new FileReader(); rd.onload=e=>{ input._cover=e.target.result; if(label) label.textContent='Обложка готова ✓'; }; rd.readAsDataURL(small); return; }
   try{
-    const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+    const ext=(small.type==='image/webp')?'webp':(small.type==='image/jpeg')?'jpg':((file.name||'c.jpg').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
     const path='reel-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.'+ext;
-    const {error}=await SB.storage.from('reel-covers').upload(path,file,{upsert:false,contentType:file.type||undefined});
+    const {error}=await SB.storage.from('reel-covers').upload(path,small,{upsert:false,contentType:small.type||undefined});
     if(error)throw error;
     const {data}=SB.storage.from('reel-covers').getPublicUrl(path);
     input._cover=data.publicUrl;
     if(prev){ prev.src=data.publicUrl; prev.style.display='block'; }
     if(label) label.textContent='Обложка загружена ✓';
-  }catch(e){ console.error('cover upload',e); toast('Не удалось загрузить обложку'); if(label) label.textContent='Ошибка загрузки — попробуйте ещё раз'; }
+  }catch(e){ console.error('cover upload',e);
+    try{ const rd=new FileReader(); rd.onload=ev=>{ input._cover=ev.target.result; if(label) label.textContent='Обложка готова ✓ (локально)'; }; rd.readAsDataURL(small); }   // стораджа нет/нет прав — не теряем обложку
+    catch(_e2){ toast('Не удалось загрузить обложку'); if(label) label.textContent='Ошибка загрузки — попробуйте ещё раз'; } }
+}
+async function smmReelCoverPick(input){ const file=input.files&&input.files[0]; input.value=''; await smmReelCoverFile(file); }
+function smmCoverDrop(e){ e.preventDefault(); e.stopPropagation(); const d=document.getElementById('srm-drop'); if(d)d.classList.remove('drag');
+  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) smmReelCoverFile(f); }
+function smmCoverOver(e){ e.preventDefault(); const d=document.getElementById('srm-drop'); if(d)d.classList.add('drag'); }
+function smmCoverLeave(e){ const d=document.getElementById('srm-drop'); if(d&&!d.contains(e.relatedTarget))d.classList.remove('drag'); }
+function smmCoverPaste(e){                                                            // Ctrl+V скриншота обложки прямо в модалку
+  const items=(e.clipboardData&&e.clipboardData.items)||[];
+  for(const it of items){ if(it.type&&it.type.startsWith('image/')){ const f=it.getAsFile(); if(f){ e.preventDefault(); smmReelCoverFile(f); return; } } }
+}
+function smmRubricPersist(name){                                                      // тихое сохранение рубрики в справочник агентства
+  try{ if(!(window.LIVE&&window.SB&&window.tMe))return; const me=window.tMe(); if(!me||!me.agency_id)return;
+    if(typeof PROJECT_TAGS!=='undefined'&&PROJECT_TAGS.rubric&&!PROJECT_TAGS.rubric.includes(name)) PROJECT_TAGS.rubric.push(name);
+    Promise.resolve(SB.from('project_tags').insert({agency_id:me.agency_id,kind:'rubric',name})).catch(()=>{});
+  }catch(_e){}
 }
 function smmReelRubNew(){
   const name=prompt('Название новой рубрики'); if(!name||!name.trim()) return;
   const nm=name.trim();
+  smmRubricPersist(nm);                                                               // рубрика доступна во всех будущих отчётах
   const pop=document.getElementById('srm-csel-pop'); if(!pop) return;
   let exists=false; pop.querySelectorAll('.smm-csel-opt').forEach(o=>{ if((o.getAttribute('data-v')||'')===nm) exists=true; });
   if(!exists){ const d=document.createElement('div'); d.className='smm-csel-opt'; d.setAttribute('data-v',nm); d.setAttribute('onclick','smmCselPick(this)'); d.textContent=nm; pop.appendChild(d); }
@@ -9726,10 +9768,15 @@ function smmReelRow(r,i){
   const cell=f=>'<input type="text" inputmode="decimal" value="'+iv(r[f])+'" oninput="smmReelEdit('+i+',\''+f+'\',this.value)">';
   return '<tr>'
     +'<td><input class="title-in" value="'+smmAttr(r.title)+'" placeholder="Reel #'+(i+1)+'" oninput="smmReelEdit('+i+',\'title\',this.value)"></td>'
-    +'<td><input class="rub-in" value="'+smmAttr(r.rubric)+'" placeholder="—" onchange="smmReelEdit('+i+',\'rubric\',this.value)"></td>'
+    +'<td><input class="rub-in" list="smm-rub-dl" value="'+smmAttr(r.rubric)+'" placeholder="—" onchange="smmReelEdit('+i+',\'rubric\',this.value)"></td>'
     +'<td>'+cell('views')+'</td><td>'+cell('reach')+'</td><td>'+cell('likes')+'</td><td>'+cell('comments')+'</td><td>'+cell('saves')+'</td><td>'+cell('shares')+'</td>'
     +'<td class="er-cell" id="smm-er-'+i+'">'+(r.er||0).toFixed(2)+'%</td>'
     +'<td><button class="del" onclick="smmReelDel('+i+')" title="Удалить">×</button></td></tr>';
+}
+function smmRubDatalist(){                                                            // подсказки рубрик для табличного режима
+  const ag=(typeof PROJECT_TAGS!=='undefined'&&Array.isArray(PROJECT_TAGS.rubric))?PROJECT_TAGS.rubric:[];
+  const names=Array.from(new Set((_smmCur?_smmCur.rubrics.map(x=>x.name).concat(_smmCur.reels.map(x=>x.rubric).filter(Boolean)):[]).concat(ag)));
+  return '<datalist id="smm-rub-dl">'+names.map(n=>'<option value="'+smmAttr(n)+'">').join('')+'</datalist>';
 }
 
 function smmRubricsSectionHTML(){
@@ -13733,9 +13780,9 @@ window.tLoadTags = async () => {
   if (!SB) return;
   const { data, error } = await SB.from('project_tags').select('kind,name').order('name');
   if (error) return;   // таблицы ещё нет — молча выходим
-  const t={category:[],service:[],tariff:[],dept:[]};
+  const t={category:[],service:[],tariff:[],dept:[],rubric:[]};
   (data||[]).forEach(r=>{ if(t[r.kind]) t[r.kind].push(r.name); });
-  if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; PROJECT_TAGS.tariff=t.tariff; PROJECT_TAGS.dept=t.dept; }
+  if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; PROJECT_TAGS.tariff=t.tariff; PROJECT_TAGS.dept=t.dept; PROJECT_TAGS.rubric=t.rubric; }
 };
 window.tTagAdd = async (kind,name) => { try { name=(name||'').trim(); if(!name)return;
   const { error } = await SB.from('project_tags').insert({ agency_id: ME&&ME.agency_id, kind, name });
