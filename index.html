@@ -5774,56 +5774,106 @@ function _gaugeSVG(score,color,dim){ const sc=Math.min(Math.max(score,0),100),r=
   if(dim) return `<svg viewBox="0 0 80 50" width="78" height="48"><path d="${bg}" fill="none" stroke="var(--bg-3)" stroke-width="6" stroke-linecap="round"/><text x="40" y="35" text-anchor="middle" fill="var(--txt-3)" font-size="14" font-family="ui-monospace,monospace">?</text></svg>`;
   return `<svg viewBox="0 0 80 50" width="78" height="48"><path d="${bg}" fill="none" stroke="var(--bg-3)" stroke-width="6" stroke-linecap="round"/><path d="${bg}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${Ln.toFixed(1)}" stroke-dashoffset="${(Ln*(1-sc/100)).toFixed(1)}"/><line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--txt)" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="2.6" fill="var(--txt)"/></svg>`; }
 function _pipeBar(pp){ const seg=(n,cls)=> n>0?`<i class="${cls}" style="flex:${n}"></i>`:''; return `<div class="pt-pipe-bar">${pp.total>0?(seg(pp.done,'sg-done')+seg(pp.active,'sg-active')+seg(pp.wait,'sg-wait')):'<i class="sg-wait" style="flex:1"></i>'}</div>`; }
-function _seedRand(seed){ let s=seed>>>0||1; return ()=>{ s^=s<<13;s>>>=0;s^=s>>17;s^=s<<5;s>>>=0; return s/4294967296; }; }
-function _strSeed(str){ let h=2166136261>>>0; const s=String(str||''); for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
-function _smoothPath(pts){ // кубическая сглаженная кривая через точки [{x,y}]
-  if(pts.length<2) return '';
-  let d='M'+pts[0].x+','+pts[0].y.toFixed(1);
-  for(let i=0;i<pts.length-1;i++){ const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
-    const c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6, c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
-    d+=' C'+c1x.toFixed(1)+','+c1y.toFixed(1)+' '+c2x.toFixed(1)+','+c2y.toFixed(1)+' '+p2.x+','+p2.y.toFixed(1); }
-  return d;
-}
-const _hSpark=(col,area,seed,trend)=>{
-  // Уникальная кривая для каждого проекта: форма из seed, наклон из trend (0..1 — «здоровье»)
-  const rnd=_seedRand(_strSeed(seed)||7), N=12, W=220, top=8, bot=46;
-  trend=(trend==null?0.5:Math.min(1,Math.max(0,trend)));
-  const pts=[]; let val=0.35+rnd()*0.25;
-  for(let i=0;i<N;i++){
-    const drift=(trend-0.5)*0.9*(i/(N-1));                                            // общий тренд вверх/вниз
-    const noise=(rnd()-0.5)*0.42;                                                     // «дыхание» линии
-    val=Math.min(1,Math.max(0.06, val*0.55 + (0.4+drift)*0.45 + noise*0.5));
-    const x=Math.round(i/(N-1)*W), y=bot-(bot-top)*val;
-    pts.push({x,y});
-  }
-  const line=_smoothPath(pts);
-  const last=pts[pts.length-1];
-  const areaD=line+` L${W},${bot+8} L0,${bot+8} Z`;
-  const gid='sg'+(_strSeed(seed)%99999);
-  return `<svg class="pjh-svg" viewBox="0 0 220 52" preserveAspectRatio="none" aria-hidden="true">`
-    +`<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>`
-    +`<line class="pjh-grid" x1="0" y1="17" x2="220" y2="17"/><line class="pjh-grid" x1="0" y1="35" x2="220" y2="35"/>`
-    +`<path d="${areaD}" fill="url(#${gid})"/>`
-    +`<path class="pjh-spark" pathLength="100" d="${line}" fill="none" style="stroke:${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
-    +`<circle class="pjh-spark-dot" cx="${last.x}" cy="${last.y.toFixed(1)}" r="3" style="fill:${col}"/></svg>`;
+/* Срок жизни → шкала «где проект в жизненном цикле»: три зоны + маркер «сейчас» + индикатор активности.
+   days — сколько живёт текущий цикл; act 0..1 — свежесть активности (1=работа кипит, 0=застой) */
+const _hLifeBar=(days,act,frozen)=>{
+  const W=220, y=30;
+  // зоны по длительности: 0-30 дн «разгон» · 30-90 «в работе» · 90+ «долгий цикл»
+  const pos=Math.max(4,Math.min(W-4, days<=90 ? days/90*(W*0.78) : (W*0.78)+Math.min(1,(days-90)/90)*(W*0.22)));
+  const z1=Math.round(W*0.26), z2=Math.round(W*0.78);                                 // границы зон на шкале
+  const actCol=frozen?'var(--txt-3)':(act>=0.6?'var(--pos)':act>=0.3?'var(--warn)':'var(--neg)');
+  const actTxt=frozen?'остановлен':(act>=0.6?'активен':act>=0.3?'замедлился':'застой');
+  return `<svg class="pjh-svg" viewBox="0 0 220 46" aria-hidden="true">`
+    // фоновая дорожка с тремя зонами
+    +`<rect x="0" y="${y-3}" width="${z1}" height="6" rx="3" fill="var(--pos)" opacity="0.16"/>`
+    +`<rect x="${z1+2}" y="${y-3}" width="${z2-z1-4}" height="6" rx="3" fill="var(--accent)" opacity="0.16"/>`
+    +`<rect x="${z2+2}" y="${y-3}" width="${W-z2-2}" height="6" rx="3" fill="var(--warn)" opacity="0.18"/>`
+    // засечки-разделители зон
+    +`<line x1="${z1}" y1="${y-6}" x2="${z1}" y2="${y+6}" stroke="var(--line-2)" stroke-width="1"/>`
+    +`<line x1="${z2}" y1="${y-6}" x2="${z2}" y2="${y+6}" stroke="var(--line-2)" stroke-width="1"/>`
+    // пройденный путь до маркера
+    +`<rect x="0" y="${y-3}" width="${pos}" height="6" rx="3" fill="${actCol}" opacity="0.9"/>`
+    // маркер «сейчас» с индикатором активности
+    +`<circle cx="${pos}" cy="${y}" r="6" fill="var(--bg-1)" stroke="${actCol}" stroke-width="2.5"/>`
+    +`<circle cx="${pos}" cy="${y}" r="2.5" fill="${actCol}"/>`
+    // подписи зон
+    +`<text x="0" y="10" class="pjh-axis" text-anchor="start">разгон</text>`
+    +`<text x="${z1+(z2-z1)/2}" y="10" class="pjh-axis" text-anchor="middle">в работе</text>`
+    +`<text x="${W}" y="10" class="pjh-axis" text-anchor="end">долгий</text>`
+    // статус активности снизу у маркера
+    +`<text x="${Math.max(20,Math.min(W-20,pos))}" y="44" class="pjh-axis" text-anchor="middle" style="fill:${actCol};font-weight:600">${actTxt}</text>`
+    +`</svg>`;
 };
 const _hRing=(pct,col,empty)=>{const r=23,c=2*Math.PI*r,off=c*(1-Math.min(100,Math.max(0,parseFloat(pct)||0))/100);return empty?`<svg class="pjh-svg" viewBox="0 0 220 58" aria-hidden="true"><circle cx="110" cy="29" r="26" fill="none" style="stroke:var(--line)" stroke-width="1" stroke-dasharray="2 5"/><circle cx="110" cy="29" r="${r}" fill="none" style="stroke:var(--bg-3)" stroke-width="6"/><text x="110" y="34" text-anchor="middle" style="font-family:var(--mono);fill:var(--txt-3)" font-size="15" font-weight="600">—</text></svg>`:`<svg class="pjh-svg" viewBox="0 0 220 58" aria-hidden="true"><circle cx="110" cy="29" r="${r}" fill="none" style="stroke:var(--bg-3)" stroke-width="6"/><circle cx="110" cy="29" r="${r}" fill="none" style="stroke:${col}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 110 29)"/></svg>`;};
-const _hBars=(pct,col,seed)=>{
-  // Высоты уникальны для проекта (seed), закрашено ровно pct% столбцов слева направо
-  const N=11, rnd=_seedRand(_strSeed(seed)||13);
-  const act=Math.round(Math.min(100,Math.max(0,pct))/100*N);
-  let s='';
-  for(let i=0;i<N;i++){
-    const base=0.25+rnd()*0.7;                                                        // индивидуальный рельеф
-    const wave=0.12*Math.sin(i*0.9+(_strSeed(seed)%6));                               // лёгкая волна поверх
-    const hv=Math.min(1,Math.max(0.12,base+wave));
-    const h=Math.round(hv*40)+2, y=50-h, cc=i<act?col:'var(--txt-3)';
-    s+=`<rect class="pjh-barr" style="animation-delay:${(i*0.045).toFixed(2)}s;fill:${cc}" x="${i*20}" y="${y}" width="12" height="${h}" rx="3"/>`;
-  }
-  return `<svg class="pjh-svg" viewBox="0 0 220 52" aria-hidden="true"><line class="pjh-grid" x1="0" y1="50" x2="220" y2="50"/>${s}</svg>`;
+/* Темп → состав работы наглядно: сделано / в работе / в очереди, с явной пометкой просрочки.
+   d,a,w — done/active/wait; over — просрочено */
+const _hPace=(d,a,w,over)=>{
+  const W=220, y=22, h=12, total=Math.max(1,d+a+w);
+  const wd=d/total*W, wa=a/total*W, ww=w/total*W;
+  let x=0; const seg=(width,fill,op)=>{ if(width<=0)return''; const s=`<rect x="${x.toFixed(1)}" y="${y}" width="${width.toFixed(1)}" height="${h}" fill="${fill}" opacity="${op}"/>`; x+=width; return s; };
+  const bars=seg(wd,'var(--pos)',0.95)+seg(wa,'var(--accent)',0.9)+seg(ww,'var(--txt-3)',0.5);
+  // легенда с числами
+  const dot=(c,op)=>`<circle cx="0" cy="0" r="3.5" fill="${c}" opacity="${op}"/>`;
+  const leg=(lx,c,op,val,lab)=>`<g transform="translate(${lx},44)">${dot(c,op)}<text x="8" y="4" class="pjh-axis" style="fill:var(--txt-2)">${lab} ${val}</text></g>`;
+  const w3=W/3;
+  return `<svg class="pjh-svg" viewBox="0 0 220 52" aria-hidden="true">`
+    +`<rect x="0" y="${y}" width="${W}" height="${h}" rx="3" fill="var(--bg-3)"/>`
+    +`<clipPath id="pcp${d}${a}${w}"><rect x="0" y="${y}" width="${W}" height="${h}" rx="3"/></clipPath>`
+    +`<g clip-path="url(#pcp${d}${a}${w})">${bars}</g>`
+    +(over>0?`<text x="${W}" y="${y-4}" text-anchor="end" class="pjh-axis" style="fill:var(--neg);font-weight:700">⚠ ${over} просроч.</text>`:`<text x="${W}" y="${y-4}" text-anchor="end" class="pjh-axis" style="fill:var(--pos)">без просрочек</text>`)
+    +leg(0,'var(--pos)',0.95,d,'готово')
+    +leg(w3,'var(--accent)',0.9,a,'в работе')
+    +leg(w3*2,'var(--txt-3)',0.5,w,'очередь')
+    +`</svg>`;
 };
-const _hDeadline=(dueDays,col,empty)=>{const W=220,cy=16;if(empty)return `<svg class="pjh-svg" viewBox="0 0 220 40" aria-hidden="true"><line x1="6" y1="${cy}" x2="214" y2="${cy}" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 6"/><text x="110" y="35" text-anchor="middle" class="pjh-axis">срок не задан</text></svg>`;const flag=Math.round(W*0.66),over=dueDays<0;const now=over?Math.min(W-6,flag+Math.round(Math.min(30,-dueDays)/30*(W-flag-6))):Math.max(6,Math.round(flag*(1-Math.min(1,dueDays/30))));const preEnd=Math.min(now,flag);const overSeg=over?`<line x1="${flag}" y1="${cy}" x2="${now}" y2="${cy}" style="stroke:${col}" stroke-width="8" stroke-linecap="round"/>`:'';const preCol=over?'var(--txt-3)':col;return `<svg class="pjh-svg" viewBox="0 0 220 40" aria-hidden="true"><line x1="6" y1="${cy}" x2="214" y2="${cy}" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round"/><line x1="6" y1="${cy}" x2="${preEnd}" y2="${cy}" style="stroke:${preCol}" stroke-width="8" stroke-linecap="round"/>${overSeg}<line x1="${flag}" y1="${cy-9}" x2="${flag}" y2="${cy+9}" style="stroke:var(--txt-2)" stroke-width="2"/><path d="M${flag},${cy-9} l7,3 l-7,3 z" style="fill:var(--txt-2)"/><circle cx="${now}" cy="${cy}" r="5" style="fill:${col}"/><circle cx="${now}" cy="${cy}" r="5" fill="none" style="stroke:var(--bg-1)" stroke-width="2"/><text x="${flag}" y="35" text-anchor="middle" class="pjh-axis">дедлайн</text></svg>`;};
-const _hGauge=(pct,col,dim)=>{const f=Math.min(100,Math.max(0,pct));return dim?`<svg class="pjh-svg" viewBox="0 0 200 64" aria-hidden="true"><path d="M18,60 A94,94 0 0 1 182,60" fill="none" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round"/><text x="100" y="46" text-anchor="middle" style="font-family:var(--mono);fill:var(--txt-3)" font-size="15">?</text></svg>`:`<svg class="pjh-svg" viewBox="0 0 200 64" aria-hidden="true"><path d="M18,60 A94,94 0 0 1 182,60" fill="none" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round"/><path pathLength="100" style="stroke:${col};stroke-dasharray:${f.toFixed(0)} 100" d="M18,60 A94,94 0 0 1 182,60" fill="none" stroke-width="8" stroke-linecap="round"/></svg>`;};
+const _hDeadline=(dueDays,col,empty)=>{
+  const W=220,cy=24;
+  if(empty)return `<svg class="pjh-svg" viewBox="0 0 220 46" aria-hidden="true"><line x1="6" y1="${cy}" x2="214" y2="${cy}" style="stroke:var(--bg-3)" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 6"/><text x="110" y="40" text-anchor="middle" class="pjh-axis">срок не задан</text></svg>`;
+  const flag=Math.round(W*0.72),over=dueDays<0;
+  // позиция «сейчас»: слева направо приближается к флажку по мере уменьшения дней (шкала до 30 дн)
+  const now=over?Math.min(W-8,flag+Math.round(Math.min(30,-dueDays)/30*(W-flag-8))):Math.max(8,Math.round(flag*(1-Math.min(1,dueDays/30))));
+  const preEnd=Math.min(now,flag);
+  const overSeg=over?`<line x1="${flag}" y1="${cy}" x2="${now}" y2="${cy}" style="stroke:var(--neg)" stroke-width="8" stroke-linecap="round"/>`:'';
+  const preCol=over?'var(--txt-3)':col;
+  return `<svg class="pjh-svg" viewBox="0 0 220 46" aria-hidden="true">`
+    // дорожка «зелёная зона до дедлайна · красная после»
+    +`<line x1="6" y1="${cy}" x2="${flag}" y2="${cy}" style="stroke:var(--pos)" stroke-width="8" stroke-linecap="round" opacity="0.15"/>`
+    +`<line x1="${flag}" y1="${cy}" x2="214" y2="${cy}" style="stroke:var(--neg)" stroke-width="8" stroke-linecap="round" opacity="0.15"/>`
+    // пройденный путь
+    +`<line x1="6" y1="${cy}" x2="${preEnd}" y2="${cy}" style="stroke:${preCol}" stroke-width="8" stroke-linecap="round"/>${overSeg}`
+    // флажок дедлайна
+    +`<line x1="${flag}" y1="${cy-11}" x2="${flag}" y2="${cy+9}" style="stroke:var(--txt)" stroke-width="2"/>`
+    +`<path d="M${flag},${cy-11} l8,3.5 l-8,3.5 z" style="fill:${over?'var(--neg)':'var(--warn)'}"/>`
+    // маркер «сейчас»
+    +`<circle cx="${now}" cy="${cy}" r="5.5" style="fill:${col}"/><circle cx="${now}" cy="${cy}" r="5.5" fill="none" style="stroke:var(--bg-1)" stroke-width="2"/>`
+    // подписи концов и флажка
+    +`<text x="6" y="12" class="pjh-axis" text-anchor="start">старт</text>`
+    +`<text x="${flag}" y="12" text-anchor="middle" class="pjh-axis" style="fill:${over?'var(--neg)':'var(--warn)'};font-weight:600">дедлайн</text>`
+    +`<text x="${Math.max(24,Math.min(W-24,now))}" y="43" text-anchor="middle" class="pjh-axis" style="fill:${col};font-weight:600">${over?'просрочен':(dueDays===0?'сегодня':'осталось '+dueDays+'д')}</text>`
+    +`</svg>`;
+};
+const _hGauge=(pct,col,dim)=>{
+  const f=Math.min(100,Math.max(0,pct));
+  const W=200, cx=100, cy=58, r=46;
+  // угол стрелки: 180° (лево=0%) → 0° (право=100%)
+  const ang=Math.PI*(1-f/100), nx=cx+r*Math.cos(ang), ny=cy-r*Math.sin(ang);
+  const arc=(a0,a1)=>{ const x0=cx+r*Math.cos(a0),y0=cy-r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy-r*Math.sin(a1); return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
+  if(dim) return `<svg class="pjh-svg" viewBox="0 0 200 68" aria-hidden="true"><path d="${arc(Math.PI,0)}" fill="none" stroke="var(--bg-3)" stroke-width="8" stroke-linecap="round"/><text x="100" y="46" text-anchor="middle" style="font-family:var(--mono);fill:var(--txt-3)" font-size="13">нет замеров</text></svg>`;
+  // три зоны: низкая 0-34 (зелёная) · средняя 34-66 (жёлтая) · высокая 66-100 (красная)
+  const aL=Math.PI, aM1=Math.PI*(1-0.34), aM2=Math.PI*(1-0.66), aR=0;
+  return `<svg class="pjh-svg" viewBox="0 0 200 68" aria-hidden="true">`
+    +`<path d="${arc(aL,aM1)}" fill="none" stroke="var(--pos)" stroke-width="8" stroke-linecap="round" opacity="0.85"/>`
+    +`<path d="${arc(aM1,aM2)}" fill="none" stroke="var(--warn)" stroke-width="8" opacity="0.85"/>`
+    +`<path d="${arc(aM2,aR)}" fill="none" stroke="var(--neg)" stroke-width="8" stroke-linecap="round" opacity="0.85"/>`
+    // стрелка на текущее значение
+    +`<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--txt)" stroke-width="2.5" stroke-linecap="round"/>`
+    +`<circle cx="${cx}" cy="${cy}" r="4" fill="var(--txt)"/>`
+    // подписи зон
+    +`<text x="8" y="66" class="pjh-axis" text-anchor="start" style="fill:var(--pos)">низк.</text>`
+    +`<text x="100" y="14" class="pjh-axis" text-anchor="middle" style="fill:var(--warn)">сред.</text>`
+    +`<text x="192" y="66" class="pjh-axis" text-anchor="end" style="fill:var(--neg)">выс.</text>`
+    +`</svg>`;
+};
 function _pjhFit(){ requestAnimationFrame(function(){ var els=document.querySelectorAll('.pjh-name-t'); for(var i=0;i<els.length;i++){ var el=els[i]; var fs=15; el.style.fontSize=fs+'px'; var g=0; while(el.scrollWidth>el.clientWidth+0.5 && fs>11 && g<20){ fs-=0.5; el.style.fontSize=fs+'px'; g++; } } }); }
 window.addEventListener('resize',function(){ clearTimeout(window._pjhFitT); window._pjhFitT=setTimeout(_pjhFit,150); });
 const _projCard=(p)=>{
@@ -5911,7 +5961,7 @@ const _projCard=(p)=>{
             <div class="pjh-top"><span class="pjh-lbl">Срок жизни</span>${life.frozen?'<span class="pjh-tg">завершён</span>':''}</div>
             <div class="pjh-val">${_ptBig(_lifeDur(life.cur/30.44))}</div>
             <div class="pjh-cs"><span class="pjh-d" style="background:${_lifeCol}"></span>${life.frozen?'активность остановлена':(life.prev>0?('ранее: '+life.prev+' дн'):'с запуска')}</div>
-            <div class="pjh-chart">${_hSpark(_lifeCol,_lifeArea,p.id||p.name,life.frozen?0.3:(1-Math.min(1,(p._lastActDays||0)/21))*0.6+Math.min(1,(p.pct||0)/100)*0.4)}</div>
+            <div class="pjh-chart">${_hLifeBar(life.cur,life.frozen?0:(1-Math.min(1,(p._lastActDays||0)/21)),life.frozen)}</div>
           </div>
           <div class="pjh-card">
             <div class="pjh-top"><span class="pjh-lbl">Дедлайн</span></div>
@@ -5923,7 +5973,7 @@ const _projCard=(p)=>{
             <div class="pjh-top"><span class="pjh-lbl">Темп</span></div>
             <div class="pjh-val pjh-val-sm" style="color:${paceC}">${paceMain}</div>
             <div class="pjh-cs"><span class="pjh-d" style="background:${paceC}"></span>${paceSub}</div>
-            <div class="pjh-chart">${_hBars(_paceW,paceC,(p.id||p.name)+'pace')}</div>
+            <div class="pjh-chart">${_hPace(pp.done,pp.active,pp.wait,p._overdueN||0)}</div>
           </div>
           <div class="pjh-card">
             <div class="pjh-top"><span class="pjh-lbl">Сложность</span>${cx.hasData?`<span class="pjh-tg">n=${cx.n} цикл.</span>`:''}</div>
