@@ -5080,6 +5080,9 @@ function agIsPM(){
   return !!me.is_pm;                                   // сотрудник — только с отметкой PM
 }
 function agMyId(){ const me=(window.tMe&&window.tMe())||null; return me?me.id:null; }
+function _tgBy(){ const me=(window.tMe&&window.tMe())||null;
+  if(!me || me.role!=='member') return 'Генеральный профиль · '+((me&&me.agencyName)||'Агентство');
+  let s=me.full_name||'Коллега'; if(me.is_pm) s+=' · Проект-менеджер'; return s; }
 function _syncUchip(){
   const me=(window.tMe&&window.tMe())||null; if(!me) return;
   const nm=document.getElementById('ag-uchip-nm');
@@ -14187,7 +14190,7 @@ window.tTaskAdd = async (projectId,row) => {
     if(data){ const _real=Object.assign({},data,{_mvTs:Date.now()}); if(_i>=0)_p._tasks[_i]=_real; else if(!_p._tasks.some(x=>x.id===data.id))_p._tasks.push(_real); }
     else if(_i>=0)_p._tasks.splice(_i,1);
     window._localTaskWriteTs=Date.now(); _pkRerender(); }
-  if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{title:row.title, due:row.due_date, due_time:row.due_time, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
+  if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{by:_tgBy(), title:row.title, due:row.due_date, due_time:row.due_time, project_name:(_tgCurProj()&&_tgCurProj().name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
   toast('Задача создана');
   if(!(_p&&_p._tasks)) await _pwReload(projectId);                                   // локального списка не было — полная загрузка
   } catch(e){
@@ -14230,7 +14233,7 @@ window.tTaskUpdate = async (id,patch) => { if(String(id).indexOf('tmp_')===0){ t
     if(typeof pd2Close==='function')pd2Close(); _pkRerender(); }
   const {error}=await SB.from('project_tasks').update(patch).eq('id',id);
   if(error){ if(_tu&&_bak){ Object.assign(_tu,_bak); _pkRerender(); } throw error; }                          // откат при ошибке
-  if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, due_time:(patch.due_time!==undefined?patch.due_time:(_tu&&_tu.due_time)), project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
+  if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{by:_tgBy(), title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, due_time:(patch.due_time!==undefined?patch.due_time:(_tu&&_tu.due_time)), project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
   if(_tu){ _tu._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); toast('Задача обновлена'); }
   else { if(typeof pd2Close==='function')pd2Close(); toast('Задача обновлена'); await _pwReload(curProjId()); }
   } catch(e){ toast('Ошибка: '+(e.message||e)); } };
