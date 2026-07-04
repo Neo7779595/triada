@@ -3314,6 +3314,9 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .cy-task{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--txt-2)}
 .cy-tk-dot{flex:none;width:6px;height:6px;border-radius:50%;background:var(--txt-3);opacity:.6}
 .cy-tk-dot.done{background:var(--pos);opacity:1}
+.cy-tk-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cy-tk-tm{flex:none;font-family:var(--mono);font-size:12px;color:var(--txt-3)}
+.cy-hd-tm{font-family:var(--mono);color:var(--accent);font-weight:600}
 .tpl-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--bg-1);color:var(--txt-2);cursor:pointer;font-family:var(--font);font-size:14px;font-weight:600;white-space:nowrap;transition:.15s}
 .tpl-btn svg{width:15px;height:15px;flex:none}
 .tpl-btn:hover{border-color:var(--accent-line);color:var(--txt)}
@@ -5627,9 +5630,10 @@ function openCyclesModal(pid){
   const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===pid); if(!p) return;
   const cy=(p._cycles||[]);
   const ov=document.getElementById('ov-cycles'); if(!ov) return;
+  const grandSec=cy.reduce((a,c)=>a+(((c.snapshot&&c.snapshot.tasks)||[]).reduce((s,t)=>s+(Number(t.time_spent)||0),0)),0);
   const body = cy.length ? cy.map((c,i)=>cycleCardHTML(c,i)).join('') : '<div class="cy-empty">Пока нет завершённых циклов. Они появятся здесь после продления контракта.</div>';
   ov.innerHTML=`<div class="modal cy-modal">
-    <div class="modal-h"><h3>Прошлые периоды · ${_ddH(p.name)}</h3><p>Архив завершённых циклов работ — этапы и задачи каждого периода.</p></div>
+    <div class="modal-h"><h3>Прошлые периоды · ${_ddH(p.name)}</h3><p>Архив завершённых контрактов${grandSec?' \u00b7 всего отработано <b style="color:var(--txt-2)">'+pkFmtDur(grandSec)+'</b>':' — этапы и задачи каждого периода'}</p></div>
     <div class="modal-b"><div class="cy-list">${body}</div></div>
     <div class="modal-f"><button class="btn-ghost" onclick="cyClose()">Закрыть</button></div>
   </div>`;
@@ -5639,18 +5643,19 @@ function cyClose(){ const ov=document.getElementById('ov-cycles'); if(ov) ov.cla
 function cyToggle(i){ const el=document.getElementById('cy-body-'+i), hd=document.getElementById('cy-hd-'+i); if(!el)return; const open=el.style.display!=='none'; el.style.display=open?'none':'block'; if(hd) hd.classList.toggle('open',!open); }
 function cycleCardHTML(c,i){
   const snap=c.snapshot||{}; const stages=snap.stages||[]; const tasks=snap.tasks||[];
+  const cycSec=tasks.reduce((a,t)=>a+(Number(t.time_spent)||0),0);
   const fmt=d=>d?String(d).split('-').reverse().join('.'):'—';
   const period=(c.period_start||c.period_end)?(fmt(c.period_start)+' — '+fmt(c.period_end)):'период не указан';
   const stDone=stages.filter(s=>s.status==='done').length;
   const names=new Set(stages.map(s=>s.name));
   const byStage={}; tasks.forEach(t=>{ const k=names.has(t.stage)?t.stage:'__orphan'; (byStage[k]=byStage[k]||[]).push(t); });
-  const taskRow=t=>`<div class="cy-task"><span class="cy-tk-dot ${t.status==='done'?'done':''}"></span>${_ddH(t.title||'Задача')}</div>`;
+  const taskRow=t=>`<div class="cy-task"><span class="cy-tk-dot ${t.status==='done'?'done':''}"></span><span class="cy-tk-nm">${_ddH(t.title||'Задача')}</span>${t.time_spent?'<span class="cy-tk-tm">'+pkFmtDur(t.time_spent)+'</span>':''}</div>`;
   const stageBlock=(name,status,list)=>`<div class="cy-stage"><div class="cy-st-h"><span class="cy-st-dot ${status==='done'?'done':''}"></span><b>${_ddH(name)}</b>${list.length?`<span class="cy-st-ct">${list.length}</span>`:''}</div>${list.length?`<div class="cy-tasks">${list.map(taskRow).join('')}</div>`:''}</div>`;
   let inner=stages.map(s=>stageBlock(s.name,s.status,byStage[s.name]||[])).join('');
   if(byStage.__orphan&&byStage.__orphan.length) inner+=stageBlock('Без этапа','',byStage.__orphan);
   if(!inner) inner='<div class="cy-empty" style="padding:10px 0">Цикл без этапов и задач.</div>';
   return `<div class="cy-card">
-    <button type="button" class="cy-hd" id="cy-hd-${i}" onclick="cyToggle(${i})"><span class="cy-hd-l"><b>Цикл ${c.cycle_no}</b><small>${period}</small></span><span class="cy-hd-r">${stDone}/${stages.length} эт. · ${tasks.length} зад.<svg class="cy-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></span></button>
+    <button type="button" class="cy-hd" id="cy-hd-${i}" onclick="cyToggle(${i})"><span class="cy-hd-l"><b>Цикл ${c.cycle_no}</b><small>${period}</small></span><span class="cy-hd-r">${stDone}/${stages.length} эт. · ${tasks.length} зад.${cycSec?' \u00b7 <b class="cy-hd-tm">'+pkFmtDur(cycSec)+'</b>':''}<svg class="cy-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></span></button>
     <div class="cy-body" id="cy-body-${i}" style="display:none">${inner}</div>
   </div>`;
 }
