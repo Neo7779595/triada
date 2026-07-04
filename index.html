@@ -3492,6 +3492,8 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .cmdk-it .s{font-size:12.5px;color:var(--txt-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
 .cmdk-parent{display:inline-flex;align-items:center;gap:3px;color:var(--txt-2);flex:none}
 .cmdk-parent svg{opacity:.6}
+.cmdk-people{display:inline-flex;align-items:center;gap:5px;flex:none;color:var(--txt-2);padding-left:9px;margin-left:4px;border-left:1px solid var(--line-2)}
+.cmdk-people svg{opacity:.55;flex:none}
 .cmdk-kind{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:5px;flex:none;background:var(--bg-3);color:var(--txt-3)}
 .cmdk-kind.k-task{background:rgba(138,143,255,.16);color:#8a8fff}
 .cmdk-kind.k-stage{background:rgba(55,230,200,.14);color:var(--accent)}
@@ -11171,7 +11173,18 @@ function cmdkIndex(cab){
   } else if(cab==='ag'){
     const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
     // Проекты
-    if(agCanView('projects')) PJ.forEach((p,i)=>add({g:'Проекты',ic:CMDK_IC.project,t:p.name,s:(p.cat&&p.cat!=='—'?p.cat+' · ':'')+(p.svc||'')+(p.pct!=null?' · '+p.pct+'%':''),badge:p.logo,logoUrl:p.logoUrl,kind:'project',prio:5,run:()=>{agNav('projects');openProject(i);}}));
+    if(agCanView('projects')) PJ.forEach((p,i)=>{
+      // ответственный и команда — в подзаголовок проекта
+      let _lead=p._lead; if(!_lead && p.lead_id){ const _x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===p.lead_id); if(_x)_lead={name:_x.name}; }
+      const _team=(p._team||[]);
+      const teamStr = _lead ? ('ПМ: '+_lead.name+(_team.length?' · +'+_team.length:'')) : (_team.length?_team.length+' в команде':'');
+      add({g:'Проекты',ic:CMDK_IC.project,t:p.name,s:(p.cat&&p.cat!=='—'?p.cat+' · ':'')+(p.svc||'')+(p.pct!=null?' · '+p.pct+'%':''),people:teamStr,peopleList:(_lead?[_lead.name]:[]).concat(_team.map(m=>m.name)),badge:p.logo,logoUrl:p.logoUrl,kind:'project',prio:5,run:()=>{agNav('projects');openProject(i);}});
+      // ответственный проекта как отдельный результат
+      if(_lead && _lead.name){ const _m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x.name===_lead.name);
+        add({g:'Ответственные',ic:CMDK_IC.person,t:_lead.name,s:'Ответственный · '+p.name,sub:'ПМ',parent:p.name,avatar:(_m&&_m.avatar)||_lead.avatar,color:(_m&&_m.color)||_lead.color,badge:(_lead.name[0]||'?'),kind:'person',prio:3,run:()=>{agNav('projects');openProject(i);}}); }
+      // участники команды проекта
+      _team.forEach(mm=>add({g:'Команда проекта',ic:CMDK_IC.person,t:mm.name,s:'В команде · '+p.name,sub:'команда',parent:p.name,avatar:mm.avatar,color:mm.color,badge:(mm.name[0]||'?'),kind:'person',prio:2,run:()=>{agNav('projects');openProject(i);}}));
+    });
     // Этапы и задачи (из загруженных проектов + дедлайнов)
     PJ.forEach(p=>{
       (p._stages||[]).forEach(st=>add({g:'Этапы',ic:CMDK_IC.stage,t:st.name||'Этап',s:p.name,sub:'этап',parent:p.name,kind:'stage',prio:3,run:()=>{ if(typeof dlGoto==='function')dlGoto(p.id,'stage',st.id); else _openProjTab(p.id,'stages'); }}));
@@ -11221,12 +11234,14 @@ function cmdkFilter(){
   }
   const scored=cmdkList.map(it=>{
     const t=(it.t||'').toLowerCase(), s=(it.s||'').toLowerCase(), g=(it.g||'').toLowerCase();
+    const ppl=(it.peopleList||[]).join(' ').toLowerCase();
     let sc=-1;
     if(t===q) sc=1000;
     else if(t.startsWith(q)) sc=600;
     else if(t.includes(' '+q)||t.includes('·'+q)) sc=420;
     else if(t.includes(q)) sc=300;
     else if(s.includes(q)) sc=140;
+    else if(ppl.includes(q)) sc=110;                                                   // нашли проект по имени участника/ПМ
     else if(g.includes(q)) sc=60;
     else { // fuzzy: все буквы запроса по порядку
       let qi=0; for(let i=0;i<t.length&&qi<q.length;i++) if(t[i]===q[qi])qi++;
@@ -11264,9 +11279,10 @@ function cmdkRender(){
         : `<div class="bd">${it.avatar?logoFill(it.avatar,(it.badge||'?')):(it.logoUrl?logoFill(it.logoUrl,(it.badge||'?')):_esc(it.badge||'?'))}</div>`;
       const parent = it.parent ? `<span class="cmdk-parent"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${_esc(it.parent)}</span>` : '';
       const sub = it.sub ? `<span class="cmdk-kind k-${it.kind||'x'}">${_esc(it.sub)}</span>` : '';
+      const people = it.people ? `<span class="cmdk-people"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5"/><path d="M16 5.5a3 3 0 0 1 0 5.8M17.5 19c0-2-.8-3.4-2-4.3"/></svg>${_esc(it.people)}</span>` : '';
       html+=`<div class="cmdk-it ${i===cmdkActive?'on':''}" onclick="cmdkRun(${i})" onmousemove="cmdkSetActive(${i})">
         ${badge}
-        <div style="flex:1;min-width:0"><div class="t">${_cmdkHl(it.t,q)}${sub}</div><div class="s">${parent}${_cmdkHl(it.s||'',q)}</div></div>
+        <div style="flex:1;min-width:0"><div class="t">${_cmdkHl(it.t,q)}${sub}</div><div class="s">${parent}${_cmdkHl(it.s||'',q)}${people}</div></div>
         <div class="go"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
       </div>`;
     });
