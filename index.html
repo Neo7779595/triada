@@ -1714,6 +1714,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
 .pd-tab .cnt{font-family:var(--mono);font-size:10px;background:var(--accent-dim);color:var(--accent);padding:1px 7px;border-radius:20px}
 .pd-tabact{margin-left:auto;display:flex;align-items:center;gap:9px;padding-left:18px}
+#ov-proj:fullscreen{width:100vw;height:100vh;background:var(--bg)}
+#ov-proj:-webkit-full-screen{width:100vw;height:100vh;background:var(--bg)}
+.pd-fs-btn.on{color:var(--accent);border-color:var(--accent-line);background:var(--accent-dim)}
 /* ==== CONTENT PLAN ==== */
 .cp{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--bg-1)}
 .cp-bar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap;flex:0 0 auto;background:linear-gradient(180deg,var(--bg-1),var(--bg))}
@@ -6092,7 +6095,21 @@ function buildDetail(p){
   return {stages,kanban:{wait,work,done},reports,smm,history,total:p.pct>0?'4м':'—',done:doneN,work:p.status==='done'?0:1,wait:Math.max(totN-doneN-(p.status==='done'?0:1),0)};
 }
 let pdIdx=0,pdTabCur='stages';
+function pdFullscreen(){
+  var el=document.getElementById('ov-proj'); if(!el) return;
+  var fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!fsEl){ var rq=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen; if(rq){ try{ var r=rq.call(el); if(r&&r.catch)r.catch(function(){}); }catch(_){} } else if(typeof toast==='function'){ toast('Полный экран не поддерживается браузером'); } }
+  else { var ex=document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen; if(ex){ try{ ex.call(document); }catch(_){} } }
+}
+function pdFsSync(){
+  var on=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  var ov=document.getElementById('ov-proj'); if(ov) ov.classList.toggle('pd-fs',on);
+  var b=document.getElementById('pd-fs-btn'); if(b) b.classList.toggle('on',on);
+  var ic=document.getElementById('pd-fs-ic'); if(ic) ic.innerHTML=on?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+}
+if(!window._pdFsBound){ window._pdFsBound=1; document.addEventListener('fullscreenchange',pdFsSync); document.addEventListener('webkitfullscreenchange',pdFsSync); }
 function pdTabbar(p){
+  const _fsOn=!!(document.fullscreenElement||document.webkitFullscreenElement);
   const reps=(p&&p._reports)?p._reports.length:0;
   const smmN=(p&&p._reports)?p._reports.filter(r=>r.kind==='SMM').length:0;
   const tabs=PD_TABS.map(([k,l,ic])=>{
@@ -6100,6 +6117,7 @@ function pdTabbar(p){
     return `<div class="pd-tab ${k===pdTabCur?'on':''}" onclick="pdTab('${k}')">${l}${cnt?`<span class="cnt">${cnt}</span>`:''}</div>`;
   }).join('');
   return tabs+`<div class="pd-tabact">
+    <button class="pd-chip pd-chip-btn pd-fs-btn${_fsOn?' on':''}" id="pd-fs-btn" onclick="pdFullscreen()" title="Полный экран · Esc чтобы выйти"><svg id="pd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${_fsOn?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>'}</svg>${_fsOn?'Свернуть':'Экран'}</button>
     <div class="pd-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b id="pk-total" class="pk-total-live">${pkFmtDur(pkProjTotal())}</b> всего</div>
     <div class="pd-chip pd-chip-btn${pdTabCur==='brief'?' on':''}" onclick="pdTab('brief')" title="Бриф проекта"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Бриф</div>
     <div class="pd-chip pd-chip-btn ct-chip" onclick="contactsOpen()" title="Контакты клиента"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Контакты${ctBadge(p)}</div>
