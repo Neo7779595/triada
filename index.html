@@ -6265,6 +6265,8 @@ function tgOpenModal(){
         ${ev('stage_done','Завершение этапа','закрытие этапа + прогресс проекта')}
         ${ev('project_done','Завершение проекта','когда все этапы готовы')}
         ${ev('report_published','Новый отчёт','при публикации Facebook Ads / SMM')}
+        ${ev('brief_ready','Бриф готов','когда бриф отправлен клиенту')}
+        ${ev('content_ready','Контент-план готов','когда лист плана отправлен клиенту')}
       </div>
       <div class="tg-foot">
         <button class="tg-test" onclick="tgTest()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>Отправить тестовое сообщение</button>
@@ -6286,7 +6288,8 @@ function _tgDeepLink(){
     const u=new URL(location.href); const pid=u.searchParams.get('p'); if(!pid) return;
     if(typeof PROJECTS==='undefined'||!PROJECTS||!PROJECTS.length) return;
     const idx=PROJECTS.findIndex(x=>String(x.id)===String(pid));
-    if(idx>=0) openProject(idx);
+    const _tab=u.searchParams.get('t');
+    if(idx>=0){ openProject(idx); if(_tab && typeof pdTab==='function' && ['stages','kanban','deadlines','content','smm','history','brief','reports'].indexOf(_tab)>=0){ try{ pdTab(_tab); }catch(_e){} } }
     history.replaceState(null,'',location.pathname);
   }catch(e){ console.warn('[deeplink]',e); }
 }
@@ -7643,6 +7646,7 @@ async function cpSendSheet(){
     const res=await window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:sh.id,name:sh.name,data:snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'});
     if(res&&res.error)throw res.error;
     p._cpShared=p._cpShared||{}; p._cpShared[sh.id]={at:new Date().toISOString(),hash:cpHash(JSON.stringify(snap))};
+    if(window.tgNotify) tgNotify(p.id,'content_ready',{title:sh.name, link:location.origin+'/?p='+p.id+'&t=content'});
     toast('Лист «'+sh.name+'» отправлен клиенту'); cpRerender();
   }catch(e){ console.error('cp send',e); toast('Не удалось отправить'); }
 }
@@ -7827,7 +7831,7 @@ function briefAddNew(pid){ var d=briefDoc(pid); var L=briefList(pid); var b=brie
 function briefSwitch(pid,bid){ var d=briefDoc(pid); if(!briefById(pid,bid))return; if(d.cur===bid)return; d.cur=bid; if(window._BRIEF_ACT)window._BRIEF_ACT[pid]=null; briefRerenderEditor(pid); }
 function briefRename(pid,bid){ var b=briefById(pid,bid); if(!b)return; var nm=prompt('Название брифа:', b.name||''); if(nm==null)return; nm=nm.trim(); if(nm)b.name=nm; briefSaveStructure(pid); briefRerenderEditor(pid); }
 function briefDelBrief(pid,bid){ var d=briefDoc(pid); var L=briefList(pid); if(L.length<=1){ if(typeof toast==='function')toast('Нельзя удалить единственный бриф'); return; } var b=briefById(pid,bid); if(!b)return; if(!confirm('Удалить бриф «'+(b.name||'')+'»? Ответы клиента по нему тоже удалятся.'))return; d.briefs=L.filter(function(x){return x.id!==bid;}); if(d.cur===bid)d.cur=d.briefs[0].id; if(window._BRIEF_ACT)window._BRIEF_ACT[pid]=null; briefSaveStructure(pid); briefSaveAnswers(pid); briefRerenderEditor(pid); if(typeof toast==='function')toast('Бриф удалён'); }
-function briefToggleVisible(pid,bid){ var b=briefById(pid,bid); if(!b)return; b.visible=!b.visible; briefSaveStructure(pid); briefRerenderEditor(pid); if(typeof toast==='function')toast(b.visible?'Бриф отправлен клиенту — виден моментально':'Бриф скрыт от клиента'); }
+function briefToggleVisible(pid,bid){ var b=briefById(pid,bid); if(!b)return; b.visible=!b.visible; briefSaveStructure(pid); briefRerenderEditor(pid); if(b.visible&&window.tgNotify) tgNotify(pid,'brief_ready',{title:(b.title||''), link:location.origin+'/?p='+pid+'&t=brief'}); if(typeof toast==='function')toast(b.visible?'Бриф отправлен клиенту — виден моментально':'Бриф скрыт от клиента'); }
 
 /* ================= АГЕНТСТВО: конструктор ================= */
 function briefBuilderHTML(p){
@@ -14375,7 +14379,7 @@ window.tReportAdd = async (projectId,row) => {
   if(_had){ const _i=_p._reports.indexOf(_tmp);                                       // подмена временного отчёта реальной строкой
     if(data){ if(_i>=0)_p._reports[_i]=data; else if(!_p._reports.some(x=>x.id===data.id))_p._reports.unshift(data); } else if(_i>=0)_p._reports.splice(_i,1);
     _pkRerender(); }
-  tgNotify(projectId,'report_published',{title: (row&&row.title) || (row&&row.kind==='SMM'?'SMM отчёт':'Facebook Ads отчёт')});
+  tgNotify(projectId,'report_published',{title: (row&&row.title) || (row&&row.kind==='SMM'?'SMM отчёт':'Facebook Ads отчёт'), link:location.origin+'/?p='+projectId+'&t='+((row&&row.kind==='SMM')?'smm':'reports')});
   toast('Отчёт опубликован'); if(!_had){ await _pwReload(projectId); if(typeof renderPd==='function') renderPd(); } } catch(e){
     if(_had){ const _i=_p._reports.indexOf(_tmp); if(_i>=0)_p._reports.splice(_i,1); _pkRerender(); }           // откат
     toast('Ошибка: '+(e.message||e)); } };
