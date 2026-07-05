@@ -91,6 +91,20 @@ button{font-family:inherit}
 .topbar2 .pg b{color:var(--txt);font-weight:600;letter-spacing:0;text-transform:none;font-size:14px;display:block;margin-top:1px}
 .tb-search{display:flex;align-items:center;gap:9px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:9px;padding:7px 11px;cursor:pointer;color:var(--txt-3);font-family:var(--font);font-size:14px;font-weight:500;transition:.16s var(--ease)}
 .qt-hint{font-size:13px;color:var(--txt-3);padding:9px 12px;background:var(--bg-2);border:1px dashed var(--line-2);border-radius:9px}
+.qt-diff{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.qt-diff-b{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 8px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);font-size:13px;font-weight:500;cursor:pointer;transition:.14s}
+.qt-diff-b:hover{border-color:var(--dc);color:var(--txt)}
+.qt-diff-b.on{border-color:var(--dc);background:color-mix(in srgb,var(--dc) 10%,var(--bg-2));color:var(--dc);font-weight:600;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--dc) 30%,transparent)}
+.qt-diff-dot{width:8px;height:8px;border-radius:50%;flex:none;opacity:.85}
+.qt-eisen{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.qt-eisen-b{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg-2);cursor:pointer;transition:.14s;text-align:left}
+.qt-eisen-b:hover{border-color:var(--ec)}
+.qt-eisen-b.on{border-color:var(--ec);background:color-mix(in srgb,var(--ec) 9%,var(--bg-2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ec) 28%,transparent)}
+.qt-eisen-e{font-size:15px;flex:none;line-height:1}
+.qt-eisen-tx{display:flex;flex-direction:column;min-width:0}
+.qt-eisen-tx b{font-size:12.5px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qt-eisen-b.on .qt-eisen-tx b{color:var(--ec)}
+.qt-eisen-tx small{font-size:11px;color:var(--txt-3);margin-top:1px}
 .tb-icon{display:flex;align-items:center;justify-content:center;width:34px;height:34px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:9px;cursor:pointer;color:var(--txt-3);transition:.16s var(--ease)}
 .tb-icon:hover{color:var(--accent);border-color:var(--accent-line);background:var(--accent-dim)}
 .tb-search:hover{color:var(--txt);border-color:var(--accent-line)}
@@ -6447,6 +6461,31 @@ function pdStageDel(id){ if(!agIsPM()){ toast('Управление проект
 function pdSeedStages(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const names=stageSetFor(PROJECTS[pdIdx].svc); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
 let pdNewSt='wait';
 /* ═══════ Быстрое добавление задачи из шапки ═══════ */
+const QT_DIFF=[['easy','Лёгкая','var(--pos)'],['medium','Средняя','var(--warn)'],['hard','Сложная','var(--neg)']];
+const QT_EISEN=[
+  ['urgent_important','Важно · Срочно','🔴','var(--neg)','Сделать первым'],
+  ['important','Важно · Несрочно','🟢','var(--pos)','Запланировать'],
+  ['urgent','Неважно · Срочно','🟡','var(--warn)','Делегировать'],
+  ['neither','Неважно · Несрочно','⚪️','var(--txt-3)','Отложить']
+];
+function _diffSegHTML(id,cur){
+  return `<div class="qt-diff" id="${id}"><input type="hidden" id="${id}-v" value="${cur||''}">`
+    +QT_DIFF.map(([k,l,c])=>`<button type="button" class="qt-diff-b${cur===k?' on':''}" data-k="${k}" style="--dc:${c}" onclick="_qtDiffPick('${id}','${k}')"><span class="qt-diff-dot" style="background:${c}"></span>${l}</button>`).join('')
+    +`</div>`;
+}
+function _qtDiffPick(id,k){
+  const h=document.getElementById(id+'-v'); if(!h)return; const cur=h.value===k?'':k; h.value=cur;   // повторный клик снимает выбор
+  const box=document.getElementById(id); if(box)box.querySelectorAll('.qt-diff-b').forEach(b=>b.classList.toggle('on',cur&&b.dataset.k===k));
+}
+function _eisenHTML(id,cur){
+  return `<div class="qt-eisen" id="${id}"><input type="hidden" id="${id}-v" value="${cur||''}">`
+    +QT_EISEN.map(([k,l,e,c,act])=>`<button type="button" class="qt-eisen-b${cur===k?' on':''}" data-k="${k}" style="--ec:${c}" onclick="_qtEisenPick('${id}','${k}')"><span class="qt-eisen-e">${e}</span><span class="qt-eisen-tx"><b>${l}</b><small>${act}</small></span></button>`).join('')
+    +`</div>`;
+}
+function _qtEisenPick(id,k){
+  const h=document.getElementById(id+'-v'); if(!h)return; const cur=h.value===k?'':k; h.value=cur;   // повторный клик снимает
+  const box=document.getElementById(id); if(box)box.querySelectorAll('.qt-eisen-b').forEach(b=>b.classList.toggle('on',cur&&b.dataset.k===k));
+}
 async function quickTaskOpen(){
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
@@ -6457,6 +6496,8 @@ async function quickTaskOpen(){
       <div class="fld"><label>Проект <span style="color:var(--neg)">*</span></label>${selField('qt-proj', projArr, '')}</div>
       <div class="fld"><label>Этап <span style="color:var(--neg)">*</span></label><div id="qt-stage-wrap"><div class="qt-hint">Сначала выберите проект</div></div></div>
       <div class="fld"><label>Что сделать <span style="color:var(--neg)">*</span></label><input id="qt-ttl" placeholder="напр. Смонтировать ролик"></div>
+      <div class="fld"><label>Сложность</label>${_diffSegHTML('qt-diff','')}</div>
+      <div class="fld"><label>Приоритет · матрица Эйзенхауэра</label>${_eisenHTML('qt-prio','')}</div>
       <div class="fld"><label>Исполнитель</label><div id="qt-asg-wrap"><div class="qt-hint">Сначала выберите проект</div></div></div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('qt-tdate','')}${timeField('qt-ttime','')}</div></div>
       <div class="fld"><label>Подзадачи</label><div class="subwrap"><div id="qt-sub" class="sublist"></div><div class="subadd"><input id="qt-subnew" placeholder="Новая подзадача…" onkeydown="qtSubKey(event)"><button type="button" class="subaddbtn" onclick="qtSubAdd()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div></div>
@@ -6495,7 +6536,10 @@ function quickTaskCreate(){
   const stage_id=_v('qt-stg'); if(!stage_id){ toast('Выберите этап'); return; }
   const T=p._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
   const subtasks=(window._qtSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
-  if(window.tTaskAdd) window.tTaskAdd(p.id,{title,stage_id,assignee_id:_v('qt-asg')||null,due_date:_v('qt-tdate')||null,due_time:_v('qt-ttime')||null,status:'wait',idx,subtasks});
+  const _diff=_v('qt-diff-v')||null, _prio=_v('qt-prio-v')||null;
+  const row={title,stage_id,assignee_id:_v('qt-asg')||null,due_date:_v('qt-tdate')||null,due_time:_v('qt-ttime')||null,status:'wait',idx,subtasks};
+  if(_diff)row.difficulty=_diff; if(_prio)row.priority=_prio;
+  if(window.tTaskAdd) window.tTaskAdd(p.id,row);
   pd2Close();
   // если открыт этот же проект — обновим доску
   if(typeof pdIdx!=='undefined' && PROJECTS[pdIdx] && PROJECTS[pdIdx].id===p.id && typeof renderPd==='function' && document.getElementById('ov-proj').classList.contains('on')) renderPd();
@@ -6530,6 +6574,8 @@ async function pdNewTask(st){
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
       <div class="fld"><label>Этап <span style="color:var(--neg)">*</span></label>${selField('pd2-stg', stArr, _defSt)}</div>
+      <div class="fld"><label>Сложность</label>${_diffSegHTML('pd2-diff','')}</div>
+      <div class="fld"><label>Приоритет · матрица Эйзенхауэра</label>${_eisenHTML('pd2-prio','')}</div>
       <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate','')}${timeField('pd2-ttime','')}</div></div>
       ${_subFldHtml()}
@@ -6541,7 +6587,10 @@ function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи з
   const stage_id=_v('pd2-stg'); if(!stage_id){toast('Выбери этап');return;}
   const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
   const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
-  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx,subtasks}); }
+  const _diff=_v('pd2-diff-v')||null, _prio=_v('pd2-prio-v')||null;
+  const row={title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx,subtasks};
+  if(_diff)row.difficulty=_diff; if(_prio)row.priority=_prio;
+  if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,row); }
 function pdTaskDel(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ toast('Проект завершён — редактирование запрещено'); return; } if(window.tTaskDel) window.tTaskDel(id); }
 async function pdTaskEdit(id){
   const p=PROJECTS[pdIdx];
@@ -6557,6 +6606,8 @@ async function pdTaskEdit(id){
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" value="${_attr(t.title)}" placeholder="напр. Смонтировать ролик"></div>
       <div class="fld"><label>Этап</label>${selField('pd2-stg', stArr, t.stage_id||'')}</div>
+      <div class="fld"><label>Сложность</label>${_diffSegHTML('pd2-diff', t.difficulty||'')}</div>
+      <div class="fld"><label>Приоритет · матрица Эйзенхауэра</label>${_eisenHTML('pd2-prio', t.priority||'')}</div>
       <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate', t.due_date||'')}${timeField('pd2-ttime', t.due_time||'')}</div></div>
       ${_subFldHtml()}
@@ -6566,7 +6617,9 @@ async function pdTaskEdit(id){
 }
 function pdSaveTask(id){ const title=_v('pd2-ttl'); if(!title){toast('Введи название');return;}
   const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
-  if(window.tTaskUpdate) window.tTaskUpdate(id,{title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,subtasks}); }
+  const patch={title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,subtasks};
+  patch.difficulty=_v('pd2-diff-v')||null; patch.priority=_v('pd2-prio-v')||null;
+  if(window.tTaskUpdate) window.tTaskUpdate(id,patch); }
 function _subUid(){ return 's'+Math.random().toString(36).slice(2,9); }
 function _subFldHtml(){ return `<div class="fld"><label>Подзадачи</label><div class="subwrap"><div id="pd2-sub" class="sublist"></div><div class="subadd"><input id="pd2-subnew" placeholder="Новая подзадача…" onkeydown="pdSubKey(event)"><button type="button" class="subaddbtn" onclick="pdSubAdd()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div></div>`; }
 function pdSubRender(){ const box=document.getElementById('pd2-sub'); if(!box) return; const arr=window._pdSub||[]; const done=arr.filter(s=>s.done).length, tot=arr.length, pct=tot?Math.round(done/tot*100):0;
@@ -14596,10 +14649,10 @@ window.tTaskAdd = async (projectId,row) => {
   if(typeof pd2Close==='function')pd2Close();
   try {
   let {data,error}=await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
-  if(error && /review_/.test(error.message||'')){                                    // колонок review_* ещё нет (миграция 08 не применена)
-    const {review_started,review_spent,...row2}=row||{};
+  if(error && /review_|difficulty|priority/.test(error.message||'')){                 // каких-то новых колонок ещё нет — шлём без них, значения остаются локально
+    const {review_started,review_spent,difficulty,priority,...row2}=row||{};
     const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}).select('*').single(); error=r2.error; data=r2.data;
-    if(!error) toast('Задача создана. Таймер утверждения отключён — примените SQL-миграцию 08');
+    if(!error && data){ if(difficulty!=null)data.difficulty=difficulty; if(priority!=null)data.priority=priority; }
   }
   if(error)throw error;
   if(_p&&_p._tasks){ const _i=_p._tasks.indexOf(_tmp);                               // подменяем временную карточку реальной строкой из БД
@@ -14647,7 +14700,11 @@ window.tTaskUpdate = async (id,patch) => { if(String(id).indexOf('tmp_')===0){ t
   const _bak=_tu?Object.assign({},_tu):null;
   if(_tu){ Object.assign(_tu,patch); _tu._mvTs=Date.now(); window._localTaskWriteTs=Date.now();               // правки видны мгновенно
     if(typeof pd2Close==='function')pd2Close(); _pkRerender(); }
-  const {error}=await SB.from('project_tasks').update(patch).eq('id',id);
+  let {error}=await SB.from('project_tasks').update(patch).eq('id',id);
+  if(error && /difficulty|priority/.test(error.message||'')){                          // новых колонок нет — повторяем без них, локальные значения уже применены
+    const {difficulty,priority,...p2}=patch||{};
+    const r2=await SB.from('project_tasks').update(p2).eq('id',id); error=r2.error;
+  }
   if(error){ if(_tu&&_bak){ Object.assign(_tu,_bak); _pkRerender(); } throw error; }                          // откат при ошибке
   if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{by:_tgBy(), title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, due_time:(patch.due_time!==undefined?patch.due_time:(_tu&&_tu.due_time)), project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
   if(_tu){ _tu._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); toast('Задача обновлена'); }
