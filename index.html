@@ -5400,6 +5400,19 @@ function svcEditorHTML(showCost){
     +'.svc-tot{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:var(--txt-3)}'
     +'.svc-tot b{font-family:var(--mono);font-size:15px}'
     +'.svc-tot .inc b{color:var(--accent)}.svc-tot .cst b{color:var(--txt)}.svc-tot .mrg b{color:var(--violet)}'
+    +'.svc-sel{position:relative}'
+    +'.svc-sel-btn{width:100%;display:flex;align-items:center;gap:8px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit;font-size:14px;cursor:pointer;transition:.14s;text-align:left}'
+    +'.svc-sel-btn:hover{border-color:var(--txt-3)}'
+    +'.svc-sel-btn .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    +'.svc-sel.empty .svc-sel-btn .lbl{color:var(--txt-3)}'
+    +'.svc-sel-btn .chev{width:15px;height:15px;flex:none;color:var(--txt-3);transition:transform .2s}'
+    +'.svc-sel.open .svc-sel-btn{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}'
+    +'.svc-sel.open .svc-sel-btn .chev{transform:rotate(180deg)}'
+    +'.svc-sel-pop{position:absolute;top:calc(100% + 5px);left:0;right:0;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px;box-shadow:0 16px 40px -14px rgba(0,0,0,.7);padding:5px;z-index:60;display:none;max-height:240px;overflow-y:auto}'
+    +'.svc-sel.open .svc-sel-pop{display:block}'
+    +'.svc-sel-opt{padding:8px 10px;border-radius:7px;font-size:14px;color:var(--txt-2);cursor:pointer;transition:.12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    +'.svc-sel-opt:hover{background:var(--bg-3);color:var(--txt)}'
+    +'.svc-sel-opt.on{color:var(--accent);background:var(--accent-dim)}'
     +'</style>'
     +'<datalist id="svc-dl">'+svcs.map(s=>'<option value="'+_attr(s)+'">').join('')+'</datalist>'
     +'<datalist id="svc-tf-dl">'+tfList.map(t=>'<option value="'+_attr(t)+'">').join('')+'</datalist>'
@@ -5410,13 +5423,20 @@ function svcEditorHTML(showCost){
 }
 function svcRender(){ const box=document.getElementById('svc-list'); if(!box)return; const a=window.NP_SVCS||[];
   const so=(window._svcOpts&&window._svcOpts.svcs)||['SMM'], to=(window._svcOpts&&window._svcOpts.tfList)||[];
-  const opt=(arr,cur)=>['<option value="">— выбрать —</option>'].concat(arr.map(x=>'<option value="'+_attr(x)+'"'+(String(cur||'')===String(x)?' selected':'')+'>'+_attr(x)+'</option>')).join('');
   box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
-    +'<select class="svc-i" onchange="svcSet('+i+',\'service\',this.value)">'+opt(so,s.service)+'</select>'
-    +'<select class="svc-i" onchange="svcSet('+i+',\'tariff\',this.value)">'+opt(to,s.tariff)+'</select>'
+    +svcSelHTML(i,'service',so,s.service,'— услуга —')
+    +svcSelHTML(i,'tariff',to,s.tariff,'— выбрать —')
     +'<div class="svc-i svc-num svc-ro" title="Доход из тарифа">'+(s.mrr?_svcMoney(s.mrr):'0')+'</div>'
     +'<button type="button" class="svc-del" title="Убрать услугу" onclick="svcDel('+i+')"'+(a.length<=1?' style="opacity:.4"':'')+'>✕</button>'
     +'</div>').join(''); svcRenderTot(); }
+function svcSelHTML(i,field,opts,cur,ph){
+  ph=ph||'— выбрать —';
+  const rows=['<div class="svc-sel-opt'+(cur?'':' on')+'" onclick="svcSelPick('+i+',\''+field+'\',\'\')">'+ph+'</div>']
+    .concat((opts||[]).map(o=>'<div class="svc-sel-opt'+(String(cur||'')===String(o)?' on':'')+'" onclick="svcSelPick('+i+',\''+field+'\',\''+_ddEsc(o)+'\')">'+_attr(o)+'</div>')).join('');
+  return '<div class="svc-sel'+(cur?'':' empty')+'"><button type="button" class="svc-sel-btn" onclick="svcSelToggle(event,this)"><span class="lbl">'+_attr(cur||ph)+'</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="svc-sel-pop">'+rows+'</div></div>';
+}
+function svcSelToggle(e,btn){ if(e){ e.preventDefault(); e.stopPropagation(); } const c=btn.parentNode; document.querySelectorAll('.svc-sel.open').forEach(x=>{ if(x!==c) x.classList.remove('open'); }); const open=c.classList.toggle('open'); if(open){ const close=ev=>{ if(!c.contains(ev.target)){ c.classList.remove('open'); document.removeEventListener('mousedown',close); } }; setTimeout(()=>document.addEventListener('mousedown',close),0); } }
+function svcSelPick(i,f,v){ svcSet(i,f,v); }
 function svcAdd(){ (window.NP_SVCS=window.NP_SVCS||[]).push({service:'',tariff:'',mrr:0,cost:0,status:'active'}); svcRender(); }
 function svcDel(i){ const a=window.NP_SVCS||[]; if(a.length<=1){ a[0]={service:'',tariff:'',mrr:0,cost:0,status:'active'}; } else { a.splice(i,1); } svcRender(); }
 function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(v); a[i].mrr=(pr!=null?pr:0); svcRender(); return; } if(f==='service' && i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function'){ npStagesReload(); } }
