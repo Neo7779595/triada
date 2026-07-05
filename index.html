@@ -1070,7 +1070,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .tc-ct{background:var(--bg-3);border-radius:20px;padding:1px 9px;font-size:12.5px;color:var(--txt-2);letter-spacing:0}
 .tc-row{display:flex;align-items:center;gap:11px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--bg);transition:.14s}
 .tc-row:hover{border-color:var(--line-2)}
-.tc-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#06140f;flex:none;overflow:hidden;position:relative}
+.tc-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;background:var(--bg-3);color:var(--txt-2);flex:none;overflow:hidden;position:relative}
 .tc-id{flex:1;min-width:0}
 .tc-id .nm{font-size:14.5px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tc-id .rl{font-size:12.5px;color:var(--txt-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -4433,7 +4433,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 .tcx-sub{font-size:11.5px;color:var(--txt-3);margin-top:3px;font-family:var(--mono);letter-spacing:.01em}
 .tcx-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
 .tcx-avs{display:flex}
-.tcx-av{width:28px;height:28px;border-radius:9px;border:2px solid var(--bg-1);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#06140f;position:relative;overflow:hidden}
+.tcx-av{width:28px;height:28px;border-radius:9px;border:2px solid var(--bg-1);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--bg-3);color:var(--txt-2);position:relative;overflow:hidden}
 .tcx-av.more{background:var(--bg-3);color:var(--txt-2);font-size:10px;font-weight:600}
 .tcx-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;white-space:nowrap;color:var(--neg);background:rgba(240,120,92,.12);border:1px solid rgba(240,120,92,.32)}
 .tcx-badge .d{width:6px;height:6px;border-radius:50%;background:var(--neg)}
@@ -4476,6 +4476,21 @@ button:active{transform:translateY(.5px) scale(.99)}
 .tc-head-nm{font-size:16px;font-weight:700;color:var(--txt)}
 .tc-avclr{align-self:flex-start;background:none;border:0;color:var(--txt-3);font-size:11.5px;cursor:pointer;padding:0;font-family:var(--font)}
 .tc-avclr:hover{color:var(--neg)}
+
+/* team card · score meter (no rings) */
+.tcx-score{flex:none;width:84px;display:flex;flex-direction:column;gap:10px}
+.tcx-score .sv{display:flex;align-items:baseline;gap:3px}
+.tcx-score .sv b{font-size:32px;font-weight:800;font-family:var(--mono);line-height:1;letter-spacing:-1.5px}
+.tcx-score .sv small{font-size:10px;color:var(--txt-3);font-weight:600}
+.tcx-score .sbar{height:8px;border-radius:4px;background:var(--bg-3);overflow:hidden;position:relative}
+.tcx-score .sbar i{display:block;height:100%;border-radius:4px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+.tcx-score .sbar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 10px,rgba(10,11,13,.85) 10px 12px);pointer-events:none}
+/* team-compose · hover-to-change avatar */
+.tc-head-av.edit{cursor:pointer}
+.tc-head-av .ini{font-family:var(--mono)}
+.tc-avhov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);opacity:0;transition:opacity .15s;color:#fff}
+.tc-head-av.edit:hover .tc-avhov{opacity:1}
+.tc-avhov svg{width:20px;height:20px}
 </style>
 </head>
 <body>
@@ -13653,16 +13668,16 @@ function renderTeam(){
       const hasSmm=smm&&smm.score!=null;
       const smmC=hasSmm?_sc(smm.score):'var(--txt-3)'; const smmG=hasSmm?_gradeOf(smm.score):null;
       const badge = ops.overdue>0 ? `<span class="tcx-badge"><span class="d"></span>${ops.overdue} просроч.</span>` : ((reworkPct>=20&&ops.closes)?`<span class="tcx-badge"><span class="d"></span>возвраты</span>`:'');
-      const avs = d.emps.slice(0,4).map((e,i)=>`<span class="tcx-av" style="background:${e.color||'var(--accent)'};margin-left:${i?'-8px':'0'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>`).join('') + (d.emps.length>4?`<span class="tcx-av more">+${d.emps.length-4}</span>`:'');
+      const avs = d.emps.slice(0,4).map((e,i)=>`<span class="tcx-av" style="color:${e.color||'var(--accent)'};margin-left:${i?'-8px':'0'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>`).join('') + (d.emps.length>4?`<span class="tcx-av more">+${d.emps.length-4}</span>`:'');
       const opsMod = `<div class="tcx-ax">
           <div class="tcx-axh"><span class="tcx-axl"><span class="dot" style="background:var(--accent)"></span>Опер.${_conf(ops.conf)}</span><span class="tcx-grade" style="color:${opsC};background:${opsG.bg}">${opsG.g}</span></div>
-          <div class="tcx-axb">${_tcxGauge(ops.score,opsC)}${_tcxEq([['Выр',ops.pO],['Ско',ops.pS],['Кач',ops.pQ],['Над',ops.pR]])}</div>
+          <div class="tcx-axb">${_tcxScore(ops.score,opsC)}${_tcxEq([['Выр',ops.pO],['Ско',ops.pS],['Кач',ops.pQ],['Над',ops.pR]])}</div>
           ${ops.lowData?`<div class="tcx-low">⚠ Мало данных (${ops.closes} ${_plural(ops.closes,'задача','задачи','задач')}) — оценка предварительная</div>`:''}
           <div class="tcx-foot"><span><b>${ops.tp}</b> закр · <b>${ops.perPerson}</b>/чел</span><span><b>${cyc}</b> цикл</span><span><b style="${reworkPct>=20?'color:var(--neg)':''}">${ops.returns}</b> возвр</span></div>
         </div>`;
       const smmMod = hasSmm ? `<div class="tcx-ax">
           <div class="tcx-axh"><span class="tcx-axl"><span class="dot" style="background:var(--violet)"></span>SMM${_conf(smm.smmConf)}</span><span class="tcx-grade" style="color:${smmC};background:${smmG.bg}">${smmG.g}</span></div>
-          <div class="tcx-axb">${_tcxGauge(smm.score,smmC)}${_tcxEq([['Вов',smm.pER],['Охв',smm.pReach],['Ауд',smm.pFol],['Рег',smm.pCad]])}</div>
+          <div class="tcx-axb">${_tcxScore(smm.score,smmC)}${_tcxEq([['Вов',smm.pER],['Охв',smm.pReach],['Ауд',smm.pFol],['Рег',smm.pCad]])}</div>
           <div class="tcx-foot"><span><b>${smm.projN}</b>/${smm.projTotal} проектов</span><span>ER <b>${smm.erRaw!=null?smm.erRaw.toFixed(1).replace('.',',')+'%':'—'}</b></span></div>
         </div>`
         : `<div class="tcx-ax empty">
@@ -13727,6 +13742,10 @@ function _tcxGauge(score,col){
   const arc=(2*Math.PI*R*_tClamp(score,0,100)/100).toFixed(1);
   return `<div class="tcx-gauge"><svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="30" fill="none" stroke="var(--bg-3)" stroke-width="6"/><circle cx="38" cy="38" r="30" fill="none" stroke="${col}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${arc} ${C}" transform="rotate(-90 38 38)"/></svg><div class="gc"><b style="color:${col}">${score}</b><small>/100</small></div></div>`;
 }
+function _tcxScore(score,col){
+  if(score==null) return `<div class="tcx-score"><div class="sv"><b style="color:var(--txt-3);font-size:26px">—</b></div><div class="sbar"></div></div>`;
+  return `<div class="tcx-score"><div class="sv"><b style="color:${col}">${score}</b><small>/100</small></div><div class="sbar"><i style="width:${_tClamp(score,0,100)}%;background:${col}"></i></div></div>`;
+}
 function _tcxEq(items){
   return `<div class="tcx-eq">`+items.map(([l,v])=>{ const na=v==null; const c=na?'var(--txt-3)':v>=75?'var(--pos)':v>=50?'var(--accent)':v>=30?'var(--warn)':'var(--neg)'; return `<div class="tcx-eqb"><span class="eqv" style="color:${c}">${na?'–':Math.round(v)}</span><span class="eqt">${na?'':`<i style="height:${Math.max(5,Math.round(v))}%;background:${c}"></i>`}</span><span class="eql">${l}</span></div>`; }).join('')+`</div>`;
 }
@@ -13754,9 +13773,9 @@ function teamRename(dept){
 function teamComposeHead(dept){
   const owner=agIsOwner(); const av=teamAvatar(dept); const ini=((dept||'?').trim()[0]||'?').toUpperCase();
   return `<div class="tc-head">
-    <div class="tc-head-av">${av?`<img src="${_attr(av)}" alt="">`:ini}
-      ${owner?`<label class="tc-avup" title="Загрузить аватар"><input type="file" accept="image/*" style="display:none" onchange="teamAvatarPick(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></label>`:''}
-    </div>
+    ${owner
+      ? `<label class="tc-head-av edit" title="Сменить аватар">${av?`<img src="${_attr(av)}" alt="">`:`<span class="ini">${ini}</span>`}<input type="file" accept="image/*" style="display:none" onchange="teamAvatarPick(this)"><span class="tc-avhov"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span></label>`
+      : `<div class="tc-head-av">${av?`<img src="${_attr(av)}" alt="">`:`<span class="ini">${ini}</span>`}</div>`}
     <div class="tc-head-main">
       ${owner?`<div class="tc-rename-row"><input id="tc-rename" value="${_attr(dept)}" placeholder="Название команды" onkeydown="if(event.key==='Enter')teamRename('${_attr(dept)}')"><button class="tc-btn add" onclick="teamRename('${_attr(dept)}')">Переименовать</button></div>`:`<div class="tc-head-nm">${_ddH(dept)}</div>`}
       ${owner&&av?`<button class="tc-avclr" onclick="teamAvatarClear()">Удалить аватар</button>`:''}
@@ -13778,7 +13797,7 @@ function teamComposeBody(dept){
   const others=TEAM.filter(e=>(e.dept||'—')!==dept);
   const owner=agIsOwner();
   const row=(e,inside)=>`<div class="tc-row">
-    <span class="tc-av" style="background:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>
+    <span class="tc-av" style="color:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>
     <div class="tc-id"><div class="nm">${_ddH(e.name||'—')}</div><div class="rl">${_ddH(e.role||'Сотрудник')}${e.dept&&!inside?` · ${_ddH(e.dept)}`:''}</div></div>
     ${owner?(inside
       ? `<button class="tc-btn rem" onclick="teamRemoveFromTeam('${e._id}')" title="Убрать из команды"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>Убрать</button>`
