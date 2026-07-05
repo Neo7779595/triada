@@ -9896,7 +9896,7 @@ let _smmStep=0, _smmT0=0, _smmTimer=null, _smmDone=false;
 
 function smmAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
 let _smmSaveT=null;
-function smmMark(){ _smmDirty=true; if(_smmRO) return; clearTimeout(_smmSaveT); _smmSaveT=setTimeout(function(){ smmSave(false); },800); }
+function smmMark(){ _smmDirty=true; try{ if(_smmCur&&_smmMeta) localStorage.setItem('smm_draft_'+_smmMeta.id, JSON.stringify(_smmCur)); }catch(_e){} if(_smmRO) return; clearTimeout(_smmSaveT); _smmSaveT=setTimeout(function(){ smmSave(false); },800); }
 
 /* корректные ставки рилса (исправлены баги DeTroyd: ER включает все 4 типа вовлечённости; нет дубля cr/sr) */
 function smmReelRates(r){
@@ -9989,6 +9989,7 @@ function smmLoadPrev(report){
 function openSMM(report, ro){
   _smmRO=!!ro;
   _smmCur=smmNormalize(report.payload);
+  try{ const _d=localStorage.getItem('smm_draft_'+report.id); if(_d){ const _dj=JSON.parse(_d); if(_dj&&typeof _dj==='object') _smmCur=smmNormalize(_dj); } }catch(_e){}
   smmLoadPrev(report);
   _smmMeta={id:report.id, projectId:report.project_id, title:report.title||'SMM-отчёт', date:_dDateFull(report.published_at)};
   _smmStep=0; _smmDone=false; _smmT0=0;
@@ -9998,6 +9999,7 @@ function openSMM(report, ro){
 }
 async function smmClose(){
   if(!_smmRO && _smmDirty) await smmSave(false);
+  try{ if(_smmMeta) localStorage.removeItem('smm_draft_'+_smmMeta.id); }catch(_e){}
   smmWzStop(); _smmStep=0; _smmT0=0; _smmDone=false;
   document.getElementById('ov-smm').classList.remove('on');
   _smmCur=null; _smmMeta=null; _smmDirty=false; _smmRO=false;
@@ -10048,6 +10050,30 @@ function smmRender(){
 }
 
 let _smmView={reel:'list',post:'list'}, _smmModalIdx=-1, _smmModalKind='reel';
+function _smmIco(n){ const p={
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+  reel:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M10 8l6 4-6 4V8z"/>',
+  post:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+  zap:'<path d="M13 2L3 14h7l-1 8 10-12h-7z"/>',
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/>',
+  tag:'<path d="M20.6 13.4L13.4 20.6a2 2 0 01-2.8 0l-7.2-7.2A2 2 0 013 12V4a1 1 0 011-1h8a2 2 0 011.4.6l7.2 7.2a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  bolt:'<path d="M13 2L3 14h7l-1 8 10-12h-7z"/>',
+  flag:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
+  chart:'<path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 4-5"/>',
+  trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM5 4H4a2 2 0 000 4h1M19 4h1a2 2 0 010 4h-1"/>'
+  }; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(p[n]||'')+'</svg>'; }
+function smmFillTimes(){ try{ const a=JSON.parse(localStorage.getItem('smm_fill_times')||'[]'); return Array.isArray(a)?a.filter(x=>+x>0).map(Number):[]; }catch(_){ return []; } }
+function smmAvgFill(){ const a=smmFillTimes(); if(!a.length)return null; return Math.round(a.reduce((s,x)=>s+x,0)/a.length); }
+function smmPushFill(sec){ try{ let a=smmFillTimes(); a.push(sec); if(a.length>12)a=a.slice(-12); localStorage.setItem('smm_fill_times',JSON.stringify(a)); }catch(_){} }
+function smmForecastRemain(doneN,total,elapsed){
+  const hist=smmAvgFill(); let est=null;
+  if(doneN>0 && elapsed>0){ const per=elapsed/doneN; let paceTotal=per*total; if(hist) paceTotal=0.55*paceTotal+0.45*hist; est=paceTotal; }
+  else if(hist) est=hist;
+  if(est==null) return null; return Math.max(0, Math.round(est-elapsed));
+}
 function smmXP(){
   const m=_smmCur.metrics, has=v=>v!=null&&v!=='';
   let xp=0;
@@ -10061,53 +10087,62 @@ function smmXP(){
 }
 function smmWzFmt(sec){ const m=Math.floor(sec/60), s=sec%60; return (m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
 function smmWzStart(){ if(_smmRO)return; if(!_smmT0)_smmT0=Date.now(); if(!_smmTimer)_smmTimer=setInterval(smmWzTick,1000); smmWzTick(); }
-function smmWzTick(){ const el=document.getElementById('smm-wz-time'); if(el&&_smmT0) el.textContent=smmWzFmt(Math.floor((Date.now()-_smmT0)/1000)); }
+function smmWzTick(){
+  if(!_smmT0) return; const secs=Math.floor((Date.now()-_smmT0)/1000);
+  const el=document.getElementById('smm-wz-time'); if(el) el.textContent=smmWzFmt(secs);
+  const fc=document.getElementById('smm-wz-fc'); if(fc){ const st=window._smmSteps||[]; const doneN=st.filter(x=>x.done).length; const r=smmForecastRemain(doneN,st.length||7,secs); fc.textContent=r==null?'—':('~'+smmWzFmt(r)); }
+}
 function smmWzStop(){ if(_smmTimer){ clearInterval(_smmTimer); _smmTimer=null; } }
 function smmWzBody(){ const el=document.querySelector('#ov-smm .smm-body'); if(el){ el.innerHTML=smmRenderData(); el.scrollTop=0; } }
 function smmWzGo(d){ const st=window._smmSteps||[]; _smmStep=Math.max(0,Math.min(st.length-1,_smmStep+d)); smmWzBody(); }
 function smmWzSet(i){ const st=window._smmSteps||[]; _smmStep=Math.max(0,Math.min(st.length-1,i)); smmWzBody(); }
-function smmWzFinish(){ _smmDone=true; smmMark(); smmWzBody(); requestAnimationFrame(smmWzConfetti); }
+function smmWzFinish(){ _smmDone=true; if(_smmT0) smmPushFill(Math.floor((Date.now()-_smmT0)/1000)); smmMark(); smmWzBody(); requestAnimationFrame(smmWzConfetti); }
 function smmWzRestart(){ _smmDone=false; smmWzBody(); }
-function smmWzConfetti(){ const host=document.getElementById('smm-cf-host'); if(!host)return; const em=['🎉','⭐','✨','🎊','💚','🔵']; for(let i=0;i<34;i++){ const sp=document.createElement('span'); sp.className='smm-cf'; sp.textContent=em[i%em.length]; sp.style.left=(Math.random()*100)+'%'; sp.style.animationDelay=(Math.random()*0.5)+'s'; sp.style.fontSize=(12+Math.random()*16)+'px'; host.appendChild(sp); } setTimeout(function(){ host.innerHTML=''; },2600); }
+function smmWzConfetti(){ const host=document.getElementById('smm-cf-host'); if(!host)return; const cols=['var(--accent)','#7BF0DC','#8A8FFF','#E3B567','#43D88C','#F0785C']; for(let i=0;i<40;i++){ const sp=document.createElement('span'); sp.className='smm-cf'; sp.style.left=(Math.random()*100)+'%'; sp.style.background=cols[i%cols.length]; sp.style.animationDelay=(Math.random()*0.55)+'s'; const sz=(6+Math.random()*7)|0; sp.style.width=sz+'px'; sp.style.height=sz+'px'; host.appendChild(sp); } setTimeout(function(){ host.innerHTML=''; },2700); }
 function smmRenderData(){
   smmComputeMetrics(); smmComputeGeneral();
   const m=_smmCur.metrics, has=v=>v!=null&&v!=='';
   const es=(n,tt,note,body)=>'<div class="smm-es"><div class="smm-es-h"><span class="n">'+n+'</span><span class="tt">'+tt+'</span><span class="sp"></span>'+(note?'<span class="smm-es-note">'+note+'</span>':'')+'</div>'+body+'</div>';
   const STEPS=[
-    {t:'Охват и просмотры',ico:'👁️',hint:'Впиши общий охват и просмотры из статистики Instagram — Reels, посты и сторис разложатся сами.',done:has(m.total_reach)&&has(m.total_views),
+    {t:'Охват и просмотры',ico:'eye',hint:'Впиши общий охват и просмотры из статистики Instagram — Reels, посты и сторис разложатся сами.',done:has(m.total_reach)&&has(m.total_views),
       html:function(){return es('','Охват','всего — из статистики · сторис — остаток',smmReachBlockHTML())+es('','Просмотры','всего — из статистики · сторис — остаток',smmViewsBlockHTML());}},
-    {t:'Reels',ico:'🎬',hint:'Добавь Reels с метриками — количество, охват и вовлечённость посчитаются сами.',done:(_smmCur.reels||[]).length>0,
+    {t:'Reels',ico:'reel',hint:'Добавь Reels с метриками — количество, охват и вовлечённость посчитаются сами.',done:(_smmCur.reels||[]).length>0,
       html:function(){return '<div class="smm-es" id="smm-reels-ed">'+smmReelsEditHTML('reel')+'</div>';}},
-    {t:'Посты',ico:'🖼️',hint:'Добавь посты так же, как Reels — количество и суммы посчитаются автоматически.',done:(_smmCur.posts||[]).length>0,
+    {t:'Посты',ico:'post',hint:'Добавь посты так же, как Reels — количество и суммы посчитаются автоматически.',done:(_smmCur.posts||[]).length>0,
       html:function(){return '<div class="smm-es" id="smm-posts-ed">'+smmReelsEditHTML('post')+'</div>';}},
-    {t:'Сторис',ico:'⚡',hint:'Впиши количество сторис — просмотры и охват возьмутся как остаток от профиля.',done:has(m.stories_count),
+    {t:'Сторис',ico:'zap',hint:'Впиши количество сторис — просмотры и охват возьмутся как остаток от профиля.',done:has(m.stories_count),
       html:function(){return es('','Сторис','просмотры и охват — остаток от профиля',smmStoriesBlockHTML());}},
-    {t:'Аудитория',ico:'👥',hint:'Подписчики сейчас и прирост. Частоту посчитаю сам из охвата и просмотров.',done:has(m.subscribers_current),
+    {t:'Аудитория',ico:'users',hint:'Подписчики сейчас и прирост. Частоту посчитаю сам из охвата и просмотров.',done:has(m.subscribers_current),
       html:function(){return es('','Аудитория','частота и прирост — авто',smmAudienceBlockHTML());}},
-    {t:'Метрики и цели',ico:'🎯',hint:'ER, лайки, комментарии, репосты, сохранения уже посчитаны. Впиши новые цели на следующий период.',done:['er','lr','tr','shr','sr'].some(k=>has(_smmCur.goals[k])),
+    {t:'Метрики и цели',ico:'target',hint:'ER, лайки, комментарии, репосты, сохранения уже посчитаны. Впиши новые цели на следующий период.',done:['er','lr','tr','shr','sr'].some(k=>has(_smmCur.goals[k])),
       html:function(){return '<div class="smm-mgrid" id="smm-mgrid">'+smmMetricCardsHTML(SMM_METRIC_DEFS)+'</div>';}},
-    {t:'Рубрики',ico:'🏷️',hint:'Рубрики собрались сами из Reels и постов. Проверь — и отчёт готов!',done:(_smmCur.rubrics||[]).length>0,
+    {t:'Рубрики',ico:'tag',hint:'Рубрики собрались сами из Reels и постов. Проверь — и отчёт готов!',done:(_smmCur.rubrics||[]).length>0,
       html:function(){return '<div class="smm-es" id="smm-rub-sec">'+smmRubricsSectionHTML()+'</div>';}}
   ];
   window._smmSteps=STEPS;
   if(_smmStep>STEPS.length-1)_smmStep=STEPS.length-1; if(_smmStep<0)_smmStep=0;
   const doneN=STEPS.filter(x=>x.done).length, pct=Math.round(100*doneN/STEPS.length), xp=smmXP();
+  const elapsed=_smmT0?Math.floor((Date.now()-_smmT0)/1000):0, avg=smmAvgFill(), remain=smmForecastRemain(doneN,STEPS.length,elapsed);
   const CSS='<style>'
     +'.smm-wz{max-width:1080px;margin:0 auto}'
-    +'.smm-wz-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;background:linear-gradient(180deg,var(--bg-1),var(--bg-2));border:1px solid var(--line-2);border-radius:14px;margin-bottom:16px}'
+    +'.smm-wz-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;background:linear-gradient(180deg,var(--bg-1),var(--bg-2));border:1px solid var(--line-2);border-radius:14px;margin-bottom:16px}'
     +'.smm-wz-steps{display:flex;gap:5px;align-items:center;flex:1;min-width:220px}'
-    +'.smm-wz-dot{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--bg-3);border:1px solid var(--line);cursor:pointer;transition:all .2s;color:var(--txt-3);flex:none}'
+    +'.smm-wz-dot{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--bg-3);border:1px solid var(--line);cursor:pointer;transition:all .2s;color:var(--txt-3);flex:none}'
+    +'.smm-wz-dot svg{width:16px;height:16px}'
     +'.smm-wz-dot.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 0 12px -2px var(--accent);transform:scale(1.08)}'
     +'.smm-wz-dot.done{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}'
     +'.smm-wz-link{flex:1;height:2px;background:var(--line);min-width:5px;border-radius:2px}'
-    +'.smm-wz-meta{display:flex;gap:10px;align-items:center;font-family:var(--mono)}'
-    +'.smm-wz-chip{display:flex;align-items:center;gap:6px;font-size:14px;padding:7px 12px;background:var(--bg-3);border:1px solid var(--line);border-radius:9px}'
+    +'.smm-wz-meta{display:flex;gap:9px;align-items:center;font-family:var(--mono);flex-wrap:wrap}'
+    +'.smm-wz-chip{display:flex;align-items:center;gap:7px;font-size:13.5px;padding:7px 12px;background:var(--bg-3);border:1px solid var(--line);border-radius:9px;color:var(--txt-2)}'
+    +'.smm-wz-chip svg{width:14px;height:14px;flex:none}'
     +'.smm-wz-chip b{color:var(--txt);font-weight:700}'
     +'.smm-wz-chip.xp{color:var(--accent);border-color:var(--accent-line)}'
+    +'.smm-wz-chip.fc{color:var(--accent)}'
     +'.smm-wz-prog{height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden;margin-bottom:22px}'
     +'.smm-wz-prog i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7BF0DC);border-radius:3px;transition:width .5s cubic-bezier(.16,1,.3,1)}'
     +'.smm-wz-head{display:flex;align-items:center;gap:14px;margin-bottom:20px}'
-    +'.smm-wz-ico{width:52px;height:52px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:26px;flex:none}'
+    +'.smm-wz-ico{width:52px;height:52px;border-radius:14px;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}'
+    +'.smm-wz-ico svg{width:26px;height:26px}'
     +'.smm-wz-head h3{font-size:22px;font-weight:700;letter-spacing:-.02em}'
     +'.smm-wz-head p{font-size:14px;color:var(--txt-2);margin-top:4px;line-height:1.5;max-width:720px}'
     +'.smm-wz-nav{display:flex;align-items:center;gap:12px;margin-top:26px;padding-top:20px;border-top:1px solid var(--line)}'
@@ -10118,38 +10153,41 @@ function smmRenderData(){
     +'.smm-wz-btn.pri:hover{box-shadow:0 8px 22px -8px var(--accent)}'
     +'.smm-wz-btn:disabled{opacity:.4;pointer-events:none}'
     +'.smm-wz-done{text-align:center;padding:46px 20px;position:relative;overflow:hidden}'
-    +'.smm-wz-done .em{font-size:60px;animation:smmpop .5s cubic-bezier(.2,1.4,.4,1) both}'
-    +'.smm-wz-done h2{font-size:28px;font-weight:800;margin:12px 0 6px;letter-spacing:-.02em}'
-    +'.smm-wz-done p{color:var(--txt-2);font-size:15px}'
+    +'.smm-wz-tr{width:82px;height:82px;margin:0 auto;border-radius:24px;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;animation:smmpop .5s cubic-bezier(.2,1.4,.4,1) both;position:relative;z-index:2}'
+    +'.smm-wz-tr svg{width:42px;height:42px}'
+    +'.smm-wz-done h2{font-size:28px;font-weight:800;margin:16px 0 6px;letter-spacing:-.02em;position:relative;z-index:2}'
+    +'.smm-wz-done p{color:var(--txt-2);font-size:15px;position:relative;z-index:2}'
     +'.smm-wz-stats{display:flex;gap:14px;justify-content:center;margin:22px 0 26px;flex-wrap:wrap;position:relative;z-index:2}'
-    +'.smm-wz-stat{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 22px;min-width:120px}'
+    +'.smm-wz-stat{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 22px;min-width:118px}'
     +'.smm-wz-stat .v{font-size:26px;font-weight:800;font-family:var(--mono);color:var(--accent)}'
     +'.smm-wz-stat .l{font-size:12px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}'
     +'#smm-cf-host{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1}'
-    +'.smm-cf{position:absolute;top:-24px;animation:smmfall 2.4s linear forwards}'
-    +'@keyframes smmfall{to{transform:translateY(460px) rotate(360deg);opacity:0}}'
+    +'.smm-cf{position:absolute;top:-24px;border-radius:2px;animation:smmfall 2.5s linear forwards}'
+    +'@keyframes smmfall{to{transform:translateY(480px) rotate(400deg);opacity:0}}'
     +'@keyframes smmpop{from{transform:scale(0)}}'
     +'</style>';
   if(_smmDone){
-    const secs=_smmT0?Math.floor((Date.now()-_smmT0)/1000):0;
     return '<div class="smm-wz">'+CSS+'<div class="smm-wz-done"><div id="smm-cf-host"></div>'
-      +'<div class="em">🎉</div><h2>Отчёт собран!</h2><p>Данные заполнены — метрики, частота, остатки и рубрики посчитаны автоматически.</p>'
-      +'<div class="smm-wz-stats"><div class="smm-wz-stat"><div class="v">'+smmWzFmt(secs)+'</div><div class="l">время</div></div>'
+      +'<div class="smm-wz-tr">'+_smmIco('trophy')+'</div><h2>Отчёт собран!</h2><p>Данные заполнены — метрики, частота, остатки и рубрики посчитаны автоматически.</p>'
+      +'<div class="smm-wz-stats"><div class="smm-wz-stat"><div class="v">'+smmWzFmt(elapsed)+'</div><div class="l">время</div></div>'
+      +(avg!=null?'<div class="smm-wz-stat"><div class="v">'+smmWzFmt(avg)+'</div><div class="l">обычно</div></div>':'')
       +'<div class="smm-wz-stat"><div class="v">'+xp+'</div><div class="l">XP</div></div>'
       +'<div class="smm-wz-stat"><div class="v">'+(_smmCur.reels||[]).length+' / '+(_smmCur.posts||[]).length+'</div><div class="l">reels / посты</div></div></div>'
       +'<div class="smm-wz-nav" style="justify-content:center;border:0;padding:0;margin:0"><button class="smm-wz-btn" onclick="smmWzRestart()">← Изменить данные</button>'
       +'<button class="smm-wz-btn pri" onclick="smmTab(\'preview\')">Смотреть презентацию →</button></div></div></div>';
   }
   const cur=STEPS[_smmStep];
-  const dots=STEPS.map(function(x,i){ return '<div class="smm-wz-dot'+(i===_smmStep?' on':(x.done?' done':''))+'" title="'+x.t+'" onclick="smmWzSet('+i+')">'+((x.done&&i!==_smmStep)?'✓':x.ico)+'</div>'; }).join('<div class="smm-wz-link"></div>');
+  const dots=STEPS.map(function(x,i){ return '<div class="smm-wz-dot'+(i===_smmStep?' on':(x.done?' done':''))+'" title="'+x.t+'" onclick="smmWzSet('+i+')">'+((x.done&&i!==_smmStep)?_smmIco('check'):_smmIco(x.ico))+'</div>'; }).join('<div class="smm-wz-link"></div>');
   const bar='<div class="smm-wz-bar"><div class="smm-wz-steps">'+dots+'</div>'
-    +'<div class="smm-wz-meta"><span class="smm-wz-chip">⏱ <b id="smm-wz-time">'+smmWzFmt(_smmT0?Math.floor((Date.now()-_smmT0)/1000):0)+'</b></span>'
-    +'<span class="smm-wz-chip xp">⚡ <b>'+xp+'</b> XP</span></div></div>'
+    +'<div class="smm-wz-meta"><span class="smm-wz-chip">'+_smmIco('clock')+'<b id="smm-wz-time">'+smmWzFmt(elapsed)+'</b></span>'
+    +'<span class="smm-wz-chip fc" title="Прогноз времени до конца">'+_smmIco('flag')+'осталось <b id="smm-wz-fc">'+(remain==null?'—':('~'+smmWzFmt(remain)))+'</b></span>'
+    +(avg!=null?'<span class="smm-wz-chip" title="Среднее время заполнения отчёта">'+_smmIco('chart')+'обычно <b>'+smmWzFmt(avg)+'</b></span>':'')
+    +'<span class="smm-wz-chip xp">'+_smmIco('bolt')+'<b>'+xp+'</b> XP</span></div></div>'
     +'<div class="smm-wz-prog"><i style="width:'+pct+'%"></i></div>';
-  const head='<div class="smm-wz-head"><div class="smm-wz-ico">'+cur.ico+'</div><div><h3>Шаг '+(_smmStep+1)+' из '+STEPS.length+' · '+cur.t+'</h3><p>'+cur.hint+'</p></div></div>';
+  const head='<div class="smm-wz-head"><div class="smm-wz-ico">'+_smmIco(cur.ico)+'</div><div><h3>Шаг '+(_smmStep+1)+' из '+STEPS.length+' · '+cur.t+'</h3><p>'+cur.hint+'</p></div></div>';
   const isLast=_smmStep===STEPS.length-1;
   const nav='<div class="smm-wz-nav"><button class="smm-wz-btn" '+(_smmStep===0?'disabled':'')+' onclick="smmWzGo(-1)">← Назад</button><div class="sp"></div>'
-    +(isLast?'<button class="smm-wz-btn pri" onclick="smmWzFinish()">Готово 🎉</button>':'<button class="smm-wz-btn pri" onclick="smmWzGo(1)">Далее →</button>')+'</div>';
+    +(isLast?'<button class="smm-wz-btn pri" onclick="smmWzFinish()">Готово '+_smmIco('check')+'</button>':'<button class="smm-wz-btn pri" onclick="smmWzGo(1)">Далее →</button>')+'</div>';
   return '<div class="smm-wz">'+CSS+bar+head+'<div class="smm-wz-body">'+cur.html()+'</div>'+nav+'</div>';
 }
 /* ——— хелперы карточек ввода: одна метрика может показываться в нескольких блоках (data-gv) ——— */
