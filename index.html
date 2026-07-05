@@ -9964,7 +9964,7 @@ function smmComputeGeneral(){
 }
 function smmGenNum(k,zero){ const m=_smmCur.metrics; return m[k]==null?(zero||'—'):Number(m[k]).toLocaleString('ru-RU'); }
 function smmGenVals(){
-  ['reels_count','reels_views','reels_reach','stories_views','stories_reach','content_total'].forEach(k=>{
+  ['reels_count','reels_views','reels_reach','posts_count','posts_views','posts_reach','stories_views','stories_reach','content_total'].forEach(k=>{
     document.querySelectorAll('[data-gv="'+k+'"]').forEach(el=>{ el.textContent=smmGenNum(k, (k==='reels_count'||k==='content_total')?'0':'—'); });
   });
 }
@@ -10043,7 +10043,7 @@ function smmRender(){
   if(_smmTab==='preview') requestAnimationFrame(smmInitReveal);
 }
 
-let _smmReelView='list', _smmModalIdx=-1, _smmModalKind='reel';
+let _smmView={reel:'list',post:'list'}, _smmModalIdx=-1, _smmModalKind='reel';
 function smmRenderData(){
   smmComputeMetrics();
   smmComputeGeneral();
@@ -10053,8 +10053,8 @@ function smmRenderData(){
     +'<div class="smm-edit-sub">'+(_smmCur.period?_ddH(_smmCur.period):'период не указан')+' · '+_smmCur.reels.length+' reels · '+(_smmCur.posts||[]).length+' постов · '+_smmCur.rubrics.length+' рубрик</div>'
     +es('01','Охват','всего — из статистики Instagram · сторис — остаток', smmReachBlockHTML())
     +es('02','Просмотры','всего — из статистики Instagram · сторис — остаток', smmViewsBlockHTML())
-    +'<div class="smm-es" id="smm-reels-ed">'+smmReelsEditHTML()+'</div>'
-    +'<div class="smm-es" id="smm-posts-ed">'+smmPostsEditHTML()+'</div>'
+    +'<div class="smm-es" id="smm-reels-ed">'+smmReelsEditHTML('reel')+'</div>'
+    +'<div class="smm-es" id="smm-posts-ed">'+smmReelsEditHTML('post')+'</div>'
     +es('05','Сторис','просмотры и охват считаются как остаток от профиля', smmStoriesBlockHTML())
     +es('06','Аудитория и метрики','ER · LR · CR · SHR · SR — из Reels и постов; частота и прирост авто', smmAudienceBlockHTML()+'<div class="smm-mgrid" id="smm-mgrid" style="margin-top:14px">'+smmMetricCardsHTML(SMM_METRIC_DEFS)+'</div>')
     +'<div class="smm-es" id="smm-rub-sec">'+smmRubricsSectionHTML()+'</div>'
@@ -10096,23 +10096,31 @@ function smmMetricCardsHTML(metrics){
       +'</div></div>';
   }).join('');
 }
-function smmReelsEditHTML(){
-  const view=_smmReelView;
+function smmReelsEditHTML(kind){
+  kind=kind||'reel'; const isPost=kind==='post';
+  const arr=_smmCur[isPost?'posts':'reels']||[];
+  const view=_smmView[kind]||'list';
+  const Noun=isPost?'Посты':'Reels', num=isPost?'04':'03', noun=isPost?'пост':'Reel';
+  const empT=isPost?'Постов пока нет':'Reels пока нет';
+  const empL=isPost?'Постов пока нет — нажмите «Добавить пост»':'Reels пока нет — нажмите «Добавить Reels»';
   const body = view==='table'
-    ? (_smmCur.reels.length
-        ? '<div class="smm-reels-wrap"><table class="smm-reels"><thead><tr><th>Заголовок</th><th>Рубрика</th><th>Просм.</th><th>Охват</th><th>Лайки</th><th>Комм.</th><th>Сохр.</th><th>Реп.</th><th>ER</th><th></th></tr></thead><tbody>'+_smmCur.reels.map((r,i)=>smmReelRow(r,i)).join('')+'</tbody></table></div>'
-        : '<div class="smm-rempty">Reels пока нет</div>')
-    : (_smmCur.reels.length
-        ? '<div class="smm-rlist">'+smmReelsListHTML()+'</div>'
-        : '<div class="smm-rempty">Reels пока нет — нажмите «Добавить Reel»</div>');
-  return '<div class="smm-es-h"><span class="n">03</span><span class="tt">Reels</span><span class="sp"></span>'
-    +'<div class="smm-vtog"><button class="'+(view==='list'?'on':'')+'" onclick="smmSetReelView(\'list\')">список</button><button class="'+(view==='table'?'on':'')+'" onclick="smmSetReelView(\'table\')">таблица</button></div>'
-    +'<button class="smm-mini-btn" onclick="smmPasteToggle()">вставить из Excel</button>'
-    +'<button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmReelModalOpen(-1)">+ Добавить Reel</button></div>'
-    +'<div class="smm-fgrid" style="margin-bottom:14px">'+_smmAutoCard('Кол-во Reels','reels_count','0')+'</div>'
+    ? (arr.length
+        ? '<div class="smm-reels-wrap"><table class="smm-reels"><thead><tr><th>Заголовок</th><th>Рубрика</th><th>Просм.</th><th>Охват</th><th>Лайки</th><th>Комм.</th><th>Сохр.</th><th>Реп.</th><th>ER</th><th></th></tr></thead><tbody>'+arr.map((r,i)=>smmReelRow(r,i,kind)).join('')+'</tbody></table></div>'
+        : '<div class="smm-rempty">'+empT+'</div>')
+    : (arr.length
+        ? '<div class="smm-rlist">'+smmReelsListHTML(kind)+'</div>'
+        : '<div class="smm-rempty">'+empL+'</div>');
+  const cards=isPost
+    ? _smmAutoCard('Кол-во постов','posts_count','0')+_smmAutoCard('Просмотры','posts_views','—')+_smmAutoCard('Охват','posts_reach','—')
+    : _smmAutoCard('Кол-во Reels','reels_count','0');
+  return '<div class="smm-es-h"><span class="n">'+num+'</span><span class="tt">'+Noun+'</span><span class="sp"></span>'
+    +'<div class="smm-vtog"><button class="'+(view==='list'?'on':'')+'" onclick="smmSetItemView(\''+kind+'\',\'list\')">список</button><button class="'+(view==='table'?'on':'')+'" onclick="smmSetItemView(\''+kind+'\',\'table\')">таблица</button></div>'
+    +'<button class="smm-mini-btn" onclick="smmPasteToggle(\''+kind+'\')">вставить из Excel</button>'
+    +'<button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmReelModalOpen(-1,\''+kind+'\')">+ Добавить '+(isPost?'пост':'Reels')+'</button></div>'
+    +'<div class="smm-fgrid" style="margin-bottom:14px">'+cards+'</div>'
     +smmRubDatalist()
-    +'<div id="smm-paste-box" style="display:none;margin-bottom:16px"><textarea class="smm-paste" id="smm-paste-ta" placeholder="Вставьте из таблицы (Tab-разделитель, по строке на Reel):&#10;заголовок⇥просмотры⇥охват⇥лайки⇥комм⇥сохр⇥репосты⇥рубрика"></textarea>'
-    +'<div style="margin-top:8px;display:flex;gap:10px;align-items:center"><button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmPasteImport()">Добавить</button><span id="smm-paste-res" style="font-size:12.5px;color:var(--pos);font-family:var(--mono)"></span></div></div>'
+    +'<div id="smm-paste-box-'+kind+'" style="display:none;margin-bottom:16px"><textarea class="smm-paste" id="smm-paste-ta-'+kind+'" placeholder="Вставьте из таблицы (Tab-разделитель, по строке на '+noun+'):&#10;заголовок⇥просмотры⇥охват⇥лайки⇥комм⇥сохр⇥репосты⇥рубрика"></textarea>'
+    +'<div style="margin-top:8px;display:flex;gap:10px;align-items:center"><button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmPasteImport(\''+kind+'\')">Добавить</button><span id="smm-paste-res-'+kind+'" style="font-size:12.5px;color:var(--pos);font-family:var(--mono)"></span></div></div>'
     +body;
 }
 function smmReelsListHTML(kind){
@@ -10125,15 +10133,7 @@ function smmReelsListHTML(kind){
     +'<button class="rdel" onclick="event.stopPropagation();smmReelDel('+i+',\''+kind+'\')" title="Удалить">×</button></div>'
   ).join('');
 }
-function smmPostsEditHTML(){
-  const posts=_smmCur.posts||[];
-  return '<div class="smm-es-h"><span class="n">04</span><span class="tt">Посты</span><span class="sp"></span>'
-    +'<button class="smm-mini-btn" style="border-color:var(--accent-line);color:var(--accent)" onclick="smmReelModalOpen(-1,\'post\')">+ Добавить пост</button></div>'
-    +'<div style="font-family:var(--mono);font-size:12.5px;color:var(--txt-3);margin-bottom:14px;letter-spacing:.02em">Добавляй посты как Reels — кол-во, просмотры и охват постов посчитаются сами.</div>'
-    +'<div class="smm-fgrid" style="margin-bottom:14px">'+_smmAutoCard('Кол-во постов','posts_count','0')+_smmAutoCard('Просмотры','posts_views','—')+_smmAutoCard('Охват','posts_reach','—')+'</div>'
-    +(posts.length?'<div class="smm-rlist">'+smmReelsListHTML('post')+'</div>':'<div class="smm-rempty">Постов пока нет — нажмите «Добавить пост»</div>');
-}
-function smmSetReelView(v){ _smmReelView=v; const el=document.getElementById('smm-reels-ed'); if(el) el.innerHTML=smmReelsEditHTML(); }
+function smmSetItemView(kind,v){ _smmView[kind]=v; const el=document.getElementById('smm-'+(kind==='post'?'posts':'reels')+'-ed'); if(el) el.innerHTML=smmReelsEditHTML(kind); }
 function smmReelModalOpen(i,kind){
   _smmModalKind=kind||'reel'; _smmModalIdx=i;
   const _arr=_smmCur[_smmModalKind==='post'?'posts':'reels'];
@@ -10385,15 +10385,16 @@ function smmReelModalSave(){
   smmReelModalClose(); smmMark(); smmRender();
 }
 
-function smmReelRow(r,i){
+function smmReelRow(r,i,kind){
+  kind=kind||'reel';
   const iv=v=>v==null?'':v;
-  const cell=f=>'<input type="text" inputmode="decimal" value="'+iv(r[f])+'" oninput="smmReelEdit('+i+',\''+f+'\',this.value)">';
+  const cell=f=>'<input type="text" inputmode="decimal" value="'+iv(r[f])+'" oninput="smmReelEdit('+i+',\''+f+'\',this.value,\''+kind+'\')">';
   return '<tr>'
-    +'<td><input class="title-in" value="'+smmAttr(r.title)+'" placeholder="Reel #'+(i+1)+'" oninput="smmReelEdit('+i+',\'title\',this.value)"></td>'
-    +'<td><input class="rub-in" list="smm-rub-dl" value="'+smmAttr(r.rubric)+'" placeholder="—" onchange="smmReelEdit('+i+',\'rubric\',this.value)"></td>'
+    +'<td><input class="title-in" value="'+smmAttr(r.title)+'" placeholder="'+(kind==='post'?'Пост':'Reel')+' #'+(i+1)+'" oninput="smmReelEdit('+i+',\'title\',this.value,\''+kind+'\')"></td>'
+    +'<td><input class="rub-in" list="smm-rub-dl" value="'+smmAttr(r.rubric)+'" placeholder="—" onchange="smmReelEdit('+i+',\'rubric\',this.value,\''+kind+'\')"></td>'
     +'<td>'+cell('views')+'</td><td>'+cell('reach')+'</td><td>'+cell('likes')+'</td><td>'+cell('comments')+'</td><td>'+cell('saves')+'</td><td>'+cell('shares')+'</td>'
-    +'<td class="er-cell" id="smm-er-'+i+'">'+(r.er||0).toFixed(2)+'%</td>'
-    +'<td><button class="del" onclick="smmReelDel('+i+')" title="Удалить">×</button></td></tr>';
+    +'<td class="er-cell" id="smm-er-'+kind+'-'+i+'">'+(r.er||0).toFixed(2)+'%</td>'
+    +'<td><button class="del" onclick="smmReelDel('+i+',\''+kind+'\')" title="Удалить">×</button></td></tr>';
 }
 function smmRubDatalist(){                                                            // подсказки рубрик для табличного режима
   const ag=(typeof PROJECT_TAGS!=='undefined'&&Array.isArray(PROJECT_TAGS.rubric))?PROJECT_TAGS.rubric:[];
@@ -10427,7 +10428,7 @@ function smmReelDel(i,kind){ _smmCur[kind==='post'?'posts':'reels'].splice(i,1);
 function smmReelEdit(i,field,val,kind){
   const r=_smmCur[kind==='post'?'posts':'reels'][i]; if(!r) return;
   if(field==='title'||field==='rubric'||field==='link'||field==='cover'){ r[field]=val; }
-  else { r[field]=smmNumOf(val); smmReelRates(r); const c=document.getElementById('smm-er-'+i); if(c) c.textContent=(r.er||0).toFixed(2)+'%'; }
+  else { r[field]=smmNumOf(val); smmReelRates(r); const c=document.getElementById('smm-er-'+(kind||'reel')+'-'+i); if(c) c.textContent=(r.er||0).toFixed(2)+'%'; }
   smmMark(); smmRefreshRubrics(); smmRefreshMetrics(); smmComputeGeneral(); smmGenVals();
 }
 function smmRubricConfirm(){
@@ -10441,9 +10442,10 @@ function smmRubricConfirm(){
 }
 function smmRubricDel(i){ _smmCur.rubrics.splice(i,1); smmMark(); smmRefreshRubrics(); }
 
-function smmPasteToggle(){ const b=document.getElementById('smm-paste-box'); if(b) b.style.display=b.style.display==='none'?'block':'none'; }
-function smmPasteImport(){
-  const ta=document.getElementById('smm-paste-ta'); if(!ta) return;
+function smmPasteToggle(kind){ kind=kind||'reel'; const b=document.getElementById('smm-paste-box-'+kind); if(b) b.style.display=b.style.display==='none'?'block':'none'; }
+function smmPasteImport(kind){
+  kind=kind||'reel'; const arr=_smmCur[kind==='post'?'posts':'reels'];
+  const ta=document.getElementById('smm-paste-ta-'+kind); if(!ta) return;
   const text=ta.value.trim(); if(!text) return;
   const lines=text.split('\n').map(l=>l.split('\t').map(c=>c.trim()));
   let start=0; if(lines[0]&&lines[0][1]!==undefined&&lines[0][1]!==''&&isNaN(+lines[0][1])) start=1;
@@ -10454,10 +10456,10 @@ function smmPasteImport(){
     const title=cols[0]||'', views=num(cols[1]); let reach=num(cols[2]); if(!reach) reach=views;
     const likes=num(cols[3]),comments=num(cols[4]),saves=num(cols[5]),shares=num(cols[6]),rubric=cols[7]||'';
     const r={link:'',cover:'',title,rubric,views,reach,likes,comments,saves,shares};
-    smmReelRates(r); _smmCur.reels.push(r); added++;
+    smmReelRates(r); arr.push(r); added++;
   });
   smmMark();
-  const res=document.getElementById('smm-paste-res'); if(res) res.textContent='✓ Добавлено '+added+' Reels';
+  const res=document.getElementById('smm-paste-res-'+kind); if(res) res.textContent='✓ Добавлено '+added+' '+(kind==='post'?'постов':'Reels');
   ta.value='';
   setTimeout(()=>{ smmRender(); },650);
 }
