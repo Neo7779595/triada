@@ -6402,7 +6402,7 @@ function pkDragEnd(e){ const c=e.target.closest('.pk-card'); if(c) c.classList.r
 function pkOver(e){ e.preventDefault(); try{e.dataTransfer.dropEffect='move';}catch(_){}; const c=e.target.closest('.pk-col'); if(c) c.classList.add('drag-over'); }
 function pkLeave(e){ const c=e.target.closest('.pk-col'); if(c && !c.contains(e.relatedTarget)) c.classList.remove('drag-over'); }
 function pkDrop(e,status){ e.preventDefault(); const c=e.target.closest('.pk-col'); if(c) c.classList.remove('drag-over'); const id=_pkDrag||(e.dataTransfer&&e.dataTransfer.getData('text/plain')); _pkDrag=null; if(!id) return; const t=(PROJECTS[pdIdx]._tasks||[]).find(x=>x.id===id); if(t&&t.status===status) return; if(window.tTaskMove) window.tTaskMove(id,status); }
-function pdNewStage(){
+function pdNewStage(){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ toast('Проект завершён — редактирование запрещено'); return; }
   pd2St='wait';
   const seg=[['wait','Ожидает','var(--warn)'],['active','В работе','var(--accent)'],['done','Завершён','var(--pos)']]
     .map(([k,l,c])=>`<button class="${k==='wait'?'on':''}" data-st="${k}" onclick="pd2SetStatus('${k}')"><span class="d" style="background:${c}"></span>${l}</button>`).join('');
@@ -6485,6 +6485,7 @@ function qtSubKey(e){ if(e.key==='Enter'){e.preventDefault(); qtSubAdd();} }
 async function pdNewTask(st){
   pdNewSt=st||'wait';
   const p=PROJECTS[pdIdx];
+  if(p&&p.status==='done'){ toast('Проект завершён — задачи создавать нельзя'); return; }
   if(p._stages===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);        // этапов ещё нет — дождаться первой загрузки
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе модалка открывается мгновенно, данные освежаются в фоне
   const stages=(p._stages||[]).filter(s=>s.status!=='done');
@@ -6515,9 +6516,10 @@ function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи з
   const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
   const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
   if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,{title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx,subtasks}); }
-function pdTaskDel(id){ if(window.tTaskDel) window.tTaskDel(id); }
+function pdTaskDel(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ toast('Проект завершён — редактирование запрещено'); return; } if(window.tTaskDel) window.tTaskDel(id); }
 async function pdTaskEdit(id){
   const p=PROJECTS[pdIdx];
+  if(p&&p.status==='done'){ toast('Проект завершён — редактирование запрещено'); return; }
   if(p._tasks===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);          // задач ещё нет — дождаться первой загрузки
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе открываем мгновенно, освежаем в фоне
   const t=(p._tasks||[]).find(x=>x.id===id); if(!t){toast('Задача не найдена');return;}
@@ -6688,20 +6690,20 @@ function renderPd(){
           return `<div class="pd-st ${s.status}" data-stid="${s.id}">
             <div class="pd-rail"><div class="pd-node">${node}</div></div>
             <div class="pd-body">
-              <div class="pd-brow"><span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></span><div class="pd-st-nm">${s.name}</div>${dd}<div class="pd-st-status">${s.status==='active'?'● '+status:status}</div><button class="pd-edit" onclick="event.stopPropagation();pdEditStage('${s.id}')">Изменить</button></div>
+              <div class="pd-brow"><span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></span><div class="pd-st-nm">${s.name}</div>${dd}<div class="pd-st-status">${s.status==='active'?'● '+status:status}</div>${p.status!=='done'?`<button class="pd-edit" onclick="event.stopPropagation();pdEditStage('${s.id}')">Изменить</button>`:''}</div>
               <div class="pd-subrow">${tcount}${mat}</div>
               ${tasksHtml}
             </div></div>`;
         }).join('');
       }
-      h=hero+`<div class="pd-sec-h"><div class="t">Этапы проекта · ${total} шагов</div><div class="pd-sec-acts">${(p._cycles&&p._cycles.length)?`<button class="pd-cyc-btn ghost" onclick="openCyclesModal('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>Прошлые периоды · ${p._cycles.length}</button>`:''}${total?`<button class="pd-cyc-btn" onclick="pdNewStage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Этап</button>`:''}</div></div><div class="pd-stages">${list}</div>`;
+      h=hero+`<div class="pd-sec-h"><div class="t">Этапы проекта · ${total} шагов</div><div class="pd-sec-acts">${(p._cycles&&p._cycles.length)?`<button class="pd-cyc-btn ghost" onclick="openCyclesModal('${p.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>Прошлые периоды · ${p._cycles.length}</button>`:''}${(total&&p.status!=='done')?`<button class="pd-cyc-btn" onclick="pdNewStage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Этап</button>`:''}</div></div><div class="pd-stages">${list}</div>`;
     }
   } else if(pdTabCur==='brief'){
     h=briefBuilderHTML(p);
   } else if(pdTabCur==='kanban'){
     if(p._tasks===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка задач…</div>'; }
     else {
-      const T=p._tasks, byst=st=>T.filter(t=>t.status===st&&_pkMatch(t));
+      const T=p._tasks, _ro=p.status==='done', byst=st=>T.filter(t=>t.status===st&&_pkMatch(t));
       const col=(st,label,color,emptyMsg,emptyIc)=>{
         const _all=byst(st), _total=_all.length, _isDone=st==='done', _collapsed=_isDone&&PK_DONE==='hidden';
         let arr=_all;
@@ -6732,7 +6734,7 @@ function renderPd(){
           } else if(rel>0){
             rtimer=`<div class="pk-timer review mini"><span class="ic">${eyeic}</span><span class="pk-time" id="rtmr-${c.id}">${pkFmtDur(rel)}</span></div>`;
           }
-          return `<div class="pk-card" draggable="true" data-tkid="${c.id}" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)">
+          return `<div class="pk-card" draggable="${_ro?'false':'true'}" data-tkid="${c.id}" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)">
               <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
@@ -6744,12 +6746,12 @@ function renderPd(){
         const _tog=_isDone?`<button class="pk-coltog" title="${_collapsed?'Показать':'Скрыть'} задачи" onclick="event.stopPropagation();pkDoneSet('${_collapsed?'recent':'hidden'}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="${_collapsed?'':'open'}"><path d="M6 9l6 6 6-6"/></svg></button>`:'';
         const _footer=(_isDone&&!_collapsed&&_total>PK_DONE_LIMIT)?`<div class="pk-colmore-wrap"><button class="pk-colmore" onclick="event.stopPropagation();pkDoneSet('${PK_DONE==='all'?'recent':'all'}')">${PK_DONE==='all'?'Свернуть до '+PK_DONE_LIMIT:'Показать все · '+_total}</button></div>`:'';
         return `<div class="pk-col${_collapsed?' collapsed':''}" data-st="${st}" style="--pk-accent:${color}" ondragover="pkOver(event)" ondragleave="pkLeave(event)" ondrop="pkDrop(event,'${st}')">
-            <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${_total}</span>${st!=='done'?`<button class="pk-hadd" title="Добавить задачу" onclick="event.stopPropagation();pdNewTask('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Задача</span></button>`:''}${_tog}</div>
+            <div class="pk-col-h"><span class="dot" style="background:${color}"></span>${label}<span class="ct">${_total}</span>${(st!=='done'&&!_ro)?`<button class="pk-hadd" title="Добавить задачу" onclick="event.stopPropagation();pdNewTask('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Задача</span></button>`:''}${_tog}</div>
             <div class="pk-body">${cards}</div>
             ${_footer}
-            <div class="pk-add-zone">
+            ${_ro?'':`<div class="pk-add-zone">
               <button class="pk-addbtn" onclick="event.stopPropagation();pdNewTask('${st}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Задача</button>
-            </div>
+            </div>`}
           </div>`; };
       const totalN=T.length, doneN=byst('done').length, activeN=byst('active').length;
       const pctDone=totalN?Math.round(doneN/totalN*100):0;
@@ -9721,7 +9723,7 @@ async function contactsSave(){
 window.contactsSave=contactsSave;
 function _v(id){const e=document.getElementById(id);return e?e.value.trim():'';}
 
-function pdEditStage(id){
+function pdEditStage(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ toast('Проект завершён — редактирование запрещено'); return; }
   const s=(PROJECTS[pdIdx]._stages||[]).find(x=>x.id===id); if(!s) return; pd2St=s.status;
   const seg=[['done','Завершён','var(--pos)'],['active','В работе','var(--accent)'],['wait','Ожидает','var(--warn)']]
     .map(([k,l,c])=>`<button class="${k===s.status?'on':''}" data-st="${k}" onclick="pd2SetStatus('${k}')"><span class="d" style="background:${c}"></span>${l}</button>`).join('');
@@ -14586,7 +14588,7 @@ window.tTaskAdd = async (projectId,row) => {
     toast('Ошибка: '+(e.message||e)); } };
 let _pkRaf=0;
 function _pkRerender(){ if(_pkRaf) return; _pkRaf=requestAnimationFrame(()=>{ _pkRaf=0; try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }); }
-window.tTaskMove = async (id,status) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); try {
+window.tTaskMove = async (id,status) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); const _pp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===(t&&t.project_id)); if(_pp&&_pp.status==='done'){ toast('Проект завершён — изменения запрещены'); return; } try {
     const patch={status}; const now=new Date().toISOString(); let _wlog=null;
     if(t){ const nowMs=Date.now();
       if(t.timer_started && t.status==='active'){ const _s=Math.max(0,Math.round((nowMs-new Date(t.timer_started).getTime())/1000)); if(_s>0) _wlog={project_id:t.project_id,task_id:t.id,member_id:t.assignee_id,started_at:t.timer_started,sec:_s}; }
