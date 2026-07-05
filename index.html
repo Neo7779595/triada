@@ -43,6 +43,7 @@ button{font-family:inherit}
   background:radial-gradient(900px 520px at 50% -8%, rgba(55,230,200,.08), transparent 60%), var(--bg)}
 /* ——— анимированный фон (только transform/opacity → GPU) ——— */
 .lg-bg{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.lg-rain{position:absolute;inset:0;width:100%;height:100%;opacity:.22;mask:radial-gradient(ellipse 80% 75% at 50% 45%,#000 25%,transparent 80%);-webkit-mask:radial-gradient(ellipse 80% 75% at 50% 45%,#000 25%,transparent 80%)}
 .lg-grid{position:absolute;inset:-2px;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:46px 46px;
   mask:radial-gradient(ellipse 70% 60% at 50% 42%,#000 30%,transparent 78%);-webkit-mask:radial-gradient(ellipse 70% 60% at 50% 42%,#000 30%,transparent 78%);
   opacity:.5;animation:lgGrid 22s linear infinite;will-change:transform}
@@ -96,7 +97,7 @@ button{font-family:inherit}
 .demo-btn:hover{border-color:var(--accent-line);color:var(--accent);background:var(--accent-dim)}
 .demo-btn small{display:block;font-family:var(--mono);font-size:11px;color:var(--txt-3);margin-top:3px;font-weight:400}
 .login-foot{margin-top:30px;font-family:var(--mono);font-size:12px;color:var(--txt-3);letter-spacing:.06em}
-@media(prefers-reduced-motion:reduce){.lg-grid,.lg-aurora,.lg-scan,.lg-particles i,.login-card::before,.login-title .t,.btn-primary::after{animation:none}}
+@media(prefers-reduced-motion:reduce){.lg-grid,.lg-aurora,.lg-scan,.lg-particles i,.login-card::before,.login-title .t,.btn-primary::after{animation:none}.lg-rain{display:none}}
 
 /* ========== APP SHELL ========== */
 .app{display:none;grid-template-columns:248px 1fr;min-height:100vh}
@@ -4394,6 +4395,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <!-- ============ ОКНО 1 · ВХОД ============ -->
 <section id="page-login">
   <div class="lg-bg" aria-hidden="true">
+    <canvas class="lg-rain" id="lg-rain"></canvas>
     <div class="lg-grid"></div>
     <div class="lg-aurora lg-a1"></div>
     <div class="lg-aurora lg-a2"></div>
@@ -4791,6 +4793,59 @@ function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast
     sec.addEventListener('pointerleave',()=>{ card.style.transform=''; });
   };
   if(document.body)init(); else document.addEventListener('DOMContentLoaded',init);
+})();
+/* Премиальный цифровой дождь — canvas, ~26 FPS cap, авто-пауза когда экран входа скрыт или вкладка неактивна */
+(function lgRain(){
+  const mq=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)');
+  if(mq&&mq.matches) return;
+  const start=()=>{
+    const cv=document.getElementById('lg-rain'); if(!cv) return;
+    const ctx=cv.getContext('2d',{alpha:true}); if(!ctx) return;
+    const GLYPHS='01アイウエカキサシタチナニ<>[]/{}=+*';
+    const FONT=15, STEP=FONT*1.35;                                                     // размер и вертикальный шаг
+    let cols=0, drops=[], W=0, H=0, dpr=Math.min(window.devicePixelRatio||1,1.5);
+    function resize(){
+      const sec=document.getElementById('page-login'); if(!sec) return;
+      W=sec.clientWidth; H=sec.clientHeight; if(!W||!H) return;
+      cv.width=Math.floor(W*dpr); cv.height=Math.floor(H*dpr);
+      cv.style.width=W+'px'; cv.style.height=H+'px';
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.font=`${FONT}px var(--mono, monospace)`; ctx.textBaseline='top';
+      const gap=2.1;                                                                   // разрежённость колонок (минимализм)
+      cols=Math.floor(W/(FONT*gap));
+      drops=new Array(cols).fill(0).map(()=>({ y:Math.random()*-H, v:(0.5+Math.random()*0.7), x:0 }));
+      drops.forEach((d,i)=>{ d.x=Math.round(i*(W/cols)+ (W/cols)/2); });
+    }
+    let raf=0, last=0, hidden=false;
+    const FRAME=1000/26;                                                              // cap FPS
+    function frame(ts){
+      raf=requestAnimationFrame(frame);
+      if(hidden) return;
+      const sec=document.getElementById('page-login');
+      if(!sec || sec.offsetParent===null){ return; }                                   // экран входа не виден — простаиваем
+      if(ts-last<FRAME) return; last=ts;
+      // затухающий шлейф вместо полной очистки — мягкий премиум-хвост
+      ctx.globalCompositeOperation='source-over';
+      ctx.fillStyle='rgba(11,17,14,0.16)';
+      ctx.fillRect(0,0,W,H);
+      for(let i=0;i<drops.length;i++){
+        const d=drops[i];
+        const ch=GLYPHS[(Math.random()*GLYPHS.length)|0];
+        // ведущий символ — ярче, остальной хвост — тусклая бирюза
+        ctx.fillStyle='rgba(120,240,221,0.85)';
+        ctx.fillText(ch, d.x, d.y);
+        ctx.fillStyle='rgba(55,230,200,0.35)';
+        ctx.fillText(GLYPHS[(Math.random()*GLYPHS.length)|0], d.x, d.y-STEP);
+        d.y+=STEP*d.v*0.5;
+        if(d.y>H+STEP){ if(Math.random()>0.985){ d.y=Math.random()*-40; d.v=0.5+Math.random()*0.7; } else d.y=Math.random()*-H*0.5; }
+      }
+    }
+    resize();
+    let rt=0; window.addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(resize,180); });
+    document.addEventListener('visibilitychange',()=>{ hidden=document.hidden; });
+    raf=requestAnimationFrame(frame);
+  };
+  if(document.body)start(); else document.addEventListener('DOMContentLoaded',start);
 })();
 function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
