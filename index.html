@@ -2471,7 +2471,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-colmore{display:block;width:100%;padding:9px;font-size:13px;font-weight:500;color:var(--txt-3);background:transparent;border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:.15s var(--ease)}
 .pk-colmore:hover{color:var(--txt-2);border-color:var(--line-2);background:var(--bg-2)}
 .pk-card{position:relative;min-width:0;background:var(--bg-2);border:1px solid var(--line-2);border-radius:11px;padding:12px 13px 11px 16px;cursor:grab;transition:transform .16s var(--ease),box-shadow .16s var(--ease),border-color .16s var(--ease)}
-.pk-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--pk-accent,var(--accent))}
+.pk-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--pk-diff,var(--pk-accent,var(--accent)))}
+.pk-card.has-diff{border-color:color-mix(in srgb,var(--pk-diff) 28%,var(--line-2));background:linear-gradient(180deg,color-mix(in srgb,var(--pk-diff) 5%,var(--bg-2)),var(--bg-2))}
+.pk-card.has-diff::before{width:4px;box-shadow:0 0 10px -2px var(--pk-diff)}
+.pk-card.has-diff:hover{border-color:color-mix(in srgb,var(--pk-diff) 50%,var(--line-2))}
+.pk-tags{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.pk-diff-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px 2px 7px;border-radius:6px;color:var(--dc);background:color-mix(in srgb,var(--dc) 12%,transparent);border:1px solid color-mix(in srgb,var(--dc) 30%,transparent)}
+.pk-diff-dot{width:6px;height:6px;border-radius:50%;background:var(--dc);flex:none}
+.pk-prio-tag{display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;width:22px;height:20px;border-radius:6px;background:var(--bg-3);border:1px solid var(--line-2);cursor:default}
 .pk-card:hover{border-color:var(--accent-line);transform:translateY(-2px);box-shadow:0 12px 28px -14px rgba(0,0,0,.65)}
 .pk-card:active{cursor:grabbing}
 .pk-card.dragging{opacity:.45;transform:scale(.97);box-shadow:none}
@@ -6399,11 +6406,13 @@ const PD_STNEXT={wait:'active',active:'review',review:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
 const PK_DONE_LIMIT=10; let PK_DONE='recent';
 /* ——— фильтры канбан-доски: этап / исполнитель / дедлайн ——— */
-let PK_F_STAGE='all', PK_F_RESP='all', PK_F_DUE='all', PK_F_Q='';
+let PK_F_STAGE='all', PK_F_RESP='all', PK_F_DUE='all', PK_F_Q='', PK_F_DIFF='all', PK_F_PRIO='all';
 function pkSetStage(v){PK_F_STAGE=v;if(typeof renderPd==='function')renderPd();}
 function pkSetResp(v){PK_F_RESP=v;if(typeof renderPd==='function')renderPd();}
 function pkSetDue(v){PK_F_DUE=v;if(typeof renderPd==='function')renderPd();}
-function pkResetFilters(){PK_F_STAGE='all';PK_F_RESP='all';PK_F_DUE='all';PK_F_Q='';if(typeof renderPd==='function')renderPd();}
+function pkSetDiff(v){PK_F_DIFF=v;if(typeof renderPd==='function')renderPd();}
+function pkSetPrio(v){PK_F_PRIO=v;if(typeof renderPd==='function')renderPd();}
+function pkResetFilters(){PK_F_STAGE='all';PK_F_RESP='all';PK_F_DUE='all';PK_F_Q='';PK_F_DIFF='all';PK_F_PRIO='all';if(typeof renderPd==='function')renderPd();}
 function pkSearch(v){
   PK_F_Q=v;
   clearTimeout(window._pkSchT);
@@ -6426,6 +6435,8 @@ function _pkMatch(t){
   if(PK_F_STAGE!=='all' && String(t.stage_id||'')!==String(PK_F_STAGE)) return false;
   if(PK_F_RESP!=='all'){ if(PK_F_RESP==='__none'){ if(t.assignee_id) return false; } else if(String(t.assignee_id||'')!==String(PK_F_RESP)) return false; }
   if(PK_F_DUE!=='all' && _pkDueBucket(t)!==PK_F_DUE) return false;
+  if(PK_F_DIFF!=='all'){ if(PK_F_DIFF==='__none'){ if(t.difficulty) return false; } else if((t.difficulty||'')!==PK_F_DIFF) return false; }
+  if(PK_F_PRIO!=='all'){ if(PK_F_PRIO==='__none'){ if(t.priority) return false; } else if((t.priority||'')!==PK_F_PRIO) return false; }
   if(PK_F_Q){ const q=PK_F_Q.toLowerCase().trim(); if(q){
     const p=(typeof PROJECTS!=='undefined'&&typeof pdIdx!=='undefined')?PROJECTS[pdIdx]:null;
     const stg=p?(((p._stages||[]).find(x=>x.id===t.stage_id)||{}).name||''):'';
@@ -6486,6 +6497,8 @@ function _qtEisenPick(id,k){
   const h=document.getElementById(id+'-v'); if(!h)return; const cur=h.value===k?'':k; h.value=cur;   // повторный клик снимает
   const box=document.getElementById(id); if(box)box.querySelectorAll('.qt-eisen-b').forEach(b=>b.classList.toggle('on',cur&&b.dataset.k===k));
 }
+function _eisenEmoji(k){ const f=QT_EISEN.find(x=>x[0]===k); return f?f[2]:''; }
+function _eisenTitle(k){ const f=QT_EISEN.find(x=>x[0]===k); return f?f[1]+' · '+f[4]:''; }
 async function quickTaskOpen(){
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
@@ -6813,8 +6826,12 @@ function renderPd(){
           } else if(rel>0){
             rtimer=`<div class="pk-timer review mini"><span class="ic">${eyeic}</span><span class="pk-time" id="rtmr-${c.id}">${pkFmtDur(rel)}</span></div>`;
           }
-          return `<div class="pk-card" draggable="${_ro?'false':'true'}" data-tkid="${c.id}" ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)">
+          const _diffMap={hard:'var(--neg)',medium:'var(--warn)',easy:'var(--pos)'};
+          const _dc=_diffMap[c.difficulty]||'';
+          const _diffLbl={hard:'Сложная',medium:'Средняя',easy:'Лёгкая'}[c.difficulty]||'';
+          return `<div class="pk-card${_dc?' has-diff':''}" draggable="${_ro?'false':'true'}" data-tkid="${c.id}"${_dc?` style="--pk-diff:${_dc}"`:''} ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)">
               <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
+              ${(_diffLbl||c.priority)?`<div class="pk-tags">${_diffLbl?`<span class="pk-diff-tag" style="--dc:${_dc}"><span class="pk-diff-dot"></span>${_diffLbl}</span>`:''}${c.priority?`<span class="pk-prio-tag" title="${_eisenTitle(c.priority)}">${_eisenEmoji(c.priority)}</span>`:''}</div>`:''}
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
               ${rtimer}
@@ -6850,13 +6867,17 @@ function renderPd(){
       const _pkStageOpts=[['all','Все этапы']].concat((p._stages||[]).map(x=>[x.id,x.name]));
       const _pkRespOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
       const _pkDueOpts=[['all','Любой срок'],['overdue','Просроченные'],['today','Сегодня'],['week','Ближайшие 7 дней'],['future','Позже'],['none','Без срока']];
+      const _pkDiffOpts=[['all','Любая сложность'],['hard','Сложная'],['medium','Средняя'],['easy','Лёгкая'],['__none','Без сложности']];
+      const _pkPrioOpts=[['all','Любой приоритет'],['urgent_important','🔴 Важно · Срочно'],['important','🟢 Важно · Несрочно'],['urgent','🟡 Неважно · Срочно'],['neither','⚪️ Неважно · Несрочно'],['__none','Без приоритета']];
       const _pkLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
-      const _pkFActive=PK_F_STAGE!=='all'||PK_F_RESP!=='all'||PK_F_DUE!=='all'||!!PK_F_Q;
+      const _pkFActive=PK_F_STAGE!=='all'||PK_F_RESP!=='all'||PK_F_DUE!=='all'||PK_F_DIFF!=='all'||PK_F_PRIO!=='all'||!!PK_F_Q;
       const _pkShown=T.filter(_pkMatch).length;
       const filterBar=`<div class="pk-filters">`
         +`<div class="search pk-search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pk-search" placeholder="Поиск по задаче, этапу, исполнителю…" value="${(PK_F_Q||'').replace(/"/g,'&quot;')}" oninput="pkSearch(this.value)" autocomplete="off" spellcheck="false"></div>`
         +_dd('pkstage','Этап',_pkLbl(_pkStageOpts,PK_F_STAGE),_pkStageOpts,PK_F_STAGE,'pkSetStage')
         +_dd('pkresp','Исполнитель',_pkLbl(_pkRespOpts,PK_F_RESP),_pkRespOpts,PK_F_RESP,'pkSetResp')
+        +_dd('pkdiff','Сложность',_pkLbl(_pkDiffOpts,PK_F_DIFF),_pkDiffOpts,PK_F_DIFF,'pkSetDiff')
+        +_dd('pkprio','Приоритет',_pkLbl(_pkPrioOpts,PK_F_PRIO),_pkPrioOpts,PK_F_PRIO,'pkSetPrio')
         +_dd('pkdue','Дедлайн',_pkLbl(_pkDueOpts,PK_F_DUE),_pkDueOpts,PK_F_DUE,'pkSetDue')
         +(_pkFActive?`<button class="pk-fclear" onclick="pkResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button><span class="pk-fcount">${_pkShown} из ${T.length} задач</span>`:'')
         +`</div>`;
