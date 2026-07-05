@@ -564,6 +564,10 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .dts-dot{width:7px;height:7px;border-radius:50%;flex:none}
 .dts-grade{font-size:12px;font-weight:800;font-family:var(--mono);padding:1px 8px;border-radius:6px;line-height:1.5}
 .dts-nd{font-size:11.5px;color:var(--txt-3);font-style:italic}
+.dts-conf{display:inline-flex;align-items:flex-end;gap:2px;margin-left:5px;height:11px}
+.dts-cbar{width:3px;border-radius:1px}
+.dts-cbar:nth-child(1){height:5px}.dts-cbar:nth-child(2){height:8px}.dts-cbar:nth-child(3){height:11px}
+.dts-lowdata{font-size:11px;color:var(--warn);background:var(--warn-dim);border-radius:6px;padding:5px 8px;margin-bottom:10px;line-height:1.35}
 .dts-score{font-size:32px;font-weight:800;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
 .dts-of{font-size:14px;font-weight:600;color:var(--txt-3);margin-left:3px;letter-spacing:0}
 .dts-bar{height:6px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin:11px 0 12px}
@@ -13219,61 +13223,95 @@ function _tWalk(rows, idKey){
   const closes=[], returns=[], seen={};
   for(const id in byItem){
     const list=byItem[id].slice().sort((a,b)=> a.created_at<b.created_at?-1:a.created_at>b.created_at?1:0);
-    let activeStart=null, lastDoneBy=null;
+    let activeStart=null, lastDoneBy=null, lastActiveMs=null;
     list.forEach(h=>{
       const ms=new Date(h.created_at).getTime();
       const f=rank[h.old_status], to=rank[h.new_status];
-      if(h.new_status==='active') activeStart=ms;
+      if(h.new_status==='active'){ activeStart=ms; lastActiveMs=ms; }
       if(h.new_status==='done'){
         closes.push({ by:h.changed_by, ms, durMs:activeStart!=null?Math.max(ms-activeStart,0):null, projectId:h.project_id||null, name:h.stage_name||null, id, first:!seen[id] });
         seen[id]=true; lastDoneBy=h.changed_by; activeStart=null;
       }
-      if(f!=null && to!=null && to<f) returns.push({ against:lastDoneBy||h.changed_by, ms });
+      if(f!=null && to!=null && to<f) returns.push({ against:lastDoneBy||h.changed_by, ms, sinceActiveMs:(lastActiveMs!=null?Math.max(ms-lastActiveMs,0):null) });
     });
   }
   return {closes,returns};
 }
+/* Веса сложности: закрыть сложное «весит» больше, чем мелочь (исправляет искажение выработки). */
+const DIFF_WEIGHT={ easy:0.6, medium:1.0, hard:1.6 };
+const _diffW=k=> (k&&DIFF_WEIGHT[k]!=null)?DIFF_WEIGHT[k]:1.0;   // без метки = нейтральный вес 1.0
+/* Целевой темп: сколько «единиц сложности» в неделю считаем 100% выработки одного человека.
+   Это абсолютный якорь вместо сравнения с лучшим — не зависит от того, есть ли в агентстве супергерой. */
+const OUTPUT_TARGET_PER_WEEK=6;
+const MIN_CYCLES_FOR_SPEED=3;      // меньше — скорость ненадёжна (малая выборка)
+const MIN_DUE_FOR_RELIAB=3;        // меньше — пунктуальность ненадёжна
+const FAST_REJECT_H=8;             // возврат в первые 8ч после взятия ≈ реджект по ТЗ, вина исполнителя ниже
+
 function computeTeamMetrics(){
   const win=_tWindow();
   const raw=window._teamRaw;
   const members=(typeof TEAM!=='undefined'?TEAM:[]);
   const inWin=ms=> ms>=win.t0 && ms<win.t1;
   const inPrev=ms=> ms>=win.prevT0 && ms<win.prevT1;
+  const weeks=Math.max(1, win.days/7);
   const nB=win.days<=14 ? Math.min(win.days,7) : Math.min(8, Math.max(4, Math.round(win.days/7)));
   const bIdx=ms=>{ const r=(ms-win.t0)/(win.t1-win.t0); return _tClamp(Math.floor(r*nB),0,nB-1); };
   const M={};
-  members.forEach(m=> M[m._id]={ m, tp:0, redo:0, prevTp:0, returns:0, closes:0, cycles:[], onTime:0, withDue:0, open:0, overdue:0, weeks:new Array(nB).fill(0) });
-  const roleCycles={}, allCycles=[];
+  members.forEach(m=> M[m._id]={ m, tp:0, tpW:0, redo:0, prevTp:0, prevTpW:0, returns:0, softReturns:0, closes:0, cycles:[], onTime:0, withDue:0, open:0, overdue:0, weeksArr:new Array(nB).fill(0) });
+  const roleCycles={}, projCycles={}, allCycles=[];
+  const diffOf=id=> (raw&&raw.taskDiff&&id!=null)?raw.taskDiff[id]:null;
+  const projOf=id=> (raw&&raw.taskProj&&id!=null)?raw.taskProj[id]:null;
   if(raw){
     const sh=_tWalk(raw.hist,'stage_id'), th=_tWalk(raw.taskHist,'task_id');
     const closes=sh.closes.concat(th.closes), returns=sh.returns.concat(th.returns);
+    // карта: когда предмет последний раз становился active (для оценки «быстрого реджекта»)
     closes.forEach(c=>{
       const a=M[c.by]; if(!a) return;
-      if(inPrev(c.ms) && c.first) a.prevTp++;
+      const w=_diffW(diffOf(c.id));
+      if(inPrev(c.ms) && c.first){ a.prevTp++; a.prevTpW+=w; }
       if(!inWin(c.ms)) return;
       a.closes++;
-      if(c.first){ a.tp++; a.weeks[bIdx(c.ms)]++; } else a.redo++;
-      if(c.durMs!=null){ a.cycles.push(c.durMs); allCycles.push(c.durMs); const rl=(a.m.role||'—'); (roleCycles[rl]=roleCycles[rl]||[]).push(c.durMs); }
+      if(c.first){ a.tp++; a.tpW+=w; a.weeksArr[bIdx(c.ms)]++; } else a.redo++;
+      if(c.durMs!=null){ a.cycles.push(c.durMs); allCycles.push(c.durMs);
+        const rl=(a.m.role||'—'); (roleCycles[rl]=roleCycles[rl]||[]).push(c.durMs);
+        const pj=projOf(c.id); if(pj!=null){ (projCycles[pj]=projCycles[pj]||[]).push(c.durMs); } }
       if(c.id!=null && raw.taskDue && raw.taskDue[c.id]!==undefined){ const due=raw.taskDue[c.id]; if(due){ a.withDue++; if(c.ms <= new Date(due+'T23:59:59').getTime()) a.onTime++; } }
     });
-    returns.forEach(r=>{ if(!inWin(r.ms)) return; const a=M[r.against]; if(a) a.returns++; });
+    returns.forEach(r=>{ if(!inWin(r.ms)) return; const a=M[r.against]; if(!a) return;
+      // «мягкий» возврат: если откат случился быстро после взятия — вероятно, вина ТЗ/постановки, а не исполнения
+      const soft = (r.sinceActiveMs!=null && r.sinceActiveMs <= FAST_REJECT_H*3600000);
+      if(soft){ a.softReturns++; a.returns+=0.4; } else a.returns+=1;   // мягкий возврат весит меньше
+    });
     const today=new Date(); today.setHours(0,0,0,0);
     (raw.tasks||[]).forEach(t=>{ const a=M[t.assignee_id]; if(!a) return; if(t.status!=='done'){ a.open++; if(t.due_date && new Date(t.due_date+'T00:00:00')<today) a.overdue++; } });
   }
   // raw pillars 0..100
-  const teamMaxTp=Math.max(1,...members.map(m=>M[m._id].tp));
   members.forEach(m=>{ const a=M[m._id];
     a.medCycle=_tMed(a.cycles);
-    a.pOutput = a.tp>0 ? _tClamp(100*a.tp/teamMaxTp,0,100) : (a.closes?0:null);
-    const rl=(m.role||'—'), roleMed=_tMed(roleCycles[rl])||_tMed(allCycles);
-    a.pSpeed = (a.medCycle!=null && roleMed) ? _tClamp(70*roleMed/a.medCycle,8,100) : null;
+    a.lowSpeed = a.cycles.length < MIN_CYCLES_FOR_SPEED;
+    a.lowDue = a.withDue < MIN_DUE_FOR_RELIAB;
+    // ВЫРАБОТКА: абсолютная, по взвешенной сложности единиц в неделю против целевого темпа
+    const perWeek = a.tpW / weeks;
+    a.pOutput = (a.closes>0 || a.tpW>0) ? _tClamp(100*perWeek/OUTPUT_TARGET_PER_WEEK,0,100) : (a.closes?0:null);
+    // СКОРОСТЬ: эталон = смесь медианы по роли и по проектам, где человек работал (устойчивее одной роли)
+    const rl=(m.role||'—');
+    const roleMed=_tMed(roleCycles[rl]);
+    // персональный проектный эталон: медиана по всем проектам сотрудника
+    const myProjMeds=[]; const seenPj={};
+    (a.cycles.length?Object.keys(projCycles):[]).forEach(()=>{});
+    // собираем медианы проектов, где у человека были циклы
+    const projMedAll=_tMed([].concat(...Object.values(projCycles)));
+    const benchMed = (roleMed!=null && projMedAll!=null) ? (roleMed*0.6+projMedAll*0.4)
+                   : (roleMed!=null?roleMed : (projMedAll!=null?projMedAll:_tMed(allCycles)));
+    a.pSpeed = (a.medCycle!=null && benchMed && !a.lowSpeed) ? _tClamp(70*benchMed/a.medCycle,8,100) : null;
+    // КАЧЕСТВО: доля без возвратов (возвраты уже смягчены по вине ТЗ)
     a.pQuality = a.closes>0 ? _tClamp(100*(1-a.returns/a.closes),0,100) : null;
-    a.pReliab = a.withDue>0 ? 100*a.onTime/a.withDue : null;  // единое определение: пунктуальность по дедлайнам
+    // НАДЁЖНОСТЬ: пунктуальность по дедлайнам, но только при достаточной выборке
+    a.pReliab = (a.withDue>0 && !a.lowDue) ? 100*a.onTime/a.withDue : null;
   });
-  // team means per pillar (для сглаживания)
+  // team means per pillar (для сглаживания малых выборок к среднему)
   const mean=k=>{ const v=members.map(m=>M[m._id][k]).filter(x=>x!=null); return v.length?v.reduce((s,x)=>s+x,0)/v.length:50; };
   const tm={ output:mean('pOutput'), speed:mean('pSpeed'), quality:mean('pQuality'), reliability:mean('pReliab') };
-  // shrink + TPI
   members.forEach(m=>{ const a=M[m._id];
     const shrN=(raw0,key,nn)=>{ if(raw0==null) return null; const c=nn/(nn+TPI_K); return c*raw0+(1-c)*tm[key]; };
     a.sOutput=shrN(a.pOutput,'output',a.closes); a.sSpeed=shrN(a.pSpeed,'speed',a.cycles.length); a.sQuality=shrN(a.pQuality,'quality',a.closes); a.sReliab=shrN(a.pReliab,'reliability',a.withDue);
@@ -13281,13 +13319,12 @@ function computeTeamMetrics(){
     add(a.sOutput,TPI_W.output); add(a.sSpeed,TPI_W.speed); add(a.sQuality,TPI_W.quality); add(a.sReliab,TPI_W.reliability);
     a.tpi = den>0 ? Math.round(num/den) : null;
     a.n=a.closes;
+    a.weeks=a.weeksArr;   // совместимость с _tArch
+    a.dataConf = _tClamp(Math.round(100*a.closes/(a.closes+6)),0,100);   // доверие к данным (0 задач=0, много=~100)
   });
-  // rank by TPI (только у кого есть данные)
   const ranked=members.filter(m=>M[m._id].tpi!=null).sort((x,y)=>M[y._id].tpi-M[x._id].tpi);
   ranked.forEach((m,i)=>{ M[m._id].rank=i+1; });
-  // archetype
   members.forEach(m=>{ const a=M[m._id]; a.arch=_tArch(a); });
-  // период-агрегаты + дельты
   const sum=k=>members.reduce((s,m)=>s+(M[m._id][k]||0),0);
   const totTp=sum('tp'), prevTp=sum('prevTp');
   const totRet=sum('returns'), totCl=sum('closes');
@@ -13303,6 +13340,7 @@ function computeTeamMetrics(){
   const rows=members.map(m=>({ ...M[m._id], _i:members.indexOf(m) }));
   return { rows, agg, win, nB };
 }
+
 /* ═══════════ ЭФФЕКТИВНОСТЬ КОМАНД: две независимые оси ═══════════
    Ops — агрегат операционных метрик по составу команды (та же 4-столповая модель, что у людей).
    SMM — агрегат по SMM-отчётам проектов, где участники команды в составе (p._team) или ведут как ПМ.
@@ -13310,35 +13348,49 @@ function computeTeamMetrics(){
 const TEAM_OPS_W={ output:0.35, speed:0.25, quality:0.25, reliability:0.15 };
 const TEAM_SMM_W={ er:0.40, reachTrend:0.25, followers:0.20, cadence:0.15 };
 
-function _teamSmmScore(projIds){
+function _teamSmmScore(projLinks){
+  // projLinks: [{id, role:'lead'|'member'}] — как команда связана с проектом (ПМ или участник)
   const all=window._smmLbAll||[];
-  if(!all.length || !projIds.length) return null;
-  const idset=new Set(projIds.map(String));
+  if(!all.length || !projLinks || !projLinks.length) return null;
+  const linkOf={}; projLinks.forEach(l=>{ linkOf[String(l.id)]=l.role; });
+  const idset=new Set(projLinks.map(l=>String(l.id)));
   const latest={}, prev={};
   all.forEach(r=>{ const k=String(r.proj&&r.proj.id); if(!idset.has(k)) return;
     if(!latest[k]) latest[k]=r; else if(!prev[k]) prev[k]=r; });
   const keys=Object.keys(latest); if(!keys.length) return null;
-  let erArr=[], reachTrendArr=[], folArr=[], nReports=0, sumReach=0, sumViews=0;
+  // вес вклада: ПМ = 1.0, просто участник = 0.6 (исправляет размытую связку №7)
+  const contribW=k=> linkOf[k]==='lead'?1.0:0.6;
+  let erItems=[], reachItems=[], folItems=[], nReports=0, sumReach=0, sumViews=0, trendMeasurable=0;
   keys.forEach(k=>{
     const m=latest[k].m||{}, pm=(prev[k]&&prev[k].m)||null; nReports++;
-    if(m.er!=null) erArr.push(+m.er);
+    const w=contribW(k);
+    // ER адаптивен к размеру аудитории (№5): планка «100 баллов» ниже для крупных аккаунтов.
+    // база 8% для ~1k, снижается логарифмически: 10k→~6%, 100k→~4.5%, 1M→~3%
+    const subs=+m.subscribers_current||0;
+    const erTarget = subs>1000 ? Math.max(2.5, 8 - 1.15*Math.log10(subs/1000)) : 8;
+    if(m.er!=null){ const pe=_tClamp((+m.er)/erTarget*100,0,100); erItems.push({v:pe,w}); }
     const curReach=(+m.reels_reach||0)+(+m.stories_reach||0)+(+m.posts_reach||0);
     sumReach+=curReach; sumViews+=(+m.total_views||0);
     if(pm){ const prevReach=(+pm.reels_reach||0)+(+pm.stories_reach||0)+(+pm.posts_reach||0);
-      if(prevReach>0){ const g=(curReach-prevReach)/prevReach; reachTrendArr.push(_tClamp(50+g*140,0,100)); } }
-    const base=+m.subscribers_current||0, fol=+m.followers||0;
-    if(base>0){ const gp=fol/base*100; folArr.push(_tClamp(50+gp*10,0,100)); }
-    else if(fol>0) folArr.push(70);
+      if(prevReach>0){ const g=(curReach-prevReach)/prevReach; reachItems.push({v:_tClamp(50+g*140,0,100),w}); trendMeasurable++; } }
+    const base=subs, fol=+m.followers||0;
+    if(base>0){ const gp=fol/base*100; folItems.push({v:_tClamp(50+gp*10,0,100),w}); }
+    else if(fol>0) folItems.push({v:70,w});
   });
-  const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
-  const erRaw=avg(erArr); const pER=erRaw!=null?_tClamp(erRaw/8*100,0,100):null;
-  const pReach=avg(reachTrendArr);
-  const pFol=avg(folArr);
-  const pCad=projIds.length?_tClamp(100*keys.length/projIds.length,0,100):null;
+  // взвешенное среднее по вкладу
+  const wavg=arr=>{ if(!arr.length) return null; let n=0,d=0; arr.forEach(x=>{ n+=x.v*x.w; d+=x.w; }); return d>0?n/d:null; };
+  const pER=wavg(erItems);
+  const pReach=wavg(reachItems);
+  const pFol=wavg(folItems);
+  const pCad=projLinks.length?_tClamp(100*keys.length/projLinks.length,0,100):null;
   let num=0,den=0; const add=(v,w)=>{ if(v!=null){ num+=v*w; den+=w; } };
   add(pER,TEAM_SMM_W.er); add(pReach,TEAM_SMM_W.reachTrend); add(pFol,TEAM_SMM_W.followers); add(pCad,TEAM_SMM_W.cadence);
   const score=den>0?Math.round(num/den):null;
-  return { score, pER, pReach, pFol, pCad, erRaw, nReports, projN:keys.length, projTotal:projIds.length, sumReach, sumViews };
+  // доверие к SMM-баллу: растёт с числом отчётов и измеримостью тренда (№6)
+  const smmConf=_tClamp(Math.round(100*(keys.length/(keys.length+2)) * (0.6+0.4*(trendMeasurable/Math.max(1,keys.length)))),0,100);
+  const erRawArr=keys.map(k=>{ const e=latest[k].m&&latest[k].m.er; return e!=null?+e:null; }).filter(x=>x!=null);
+  const erRaw=erRawArr.length?erRawArr.reduce((s,x)=>s+x,0)/erRawArr.length:null;
+  return { score, pER, pReach, pFol, pCad, erRaw, nReports, projN:keys.length, projTotal:projLinks.length, sumReach, sumViews, smmConf, trendMeasurable };
 }
 
 function computeDeptScores(){
@@ -13357,16 +13409,27 @@ function computeDeptScores(){
     oadd(oO,TEAM_OPS_W.output); oadd(oS,TEAM_OPS_W.speed); oadd(oQ,TEAM_OPS_W.quality); oadd(oR,TEAM_OPS_W.reliability);
     const opsScore=od>0?Math.round(on/od):null;
     const sum=k=>rws.reduce((s,r)=>s+(r[k]||0),0);
-    const ops={ score:opsScore, tp:sum('tp'), returns:sum('returns'), closes:sum('closes'),
+    const totCloses=sum('closes');
+    // доверие к операционному баллу: доля сотрудников с данными + общий объём (№11, №3)
+    const withData=rws.filter(r=>r.tpi!=null).length;
+    const opsConf=_tClamp(Math.round(100*(withData/Math.max(1,d.emps.length)) * (totCloses/(totCloses+8))),0,100);
+    const ops={ score:opsScore, tp:sum('tp'), tpW:sum('tpW'), returns:Math.round(sum('returns')), closes:totCloses,
       onTime:sum('onTime'), withDue:sum('withDue'), open:sum('open'), overdue:sum('overdue'),
-      medCycle:_tMed([].concat(...rws.map(r=>r.cycles||[]))), pO:oO,pS:oS,pQ:oQ,pR:oR, withData:rws.length };
-    const projIds=PJ.filter(p=>{
-      const team=(p._team||[]).map(t=>String(t._id));
+      medCycle:_tMed([].concat(...rws.map(r=>r.cycles||[]))), pO:oO,pS:oS,pQ:oQ,pR:oR,
+      withData, teamSize:d.emps.length, perPerson: d.emps.length?Math.round(sum('tp')/d.emps.length*10)/10:0,
+      conf:opsConf, lowData: totCloses < 4 };
+    // связка с проектами + роль (ПМ/участник) для взвешивания вклада (№7)
+    const links=[];
+    PJ.forEach(p=>{
       const lead=p.lead_id!=null?String(p.lead_id):null;
-      return team.some(id=>d.memberIds.has(id)) || (lead && d.memberIds.has(lead));
-    }).map(p=>p.id);
-    const smm=_teamSmmScore(projIds);
-    return { name:d.name, emps:d.emps, ops, smm, projIds };
+      const team=(p._team||[]).map(t=>String(t._id));
+      const isLead = lead && d.memberIds.has(lead);
+      const isMember = team.some(id=>d.memberIds.has(id));
+      if(isLead) links.push({id:p.id, role:'lead'});
+      else if(isMember) links.push({id:p.id, role:'member'});
+    });
+    const smm=_teamSmmScore(links);
+    return { name:d.name, emps:d.emps, ops, smm, projLinks:links };
   });
   return { depts, win:tm.win };
 }
@@ -13516,16 +13579,18 @@ function renderTeam(){
       const av=(a.ops.score!=null?a.ops.score:-1), bv=(b.ops.score!=null?b.ops.score:-1); return bv-av;
     });
     const _sc=v=>v!=null?effColor(v):'var(--txt-3)';
-    const _gr=v=>{ const g=_gradeOf(v); return g.g; };
     const _mini=(lbl,val)=>`<div class="dts-mini"><span class="dts-ml">${lbl}</span><span class="dts-mv" style="color:${_sc(val)}">${val!=null?Math.round(val):'—'}</span></div>`;
+    // индикатор доверия к данным: точки-заполненность (мало данных → приглушённо)
+    const _conf=(c)=>{ const lv=c>=70?3:c>=40?2:c>=15?1:0; const col=c>=70?'var(--pos)':c>=40?'var(--warn)':'var(--txt-3)';
+      return `<span class="dts-conf" title="Доверие к данным: ${c}%">${[0,1,2].map(i=>`<span class="dts-cbar" style="background:${i<lv?col:'var(--bg-3)'}"></span>`).join('')}</span>`; };
     body=`<div class="dept-grid">${depts.length?depts.map(d=>{
       const ops=d.ops, smm=d.smm;
       const opsC=_sc(ops.score), opsG=_gradeOf(ops.score);
       const reworkPct=ops.closes?Math.round(100*ops.returns/ops.closes):0;
-      const onTimePct=ops.withDue?Math.round(100*ops.onTime/ops.withDue):null;
       const cyc=ops.medCycle!=null?_cycDur(ops.medCycle):'—';
       const hasSmm=smm&&smm.score!=null;
       const smmC=hasSmm?_sc(smm.score):'var(--txt-3)';
+      const opsScoreDim = ops.lowData ? 'opacity:.55' : '';
       return `<div class="dept-card dept-clic" onclick="openTeamCompose('${_attr(d.name)}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openTeamCompose('${_attr(d.name)}')">
         <div class="dept-h">
           <div><div class="dept-name" style="margin-bottom:6px">${d.name}</div><div style="font-size:12.5px;color:var(--txt-3)">${d.emps.length} ${_plural(d.emps.length,'сотрудник','сотрудника','сотрудников')} · за ${_periodLbl()}</div></div>
@@ -13533,18 +13598,20 @@ function renderTeam(){
         </div>
         <div class="dts-axes">
           <div class="dts-ax">
-            <div class="dts-axh"><span class="dts-axl"><span class="dts-dot" style="background:var(--accent)"></span>Операционная</span><span class="dts-grade" style="color:${opsC};background:${opsG.bg}">${opsG.g}</span></div>
-            <div class="dts-score" style="color:${opsC}">${ops.score!=null?ops.score:'—'}<span class="dts-of">/100</span></div>
+            <div class="dts-axh"><span class="dts-axl"><span class="dts-dot" style="background:var(--accent)"></span>Операционная ${_conf(ops.conf)}</span><span class="dts-grade" style="color:${opsC};background:${opsG.bg}">${opsG.g}</span></div>
+            <div class="dts-score" style="color:${opsC};${opsScoreDim}">${ops.score!=null?ops.score:'—'}<span class="dts-of">/100</span></div>
             <div class="dts-bar"><i style="width:${ops.score||0}%;background:${opsC}"></i></div>
             <div class="dts-minis">${_mini('Выработка',ops.pO)}${_mini('Скорость',ops.pS)}${_mini('Качество',ops.pQ)}${_mini('Надёжн.',ops.pR)}</div>
-            <div class="dts-foot"><span>${ops.tp} закрыто</span><span>${cyc} цикл</span><span style="color:${reworkPct>=20?'var(--neg)':'var(--txt-3)'}">${ops.returns} возвр.</span></div>
+            ${ops.lowData?`<div class="dts-lowdata">⚠ Мало данных (${ops.closes} ${_plural(ops.closes,'задача','задачи','задач')}) — оценка предварительная</div>`:''}
+            <div class="dts-foot"><span>${ops.tp} закрыто · ${ops.perPerson}/чел</span><span>${cyc} цикл</span><span style="color:${reworkPct>=20?'var(--neg)':'var(--txt-3)'}">${ops.returns} возвр.</span></div>
           </div>
           <div class="dts-ax${hasSmm?'':' dts-empty'}">
-            <div class="dts-axh"><span class="dts-axl"><span class="dts-dot" style="background:var(--violet)"></span>SMM</span>${hasSmm?'<span class="dts-grade" style="color:'+smmC+';background:'+_gradeOf(smm.score).bg+'">'+_gradeOf(smm.score).g+'</span>':'<span class="dts-nd">нет данных</span>'}</div>
+            <div class="dts-axh"><span class="dts-axl"><span class="dts-dot" style="background:var(--violet)"></span>SMM${hasSmm?' '+_conf(smm.smmConf):''}</span>${hasSmm?'<span class="dts-grade" style="color:'+smmC+';background:'+_gradeOf(smm.score).bg+'">'+_gradeOf(smm.score).g+'</span>':'<span class="dts-nd">нет данных</span>'}</div>
             ${hasSmm?`
             <div class="dts-score" style="color:${smmC}">${smm.score}<span class="dts-of">/100</span></div>
             <div class="dts-bar"><i style="width:${smm.score}%;background:${smmC}"></i></div>
             <div class="dts-minis">${_mini('Вовлеч.',smm.pER)}${_mini('Охват',smm.pReach)}${_mini('Аудит.',smm.pFol)}${_mini('Регул.',smm.pCad)}</div>
+            ${smm.trendMeasurable<smm.projN?`<div class="dts-lowdata">Тренд охвата: ${smm.trendMeasurable}/${smm.projN} проектов с историей</div>`:''}
             <div class="dts-foot"><span>${smm.projN}/${smm.projTotal} проектов</span><span>ER ${smm.erRaw!=null?smm.erRaw.toFixed(1).replace('.',',')+'%':'—'}</span></div>`
             :`<div class="dts-ndbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg><span>Нет SMM-проектов у команды</span></div>`}
           </div>
@@ -15434,10 +15501,15 @@ window.tLoadTeam = async () => {
   const _doneProj = new Set(((pr&&pr.data)||[]).filter(x=>x.status==='done').map(x=>x.id));
   const _projName={}; ((pr&&pr.data)||[]).forEach(x=>{ _projName[x.id]=x.name||''; });
   const _td={};   // детальная статистика задач по исполнителю (реальные данные)
-  const tasks = (tr.data||[]).filter(t=>!_doneProj.has(t.project_id)), hist = hr.data||[];
+  let tr2=await SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started,difficulty,priority');
+  if(tr2.error && /difficulty|priority/.test(tr2.error.message||'')) tr2=tr;   // колонок ещё нет — используем базовую выборку
+  const trUse = (tr2 && !tr2.error) ? tr2 : tr;
+  const tasks = (trUse.data||[]).filter(t=>!_doneProj.has(t.project_id)), hist = hr.data||[];
   const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];   // task_history может ещё не существовать
   const taskDue = {}; tasks.forEach(t=>{ if(t.id!=null) taskDue[t.id]=t.due_date||null; });
-  window._teamRaw = { tasks, hist, taskHist, taskDue, loadedAt: now };
+  const taskDiff = {}; tasks.forEach(t=>{ if(t.id!=null && t.difficulty) taskDiff[t.id]=t.difficulty; });   // сложность по задаче (для взвешивания выработки)
+  const taskProj = {}; tasks.forEach(t=>{ if(t.id!=null) taskProj[t.id]=t.project_id; });                   // проект задачи (для эталона скорости)
+  window._teamRaw = { tasks, hist, taskHist, taskDue, taskDiff, taskProj, loadedAt: now };
   const rank = { wait:0, active:1, done:2 };
   const stat = {};
   const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,review:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 });
