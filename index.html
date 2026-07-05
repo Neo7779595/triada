@@ -6425,7 +6425,7 @@ async function quickTaskOpen(){
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
   window._qtSub=[];
-  const projArr=PROJECTS.map(p=>[String(p.id), p.name]);
+  const projArr=PROJECTS.filter(p=>p.status!=='done').map(p=>[String(p.id), p.name]);
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Добавить задачу</h3><p>Быстрое создание · выберите проект и этап</p></div>
     <div class="modal-b">
       <div class="fld"><label>Проект <span style="color:var(--neg)">*</span></label>${selField('qt-proj', projArr, '')}</div>
@@ -6446,9 +6446,9 @@ async function _qtOnProject(idStr){
   // догружаем этапы и команду проекта
   if(p._stages===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});
-  const stages=(p._stages||[]);
+  const stages=(p._stages||[]).filter(s=>s.status!=='done');
   if(sw){
-    if(!stages.length){ sw.innerHTML='<div class="qt-hint" style="color:var(--warn)">У проекта нет этапов — добавьте этап в карточке проекта</div>'; }
+    if(!stages.length){ sw.innerHTML='<div class="qt-hint" style="color:var(--warn)">Нет активных этапов — все завершены или их нет</div>'; }
     else{
       const _stLbl=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
       const stArr=stages.map(s=>[s.id,_stLbl(s)]);
@@ -6487,10 +6487,10 @@ async function pdNewTask(st){
   const p=PROJECTS[pdIdx];
   if(p._stages===undefined && window.tLoadProjectWork) await window.tLoadProjectWork(p.id);        // этапов ещё нет — дождаться первой загрузки
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе модалка открывается мгновенно, данные освежаются в фоне
-  const stages=(p._stages||[]);
+  const stages=(p._stages||[]).filter(s=>s.status!=='done');
   if(!stages.length){
     pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
-      <div class="modal-b"><div class="modph" style="padding:26px 0"><h3>Нет этапов</h3><p>Сначала добавь хотя бы один этап во вкладке «Этапы», затем создавай задачи.</p></div></div>
+      <div class="modal-b"><div class="modph" style="padding:26px 0"><h3>Нет активных этапов</h3><p>Задачи создаются только в незавершённых этапах. Добавь или активируй этап во вкладке «Этапы».</p></div></div>
       <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div></div>`);
     return;
   }
