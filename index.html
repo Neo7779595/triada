@@ -5214,7 +5214,7 @@ function projSettings(i){
       <div class="fld"><label>Название</label><input id="pj-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
       <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}<div class="fld"><label>Ответственный</label>${selField('pj-lead',leadOpts,(p.lead_id||''))}</div></div>
-      <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML()}</div>
+      <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML(false)}</div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
         <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('np-cstart','')}</div><div class="np-ct-d"><span>Окончание</span>${dateField('np-cend','')}</div></div>
@@ -5382,6 +5382,7 @@ function svcEditorHTML(showCost){
   window.NP_SVC_SHOWCOST=(showCost!==false); const sc=window.NP_SVC_SHOWCOST;
   const svcs=(typeof _tagList==='function')?_tagList('service',['SMM','PROD','DESIGN'],''):['SMM'];
   const tfs=((window.TARIFF_TPL||[]).map(t=>t.name)); const tfList=tfs.length?tfs:((typeof _tagList==='function')?_tagList('tariff',['Platinum','Gold','Silver'],''):[]);
+  window._svcOpts={svcs:svcs,tfList:tfList};
   return '<style>'
     +'.svc-ed{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:11px}'
     +'.svc-head{display:grid;grid-template-columns:1.3fr 1.1fr .9fr .9fr 30px;gap:8px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3);font-weight:600;padding:0 2px 8px}'
@@ -5390,6 +5391,8 @@ function svcEditorHTML(showCost){
     +'.svc-i{background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit;font-size:14px;outline:none;width:100%;transition:.14s}'
     +'.svc-i:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}'
     +'.svc-num{text-align:right;font-family:var(--mono)}'
+    +'.svc-num.svc-ro{display:flex;align-items:center;justify-content:flex-end;color:var(--accent);background:var(--bg-1);cursor:default;font-weight:700}'
+    +'.svc-i select,select.svc-i{cursor:pointer}'
     +'.svc-del{width:30px;height:34px;border:1px solid var(--line-2);border-radius:8px;background:transparent;color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:.14s}'
     +'.svc-del:hover{color:var(--neg);border-color:var(--neg)}'
     +'.svc-add{margin-top:3px;width:100%;padding:9px;border:1px dashed var(--accent-line);border-radius:9px;background:var(--accent-dim);color:var(--accent);cursor:pointer;font:inherit;font-weight:600;font-size:14px;transition:.14s}'
@@ -5405,16 +5408,18 @@ function svcEditorHTML(showCost){
     +'<button type="button" class="svc-add" onclick="svcAdd()">+ Добавить услугу</button>'
     +'<div class="svc-tot" id="svc-tot"></div></div>';
 }
-function svcRender(){ const box=document.getElementById('svc-list'); if(!box)return; const sc=window.NP_SVC_SHOWCOST!==false; const a=window.NP_SVCS||[]; box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
-  +'<input class="svc-i" list="svc-dl" placeholder="Услуга" value="'+_attr(s.service)+'" onchange="svcSet('+i+',\'service\',this.value)">'
-  +'<input class="svc-i" list="svc-tf-dl" placeholder="Тариф" value="'+_attr(s.tariff)+'" onchange="svcSet('+i+',\'tariff\',this.value)">'
-  +'<input class="svc-i svc-num" type="number" min="0" placeholder="0" value="'+(s.mrr||'')+'" oninput="svcSet('+i+',\'mrr\',this.value)">'
-  +(sc?('<input class="svc-i svc-num" type="number" min="0" placeholder="0" value="'+(s.cost||'')+'" oninput="svcSet('+i+',\'cost\',this.value)">'):'')
-  +'<button type="button" class="svc-del" title="Убрать услугу" onclick="svcDel('+i+')"'+(a.length<=1?' style="opacity:.4"':'')+'>✕</button>'
-  +'</div>').join(''); svcRenderTot(); }
+function svcRender(){ const box=document.getElementById('svc-list'); if(!box)return; const a=window.NP_SVCS||[];
+  const so=(window._svcOpts&&window._svcOpts.svcs)||['SMM'], to=(window._svcOpts&&window._svcOpts.tfList)||[];
+  const opt=(arr,cur)=>['<option value="">— выбрать —</option>'].concat(arr.map(x=>'<option value="'+_attr(x)+'"'+(String(cur||'')===String(x)?' selected':'')+'>'+_attr(x)+'</option>')).join('');
+  box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
+    +'<select class="svc-i" onchange="svcSet('+i+',\'service\',this.value)">'+opt(so,s.service)+'</select>'
+    +'<select class="svc-i" onchange="svcSet('+i+',\'tariff\',this.value)">'+opt(to,s.tariff)+'</select>'
+    +'<div class="svc-i svc-num svc-ro" title="Доход из тарифа">'+(s.mrr?_svcMoney(s.mrr):'0')+'</div>'
+    +'<button type="button" class="svc-del" title="Убрать услугу" onclick="svcDel('+i+')"'+(a.length<=1?' style="opacity:.4"':'')+'>✕</button>'
+    +'</div>').join(''); svcRenderTot(); }
 function svcAdd(){ (window.NP_SVCS=window.NP_SVCS||[]).push({service:'',tariff:'',mrr:0,cost:0,status:'active'}); svcRender(); }
 function svcDel(i){ const a=window.NP_SVCS||[]; if(a.length<=1){ a[0]={service:'',tariff:'',mrr:0,cost:0,status:'active'}; } else { a.splice(i,1); } svcRender(); }
-function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(v); if(pr!=null && !a[i].mrr){ a[i].mrr=pr; svcRender(); return; } } if(f==='service' && i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function'){ npStagesReload(); } }
+function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(v); a[i].mrr=(pr!=null?pr:0); svcRender(); return; } if(f==='service' && i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function'){ npStagesReload(); } }
 function svcRenderTot(){ const el=document.getElementById('svc-tot'); if(!el)return; const sc=window.NP_SVC_SHOWCOST!==false; let inc=0,cst=0; (window.NP_SVCS||[]).forEach(s=>{inc+=Number(s.mrr)||0;cst+=Number(s.cost)||0;}); const mrg=inc>0?Math.round(100*(inc-cst)/inc):0; el.innerHTML='<span class="inc">Доход: <b>'+_svcMoney(inc)+'</b></span>'+(sc?('<span class="cst">Расход: <b>'+_svcMoney(cst)+'</b></span><span class="mrg">Маржа: <b>'+mrg+'%</b></span>'):''); if(window.PFIN && document.getElementById('pf-pl')){ window.PFIN.mrr=inc; if(typeof pfRecalc==='function')pfRecalc(); } }
 function svcCollect(){ return (window.NP_SVCS||[]).map(s=>({service:(s.service||'').trim(),tariff:(s.tariff||'').trim()||null,mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})).filter(s=>s.service||s.mrr||s.cost); }
 function svcPrimary(list){ const a=(list||svcCollect()).slice().sort((x,y)=>(y.mrr||0)-(x.mrr||0)); return a[0]||{service:'',tariff:null}; }
@@ -5449,7 +5454,7 @@ function openNewProject(){
       <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. Uzbek Doner"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
       <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
-      <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML()}</div>
+      <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML(false)}</div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
         <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('np-cstart','')}</div><div class="np-ct-d"><span>Окончание</span>${dateField('np-cend','')}</div></div>
