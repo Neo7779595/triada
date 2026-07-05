@@ -129,6 +129,31 @@ button{font-family:inherit}
 .topbar2 .pg{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3)}
 .topbar2 .pg b{color:var(--txt);font-weight:600;letter-spacing:0;text-transform:none;font-size:14px;display:block;margin-top:1px}
 .tb-search{display:flex;align-items:center;gap:9px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:9px;padding:7px 11px;cursor:pointer;color:var(--txt-3);font-family:var(--font);font-size:14px;font-weight:500;transition:.16s var(--ease)}
+.pf-row{background:var(--bg-2);border:1px solid var(--line);border-radius:11px;padding:10px 11px;margin-bottom:8px}
+.pf-row-main{display:grid;grid-template-columns:1.4fr 1fr;gap:8px}
+.pf-row-calc{display:flex;align-items:center;gap:7px;margin-top:8px}
+.pf-select{appearance:none;-webkit-appearance:none;background:var(--bg-1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7671' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid var(--line-2);border-radius:8px;padding:9px 30px 9px 11px;color:var(--txt);font-family:var(--font);font-size:13.5px;cursor:pointer;width:100%;transition:border-color .15s}
+.pf-select:focus{outline:none;border-color:var(--accent-line)}
+.pf-qty{width:60px;text-align:center;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 6px;color:var(--txt);font-size:13.5px}
+.pf-rate{flex:1;min-width:0;text-align:right;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 10px;color:var(--txt);font-size:13.5px}
+.pf-amt{flex:1;text-align:right;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 10px;color:var(--txt);font-size:13.5px}
+.pf-x,.pf-eq{color:var(--txt-3);font-size:13px;flex:0 0 auto}
+.pf-sum{flex:1;text-align:right;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pf-fixed{flex:1;display:flex;align-items:center;gap:8px}
+.pf-fx-l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);flex:0 0 auto}
+.pf-del{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-3);border-radius:8px;cursor:pointer;font-size:13px;transition:.14s}
+.pf-del:hover{color:var(--neg);border-color:var(--neg)}
+.pf-staff{margin-top:8px}
+.pf-empty{border:1px dashed var(--line-2);border-radius:10px;padding:12px;text-align:center;color:var(--txt-3);font-size:13px;cursor:pointer;transition:.14s}
+.pf-empty:hover{border-color:var(--accent-line);color:var(--accent)}
+.pf-empty span{color:var(--accent);font-weight:600;margin-left:4px}
+.pf-cat-btn{flex:0 0 auto;padding:8px 12px!important;font-size:12.5px!important;display:flex;align-items:center;gap:7px}
+.fce-row{display:grid;grid-template-columns:1.5fr 1.1fr .9fr 30px;gap:8px;margin-bottom:7px;align-items:center}
+.fce-row-cat{grid-template-columns:1.7fr 1.3fr 30px}
+.fce-head{display:grid;grid-template-columns:1.5fr 1.1fr .9fr 30px;gap:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin:2px 2px 7px}
+.fce-name,.fce-rate{background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 11px;color:var(--txt);font-family:var(--font);font-size:13.5px}
+.fce-rate{text-align:right;font-family:var(--mono)}
+
 .qt-hint{font-size:13px;color:var(--txt-3);padding:9px 12px;background:var(--bg-2);border:1px dashed var(--line-2);border-radius:9px}
 .qt-diff{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .qt-diff-b{display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 8px;border-radius:9px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);font-size:13px;font-weight:500;cursor:pointer;transition:.14s}
@@ -5039,6 +5064,57 @@ function renderAnalytics(){
     </div></div>
   </div>`;
 }
+/* ═══════════ СПРАВОЧНИКИ РАСХОДОВ (уровень агентства, настраиваются раз) ═══════════
+   Роли сотрудников со ставками и единицами расчёта + категории прочих расходов.
+   Хранятся локально по агентству. В проекте ставка подтягивается, но переопределяется. */
+const FIN_UNITS=[
+  ['reels','за 1 Reels','шт'],
+  ['stories','за 1 Stories','шт'],
+  ['post','за 1 пост','шт'],
+  ['hour','за час','ч'],
+  ['month','за месяц','мес'],
+  ['piece','за штуку','шт']
+];
+const FIN_UNIT_LABEL=Object.fromEntries(FIN_UNITS.map(u=>[u[0],u[1]]));
+const FIN_UNIT_SHORT=Object.fromEntries(FIN_UNITS.map(u=>[u[0],u[2]]));
+// дефолтные роли из брифа заказчика (ставку 0 задаст пользователь под своё агентство)
+const FIN_ROLES_DEFAULT=[
+  {name:'Оператор',rate:0,unit:'hour'},
+  {name:'Монтажёр',rate:0,unit:'reels'},
+  {name:'Мобилограф',rate:0,unit:'hour'},
+  {name:'Графический дизайнер',rate:0,unit:'post'},
+  {name:'Веб-дизайнер',rate:0,unit:'month'},
+  {name:'Моушн-дизайнер',rate:0,unit:'reels'},
+  {name:'Сторисмейкер',rate:0,unit:'stories'},
+  {name:'Проект-менеджер',rate:0,unit:'month'},
+  {name:'Бренд-фейс',rate:0,unit:'month'}
+];
+const FIN_CATS_DEFAULT=[
+  {name:'Офис',unit:'month'},
+  {name:'Такси',unit:'piece'},
+  {name:'Документация',unit:'month'},
+  {name:'Подписки',unit:'month'},
+  {name:'Реклама',unit:'month'},
+  {name:'Оборудование',unit:'piece'}
+];
+function _finCatKey(){ const me=(window.tMe&&window.tMe())||{}; return 'triada_fincat_'+(me.agencySlug||'default'); }
+let FIN_CAT_CACHE=null;
+function finCatLoad(){
+  if(FIN_CAT_CACHE) return FIN_CAT_CACHE;
+  let d=null; try{ const r=localStorage.getItem(_finCatKey()); if(r)d=JSON.parse(r); }catch(e){}
+  if(!d||typeof d!=='object') d={};
+  if(!Array.isArray(d.roles)) d.roles=JSON.parse(JSON.stringify(FIN_ROLES_DEFAULT));
+  if(!Array.isArray(d.cats))  d.cats =JSON.parse(JSON.stringify(FIN_CATS_DEFAULT));
+  FIN_CAT_CACHE=d; return d;
+}
+function finCatSave(d){ FIN_CAT_CACHE=d; try{ localStorage.setItem(_finCatKey(),JSON.stringify(d)); }catch(e){} }
+// сотрудники по роли (для привязки строки к конкретному человеку)
+function finStaffByRole(roleName){
+  const T=(typeof TEAM!=='undefined'?TEAM:[]);
+  const rn=(roleName||'').toLowerCase();
+  return T.filter(e=>((e.role||'').toLowerCase()===rn)).map(e=>[e._id, e.name]);
+}
+
 let TARIFFS=[
     {key:'trial',name:'Trial',price:'Бесплатно',per:'14 дней',feats:[[1,'1 кабинет агентства'],[1,'До 3 клиентов'],[1,'5 модулей аналитики'],[0,'Брендирование'],[0,'API и вебхуки'],[0,'Приоритетная поддержка']]},
     {key:'basic',name:'Basic',price:'1 900 000',per:'сум / мес',feats:[[1,'До 5 клиентов'],[1,'Все 8 модулей'],[1,'Командные роли'],[1,'Экспорт PDF/Excel'],[0,'White-label бренд'],[0,'API и вебхуки']]},
@@ -12724,26 +12800,57 @@ function openProjFinance(id){
   const p=list.find(x=>x.id===id);
   if(!p){ toast('Проект не найден'); return; }
   const f=p.finance||{};
-  const arr=k=>Array.isArray(f[k])?JSON.parse(JSON.stringify(f[k])):[];
+  const arr=k=>{ const a=Array.isArray(f[k])?JSON.parse(JSON.stringify(f[k])):[];
+    return a.map(r=>({ name:r.name||'', role:r.role||'', unit:r.unit||'month', rate:r.rate!=null?r.rate:(r.amount||0), qty:r.qty!=null?r.qty:1, manual:r.manual!=null?r.manual:(r.unit?false:true), staffId:r.staffId||null, amount:r.amount||0 })); };
   PFIN={ id, name:p.name, logoUrl:p.logoUrl, logo:p.logo, mrr:p.mrr||0,
     salaries:arr('salaries'), opex:arr('opex'), projex:arr('projex'), hours:f.hours||0, _svcs:(p._svcs||null), _svcsInit:false };
   pfRender();
   if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_services').select('id,service,tariff,mrr,cost,status,sort').eq('project_id',id).order('sort').then(r=>{ if(r&&r.data&&r.data.length && PFIN&&PFIN.id===id){ PFIN._svcs=r.data; svcReset(r.data); } }); }catch(_e){} }
 }
 function pfTotals(){
-  const sum=a=>a.reduce((s,r)=>s+(r.amount||0),0);
+  const sum=a=>a.reduce((s,r)=>s+(pfRowAmount(r)||0),0);
   const s=sum(PFIN.salaries), o=sum(PFIN.opex), pr=sum(PFIN.projex);
   const cost=s+o+pr, profit=PFIN.mrr-cost;
   const margin=PFIN.mrr>0?Math.round(100*profit/PFIN.mrr):null;
   return {s,o,pr,cost,profit,margin};
 }
-function pfAdd(list){ PFIN[list].push({name:'',amount:0}); pfRender(); }
+// сумма строки: фикс (unit=month) → rate; иначе qty × rate; ручное amount имеет приоритет если задано вручную
+function pfRowAmount(r){
+  if(r.manual) return r.amount||0;
+  if(r.unit==='month') return r.rate||0;
+  return Math.round((r.qty||0)*(r.rate||0));
+}
+function _pfRowLbl(r){
+  const nm=(r.name||'—');
+  if(r.manual||r.unit==='month') return nm;
+  const q=r.qty||0, un=FIN_UNIT_SHORT[r.unit]||'';
+  return q>0 ? `${nm} · ${q} ${un} × ${money(r.rate||0)}` : nm;
+}
+function pfAdd(list){ PFIN[list].push({name:'',role:'',unit:'month',rate:0,qty:1,amount:0,manual:false,staffId:null}); pfRender(); }
 function pfDel(list,i){ PFIN[list].splice(i,1); pfRender(); }
 function pfSetName(list,i,v){ PFIN[list][i].name=v; }
-function pfSetAmt(list,i,v){ PFIN[list][i].amount=Math.max(0,parseInt(v,10)||0); pfRecalc(); }
+function pfSetQty(list,i,v){ const r=PFIN[list][i]; r.qty=Math.max(0,parseFloat(v)||0); r.manual=false; r.amount=pfRowAmount(r); pfRecalc(); }
+function pfSetRate(list,i,v){ const r=PFIN[list][i]; r.rate=Math.max(0,parseInt(v,10)||0); r.manual=false; r.amount=pfRowAmount(r); pfRecalc(); }
+function pfSetAmt(list,i,v){ const r=PFIN[list][i]; r.amount=Math.max(0,parseInt(v,10)||0); r.manual=true; pfRecalc(); }
+// выбор роли/категории из справочника → подтягиваем ставку и единицу
+function pfPickCat(list,i,val){
+  const r=PFIN[list][i]; const cat=finCatLoad();
+  const pool = list==='salaries' ? cat.roles : cat.cats;
+  const item = pool.find(x=>x.name===val);
+  if(item){ r.name=item.name; r.role=item.name; r.unit=item.unit||'month'; if(item.rate!=null&&!r.manual)r.rate=item.rate; r.staffId=null; }
+  else { r.name=val; r.role=''; }
+  r.amount=pfRowAmount(r);
+  pfRender();
+}
+function pfSetUnit(list,i,val){ const r=PFIN[list][i]; r.unit=val; r.manual=false; r.amount=pfRowAmount(r); pfRender(); }
+function pfSetStaff(list,i,val){ const r=PFIN[list][i]; r.staffId=val||null;
+  if(val){ const T=(typeof TEAM!=='undefined'?TEAM:[]); const e=T.find(x=>String(x._id)===String(val)); if(e)r.name=e.name; }
+  pfRecalc();
+}
 function pfSetMrr(v){ PFIN.mrr=Math.max(0,parseInt(v,10)||0); pfRecalc(); }
 function pfSetHours(v){ PFIN.hours=Math.max(0,parseInt(v,10)||0); }
-function pfRecalc(){ const el=document.getElementById('pf-pl'); if(el) el.innerHTML=pfPLHtml(); }
+function pfRecalc(){ const el=document.getElementById('pf-pl'); if(el) el.innerHTML=pfPLHtml(); const tot=document.getElementById('pf-cost-tot'); if(tot){ const t=pfTotals(); tot.textContent=money(t.cost); } }
+
 function pfLine(lbl,val,col,indent,bold){
   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:${indent?'3px 0':'7px 0'};${indent?'':'border-top:1px solid var(--line)'}">
     <span style="font-size:${indent?'11.5px':'13px'};color:${indent?'var(--txt-3)':'var(--txt-2)'};${bold?'font-weight:700':''};padding-left:${indent?'15px':'0'}">${lbl}</span>
@@ -12753,11 +12860,11 @@ function pfPLHtml(){
   const t=pfTotals(); let h='';
   h+=pfLine('Доход (бюджет)', money(PFIN.mrr), 'var(--pos)');
   h+=pfLine('↳ Зарплаты', t.s?'−'+money(t.s):'—', 'var(--txt-3)');
-  PFIN.salaries.forEach(r=>{ if((r.name&&r.name.trim())||r.amount) h+=pfLine(r.name||'—', money(r.amount||0), 'var(--txt-3)', true); });
+  PFIN.salaries.forEach(r=>{ const a=pfRowAmount(r); if((r.name&&r.name.trim())||a) h+=pfLine(_pfRowLbl(r), money(a), 'var(--txt-3)', true); });
   h+=pfLine('↳ Операционные', t.o?'−'+money(t.o):'—', 'var(--txt-3)');
-  PFIN.opex.forEach(r=>{ if((r.name&&r.name.trim())||r.amount) h+=pfLine(r.name||'—', money(r.amount||0), 'var(--txt-3)', true); });
+  PFIN.opex.forEach(r=>{ const a=pfRowAmount(r); if((r.name&&r.name.trim())||a) h+=pfLine(_pfRowLbl(r), money(a), 'var(--txt-3)', true); });
   h+=pfLine('↳ На проект', t.pr?'−'+money(t.pr):'—', 'var(--txt-3)');
-  PFIN.projex.forEach(r=>{ if((r.name&&r.name.trim())||r.amount) h+=pfLine(r.name||'—', money(r.amount||0), 'var(--txt-3)', true); });
+  PFIN.projex.forEach(r=>{ const a=pfRowAmount(r); if((r.name&&r.name.trim())||a) h+=pfLine(_pfRowLbl(r), money(a), 'var(--txt-3)', true); });
   h+=pfLine('Итого расходы', money(t.cost), 'var(--neg)');
   h+=pfLine('Прибыль', (t.profit>=0?'+':'')+money(t.profit), t.profit>=0?'var(--pos)':'var(--neg)', false, true);
   const mc=t.margin==null?'var(--txt-3)':t.margin>=50?'var(--pos)':t.margin>=25?'var(--accent)':'var(--neg)';
@@ -12766,28 +12873,63 @@ function pfPLHtml(){
 }
 function pfSection(list,title,sub,ph){
   const rows=PFIN[list];
-  return `<div class="fld" style="margin-top:6px">
+  const cat=finCatLoad();
+  const pool = list==='salaries' ? cat.roles : cat.cats;
+  const isSalary = list==='salaries';
+  const catLabel = isSalary?'роль':'категория';
+  const rowHtml=(r,i)=>{
+    const amt=pfRowAmount(r);
+    const fixed = r.unit==='month';
+    const staff = isSalary && r.role ? finStaffByRole(r.role) : [];
+    // селект роли/категории
+    const catOpts=[['','— '+catLabel+' —']].concat(pool.map(x=>[x.name,x.name]));
+    const curCatLbl = r.name || ('— '+catLabel+' —');
+    return `<div class="pf-row">
+      <div class="pf-row-main">
+        ${_pfSel('pfc-'+list+'-'+i, catOpts, r.name, `pfPickCat('${list}',${i},this.value)`, catLabel)}
+        ${_pfSel('pfu-'+list+'-'+i, FIN_UNITS.map(u=>[u[0],u[1]]), r.unit, `pfSetUnit('${list}',${i},this.value)`, 'единица')}
+      </div>
+      <div class="pf-row-calc">
+        ${fixed?`
+          <div class="pf-fixed"><span class="pf-fx-l">сумма / мес</span>
+            <input type="number" min="0" step="50000" value="${amt}" oninput="pfSetAmt('${list}',${i},this.value)" class="pf-amt"></div>
+        `:`
+          <input type="number" min="0" step="1" value="${r.qty||0}" oninput="pfSetQty('${list}',${i},this.value)" class="pf-qty" title="количество">
+          <span class="pf-x">×</span>
+          <input type="number" min="0" step="10000" value="${r.rate||0}" oninput="pfSetRate('${list}',${i},this.value)" class="pf-rate" title="ставка ${FIN_UNIT_LABEL[r.unit]||''}">
+          <span class="pf-eq">=</span>
+          <span class="pf-sum">${money(amt)}</span>
+        `}
+        <button class="pf-del" onclick="pfDel('${list}',${i})" title="Удалить">✕</button>
+      </div>
+      ${staff.length?`<div class="pf-staff">${_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',`pfSetStaff('${list}',${i},this.value)`,'сотрудник')}</div>`:''}
+    </div>`;
+  };
+  return `<div class="fld pf-sec" style="margin-top:6px">
     <label style="display:flex;justify-content:space-between;align-items:center">${title}<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="pfAdd('${list}')">+ Добавить</button></label>
-    ${rows.length?`<div style="display:flex;justify-content:space-between;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3);margin:0 2px 7px"><span>${sub}</span><span>сумма / мес</span></div>`:''}
-    ${rows.length?rows.map((r,i)=>`<div style="display:flex;gap:8px;margin-bottom:7px">
-      <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="${ph}" oninput="pfSetName('${list}',${i},this.value)" style="flex:1">
-      <input type="number" min="0" step="50000" value="${r.amount||0}" oninput="pfSetAmt('${list}',${i},this.value)" style="width:150px;text-align:right;font-family:var(--mono)">
-      <button class="btn-ghost" style="padding:0 12px;color:var(--neg);flex:0 0 auto" onclick="pfDel('${list}',${i})">✕</button>
-    </div>`).join(''):`<div style="font-size:13.5px;color:var(--txt-3);padding:2px 2px 4px">${ph}</div>`}
+    ${rows.length?rows.map(rowHtml).join(''):`<div class="pf-empty" onclick="pfAdd('${list}')">${ph} <span>+ добавить</span></div>`}
   </div>`;
 }
+// компактный нативный селект в стиле платформы (без кастомного дропдауна — надёжнее в скролле модалки)
+function _pfSel(id,opts,cur,onchange,ph){
+  return `<select id="${id}" class="pf-select" onchange="${onchange}">
+    ${opts.map(o=>`<option value="${String(o[0]).replace(/"/g,'&quot;')}"${String(o[0])===String(cur)?' selected':''}>${o[1]}</option>`).join('')}
+  </select>`;
+}
+
 function pfRender(){
   const suff=t=>`<span style="display:flex;align-items:center;padding:0 14px;background:var(--bg-3);border:1px solid var(--line);border-left:none;border-radius:0 9px 9px 0;font-size:13px;color:var(--txt-3);flex:0 0 auto">${t}</span>`;
   pd2Open(`<div class="modal" style="max-width:560px">
     <div class="modal-h" style="display:flex;align-items:center;gap:12px">
       <div class="ov-av" style="width:40px;height:40px;border-radius:10px">${logoFill(PFIN.logoUrl,PFIN.logo)}</div>
-      <div><h3 style="margin:0">Финансы проекта</h3><p style="margin:2px 0 0;text-transform:uppercase;letter-spacing:.04em">${PFIN.name}</p></div>
+      <div style="flex:1"><h3 style="margin:0">Финансы проекта</h3><p style="margin:2px 0 0;text-transform:uppercase;letter-spacing:.04em">${PFIN.name}</p></div>
+      <button class="btn-ghost pf-cat-btn" onclick="openFinCatalog()" title="Настроить роли и категории"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Справочники</button>
     </div>
     <div class="modal-b" style="max-height:64vh;overflow:auto">
       <div class="fld"><label style="display:flex;justify-content:space-between">Услуги и доход от клиента <span style="color:var(--txt-3);font-weight:400;text-transform:uppercase;font-size:11.5px;letter-spacing:.07em;align-self:center">бюджет / мес</span></label>${svcEditorHTML(false)}</div>
-      ${pfSection('salaries','Зарплаты','имя / роль','Имя сотрудника')}
-      ${pfSection('opex','Операционные расходы','статья (аренда, инструменты…)','Аренда, инструменты, реклама…')}
-      ${pfSection('projex','Расходы на проект','статья (съёмка, реквизит…)','Съёмка, реквизит, студия…')}
+      ${pfSection('salaries','Команда и гонорары','роль','Выберите роль из справочника')}
+      ${pfSection('opex','Операционные расходы','категория','Выберите категорию')}
+      ${pfSection('projex','Расходы на проект','категория','Выберите категорию')}
       <div class="fld" style="margin-top:6px"><label>Отработанные часы</label>
         <div style="display:flex"><input id="pf-hours" type="number" min="0" value="${PFIN.hours}" oninput="pfSetHours(this.value)" style="flex:1;border-radius:9px 0 0 9px;font-family:var(--mono)">${suff('часов')}</div></div>
       <div class="eyebrow" style="margin:20px 0 9px">P&L — расчёт в реальном времени</div>
@@ -12801,7 +12943,7 @@ async function saveProjFinance(){
   if(!PFIN) return;
   const svcsArr=svcCollect(); const prim=svcPrimary(svcsArr); PFIN.mrr=svcTotals(svcsArr).mrr;
   const t=pfTotals();
-  const clean=arr=>arr.filter(r=>(r.name&&r.name.trim())||r.amount>0).map(r=>({name:(r.name||'').trim(),amount:r.amount||0}));
+  const clean=arr=>arr.filter(r=>(r.name&&r.name.trim())||pfRowAmount(r)>0).map(r=>({name:(r.name||'').trim(),role:r.role||'',unit:r.unit||'month',rate:r.rate||0,qty:r.qty||0,manual:!!r.manual,staffId:r.staffId||null,amount:pfRowAmount(r)}));
   const finance={ salaries:clean(PFIN.salaries), opex:clean(PFIN.opex), projex:clean(PFIN.projex), hours:PFIN.hours||0 };
   if(window.LIVE&&window.tProjectUpdate){
     try{ await SB.from('project_services').delete().eq('project_id',PFIN.id); if(svcsArr.length){ const rows=svcsArr.map((s,k)=>({project_id:PFIN.id,service:s.service||'Услуга',tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; } }catch(e){ console.error('fin services',e); toast('Услуги не сохранились'); }
@@ -12812,6 +12954,62 @@ async function saveProjFinance(){
     if(p){ p.mrr=PFIN.mrr; p.cost=t.cost; p.hours=PFIN.hours; p.finance=finance; p.profit=PFIN.mrr-t.cost; p.margin=PFIN.mrr>0?Math.round(100*(PFIN.mrr-t.cost)/PFIN.mrr):null; p._svcs=svcsArr; } }
   if(typeof PROJECTS!=='undefined'){ const pp=PROJECTS.find(x=>x.id===PFIN.id); if(pp){ pp.mrr=PFIN.mrr; pp._svcs=svcsArr; if(prim.service)pp.svc=prim.service; pp.tariff=prim.tariff||null; } }
   pd2Close(); PFIN=null; renderFinance(); toast('P&L сохранён');
+}
+
+/* ═══════ Редактор справочников расходов (роли + категории) ═══════ */
+let FINCAT_EDIT=null;
+function openFinCatalog(){
+  const d=finCatLoad();
+  FINCAT_EDIT={ roles:JSON.parse(JSON.stringify(d.roles)), cats:JSON.parse(JSON.stringify(d.cats)) };
+  finCatRender();
+}
+function finCatRoleAdd(){ FINCAT_EDIT.roles.push({name:'',rate:0,unit:'month'}); finCatRender(); }
+function finCatRoleDel(i){ FINCAT_EDIT.roles.splice(i,1); finCatRender(); }
+function finCatCatAdd(){ FINCAT_EDIT.cats.push({name:'',unit:'month'}); finCatRender(); }
+function finCatCatDel(i){ FINCAT_EDIT.cats.splice(i,1); finCatRender(); }
+function finCatSetRole(i,f,v){ FINCAT_EDIT.roles[i][f]= f==='rate'?Math.max(0,parseInt(v,10)||0):v; }
+function finCatSetCat(i,f,v){ FINCAT_EDIT.cats[i][f]=v; }
+function finCatSaveClose(){
+  const d=finCatLoad();
+  d.roles=FINCAT_EDIT.roles.filter(r=>(r.name||'').trim()).map(r=>({name:r.name.trim(),rate:r.rate||0,unit:r.unit||'month'}));
+  d.cats =FINCAT_EDIT.cats.filter(c=>(c.name||'').trim()).map(c=>({name:c.name.trim(),unit:c.unit||'month'}));
+  finCatSave(d); FINCAT_EDIT=null;
+  if(window.PFIN){ pfRender(); } else { pd2Close(); }
+  toast('Справочники сохранены');
+}
+function finCatResetDefaults(){
+  FINCAT_EDIT={ roles:JSON.parse(JSON.stringify(FIN_ROLES_DEFAULT)), cats:JSON.parse(JSON.stringify(FIN_CATS_DEFAULT)) };
+  finCatRender();
+}
+function finCatRender(){
+  const unitSel=(cur,onch)=>`<select class="pf-select" onchange="${onch}">${FIN_UNITS.map(u=>`<option value="${u[0]}"${u[0]===cur?' selected':''}>${u[1]}</option>`).join('')}</select>`;
+  const roleRows=FINCAT_EDIT.roles.map((r,i)=>`<div class="fce-row">
+    <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Роль (напр. Монтажёр)" oninput="finCatSetRole(${i},'name',this.value)" class="fce-name">
+    ${unitSel(r.unit,`finCatSetRole(${i},'unit',this.value)`)}
+    <input type="number" min="0" step="10000" value="${r.rate||0}" oninput="finCatSetRole(${i},'rate',this.value)" class="fce-rate" placeholder="ставка">
+    <button class="pf-del" onclick="finCatRoleDel(${i})" title="Удалить">✕</button>
+  </div>`).join('');
+  const catRows=FINCAT_EDIT.cats.map((c,i)=>`<div class="fce-row fce-row-cat">
+    <input value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="Категория (напр. Такси)" oninput="finCatSetCat(${i},'name',this.value)" class="fce-name">
+    ${unitSel(c.unit,`finCatSetCat(${i},'unit',this.value)`)}
+    <button class="pf-del" onclick="finCatCatDel(${i})" title="Удалить">✕</button>
+  </div>`).join('');
+  pd2Open(`<div class="modal" style="max-width:560px">
+    <div class="modal-h"><h3 style="margin:0">Справочники расходов</h3><p style="margin:3px 0 0">Настройте роли и категории один раз — дальше выбор из списка</p></div>
+    <div class="modal-b" style="max-height:66vh;overflow:auto">
+      <div class="fld">
+        <label style="display:flex;justify-content:space-between;align-items:center">Роли сотрудников и ставки<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatRoleAdd()">+ Роль</button></label>
+        <div class="fce-head"><span>название</span><span>единица</span><span>ставка</span><span></span></div>
+        ${roleRows||'<div class="pf-empty">Пока нет ролей</div>'}
+      </div>
+      <div class="fld" style="margin-top:14px">
+        <label style="display:flex;justify-content:space-between;align-items:center">Категории прочих расходов<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatCatAdd()">+ Категория</button></label>
+        ${catRows||'<div class="pf-empty">Пока нет категорий</div>'}
+      </div>
+      <button class="btn-ghost" style="margin-top:12px;font-size:12.5px;color:var(--txt-3)" onclick="finCatResetDefaults()">↺ Вернуть стандартный список</button>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="FINCAT_EDIT=null; ${'window.PFIN?pfRender():pd2Close()'}">Отмена</button><button class="btn-add" onclick="finCatSaveClose()">✓ Сохранить</button></div>
+  </div>`);
 }
 
 /* ——— finance helpers: hours format, filters, profit split ——— */
