@@ -556,6 +556,28 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .dept-bar{height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin:14px 0 12px}
 .dept-bar i{display:block;height:100%;background:var(--pos);border-radius:4px}
 .dept-stats{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.dts-axes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.dts-ax{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:13px 13px 12px}
+.dts-ax.dts-empty{opacity:.72}
+.dts-axh{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.dts-axl{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-2)}
+.dts-dot{width:7px;height:7px;border-radius:50%;flex:none}
+.dts-grade{font-size:12px;font-weight:800;font-family:var(--mono);padding:1px 8px;border-radius:6px;line-height:1.5}
+.dts-nd{font-size:11.5px;color:var(--txt-3);font-style:italic}
+.dts-score{font-size:32px;font-weight:800;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.dts-of{font-size:14px;font-weight:600;color:var(--txt-3);margin-left:3px;letter-spacing:0}
+.dts-bar{height:6px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin:11px 0 12px}
+.dts-bar i{display:block;height:100%;border-radius:4px;transition:width .6s var(--ease-out)}
+.dts-minis{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-bottom:11px}
+.dts-mini{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.dts-ml{font-size:11.5px;color:var(--txt-3)}
+.dts-mv{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.dts-foot{display:flex;flex-wrap:wrap;gap:4px 12px;padding-top:10px;border-top:1px solid var(--line);font-size:11.5px;color:var(--txt-3);font-family:var(--mono)}
+.dts-ndbox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:20px 8px 14px;text-align:center;color:var(--txt-3)}
+.dts-ndbox svg{width:26px;height:26px;opacity:.5}
+.dts-ndbox span{font-size:12px;line-height:1.4;max-width:150px}
+@media(max-width:560px){.dts-axes{grid-template-columns:1fr}}
+
 .dept-stats .st{flex:1;background:var(--bg);padding:10px;text-align:center}
 .dept-stats .st .v{font-family:var(--mono);font-size:16px}
 .dept-stats .st .l{font-size:11px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.07em;margin-top:4px}
@@ -13163,7 +13185,11 @@ let TEAM=[
   {name:'Нур-Ислам Алиев',role:'Руководитель',dept:'Администрация',color:'#F0785C',cycle:'—',inwork:'—',d7:'—',d30:'—',rework:39,eff:null},
 ];
 let TEAMAGG={assigned:0,open:0,overdue:0,v30:0};
-function setTeamTab(t){teamTab=t;renderTeam();}
+function setTeamTab(t){teamTab=t;renderTeam();
+  if(t==='depts' && window._smmLbAll==null && !_smmLbLoading && typeof smmLoadLb==='function'){   // SMM-балл команд требует данных лидерборда
+    smmLoadLb().then(()=>{ if(teamTab==='depts') renderTeam(); }).catch(()=>{});
+  }
+}
 function effColor(e){return e>=75?'var(--pos)':e>=50?'var(--warn)':'var(--neg)';}
 
 /* ===== TALENT INTELLIGENCE · period-aware performance engine ===== */
@@ -13277,6 +13303,74 @@ function computeTeamMetrics(){
   const rows=members.map(m=>({ ...M[m._id], _i:members.indexOf(m) }));
   return { rows, agg, win, nB };
 }
+/* ═══════════ ЭФФЕКТИВНОСТЬ КОМАНД: две независимые оси ═══════════
+   Ops — агрегат операционных метрик по составу команды (та же 4-столповая модель, что у людей).
+   SMM — агрегат по SMM-отчётам проектов, где участники команды в составе (p._team) или ведут как ПМ.
+   Команды без SMM-проектов не штрафуются: SMM = null («нет данных»). Смешанного числа нет. */
+const TEAM_OPS_W={ output:0.35, speed:0.25, quality:0.25, reliability:0.15 };
+const TEAM_SMM_W={ er:0.40, reachTrend:0.25, followers:0.20, cadence:0.15 };
+
+function _teamSmmScore(projIds){
+  const all=window._smmLbAll||[];
+  if(!all.length || !projIds.length) return null;
+  const idset=new Set(projIds.map(String));
+  const latest={}, prev={};
+  all.forEach(r=>{ const k=String(r.proj&&r.proj.id); if(!idset.has(k)) return;
+    if(!latest[k]) latest[k]=r; else if(!prev[k]) prev[k]=r; });
+  const keys=Object.keys(latest); if(!keys.length) return null;
+  let erArr=[], reachTrendArr=[], folArr=[], nReports=0, sumReach=0, sumViews=0;
+  keys.forEach(k=>{
+    const m=latest[k].m||{}, pm=(prev[k]&&prev[k].m)||null; nReports++;
+    if(m.er!=null) erArr.push(+m.er);
+    const curReach=(+m.reels_reach||0)+(+m.stories_reach||0)+(+m.posts_reach||0);
+    sumReach+=curReach; sumViews+=(+m.total_views||0);
+    if(pm){ const prevReach=(+pm.reels_reach||0)+(+pm.stories_reach||0)+(+pm.posts_reach||0);
+      if(prevReach>0){ const g=(curReach-prevReach)/prevReach; reachTrendArr.push(_tClamp(50+g*140,0,100)); } }
+    const base=+m.subscribers_current||0, fol=+m.followers||0;
+    if(base>0){ const gp=fol/base*100; folArr.push(_tClamp(50+gp*10,0,100)); }
+    else if(fol>0) folArr.push(70);
+  });
+  const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:null;
+  const erRaw=avg(erArr); const pER=erRaw!=null?_tClamp(erRaw/8*100,0,100):null;
+  const pReach=avg(reachTrendArr);
+  const pFol=avg(folArr);
+  const pCad=projIds.length?_tClamp(100*keys.length/projIds.length,0,100):null;
+  let num=0,den=0; const add=(v,w)=>{ if(v!=null){ num+=v*w; den+=w; } };
+  add(pER,TEAM_SMM_W.er); add(pReach,TEAM_SMM_W.reachTrend); add(pFol,TEAM_SMM_W.followers); add(pCad,TEAM_SMM_W.cadence);
+  const score=den>0?Math.round(num/den):null;
+  return { score, pER, pReach, pFol, pCad, erRaw, nReports, projN:keys.length, projTotal:projIds.length, sumReach, sumViews };
+}
+
+function computeDeptScores(){
+  const tm=computeTeamMetrics();
+  const byId={}; tm.rows.forEach(r=>{ byId[r.m._id]=r; });
+  const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const deptMap={};
+  (typeof TEAM!=='undefined'?TEAM:[]).forEach(e=>{ const d=e.dept||'—';
+    const x=deptMap[d]||(deptMap[d]={name:d,emps:[],memberIds:new Set()});
+    x.emps.push(e); x.memberIds.add(e._id); });
+  const depts=Object.values(deptMap).map(d=>{
+    const rws=d.emps.map(e=>byId[e._id]).filter(Boolean);
+    const pill=key=>{ const v=rws.map(r=>r[key]).filter(x=>x!=null); return v.length?v.reduce((s,x)=>s+x,0)/v.length:null; };
+    const oO=pill('sOutput'), oS=pill('sSpeed'), oQ=pill('sQuality'), oR=pill('sReliab');
+    let on=0,od=0; const oadd=(v,w)=>{ if(v!=null){ on+=v*w; od+=w; } };
+    oadd(oO,TEAM_OPS_W.output); oadd(oS,TEAM_OPS_W.speed); oadd(oQ,TEAM_OPS_W.quality); oadd(oR,TEAM_OPS_W.reliability);
+    const opsScore=od>0?Math.round(on/od):null;
+    const sum=k=>rws.reduce((s,r)=>s+(r[k]||0),0);
+    const ops={ score:opsScore, tp:sum('tp'), returns:sum('returns'), closes:sum('closes'),
+      onTime:sum('onTime'), withDue:sum('withDue'), open:sum('open'), overdue:sum('overdue'),
+      medCycle:_tMed([].concat(...rws.map(r=>r.cycles||[]))), pO:oO,pS:oS,pQ:oQ,pR:oR, withData:rws.length };
+    const projIds=PJ.filter(p=>{
+      const team=(p._team||[]).map(t=>String(t._id));
+      const lead=p.lead_id!=null?String(p.lead_id):null;
+      return team.some(id=>d.memberIds.has(id)) || (lead && d.memberIds.has(lead));
+    }).map(p=>p.id);
+    const smm=_teamSmmScore(projIds);
+    return { name:d.name, emps:d.emps, ops, smm, projIds };
+  });
+  return { depts, win:tm.win };
+}
+
 function _tArch(a){
   if(a.n<3) return {label:'Мало данных', col:'var(--txt-3)'};
   if(a.overdue>=2) return {label:'Под риском', col:'var(--neg)'};
@@ -13417,22 +13511,45 @@ function renderTeam(){
         </table>
       </div>`;
   } else {
-    const deptMap={};
-    TEAM.forEach(e=>{ const d=e.dept||'—'; const x=deptMap[d]||(deptMap[d]={name:d,emps:[],assigned:0,done:0,open:0,v30:0,rework:0,maxOpen:0});
-      x.emps.push(e); x.assigned+=e._assigned||0; x.done+=e._done||0; x.open+=e._open||0; x.v30+=e._v30||0; x.rework+=e._rework||0; if((e._open||0)>x.maxOpen)x.maxOpen=e._open||0; });
-    const depts=Object.values(deptMap).sort((a,b)=>b.v30-a.v30);
+    const _ds=computeDeptScores();
+    const depts=_ds.depts.slice().sort((a,b)=>{
+      const av=(a.ops.score!=null?a.ops.score:-1), bv=(b.ops.score!=null?b.ops.score:-1); return bv-av;
+    });
+    const _sc=v=>v!=null?effColor(v):'var(--txt-3)';
+    const _gr=v=>{ const g=_gradeOf(v); return g.g; };
+    const _mini=(lbl,val)=>`<div class="dts-mini"><span class="dts-ml">${lbl}</span><span class="dts-mv" style="color:${_sc(val)}">${val!=null?Math.round(val):'—'}</span></div>`;
     body=`<div class="dept-grid">${depts.length?depts.map(d=>{
-      const comp=d.assigned?Math.round(100*d.done/d.assigned):null;
-      const conc=d.open?Math.round(100*d.maxOpen/d.open):0;
-      const reworkHigh=d.done && Math.round(100*d.rework/Math.max(d.done,1))>=20;
+      const ops=d.ops, smm=d.smm;
+      const opsC=_sc(ops.score), opsG=_gradeOf(ops.score);
+      const reworkPct=ops.closes?Math.round(100*ops.returns/ops.closes):0;
+      const onTimePct=ops.withDue?Math.round(100*ops.onTime/ops.withDue):null;
+      const cyc=ops.medCycle!=null?_cycDur(ops.medCycle):'—';
+      const hasSmm=smm&&smm.score!=null;
+      const smmC=hasSmm?_sc(smm.score):'var(--txt-3)';
       return `<div class="dept-card dept-clic" onclick="openTeamCompose('${_attr(d.name)}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openTeamCompose('${_attr(d.name)}')">
-        <div class="dept-h"><div><div class="dept-cy">${d.v30}<span class="u"> закр.</span></div><div style="font-size:12.5px;color:var(--txt-3);margin-top:5px">закрыто за 30 дн · ${d.emps.length} сотр.</div></div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px"><div class="dept-name">${d.name}</div>${reworkHigh?'<span class="badge b-susp" style="font-size:11.5px"><span class="bd"></span>Возвраты высокие</span>':''}</div></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px"><span style="font-size:12.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em">Выполнение задач</span><span class="num" style="font-size:19px;color:${comp!=null?effColor(comp):'var(--txt-3)'}">${comp!=null?comp+'%':'—'}</span></div>
-        <div class="dept-bar"><i style="width:${comp||0}%"></i></div>
-        <div class="dept-stats"><div class="st"><div class="v">${d.open}</div><div class="l">В работе</div></div><div class="st"><div class="v" style="color:${d.rework?'var(--neg)':'var(--txt)'}">${d.rework}</div><div class="l">Возвратов</div></div><div class="st"><div class="v">${d.done}</div><div class="l">Выполнено</div></div></div>
-        ${conc>=70&&d.emps.length>1?`<div class="dept-warn">⚠ ${conc}% открытых задач на одном исполнителе</div>`:''}
-        <div style="display:flex;margin-top:13px">${d.emps.slice(0,5).map((e,i)=>`<span style="position:relative;overflow:hidden;width:28px;height:28px;border-radius:50%;background:${e.color};color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;border:2px solid var(--bg-1);margin-left:${i?'-6px':'0'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>`).join('')}</div>
+        <div class="dept-h">
+          <div><div class="dept-name" style="margin-bottom:6px">${d.name}</div><div style="font-size:12.5px;color:var(--txt-3)">${d.emps.length} ${_plural(d.emps.length,'сотрудник','сотрудника','сотрудников')} · за ${_periodLbl()}</div></div>
+          ${ops.overdue>0?'<span class="badge b-susp" style="font-size:11.5px"><span class="bd"></span>'+ops.overdue+' просроч.</span>':(reworkPct>=20&&ops.closes?'<span class="badge b-susp" style="font-size:11.5px"><span class="bd"></span>Возвраты высокие</span>':'')}
+        </div>
+        <div class="dts-axes">
+          <div class="dts-ax">
+            <div class="dts-axh"><span class="dts-axl"><span class="dts-dot" style="background:var(--accent)"></span>Операционная</span><span class="dts-grade" style="color:${opsC};background:${opsG.bg}">${opsG.g}</span></div>
+            <div class="dts-score" style="color:${opsC}">${ops.score!=null?ops.score:'—'}<span class="dts-of">/100</span></div>
+            <div class="dts-bar"><i style="width:${ops.score||0}%;background:${opsC}"></i></div>
+            <div class="dts-minis">${_mini('Выработка',ops.pO)}${_mini('Скорость',ops.pS)}${_mini('Качество',ops.pQ)}${_mini('Надёжн.',ops.pR)}</div>
+            <div class="dts-foot"><span>${ops.tp} закрыто</span><span>${cyc} цикл</span><span style="color:${reworkPct>=20?'var(--neg)':'var(--txt-3)'}">${ops.returns} возвр.</span></div>
+          </div>
+          <div class="dts-ax${hasSmm?'':' dts-empty'}">
+            <div class="dts-axh"><span class="dts-axl"><span class="dts-dot" style="background:var(--violet)"></span>SMM</span>${hasSmm?'<span class="dts-grade" style="color:'+smmC+';background:'+_gradeOf(smm.score).bg+'">'+_gradeOf(smm.score).g+'</span>':'<span class="dts-nd">нет данных</span>'}</div>
+            ${hasSmm?`
+            <div class="dts-score" style="color:${smmC}">${smm.score}<span class="dts-of">/100</span></div>
+            <div class="dts-bar"><i style="width:${smm.score}%;background:${smmC}"></i></div>
+            <div class="dts-minis">${_mini('Вовлеч.',smm.pER)}${_mini('Охват',smm.pReach)}${_mini('Аудит.',smm.pFol)}${_mini('Регул.',smm.pCad)}</div>
+            <div class="dts-foot"><span>${smm.projN}/${smm.projTotal} проектов</span><span>ER ${smm.erRaw!=null?smm.erRaw.toFixed(1).replace('.',',')+'%':'—'}</span></div>`
+            :`<div class="dts-ndbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg><span>Нет SMM-проектов у команды</span></div>`}
+          </div>
+        </div>
+        <div style="display:flex;margin-top:14px">${d.emps.slice(0,6).map((e,i)=>`<span style="position:relative;overflow:hidden;width:28px;height:28px;border-radius:50%;background:${e.color};color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;border:2px solid var(--bg-1);margin-left:${i?'-6px':'0'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span>`).join('')}${d.emps.length>6?`<span style="width:28px;height:28px;border-radius:50%;background:var(--bg-3);color:var(--txt-2);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:11px;border:2px solid var(--bg-1);margin-left:-6px">+${d.emps.length-6}</span>`:''}</div>
       </div>`;}).join(''):'<div class="empty-mini">Нет команд</div>'}</div>`;
   }
   const _today=new Date().toISOString().slice(0,10);
