@@ -9892,6 +9892,7 @@ function openReportProj(i){
 
 /* ═══════ SMM-отчёт · редактор данных (Фаза 3) ═══════ */
 let _smmCur=null, _smmMeta=null, _smmTab='data', _smmDirty=false, _smmRO=false;
+let _smmStep=0, _smmT0=0, _smmTimer=null, _smmDone=false;
 
 function smmAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
 let _smmSaveT=null;
@@ -9990,18 +9991,20 @@ function openSMM(report, ro){
   _smmCur=smmNormalize(report.payload);
   smmLoadPrev(report);
   _smmMeta={id:report.id, projectId:report.project_id, title:report.title||'SMM-отчёт', date:_dDateFull(report.published_at)};
+  _smmStep=0; _smmDone=false; _smmT0=0;
   _smmTab=_smmRO?'preview':(smmHasData(report)?'preview':'data'); _smmDirty=false; _smmLbData=null;
   document.getElementById('ov-smm').classList.add('on');
   smmRender();
 }
 async function smmClose(){
   if(!_smmRO && _smmDirty) await smmSave(false);
+  smmWzStop(); _smmStep=0; _smmT0=0; _smmDone=false;
   document.getElementById('ov-smm').classList.remove('on');
   _smmCur=null; _smmMeta=null; _smmDirty=false; _smmRO=false;
   if(typeof renderPd==='function' && document.getElementById('ov-proj').classList.contains('on')) renderPd();   // карточки отчётов сразу с свежими цифрами
 }
 async function smmTab(t){
-  if(t==='lb')_smmLbAnim=true; _smmTab=t; smmRender();
+  if(t==='lb')_smmLbAnim=true; if(t==='data')_smmDone=false; _smmTab=t; smmRender();
   if(t==='lb' && _smmLbData===null && !_smmLbLoading){ await smmLoadLb(); if(_smmTab==='lb') smmRender(); }
 }
 
@@ -10041,24 +10044,113 @@ function smmRender(){
     +'<div class="smm-body">'+(_smmTab==='data'?smmRenderData():smmRenderPresentation())+'</div>'
     +'</div>';
   if(_smmTab==='preview') requestAnimationFrame(smmInitReveal);
+  if(_smmTab==='data' && !_smmRO){ smmWzStart(); if(_smmDone) requestAnimationFrame(smmWzConfetti); } else { smmWzStop(); }
 }
 
 let _smmView={reel:'list',post:'list'}, _smmModalIdx=-1, _smmModalKind='reel';
+function smmXP(){
+  const m=_smmCur.metrics, has=v=>v!=null&&v!=='';
+  let xp=0;
+  if(has(m.total_reach))xp+=10; if(has(m.total_views))xp+=10;
+  xp+=(_smmCur.reels||[]).length*10; xp+=(_smmCur.posts||[]).length*10;
+  if(has(m.stories_count))xp+=10;
+  if(has(m.subscribers_current))xp+=10; if(has(m.followers))xp+=10;
+  ['er','lr','tr','shr','sr'].forEach(k=>{ if(has(_smmCur.goals[k]))xp+=5; });
+  if((_smmCur.rubrics||[]).length)xp+=10;
+  return xp;
+}
+function smmWzFmt(sec){ const m=Math.floor(sec/60), s=sec%60; return (m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
+function smmWzStart(){ if(_smmRO)return; if(!_smmT0)_smmT0=Date.now(); if(!_smmTimer)_smmTimer=setInterval(smmWzTick,1000); smmWzTick(); }
+function smmWzTick(){ const el=document.getElementById('smm-wz-time'); if(el&&_smmT0) el.textContent=smmWzFmt(Math.floor((Date.now()-_smmT0)/1000)); }
+function smmWzStop(){ if(_smmTimer){ clearInterval(_smmTimer); _smmTimer=null; } }
+function smmWzBody(){ const el=document.querySelector('#ov-smm .smm-body'); if(el){ el.innerHTML=smmRenderData(); el.scrollTop=0; } }
+function smmWzGo(d){ const st=window._smmSteps||[]; _smmStep=Math.max(0,Math.min(st.length-1,_smmStep+d)); smmWzBody(); }
+function smmWzSet(i){ const st=window._smmSteps||[]; _smmStep=Math.max(0,Math.min(st.length-1,i)); smmWzBody(); }
+function smmWzFinish(){ _smmDone=true; smmMark(); smmWzBody(); requestAnimationFrame(smmWzConfetti); }
+function smmWzRestart(){ _smmDone=false; smmWzBody(); }
+function smmWzConfetti(){ const host=document.getElementById('smm-cf-host'); if(!host)return; const em=['🎉','⭐','✨','🎊','💚','🔵']; for(let i=0;i<34;i++){ const sp=document.createElement('span'); sp.className='smm-cf'; sp.textContent=em[i%em.length]; sp.style.left=(Math.random()*100)+'%'; sp.style.animationDelay=(Math.random()*0.5)+'s'; sp.style.fontSize=(12+Math.random()*16)+'px'; host.appendChild(sp); } setTimeout(function(){ host.innerHTML=''; },2600); }
 function smmRenderData(){
-  smmComputeMetrics();
-  smmComputeGeneral();
-  const es=(n,tt,note,body,id)=>'<div class="smm-es"'+(id?' id="'+id+'"':'')+'><div class="smm-es-h"><span class="n">'+n+'</span><span class="tt">'+tt+'</span><span class="sp"></span>'+(note?'<span class="smm-es-note">'+note+'</span>':'')+'</div>'+body+'</div>';
-  return '<div class="smm-edit">'
-    +'<div class="smm-edit-title">Ввод данных</div>'
-    +'<div class="smm-edit-sub">'+(_smmCur.period?_ddH(_smmCur.period):'период не указан')+' · '+_smmCur.reels.length+' reels · '+(_smmCur.posts||[]).length+' постов · '+_smmCur.rubrics.length+' рубрик</div>'
-    +es('01','Охват','всего — из статистики Instagram · сторис — остаток', smmReachBlockHTML())
-    +es('02','Просмотры','всего — из статистики Instagram · сторис — остаток', smmViewsBlockHTML())
-    +'<div class="smm-es" id="smm-reels-ed">'+smmReelsEditHTML('reel')+'</div>'
-    +'<div class="smm-es" id="smm-posts-ed">'+smmReelsEditHTML('post')+'</div>'
-    +es('05','Сторис','просмотры и охват считаются как остаток от профиля', smmStoriesBlockHTML())
-    +es('06','Аудитория и метрики','ER · LR · CR · SHR · SR — из Reels и постов; частота и прирост авто', smmAudienceBlockHTML()+'<div class="smm-mgrid" id="smm-mgrid" style="margin-top:14px">'+smmMetricCardsHTML(SMM_METRIC_DEFS)+'</div>')
-    +'<div class="smm-es" id="smm-rub-sec">'+smmRubricsSectionHTML()+'</div>'
-    +'</div>';
+  smmComputeMetrics(); smmComputeGeneral();
+  const m=_smmCur.metrics, has=v=>v!=null&&v!=='';
+  const es=(n,tt,note,body)=>'<div class="smm-es"><div class="smm-es-h"><span class="n">'+n+'</span><span class="tt">'+tt+'</span><span class="sp"></span>'+(note?'<span class="smm-es-note">'+note+'</span>':'')+'</div>'+body+'</div>';
+  const STEPS=[
+    {t:'Охват и просмотры',ico:'👁️',hint:'Впиши общий охват и просмотры из статистики Instagram — Reels, посты и сторис разложатся сами.',done:has(m.total_reach)&&has(m.total_views),
+      html:function(){return es('','Охват','всего — из статистики · сторис — остаток',smmReachBlockHTML())+es('','Просмотры','всего — из статистики · сторис — остаток',smmViewsBlockHTML());}},
+    {t:'Reels',ico:'🎬',hint:'Добавь Reels с метриками — количество, охват и вовлечённость посчитаются сами.',done:(_smmCur.reels||[]).length>0,
+      html:function(){return '<div class="smm-es" id="smm-reels-ed">'+smmReelsEditHTML('reel')+'</div>';}},
+    {t:'Посты',ico:'🖼️',hint:'Добавь посты так же, как Reels — количество и суммы посчитаются автоматически.',done:(_smmCur.posts||[]).length>0,
+      html:function(){return '<div class="smm-es" id="smm-posts-ed">'+smmReelsEditHTML('post')+'</div>';}},
+    {t:'Сторис',ico:'⚡',hint:'Впиши количество сторис — просмотры и охват возьмутся как остаток от профиля.',done:has(m.stories_count),
+      html:function(){return es('','Сторис','просмотры и охват — остаток от профиля',smmStoriesBlockHTML());}},
+    {t:'Аудитория',ico:'👥',hint:'Подписчики сейчас и прирост. Частоту посчитаю сам из охвата и просмотров.',done:has(m.subscribers_current),
+      html:function(){return es('','Аудитория','частота и прирост — авто',smmAudienceBlockHTML());}},
+    {t:'Метрики и цели',ico:'🎯',hint:'ER, лайки, комментарии, репосты, сохранения уже посчитаны. Впиши новые цели на следующий период.',done:['er','lr','tr','shr','sr'].some(k=>has(_smmCur.goals[k])),
+      html:function(){return '<div class="smm-mgrid" id="smm-mgrid">'+smmMetricCardsHTML(SMM_METRIC_DEFS)+'</div>';}},
+    {t:'Рубрики',ico:'🏷️',hint:'Рубрики собрались сами из Reels и постов. Проверь — и отчёт готов!',done:(_smmCur.rubrics||[]).length>0,
+      html:function(){return '<div class="smm-es" id="smm-rub-sec">'+smmRubricsSectionHTML()+'</div>';}}
+  ];
+  window._smmSteps=STEPS;
+  if(_smmStep>STEPS.length-1)_smmStep=STEPS.length-1; if(_smmStep<0)_smmStep=0;
+  const doneN=STEPS.filter(x=>x.done).length, pct=Math.round(100*doneN/STEPS.length), xp=smmXP();
+  const CSS='<style>'
+    +'.smm-wz{max-width:1080px;margin:0 auto}'
+    +'.smm-wz-bar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;background:linear-gradient(180deg,var(--bg-1),var(--bg-2));border:1px solid var(--line-2);border-radius:14px;margin-bottom:16px}'
+    +'.smm-wz-steps{display:flex;gap:5px;align-items:center;flex:1;min-width:220px}'
+    +'.smm-wz-dot{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--bg-3);border:1px solid var(--line);cursor:pointer;transition:all .2s;color:var(--txt-3);flex:none}'
+    +'.smm-wz-dot.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);box-shadow:0 0 12px -2px var(--accent);transform:scale(1.08)}'
+    +'.smm-wz-dot.done{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}'
+    +'.smm-wz-link{flex:1;height:2px;background:var(--line);min-width:5px;border-radius:2px}'
+    +'.smm-wz-meta{display:flex;gap:10px;align-items:center;font-family:var(--mono)}'
+    +'.smm-wz-chip{display:flex;align-items:center;gap:6px;font-size:14px;padding:7px 12px;background:var(--bg-3);border:1px solid var(--line);border-radius:9px}'
+    +'.smm-wz-chip b{color:var(--txt);font-weight:700}'
+    +'.smm-wz-chip.xp{color:var(--accent);border-color:var(--accent-line)}'
+    +'.smm-wz-prog{height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden;margin-bottom:22px}'
+    +'.smm-wz-prog i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7BF0DC);border-radius:3px;transition:width .5s cubic-bezier(.16,1,.3,1)}'
+    +'.smm-wz-head{display:flex;align-items:center;gap:14px;margin-bottom:20px}'
+    +'.smm-wz-ico{width:52px;height:52px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:26px;flex:none}'
+    +'.smm-wz-head h3{font-size:22px;font-weight:700;letter-spacing:-.02em}'
+    +'.smm-wz-head p{font-size:14px;color:var(--txt-2);margin-top:4px;line-height:1.5;max-width:720px}'
+    +'.smm-wz-nav{display:flex;align-items:center;gap:12px;margin-top:26px;padding-top:20px;border-top:1px solid var(--line)}'
+    +'.smm-wz-nav .sp{flex:1}'
+    +'.smm-wz-btn{height:44px;padding:0 22px;border-radius:11px;font-size:14.5px;font-weight:600;cursor:pointer;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);display:inline-flex;align-items:center;gap:8px;transition:all .15s}'
+    +'.smm-wz-btn:hover{border-color:var(--txt-3)}'
+    +'.smm-wz-btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}'
+    +'.smm-wz-btn.pri:hover{box-shadow:0 8px 22px -8px var(--accent)}'
+    +'.smm-wz-btn:disabled{opacity:.4;pointer-events:none}'
+    +'.smm-wz-done{text-align:center;padding:46px 20px;position:relative;overflow:hidden}'
+    +'.smm-wz-done .em{font-size:60px;animation:smmpop .5s cubic-bezier(.2,1.4,.4,1) both}'
+    +'.smm-wz-done h2{font-size:28px;font-weight:800;margin:12px 0 6px;letter-spacing:-.02em}'
+    +'.smm-wz-done p{color:var(--txt-2);font-size:15px}'
+    +'.smm-wz-stats{display:flex;gap:14px;justify-content:center;margin:22px 0 26px;flex-wrap:wrap;position:relative;z-index:2}'
+    +'.smm-wz-stat{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 22px;min-width:120px}'
+    +'.smm-wz-stat .v{font-size:26px;font-weight:800;font-family:var(--mono);color:var(--accent)}'
+    +'.smm-wz-stat .l{font-size:12px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}'
+    +'#smm-cf-host{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1}'
+    +'.smm-cf{position:absolute;top:-24px;animation:smmfall 2.4s linear forwards}'
+    +'@keyframes smmfall{to{transform:translateY(460px) rotate(360deg);opacity:0}}'
+    +'@keyframes smmpop{from{transform:scale(0)}}'
+    +'</style>';
+  if(_smmDone){
+    const secs=_smmT0?Math.floor((Date.now()-_smmT0)/1000):0;
+    return '<div class="smm-wz">'+CSS+'<div class="smm-wz-done"><div id="smm-cf-host"></div>'
+      +'<div class="em">🎉</div><h2>Отчёт собран!</h2><p>Данные заполнены — метрики, частота, остатки и рубрики посчитаны автоматически.</p>'
+      +'<div class="smm-wz-stats"><div class="smm-wz-stat"><div class="v">'+smmWzFmt(secs)+'</div><div class="l">время</div></div>'
+      +'<div class="smm-wz-stat"><div class="v">'+xp+'</div><div class="l">XP</div></div>'
+      +'<div class="smm-wz-stat"><div class="v">'+(_smmCur.reels||[]).length+' / '+(_smmCur.posts||[]).length+'</div><div class="l">reels / посты</div></div></div>'
+      +'<div class="smm-wz-nav" style="justify-content:center;border:0;padding:0;margin:0"><button class="smm-wz-btn" onclick="smmWzRestart()">← Изменить данные</button>'
+      +'<button class="smm-wz-btn pri" onclick="smmTab(\'preview\')">Смотреть презентацию →</button></div></div></div>';
+  }
+  const cur=STEPS[_smmStep];
+  const dots=STEPS.map(function(x,i){ return '<div class="smm-wz-dot'+(i===_smmStep?' on':(x.done?' done':''))+'" title="'+x.t+'" onclick="smmWzSet('+i+')">'+((x.done&&i!==_smmStep)?'✓':x.ico)+'</div>'; }).join('<div class="smm-wz-link"></div>');
+  const bar='<div class="smm-wz-bar"><div class="smm-wz-steps">'+dots+'</div>'
+    +'<div class="smm-wz-meta"><span class="smm-wz-chip">⏱ <b id="smm-wz-time">'+smmWzFmt(_smmT0?Math.floor((Date.now()-_smmT0)/1000):0)+'</b></span>'
+    +'<span class="smm-wz-chip xp">⚡ <b>'+xp+'</b> XP</span></div></div>'
+    +'<div class="smm-wz-prog"><i style="width:'+pct+'%"></i></div>';
+  const head='<div class="smm-wz-head"><div class="smm-wz-ico">'+cur.ico+'</div><div><h3>Шаг '+(_smmStep+1)+' из '+STEPS.length+' · '+cur.t+'</h3><p>'+cur.hint+'</p></div></div>';
+  const isLast=_smmStep===STEPS.length-1;
+  const nav='<div class="smm-wz-nav"><button class="smm-wz-btn" '+(_smmStep===0?'disabled':'')+' onclick="smmWzGo(-1)">← Назад</button><div class="sp"></div>'
+    +(isLast?'<button class="smm-wz-btn pri" onclick="smmWzFinish()">Готово 🎉</button>':'<button class="smm-wz-btn pri" onclick="smmWzGo(1)">Далее →</button>')+'</div>';
+  return '<div class="smm-wz">'+CSS+bar+head+'<div class="smm-wz-body">'+cur.html()+'</div>'+nav+'</div>';
 }
 /* ——— хелперы карточек ввода: одна метрика может показываться в нескольких блоках (data-gv) ——— */
 function _smmAutoCard(lab,key,zero){ return '<div class="smm-fc smm-fc-ro"><label>'+lab+'<span class="smm-fc-badge auto">авто</span></label><div class="smm-fc-val" data-gv="'+key+'">'+smmGenNum(key,zero)+'</div></div>'; }
