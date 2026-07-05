@@ -6425,7 +6425,7 @@ async function quickTaskOpen(){
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
   window._qtSub=[];
-  const projArr=PROJECTS.map((p,i)=>[String(i), p.name]);
+  const projArr=PROJECTS.map(p=>[String(p.id), p.name]);
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Добавить задачу</h3><p>Быстрое создание · выберите проект и этап</p></div>
     <div class="modal-b">
       <div class="fld"><label>Проект <span style="color:var(--neg)">*</span></label>${selField('qt-proj', projArr, '')}</div>
@@ -6439,9 +6439,8 @@ async function quickTaskOpen(){
   qtSubRender();
   // реакция на выбор проекта — через хук в selPick('qt-proj', …)
 }
-async function _qtOnProject(idxStr){
-  const i=parseInt(idxStr,10); if(isNaN(i)||!PROJECTS[i]) return;
-  const p=PROJECTS[i];
+async function _qtOnProject(idStr){
+  const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>String(x.id)===String(idStr)); if(!p) return;
   const sw=document.getElementById('qt-stage-wrap'), aw=document.getElementById('qt-asg-wrap');
   if(sw) sw.innerHTML='<div class="qt-hint">Загрузка этапов…</div>';
   // догружаем этапы и команду проекта
@@ -6463,9 +6462,9 @@ async function _qtOnProject(idxStr){
   }
 }
 function quickTaskCreate(){
-  const pidx=parseInt(_v('qt-proj'),10);
-  if(isNaN(pidx)||!PROJECTS[pidx]){ toast('Выберите проект'); return; }
-  const p=PROJECTS[pidx];
+  const pid=_v('qt-proj');
+  const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>String(x.id)===String(pid));
+  if(!p){ toast('Выберите проект'); return; }
   const title=_v('qt-ttl'); if(!title){ toast('Введите название задачи'); return; }
   const stage_id=_v('qt-stg'); if(!stage_id){ toast('Выберите этап'); return; }
   const T=p._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
