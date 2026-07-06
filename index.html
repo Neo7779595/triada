@@ -6157,6 +6157,28 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
 function _closePops(){ document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
 function ddToggle(k){const el=document.getElementById('dd-'+k);if(!el)return;const o=el.classList.contains('open');_closePops();if(!o)el.classList.add('open');}
 const _attr=v=>_ddH(v).replace(/"/g,'&quot;');
+/* Кастомный дропдаун в фирменном стиле с произвольным колбэком.
+   opts: [[value,label],…]; при выборе вызывает cb(value). Колбэк хранится в реестре по id. */
+window._DDSEL_CB=window._DDSEL_CB||{};
+function _ddSel(id, opts, cur, cb, ph){
+  window._DDSEL_CB[id]=cb;
+  const O=(opts||[]).map(o=>Array.isArray(o)?o:[o,o]);
+  const co=O.find(o=>String(o[0])===String(cur));
+  const lbl=co?co[1]:(ph||'Выбрать');
+  const caret='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
+  const ck='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  return `<div class="dd seldd ddsel" id="seldd-${id}">`
+    +`<input type="hidden" id="${id}" value="${_attr(cur==null?'':cur)}">`
+    +`<button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${co?'':'color:var(--txt-3);font-weight:500'}">${_ddH(lbl)}</span>${caret}</button>`
+    +`<div class="dd-menu">`+O.map(o=>`<button type="button" class="dd-opt ${String(o[0])===String(cur)?'on':''}" data-v="${_attr(o[0])}" data-l="${_attr(o[1])}" onclick="_ddSelPick('${id}',this.dataset.v,this.dataset.l)">${_ddH(o[1])}${ck}</button>`).join('')+`</div></div>`;
+}
+function _ddSelPick(id,v,l){
+  const h=document.getElementById(id); if(h)h.value=v;
+  const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; }
+  const el=document.getElementById('seldd-'+id); if(el)el.classList.remove('open');
+  const cb=window._DDSEL_CB[id]; if(typeof cb==='function'){ try{ cb(v); }catch(e){} }
+}
+
 function selField(id, options, cur){
   const opts=(options||[]).map(o=>Array.isArray(o)?o:[o,o]);
   cur=(cur==null?'':cur);
@@ -13008,8 +13030,8 @@ function pfSection(list,title,sub,ph){
     const curCatLbl = r.name || ('— '+catLabel+' —');
     return `<div class="pf-row">
       <div class="pf-row-main">
-        ${_pfSel('pfc-'+list+'-'+i, catOpts, r.name, `pfPickCat('${list}',${i},this.value)`, catLabel)}
-        ${_pfSel('pfu-'+list+'-'+i, FIN_UNITS.map(u=>[u[0],u[1]]), r.unit, `pfSetUnit('${list}',${i},this.value)`, 'единица')}
+        ${_pfSel('pfc-'+list+'-'+i, catOpts, r.name, v=>pfPickCat(list,i,v), catLabel)}
+        ${_pfSel('pfu-'+list+'-'+i, FIN_UNITS.map(u=>[u[0],u[1]]), r.unit, v=>pfSetUnit(list,i,v), 'единица')}
       </div>
       <div class="pf-row-calc">
         ${fixed?`
@@ -13024,7 +13046,7 @@ function pfSection(list,title,sub,ph){
         `}
         <button class="pf-del" onclick="pfDel('${list}',${i})" title="Удалить">✕</button>
       </div>
-      ${staff.length?`<div class="pf-staff">${_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',`pfSetStaff('${list}',${i},this.value)`,'сотрудник')}</div>`:''}
+      ${staff.length?`<div class="pf-staff">${_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',v=>pfSetStaff(list,i,v),'сотрудник')}</div>`:''}
     </div>`;
   };
   return `<div class="fld pf-sec" style="margin-top:6px">
@@ -13033,10 +13055,8 @@ function pfSection(list,title,sub,ph){
   </div>`;
 }
 // компактный нативный селект в стиле платформы (без кастомного дропдауна — надёжнее в скролле модалки)
-function _pfSel(id,opts,cur,onchange,ph){
-  return `<select id="${id}" class="pf-select" onchange="${onchange}">
-    ${opts.map(o=>`<option value="${String(o[0]).replace(/"/g,'&quot;')}"${String(o[0])===String(cur)?' selected':''}>${o[1]}</option>`).join('')}
-  </select>`;
+function _pfSel(id,opts,cur,cb,ph){
+  return _ddSel(id, opts, cur, cb, ph);
 }
 
 function pfRender(){
@@ -13104,16 +13124,16 @@ function finCatResetDefaults(){
   finCatRender();
 }
 function finCatRender(){
-  const unitSel=(cur,onch)=>`<select class="pf-select" onchange="${onch}">${FIN_UNITS.map(u=>`<option value="${u[0]}"${u[0]===cur?' selected':''}>${u[1]}</option>`).join('')}</select>`;
+  const unitSel=(id,cur,cb)=>_ddSel(id, FIN_UNITS.map(u=>[u[0],u[1]]), cur, cb, 'единица');
   const roleRows=FINCAT_EDIT.roles.map((r,i)=>`<div class="fce-row">
     <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Роль (напр. Монтажёр)" oninput="finCatSetRole(${i},'name',this.value)" class="fce-name">
-    ${unitSel(r.unit,`finCatSetRole(${i},'unit',this.value)`)}
+    ${unitSel('fcru-'+i, r.unit, v=>finCatSetRole(i,'unit',v))}
     <input type="number" min="0" step="10000" value="${r.rate||0}" oninput="finCatSetRole(${i},'rate',this.value)" class="fce-rate" placeholder="ставка">
     <button class="pf-del" onclick="finCatRoleDel(${i})" title="Удалить">✕</button>
   </div>`).join('');
   const catRows=FINCAT_EDIT.cats.map((c,i)=>`<div class="fce-row fce-row-cat">
     <input value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="Категория (напр. Такси)" oninput="finCatSetCat(${i},'name',this.value)" class="fce-name">
-    ${unitSel(c.unit,`finCatSetCat(${i},'unit',this.value)`)}
+    ${unitSel('fccu-'+i, c.unit, v=>finCatSetCat(i,'unit',v))}
     <button class="pf-del" onclick="finCatCatDel(${i})" title="Удалить">✕</button>
   </div>`).join('');
   pd2Open(`<div class="modal" style="max-width:560px">
