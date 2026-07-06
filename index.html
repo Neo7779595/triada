@@ -4747,7 +4747,6 @@ button:active{transform:translateY(.5px) scale(.99)}
       <button class="tb-search" onclick="cmdkOpen()" title="Глобальный поиск (⌘K)"><span>Глобальный поиск</span><kbd>⌘K</kbd></button>
       <button class="tb-search" onclick="quickTaskOpen()" title="Добавить задачу"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 5v14M5 12h14"/></svg><span>Задача</span></button>
       <button class="tb-search" id="ag-stpl-btn" onclick="openTemplatesSettings()" title="Настройки шаблонов" style="display:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Настройки шаблонов</span></button>
-      <button class="tb-search" id="ag-pnl-btn" onclick="openPnlOverview()" title="P&L по всем проектам" style="display:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/></svg><span>P&L проектов</span></button>
       <button class="tb-search" id="ag-tg-btn" onclick="tgTeamModal()" title="Telegram-группа команды" style="display:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg><span>Telegram</span></button>
       <button class="u-chip" id="ag-uchip" onclick="myProfileOpen()" title="Мой профиль · сменить фото" style="background:none;font-family:inherit"><span class="d"></span><span id="ag-uchip-av" style="width:22px;height:22px;border-radius:6px;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;overflow:hidden;flex:none"></span><span id="ag-uchip-nm">Менеджер агентства</span></button>
     </header>
@@ -5633,8 +5632,6 @@ function agNav(m){
 }
 /* ——— project quick actions / general settings actions ——— */
 function _agSetTopBtn(m){
-  const pnlBtn=document.getElementById('ag-pnl-btn');
-  if(pnlBtn) pnlBtn.style.display=(m==='finance'&&agIsOwner())?'':'none';   // P&L проектов — только в финансах
   const btn=document.getElementById('ag-stpl-btn'); if(!btn) return;
   if(!agIsOwner()){ btn.style.display='none'; return; }
   btn.style.display='';
@@ -13079,104 +13076,6 @@ async function saveProjFinance(){
     if(p){ p.mrr=PFIN.mrr; p.cost=t.cost; p.hours=PFIN.hours; p.finance=finance; p.profit=PFIN.mrr-t.cost; p.margin=PFIN.mrr>0?Math.round(100*(PFIN.mrr-t.cost)/PFIN.mrr):null; p._svcs=svcsArr; } }
   if(typeof PROJECTS!=='undefined'){ const pp=PROJECTS.find(x=>x.id===PFIN.id); if(pp){ pp.mrr=PFIN.mrr; pp._svcs=svcsArr; if(prim.service)pp.svc=prim.service; pp.tariff=prim.tariff||null; } }
   pd2Close(); PFIN=null; renderFinance(); toast('P&L сохранён');
-}
-
-/* ═══════ Единое окно P&L по всем проектам ═══════ */
-let PNL_SORT={key:'mrr',dir:'desc'};
-function openPnlOverview(){
-  const F=(typeof FINANCE!=='undefined'?FINANCE:{ready:false});
-  if(!F.ready||!F.projects){ toast('Финансовые данные ещё не загружены'); return; }
-  pnlRender();
-}
-function pnlSort(key){
-  if(PNL_SORT.key===key) PNL_SORT.dir=PNL_SORT.dir==='desc'?'asc':'desc';
-  else { PNL_SORT.key=key; PNL_SORT.dir=(key==='name')?'asc':'desc'; }
-  pnlRender();
-}
-function pnlOpenProject(id){
-  const idx=(typeof PROJECTS!=='undefined'?PROJECTS:[]).findIndex(p=>String(p.id)===String(id));
-  if(idx>=0 && typeof openProjFinance==='function'){ openProjFinance(idx); }
-}
-function pnlRender(){
-  const F=FINANCE;
-  const mColor=m=>m==null?'var(--txt-3)':m>=50?'var(--pos)':m>=25?'var(--accent)':m>=0?'var(--warn)':'var(--neg)';
-  let rows=F.projects.slice();
-  const dir=PNL_SORT.dir==='desc'?-1:1;
-  rows.sort((a,b)=>{
-    let av,bv;
-    switch(PNL_SORT.key){
-      case 'name': return dir*String(a.name).localeCompare(String(b.name),'ru');
-      case 'margin': av=a.margin==null?-999:a.margin; bv=b.margin==null?-999:b.margin; break;
-      case 'profit': av=a.profit; bv=b.profit; break;
-      case 'cost': av=a.cost; bv=b.cost; break;
-      case 'hours': av=a.hours||0; bv=b.hours||0; break;
-      case 'pph': av=a.profitPerHour==null?-1e12:a.profitPerHour; bv=b.profitPerHour==null?-1e12:b.profitPerHour; break;
-      default: av=a.mrr; bv=b.mrr;
-    }
-    return dir*(av-bv);
-  });
-  const tMrr=rows.reduce((s,p)=>s+(p.mrr||0),0);
-  const tCost=rows.reduce((s,p)=>s+(p.cost||0),0);
-  const tProfit=tMrr-tCost;
-  const tMargin=tMrr>0?Math.round(100*tProfit/tMrr):null;
-  const tHours=rows.reduce((s,p)=>s+(p.hours||0),0);
-  const arrow=k=>PNL_SORT.key===k?`<span class="pnl-arr">${PNL_SORT.dir==='desc'?'↓':'↑'}</span>`:'';
-  const th=(k,lbl,al)=>`<th class="pnl-th${al==='r'?' r':''}${PNL_SORT.key===k?' on':''}" onclick="pnlSort('${k}')">${lbl}${arrow(k)}</th>`;
-  const row=p=>{
-    const mc=mColor(p.margin);
-    const barW=p.mrr>0?Math.min(100,Math.round(100*p.cost/p.mrr)):0;
-    return `<tr class="pnl-tr" onclick="pnlOpenProject('${p.id}')">
-      <td class="pnl-td-name"><div class="pnl-name-wrap">
-        <span class="pnl-logo">${logoFill(p.logoUrl,(p.logo||'?'))}</span>
-        <span class="pnl-nm"><b>${_ddH(p.name)}</b><small>${_ddH(p.cat||'—')}${p.status==='done'?' · завершён':''}</small></span>
-      </div></td>
-      <td class="r pnl-mono">${money(p.mrr)}</td>
-      <td class="r pnl-mono" style="color:var(--txt-2)">${money(p.cost)}
-        <span class="pnl-costbar"><i style="width:${barW}%;background:${barW>=75?'var(--neg)':barW>=50?'var(--warn)':'var(--pos)'}"></i></span>
-      </td>
-      <td class="r pnl-mono" style="color:${p.profit>=0?'var(--pos)':'var(--neg)'};font-weight:700">${p.profit>=0?'+':''}${money(p.profit)}</td>
-      <td class="r"><span class="pnl-mgpill" style="color:${mc};background:color-mix(in srgb,${mc} 12%,transparent)">${p.margin==null?'—':p.margin+'%'}</span></td>
-      <td class="r pnl-mono" style="color:var(--txt-3)">${p.hours>0?(Math.round(p.hours*10)/10)+'ч':'—'}</td>
-      <td class="r pnl-mono" style="color:var(--txt-2)">${p.profitPerHour!=null?money(p.profitPerHour):'—'}</td>
-      <td class="r"><button class="pnl-gear" onclick="event.stopPropagation();pnlOpenProject('${p.id}')" title="Настроить P&L"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button></td>
-    </tr>`;
-  };
-  pd2Open(`<div class="modal pnl-modal">
-    <div class="modal-h pnl-h">
-      <div><h3 style="margin:0">P&L по проектам</h3><p style="margin:3px 0 0">Все проекты в одной таблице · клик по строке — настройка</p></div>
-      <div class="pnl-tot">
-        <div class="pnl-tot-i"><span>Выручка</span><b>${money(tMrr)}</b></div>
-        <div class="pnl-tot-i"><span>Расходы</span><b style="color:var(--txt-2)">${money(tCost)}</b></div>
-        <div class="pnl-tot-i"><span>Прибыль</span><b style="color:${tProfit>=0?'var(--pos)':'var(--neg)'}">${tProfit>=0?'+':''}${money(tProfit)}</b></div>
-        <div class="pnl-tot-i"><span>Маржа</span><b style="color:${mColor(tMargin)}">${tMargin==null?'—':tMargin+'%'}</b></div>
-      </div>
-    </div>
-    <div class="modal-b pnl-b">
-      <table class="pnl-table">
-        <thead><tr>
-          ${th('name','Проект')}
-          ${th('mrr','Выручка','r')}
-          ${th('cost','Расходы','r')}
-          ${th('profit','Прибыль','r')}
-          ${th('margin','Маржа','r')}
-          ${th('hours','Часы','r')}
-          ${th('pph','Приб/час','r')}
-          <th class="pnl-th r"></th>
-        </tr></thead>
-        <tbody>${rows.length?rows.map(row).join(''):'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--txt-3)">Нет проектов</td></tr>'}</tbody>
-        <tfoot><tr class="pnl-foot">
-          <td>Итого · ${rows.length} ${_plural(rows.length,'проект','проекта','проектов')}</td>
-          <td class="r pnl-mono">${money(tMrr)}</td>
-          <td class="r pnl-mono">${money(tCost)}</td>
-          <td class="r pnl-mono" style="color:${tProfit>=0?'var(--pos)':'var(--neg)'};font-weight:700">${tProfit>=0?'+':''}${money(tProfit)}</td>
-          <td class="r"><span class="pnl-mgpill" style="color:${mColor(tMargin)};background:color-mix(in srgb,${mColor(tMargin)} 12%,transparent)">${tMargin==null?'—':tMargin+'%'}</span></td>
-          <td class="r pnl-mono" style="color:var(--txt-3)">${tHours>0?Math.round(tHours)+'ч':'—'}</td>
-          <td class="r"></td><td></td>
-        </tr></tfoot>
-      </table>
-    </div>
-    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div>
-  </div>`);
 }
 
 /* ═══════ Редактор справочников расходов (роли + категории) ═══════ */
