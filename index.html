@@ -173,11 +173,11 @@ button{font-family:inherit}
 .pf-row-calc{display:flex;align-items:center;gap:7px;margin-top:8px}
 .pf-select{appearance:none;-webkit-appearance:none;background:var(--bg-1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7671' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid var(--line-2);border-radius:8px;padding:9px 30px 9px 11px;color:var(--txt);font-family:var(--font);font-size:13.5px;cursor:pointer;width:100%;transition:border-color .15s}
 .pf-select:focus{outline:none;border-color:var(--accent-line)}
-.pf-qty{width:60px;text-align:center;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 6px;color:var(--txt);font-size:13.5px}
-.pf-rate{flex:1;min-width:0;text-align:right;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 10px;color:var(--txt);font-size:13.5px}
+.pf-qty{width:56px;flex:0 0 56px;text-align:center;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 6px;color:var(--txt);font-size:13.5px}
+.pf-rate{flex:1 1 0;min-width:70px;text-align:right;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 10px;color:var(--txt);font-size:13.5px}
 .pf-amt{flex:1;text-align:right;font-family:var(--mono);background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;padding:9px 10px;color:var(--txt);font-size:13.5px}
 .pf-x,.pf-eq{color:var(--txt-3);font-size:13px;flex:0 0 auto}
-.pf-sum{flex:1;text-align:right;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.pf-sum{flex:1 1 0;text-align:right;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);min-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pf-fixed{flex:1;display:flex;align-items:center;gap:8px}
 .pf-fx-l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);flex:0 0 auto}
 .pf-del{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-3);border-radius:8px;cursor:pointer;font-size:13px;transition:.14s}
@@ -12944,10 +12944,12 @@ function openProjFinance(id){
   const p=list.find(x=>x.id===id);
   if(!p){ toast('Проект не найден'); return; }
   const f=p.finance||{};
-  const arr=k=>{ const a=Array.isArray(f[k])?JSON.parse(JSON.stringify(f[k])):[];
-    return a.map(r=>({ name:r.name||'', role:r.role||'', unit:r.unit||'month', rate:r.rate!=null?r.rate:(r.amount||0), qty:r.qty!=null?r.qty:1, manual:r.manual!=null?r.manual:(r.unit?false:true), staffId:r.staffId||null, amount:r.amount||0 })); };
+  const arr=(k,isSal)=>{ const a=Array.isArray(f[k])?JSON.parse(JSON.stringify(f[k])):[];
+    return a.map(r=>{ let u=r.unit||'month';
+      if(!isSal && !['month','piece','hour'].includes(u)) u='month';   // чиним категории с неверной единицей (напр. reels)
+      return { name:r.name||'', role:r.role||'', unit:u, rate:r.rate!=null?r.rate:(r.amount||0), qty:r.qty!=null?r.qty:1, manual:r.manual!=null?r.manual:(r.unit?false:true), staffId:r.staffId||null, amount:r.amount||0 }; }); };
   PFIN={ id, name:p.name, logoUrl:p.logoUrl, logo:p.logo, mrr:p.mrr||0,
-    salaries:arr('salaries'), opex:arr('opex'), projex:arr('projex'), hours:f.hours||0, _svcs:(p._svcs||null), _svcsInit:false };
+    salaries:arr('salaries',true), opex:arr('opex',false), projex:arr('projex',false), hours:f.hours||0, _svcs:(p._svcs||null), _svcsInit:false };
   pfRender();
   if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_services').select('id,service,tariff,mrr,cost,status,sort').eq('project_id',id).order('sort').then(r=>{ if(r&&r.data&&r.data.length && PFIN&&PFIN.id===id){ PFIN._svcs=r.data; svcReset(r.data); } }); }catch(_e){} }
 }
@@ -12980,8 +12982,11 @@ function pfSetAmt(list,i,v){ const r=PFIN[list][i]; r.amount=Math.max(0,parseInt
 function pfPickCat(list,i,val){
   const r=PFIN[list][i]; const cat=finCatLoad();
   const pool = list==='salaries' ? cat.roles : cat.cats;
+  const isSalary = list==='salaries';
   const item = pool.find(x=>x.name===val);
-  if(item){ r.name=item.name; r.role=item.name; r.unit=item.unit||'month'; if(item.rate!=null&&!r.manual)r.rate=item.rate; r.staffId=null; }
+  if(item){ r.name=item.name; r.role=item.name; let u=item.unit||'month';
+    if(!isSalary && !['month','piece','hour'].includes(u)) u='month';   // категории расходов не бывают за Reels/Stories/пост
+    r.unit=u; if(item.rate!=null&&!r.manual)r.rate=item.rate; r.staffId=null; }
   else { r.name=val; r.role=''; }
   r.amount=pfRowAmount(r);
   pfRender();
@@ -13021,6 +13026,8 @@ function pfSection(list,title,sub,ph){
   const pool = list==='salaries' ? cat.roles : cat.cats;
   const isSalary = list==='salaries';
   const catLabel = isSalary?'роль':'категория';
+  // для гонораров — полный набор единиц; для категорий расходов — только осмысленные (месяц / штука / час)
+  const unitOpts = isSalary ? FIN_UNITS.map(u=>[u[0],u[1]]) : FIN_UNITS.filter(u=>['month','piece','hour'].includes(u[0])).map(u=>[u[0],u[1]]);
   const rowHtml=(r,i)=>{
     const amt=pfRowAmount(r);
     const fixed = r.unit==='month';
@@ -13031,7 +13038,7 @@ function pfSection(list,title,sub,ph){
     return `<div class="pf-row">
       <div class="pf-row-main">
         ${_pfSel('pfc-'+list+'-'+i, catOpts, r.name, v=>pfPickCat(list,i,v), catLabel)}
-        ${_pfSel('pfu-'+list+'-'+i, FIN_UNITS.map(u=>[u[0],u[1]]), r.unit, v=>pfSetUnit(list,i,v), 'единица')}
+        ${_pfSel('pfu-'+list+'-'+i, unitOpts, r.unit, v=>pfSetUnit(list,i,v), 'единица')}
       </div>
       <div class="pf-row-calc">
         ${fixed?`
