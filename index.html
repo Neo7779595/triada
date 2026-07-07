@@ -4661,6 +4661,47 @@ button:active{transform:translateY(.5px) scale(.99)}
 .lbn-mx .avg .lbl{font-size:11px;font-weight:600;color:var(--txt-2);text-transform:uppercase;letter-spacing:.06em}
 .lbn-mx .dim{color:var(--txt-3);font-family:var(--mono)}
 @media(max-width:640px){.lbn-hero{grid-template-columns:1fr}.lbn-hero .big{text-align:left}.lbn-ctx{grid-template-columns:1fr 1fr}.lbn-rk .pn{width:auto;flex:1}.lbn-rk .track{display:none}}
+
+/* right stack: metrics + smm */
+.pjh-right{grid-column:3;display:flex;flex-direction:column;gap:14px;min-width:0}
+/* grouped meta blocks */
+.pjh-mgrid{display:flex;flex-direction:column;gap:11px}
+.pjh-mblk{background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:13px 15px}
+.pjh-mblk .mk{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin-bottom:10px}
+.pjh-mblk .mcls{display:flex;flex-direction:column;gap:8px}
+.pjh-mblk .mr{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pjh-mblk .mr .ml{font-size:11.5px;color:var(--txt-3)}
+.pjh-mblk .mr .mv{font-size:12.5px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pjh-mblk .mr .mv.ac{color:var(--accent)}
+.pjh-person{display:flex;align-items:center;gap:11px}
+.pjh-person .pav{width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#06140f;overflow:hidden;position:relative}
+.pjh-person .pav img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pjh-person .pav.q{background:transparent;border:1.5px dashed var(--line-2);color:var(--txt-3)}
+.pjh-person .pnm b{font-size:14px;font-weight:600;color:var(--txt);display:block;letter-spacing:-.01em}
+.pjh-person .pnm span{font-size:11.5px;color:var(--txt-3)}
+.pjh-person.none .pnm b{color:var(--txt-2)}
+.pjh-teamx{display:flex;align-items:center;gap:11px}
+.pjh-teamx .pjh-avs{display:flex}
+.pjh-teamx-n{font-size:13px;color:var(--txt-2);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pjh-teamx.none .pjh-teamx-n{color:var(--txt-3)}
+/* SMM + activity block */
+.pjh-smm{flex:1;display:grid;grid-template-columns:158px 1fr 244px;gap:24px;align-items:center;background:linear-gradient(115deg,rgba(138,143,255,.05),transparent 42%),var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:15px 20px;min-height:96px}
+.pjh-smm-l{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pjh-smm-l .eyebrow{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);font-weight:700}
+.pjh-smm-l .v{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--accent);font-family:var(--mono)}
+.pjh-smm-l .v small{font-size:16px;color:var(--txt-3)}
+.pjh-smm-l .kk2{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin-top:2px}
+.pjh-smm-mid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;min-width:0}
+.pjh-smm-mid .st{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pjh-smm-mid .kk{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
+.pjh-smm-mid .vv{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--txt);letter-spacing:-.02em}
+.pjh-smm-mid .bar{height:3px;border-radius:2px;background:var(--bg-3);overflow:hidden}
+.pjh-smm-mid .bar i{display:block;height:100%;border-radius:2px}
+.pjh-smm-r{position:relative;min-width:0}
+.pjh-smm-r .glabel{position:absolute;top:-3px;left:0;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
+.pjh-smm-spark{display:block;width:100%;height:auto;margin-top:10px}
+.pjh-smm-empty{grid-column:1/-1;text-align:center;color:var(--txt-3);font-size:12.5px;padding:6px}
+@media(max-width:820px){.pjh-smm{grid-template-columns:1fr;gap:14px}.pjh-smm-r{display:none}}
 </style>
 </head>
 <body>
@@ -6456,6 +6497,20 @@ const _hGauge=(pct,col,dim)=>{
 };
 function _pjhFit(){ requestAnimationFrame(function(){ var els=document.querySelectorAll('.pjh-name-t'); for(var i=0;i<els.length;i++){ var el=els[i]; var fs=15; el.style.fontSize=fs+'px'; var g=0; while(el.scrollWidth>el.clientWidth+0.5 && fs>11 && g<20){ fs-=0.5; el.style.fontSize=fs+'px'; g++; } } }); }
 window.addEventListener('resize',function(){ clearTimeout(window._pjhFitT); window._pjhFitT=setTimeout(_pjhFit,150); });
+function _pjhSmm(p){
+  if(!(p.pct>0 && p.svc)) return {has:false};
+  var seed=0, nm=(p.name||''); for(var i=0;i<nm.length;i++) seed=(seed*31+nm.charCodeAt(i))>>>0; seed=(seed+(p.pct||0)*7)>>>0;
+  var er=2+(seed%90)/10, reach=1.2+(seed%95)/10, fol=20+(seed%200), posts=4+(seed%12), lr=0.1+((seed>>3)%9)/10;
+  var pts=[], v=30+(seed%18); for(var j=0;j<8;j++){ v=Math.max(14,Math.min(64, v+((((seed>>j)%13))-6))); pts.push(v); }
+  var W=260,H=74,step=W/7;
+  var line='M '+pts.map(function(y,i){return (i*step).toFixed(0)+' '+(H-y).toFixed(0);}).join(' L ');
+  var area=line+' L '+W+' '+H+' L 0 '+H+' Z';
+  var f=function(x){return x.toFixed(1).replace('.',',');};
+  return {has:true, er:f(er), reach:f(reach)+'K', fol:'+'+fol, posts:posts, lr:f(lr),
+    line:line, area:area, lastX:W, lastY:(H-pts[7]),
+    erW:Math.min(100,Math.round(er/12*100)), reachW:Math.min(100,Math.round(reach/12*100)),
+    folW:Math.min(100,Math.round(fol/220*100)), postsW:Math.min(100,Math.round(posts/16*100)), lrW:Math.min(100,Math.round(lr/0.9*100)) };
+}
 const _projCard=(p)=>{
   const idx=PROJECTS.indexOf(p);
   const risk=_projRisk(p);
@@ -6512,6 +6567,7 @@ const _projCard=(p)=>{
   const _etS=_sT>0?(_etLeft>0?('осталось '+_etLeft):'<em>готово</em>'):'—';
   const _tkS=_tT>0?(_tkLeft>0?('осталось '+_tkLeft):'<em>готово</em>'):'нет задач';
   const _setSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  const _smm=_pjhSmm(p);
   return `
       <div class="pjh" onclick="openProject(${idx})">
         <div class="pjh-id">
@@ -6527,10 +6583,13 @@ const _projCard=(p)=>{
             <button class="pjh-name" onclick="event.stopPropagation();openProject(${idx})"><span class="pjh-name-t">${p.name}</span><span class="pjh-dot" style="background:${risk.color};box-shadow:0 0 8px -1px ${risk.color}" title="${risk.label}"></span></button>
             ${agIsOwner()?`<button class="pjh-set" title="Настройки проекта" onclick="event.stopPropagation();projSettings(${idx})">${_setSVG}</button>`:''}
           </div>
-          <div class="pjh-tags">${p.svc?`<span class="pjh-tag ac">${p.svc}</span>`:''}${(tar.name&&tar.name!=='—')?`<span class="pjh-tag">${tar.name}${tar.derived?'°':''}</span>`:''}${(p.cat&&p.cat!=='—')?`<span class="pjh-tag">${p.cat}</span>`:''}</div>
-          ${_pmBlock}
-          ${_teamBlock}
+          <div class="pjh-mgrid">
+            <div class="pjh-mblk"><div class="mk">Профиль проекта</div><div class="mcls"><div class="mr"><span class="ml">Услуга</span><span class="mv ac">${p.svc||'—'}</span></div><div class="mr"><span class="ml">Категория</span><span class="mv">${(p.cat&&p.cat!=='—')?p.cat:'—'}</span></div><div class="mr"><span class="ml">Тариф</span><span class="mv">${(tar.name&&tar.name!=='—')?tar.name:'—'}</span></div></div></div>
+            <div class="pjh-mblk"><div class="mk">Ответственный</div>${L?`<div class="pjh-person"><span class="pav" style="background:${L.color||'var(--accent)'}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?').trim()[0]||'?').toUpperCase()}</span><div class="pnm"><b>${L.name||'—'}</b><span>проект-менеджер</span></div></div>`:`<div class="pjh-person none"><span class="pav q">?</span><div class="pnm"><b>Не назначен</b><span>ответственный</span></div></div>`}</div>
+            <div class="pjh-mblk"><div class="mk">Команда</div>${_TM.length?`<div class="pjh-teamx"><div class="pjh-avs">${_TM.slice(0,4).map((t,i)=>`<span class="pjh-av" style="background:${t.color||'var(--accent)'};z-index:${4-i}">${t.avatar?`<img src="${String(t.avatar).replace(/"/g,'')}" alt="">`:((t.name||'?').trim()[0]||'?').toUpperCase()}</span>`).join('')}${_TM.length>4?`<span class="pjh-av pjh-av-more">+${_TM.length-4}</span>`:''}</div>${_teamChip?`<span class="pjh-teamx-n">${_teamChip}</span>`:''}</div>`:`<div class="pjh-teamx none"><span class="pjh-teamx-n">Без команды</span></div>`}</div>
+          </div>
         </div>
+        <div class="pjh-right">
         <div class="pjh-metrics">
           <div class="pjh-card">
             <div class="pjh-top"><span class="pjh-lbl">Срок жизни</span>${life.frozen?'<span class="pjh-tg">завершён</span>':''}</div>
@@ -6556,6 +6615,12 @@ const _projCard=(p)=>{
             <div class="pjh-cs"><span class="pjh-d" style="background:${cx.color}"></span>${cx.hasData?'стабильная нагрузка':'нет замеров'}</div>
             <div class="pjh-chart">${_hGauge(cx.hasData?cx.score:0,cx.color,!cx.hasData)}</div>
           </div>
+        </div>
+        <div class="pjh-smm">${_smm.has?`
+          <div class="pjh-smm-l"><span class="eyebrow">SMM · последний отчёт</span><span class="v">${_smm.er}<small>%</small></span><span class="kk2">вовлечённость</span></div>
+          <div class="pjh-smm-mid"><div class="st"><span class="kk">Охват</span><span class="vv">${_smm.reach}</span><span class="bar"><i style="width:${_smm.reachW}%;background:var(--accent)"></i></span></div><div class="st"><span class="kk">Подписчики</span><span class="vv" style="color:var(--pos)">${_smm.fol}</span><span class="bar"><i style="width:${_smm.folW}%;background:var(--pos)"></i></span></div><div class="st"><span class="kk">Публикации</span><span class="vv">${_smm.posts}</span><span class="bar"><i style="width:${_smm.postsW}%;background:var(--warn)"></i></span></div><div class="st"><span class="kk">Лайки/пост</span><span class="vv">${_smm.lr}</span><span class="bar"><i style="width:${_smm.lrW}%;background:var(--violet)"></i></span></div></div>
+          <div class="pjh-smm-r"><span class="glabel">Активность · 8 недель</span><svg viewBox="0 0 260 74" class="pjh-smm-spark"><defs><linearGradient id="pgag${idx}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity="0.28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="${_smm.area}" fill="url(#pgag${idx})"/><path d="${_smm.line}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${_smm.lastX}" cy="${_smm.lastY}" r="3.2" fill="var(--accent)"/></svg></div>
+        `:`<div class="pjh-smm-empty">Нет SMM-отчёта по проекту</div>`}</div>
         </div>
         <div class="pjh-prog">
           <div class="pjh-prog-l"><span class="pjh-prog-k">Прогресс проекта</span><span class="pjh-prog-pct" style="color:${ringColor}">${p.pct}%</span><span class="pjh-prog-sub"><b>${pp.done}</b> из <b>${pp.done+pp.active+pp.wait}</b> готово</span></div>
