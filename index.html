@@ -4468,14 +4468,34 @@ button:active{transform:translateY(.5px) scale(.99)}
 .pjh-term.is-neg .tb-days{background:rgba(240,120,92,.18)}
 .pjh-term.is-none{cursor:default;color:var(--txt-3);justify-content:flex-start}
 .pjh-term.is-pos:hover,.pjh-term.is-warn:hover,.pjh-term.is-neg:hover{filter:brightness(1.08)}
-.pjh-prog{display:flex;flex-direction:column;gap:7px}
+.pjh-prog{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:28px;align-items:center;background:var(--bg-2);border:1px solid var(--line);border-radius:16px;padding:16px 22px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+.pjh-prog-l{display:flex;flex-direction:column;gap:2px;min-width:120px}
+.pjh-prog-l .pjh-prog-k{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
+.pjh-prog-pct{font-size:32px;font-weight:800;letter-spacing:-.03em;line-height:1.05;font-family:var(--mono)}
+.pjh-prog-sub{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-top:2px}
+.pjh-prog-sub b{color:var(--txt-2);font-weight:600}
+.pjh-prog-mid{min-width:0}
+.pjh-prog-track{display:flex;gap:3px;height:20px;border-radius:8px;overflow:hidden;background:var(--bg-3)}
+.pjh-prog-track .seg{border-radius:5px;min-width:3px;transition:flex .4s var(--ease-out,ease)}
+.pjh-prog-track .seg.done{background:linear-gradient(180deg,#5BE3A0,#43D88C);box-shadow:0 0 16px -2px rgba(67,216,140,.5)}
+.pjh-prog-track .seg.active{background:linear-gradient(180deg,#5df0da,#37E6C8)}
+.pjh-prog-track .seg.wait{background:var(--bg-3);box-shadow:inset 0 0 0 1px var(--line-2)}
+.pjh-prog-scale{display:flex;justify-content:space-between;margin-top:7px;font-family:var(--mono);font-size:9.5px;color:var(--txt-3)}
+.pjh-prog-lg{display:flex;flex-direction:column;gap:8px}
+.pjh-prog-lg .lg{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--txt-2);white-space:nowrap}
+.pjh-prog-lg .lg i{width:9px;height:9px;border-radius:3px;flex:none}
+.pjh-prog-lg .lg b{color:var(--txt);font-weight:700;font-family:var(--mono)}
+.pjh-prog-lg .lg.done i{background:var(--pos)}
+.pjh-prog-lg .lg.active i{background:var(--accent)}
+.pjh-prog-lg .lg.wait i{background:var(--bg-3);box-shadow:inset 0 0 0 1px var(--line-2)}
+@media(max-width:720px){.pjh-prog{grid-template-columns:1fr;gap:14px}.pjh-prog-lg{flex-direction:row;flex-wrap:wrap}}
 .pjh-prog-h{display:flex;align-items:baseline;justify-content:space-between}
 .pjh-p{font-family:var(--mono);font-size:14px;font-weight:600}
 .pjh-bar{height:6px;border-radius:999px;background:var(--bg-3);overflow:hidden}
 .pjh-bar i{display:block;height:100%;border-radius:999px;box-shadow:0 0 12px rgba(55,230,200,.35)}
 .pjh-prog-s{font-family:var(--mono);font-size:11.5px;color:var(--txt-3);letter-spacing:.02em}
 .pjh-prog-s b{color:var(--txt-2);font-weight:600}
-.pjh-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-self:center;align-content:center}
+.pjh-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-self:start;align-content:start}
 .pjh-card{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r);padding:16px 16px 14px;display:flex;flex-direction:column;transition:.18s;overflow:hidden}
 .pjh-card:hover{border-color:var(--line-2)}
 .pjh-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}
@@ -6510,11 +6530,6 @@ const _projCard=(p)=>{
           <div class="pjh-tags">${p.svc?`<span class="pjh-tag ac">${p.svc}</span>`:''}${(tar.name&&tar.name!=='—')?`<span class="pjh-tag">${tar.name}${tar.derived?'°':''}</span>`:''}${(p.cat&&p.cat!=='—')?`<span class="pjh-tag">${p.cat}</span>`:''}</div>
           ${_pmBlock}
           ${_teamBlock}
-          <div class="pjh-prog">
-            <div class="pjh-prog-h"><span class="pjh-k">Прогресс проекта</span><span class="pjh-p" style="color:${ringColor}">${p.pct}%</span></div>
-            <div class="pjh-bar"><i style="width:${Math.min(100,Math.max(0,p.pct))}%;background:${ringColor}"></i></div>
-            <div class="pjh-prog-s"><b>${pp.done}</b> done · <b>${pp.active}</b> в работе · <b>${pp.wait}</b> в очереди</div>
-          </div>
         </div>
         <div class="pjh-metrics">
           <div class="pjh-card">
@@ -6541,6 +6556,11 @@ const _projCard=(p)=>{
             <div class="pjh-cs"><span class="pjh-d" style="background:${cx.color}"></span>${cx.hasData?'стабильная нагрузка':'нет замеров'}</div>
             <div class="pjh-chart">${_hGauge(cx.hasData?cx.score:0,cx.color,!cx.hasData)}</div>
           </div>
+        </div>
+        <div class="pjh-prog">
+          <div class="pjh-prog-l"><span class="pjh-prog-k">Прогресс проекта</span><span class="pjh-prog-pct" style="color:${ringColor}">${p.pct}%</span><span class="pjh-prog-sub"><b>${pp.done}</b> из <b>${pp.done+pp.active+pp.wait}</b> готово</span></div>
+          <div class="pjh-prog-mid"><div class="pjh-prog-track">${(pp.done+pp.active+pp.wait)>0?`${pp.done>0?`<div class="seg done" style="flex:${pp.done}"></div>`:''}${pp.active>0?`<div class="seg active" style="flex:${pp.active}"></div>`:''}${pp.wait>0?`<div class="seg wait" style="flex:${pp.wait}"></div>`:''}`:`<div class="seg wait" style="flex:1"></div>`}</div><div class="pjh-prog-scale"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div></div>
+          <div class="pjh-prog-lg"><span class="lg done"><i></i>Готово <b>${pp.done}</b></span><span class="lg active"><i></i>В работе <b>${pp.active}</b></span><span class="lg wait"><i></i>В очереди <b>${pp.wait}</b></span></div>
         </div>
       </div>`;
 };
