@@ -1809,6 +1809,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 @media(max-width:1000px){.lb-ops-strip{grid-template-columns:repeat(2,1fr)}}
 .lb-ops-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:22px 0 12px}
 .lb-ops-sort{display:inline-flex;gap:4px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:4px}
+.lb-ops-sort.wrap{flex-wrap:wrap}
 .lb-ops-sort button{border:0;background:transparent;color:var(--txt-3);font-size:13px;font-weight:600;padding:7px 13px;border-radius:7px;cursor:pointer;transition:.14s;white-space:nowrap}
 .lb-ops-sort button:hover{color:var(--txt-2)}
 .lb-ops-sort button.on{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
@@ -11745,10 +11746,7 @@ function lbPaint(){
     return;
   }
   const m=document.getElementById('lb-smm');
-  if(m){
-    const c=m.querySelector('.lbx-ctr'); if(c) c.outerHTML=lbControlsHTML();
-    const b=m.querySelector('.lb-smm-render'); if(b) b.innerHTML=smmRenderLb();
-  }
+  if(m){ m.innerHTML=renderSmmLbSimple(); }
 }
 function lbControlsHTML(){
   const M=SMM_LB_METRICS, cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
@@ -11802,7 +11800,7 @@ function renderLeaderboard(){
   if(_smmLbData===null && !_smmLbLoading){ smmLoadLb().then(()=>{ if(_agCurModule()==='leaderboard' && _lbTab==='smm') renderLeaderboard(); }).catch(()=>{}); }
   if(!window._teamRaw && window.tLoadTeam){ window.tLoadTeam().then(()=>{ if(_agCurModule()==='leaderboard' && _lbTab==='ops') renderLeaderboard(); }).catch(()=>{}); }
   const tab=_lbTab;
-  const smmInline='<div id="lb-smm" class="lb-inline">'+lbControlsHTML()+'<div class="lb-smm-render">'+smmRenderLb()+'</div></div>';
+  const smmInline='<div id="lb-smm" class="lb-inline">'+renderSmmLbSimple()+'</div>';
   cont.innerHTML=
     '<div class="ph"><div><div class="eyebrow">Агентство · Рейтинг проектов</div><h1>Лидерборд</h1>'
     +'<div class="ph-pulse"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px -1px var(--accent)"></span>'+(tab==='smm'?'рейтинг проектов по SMM-метрикам':'скорость движения проектов по этапам и задачам')+'</div></div></div>'
@@ -11811,6 +11809,56 @@ function renderLeaderboard(){
     +'<button class="team-tab '+(tab==='ops'?'on':'')+'" onclick="setLbTab(\'ops\')">Операционная эффективность</button>'
     +'</div></div>'
     +(tab==='smm'?smmInline:renderOpsLb());
+}
+/* Упрощённый SMM-рейтинг в стиле операционной вкладки (сводка + метрики + плоский список) */
+function renderSmmLbSimple(){
+  const M=SMM_LB_METRICS;
+  const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват Reels + Stories',followers:'Прирост подписчиков'};
+  const SHORT={er:'ER',lr:'Лайки',tr:'Комменты',shr:'Репосты',sr:'Сохран.',reach:'Охват',followers:'Подписчики'};
+  const cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
+  const nfK=v=>{ v=Math.round(Number(v)||0); const a=Math.abs(v); return a>=1000?((v/1000).toFixed(a>=10000?0:1).replace('.',',').replace(',0','')+'K'):String(v); };
+  const fmtV=(v,mc)=>{ mc=mc||cfg; if(v==null)return '—'; return mc.pct?(+v).toFixed(2).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)); };
+  const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',','):(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
+  const esc=v=>_ddH(v);
+  if(_smmLbData===null) return '<div class="lb-load">Загрузка рейтинга…</div>';
+  if(!_smmLbData.length) return '<div class="lb-load">SMM-отчётов в агентстве пока нет<br><span style="opacity:.6">создайте отчёты в проектах — они появятся здесь</span></div>';
+  const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m)})).filter(r=>r.val!=null);
+  const metricBtns=M.map(mc=>'<button class="'+(mc.k===cfg.k?'on':'')+'" onclick="smmSetLbMetric(\''+mc.k+'\')">'+SHORT[mc.k]+'</button>').join('');
+  const headBar='<div class="lb-ops-head"><div class="lb-ops-sort wrap">'+metricBtns+'</div><div class="lb-ops-legend">рейтинг по метрике · '+esc(NAMES[cfg.k])+'</div></div>';
+  if(!rows.length) return headBar+'<div class="lb-load">Нет данных по метрике «'+esc(NAMES[cfg.k])+'»<br><span style="opacity:.6">проектов с этой метрикой: 0 из '+_smmLbData.length+'</span></div>';
+  rows.sort((a,b)=>(b.val||0)-(a.val||0)); rows.forEach((r,i)=>r.rank=i+1);
+  const vals=rows.map(r=>r.val);
+  const maxV=Math.max.apply(null,vals), minV=Math.min.apply(null,vals), maxAbs=Math.max.apply(null,vals.map(v=>Math.abs(v)))||1;
+  const avg=vals.reduce((s,x)=>s+x,0)/vals.length;
+  const sv=vals.slice().sort((a,b)=>a-b);
+  const med=sv.length%2?sv[(sv.length-1)/2]:(sv[sv.length/2-1]+sv[sv.length/2])/2;
+  const belowAvg=vals.filter(v=>v<avg).length;
+  const leader=rows[0], last=rows[rows.length-1];
+  const secM=['er','reach','followers'].map(k=>M.find(x=>x.k===k)).filter(Boolean);
+  const strip='<div class="px-ov lb-ops-strip">'
+    +'<div class="px-ov-cell"><div class="px-ov-l">Медиана · '+esc(NAMES[cfg.k])+'</div><div class="px-ov-v">'+fmtV(med).replace('%','<small>%</small>')+'</div><div class="px-ov-ctx">среднее '+fmtV(avg)+'</div></div>'
+    +'<div class="px-ov-cell"><div class="px-ov-l">Лидер</div><div class="px-ov-v" style="font-size:19px;color:var(--pos)">'+esc(leader.proj.name)+'</div><div class="px-ov-ctx">'+fmtV(leader.val)+'</div></div>'
+    +'<div class="px-ov-cell"><div class="px-ov-l">Отстающий</div><div class="px-ov-v" style="font-size:19px;color:var(--warn)">'+(rows.length>1?esc(last.proj.name):'—')+'</div><div class="px-ov-ctx">'+(rows.length>1?fmtV(last.val):'—')+'</div></div>'
+    +'<div class="px-ov-cell"><div class="px-ov-l">Ниже среднего</div><div class="px-ov-v"'+(belowAvg>0?' style="color:var(--neg)"':'')+'>'+belowAvg+'<small> / '+rows.length+'</small></div><div class="px-ov-ctx">проектов</div></div>'
+  +'</div>';
+  const body=rows.map(r=>{
+    const t=(r.val-minV)/((maxV-minV)||1);
+    const hcol=t>=.66?'var(--pos)':t>=.33?'var(--accent)':'var(--txt-2)';
+    const bw=_tClamp(Math.round(Math.abs(r.val)/maxAbs*100),3,100);
+    const rk=r.rank<=3?'<span class="lb-medal m'+r.rank+'">'+r.rank+'</span>':'<span class="lb-rk">'+r.rank+'</span>';
+    const col=r.proj.color||'#37E6C8'; const init=esc(((r.proj.name||'?').trim()[0]||'?').toUpperCase());
+    const ic='<span class="lb-opic" style="background:'+col+'22;color:'+col+'">'+logoFill(r.proj.logoUrl,init)+'</span>';
+    const secCols=secM.map(mc=>'<span class="lb-opc">'+fmtCell(mc.get(r.m),mc)+'</span>').join('');
+    return '<div class="lb-oprow">'
+      +rk
+      +'<span class="lb-opproj">'+ic+'<span class="lb-opnm">'+esc(r.proj.name)+'</span></span>'
+      +'<span class="lb-opmetric"><b style="color:'+hcol+'">'+fmtV(r.val).replace('%','<small>%</small>')+'</b><span class="lb-opbar"><i style="width:'+bw+'%;background:'+hcol+'"></i></span></span>'
+      +secCols
+    +'</div>';
+  }).join('');
+  const secHead=secM.map(mc=>'<span class="c">'+SHORT[mc.k]+'</span>').join('');
+  const headerRow='<div class="lb-oprow lb-ophead"><span>#</span><span>Проект</span><span class="c">'+esc(NAMES[cfg.k])+'</span>'+secHead+'</div>';
+  return strip+headBar+'<div class="lb-oplist">'+headerRow+body+'</div>';
 }
 /* Операционная эффективность: реальные метрики по этапам и задачам из истории (window._teamRaw) */
 function computeProjectOps(){
