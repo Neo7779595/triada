@@ -11831,12 +11831,22 @@ function renderSmmLbSimple(){
   const fmtV=(v,mc)=>{ mc=mc||cfg; if(v==null)return '—'; return mc.pct?(+v).toFixed(2).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)); };
   const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',','):(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
   const esc=v=>_ddH(v);
-  if(_smmLbData===null) return '<div class="lb-load">Загрузка рейтинга…</div>';
-  if(!_smmLbData.length) return '<div class="lb-load">SMM-отчётов в агентстве пока нет<br><span style="opacity:.6">создайте отчёты в проектах — они появятся здесь</span></div>';
-  const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m)})).filter(r=>r.val!=null);
+  const _all=_smmLbAll||[]; const prevMap={};
+  if(_smmLbPeriod==='__latest'){ const byP={}; _all.forEach(r=>{ const k=String(r.proj.id); (byP[k]||(byP[k]=[])).push(r); }); Object.keys(byP).forEach(k=>{ const arr=byP[k].slice().sort((a,b)=>a.ts<b.ts?1:(a.ts>b.ts?-1:0)); if(arr[1])prevMap[k]=arr[1].m; }); }
+  else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); const _pn=(_ix>=0&&_smmLbPeriods[_ix+1])?_smmLbPeriods[_ix+1].period:null; if(_pn){ const sn=new Set(); _all.forEach(r=>{ if(r.period!==_pn)return; const k=String(r.proj.id); if(sn.has(k))return; sn.add(k); prevMap[k]=r.m; }); } }
+  const curName=_smmLbPeriod==='__latest'?'последний отчёт':_smmLbPeriod;
+  let prevName=null; if(_smmLbPeriod==='__latest'){ prevName=Object.keys(prevMap).length?'предыдущим отчётом':null; } else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); if(_ix>=0&&_smmLbPeriods[_ix+1]) prevName=_smmLbPeriods[_ix+1].period; }
+  const perSel=_smmLbPeriods.length ? ('<div class="lb-ops-sort wrap"><button class="'+(_smmLbPeriod==='__latest'?'on':'')+'" onclick="smmSetLbPeriodIdx(-1)">Последний</button>'+_smmLbPeriods.map((pp,i)=>'<button class="'+(_smmLbPeriod===pp.period?'on':'')+'" onclick="smmSetLbPeriodIdx('+i+')">'+esc(pp.period)+'</button>').join('')+'</div>') : '<span></span>';
+  const perLbl='<b>'+esc(curName)+'</b>'+(prevName?' · сравнение с '+esc(prevName):' · нет предыдущего периода');
+  const perBar='<div class="lb-period">'+perSel+'<div class="lb-period-lbl"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'+perLbl+'</div></div>';
   const metricBtns=M.map(mc=>'<button class="'+(mc.k===cfg.k?'on':'')+'" onclick="smmSetLbMetric(\''+mc.k+'\')">'+SHORT[mc.k]+'</button>').join('');
   const headBar='<div class="lb-ops-head"><div class="lb-ops-sort wrap">'+metricBtns+'</div><div class="lb-ops-legend">рейтинг по метрике · '+esc(NAMES[cfg.k])+'</div></div>';
-  if(!rows.length) return headBar+'<div class="lb-load">Нет данных по метрике «'+esc(NAMES[cfg.k])+'»<br><span style="opacity:.6">проектов с этой метрикой: 0 из '+_smmLbData.length+'</span></div>';
+  const shell=inner=>perBar+headBar+inner;
+  if(_smmLbData===null) return shell('<div class="lb-load">Загрузка рейтинга…</div>');
+  if(!_all.length) return perBar+'<div class="lb-load">SMM-отчётов в агентстве пока нет<br><span style="opacity:.6">создайте отчёты в проектах — они появятся здесь</span></div>';
+  const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m)})).filter(r=>r.val!=null);
+  if(!_smmLbData.length) return shell('<div class="lb-load">За период «'+esc(curName)+'» отчётов нет<br><span style="opacity:.6">выберите другой период выше</span></div>');
+  if(!rows.length) return shell('<div class="lb-load">Нет данных по метрике «'+esc(NAMES[cfg.k])+'» за «'+esc(curName)+'»<br><span style="opacity:.6">попробуйте другую метрику или период</span></div>');
   rows.sort((a,b)=>(b.val||0)-(a.val||0)); rows.forEach((r,i)=>r.rank=i+1);
   const vals=rows.map(r=>r.val);
   const maxV=Math.max.apply(null,vals), minV=Math.min.apply(null,vals), maxAbs=Math.max.apply(null,vals.map(v=>Math.abs(v)))||1;
@@ -11846,14 +11856,6 @@ function renderSmmLbSimple(){
   const belowAvg=vals.filter(v=>v<avg).length;
   const leader=rows[0], last=rows[rows.length-1];
   const secM=['er','reach','followers'].map(k=>M.find(x=>x.k===k)).filter(Boolean);
-  const _all=_smmLbAll||[]; const prevMap={};
-  if(_smmLbPeriod==='__latest'){ const byP={}; _all.forEach(r=>{ const k=String(r.proj.id); (byP[k]||(byP[k]=[])).push(r); }); Object.keys(byP).forEach(k=>{ const arr=byP[k].slice().sort((a,b)=>a.ts<b.ts?1:(a.ts>b.ts?-1:0)); if(arr[1])prevMap[k]=arr[1].m; }); }
-  else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); const _pn=(_ix>=0&&_smmLbPeriods[_ix+1])?_smmLbPeriods[_ix+1].period:null; if(_pn){ const sn=new Set(); _all.forEach(r=>{ if(r.period!==_pn)return; const k=String(r.proj.id); if(sn.has(k))return; sn.add(k); prevMap[k]=r.m; }); } }
-  const curName=_smmLbPeriod==='__latest'?'последний отчёт':_smmLbPeriod;
-  let prevName=null; if(_smmLbPeriod==='__latest'){ prevName=Object.keys(prevMap).length?'предыдущим отчётом':null; } else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); if(_ix>=0&&_smmLbPeriods[_ix+1]) prevName=_smmLbPeriods[_ix+1].period; }
-  const perSel=_smmLbPeriods.length>=2 ? ('<div class="lb-ops-sort wrap"><button class="'+(_smmLbPeriod==='__latest'?'on':'')+'" onclick="smmSetLbPeriodIdx(-1)">Последний</button>'+_smmLbPeriods.map((pp,i)=>'<button class="'+(_smmLbPeriod===pp.period?'on':'')+'" onclick="smmSetLbPeriodIdx('+i+')">'+esc(pp.period)+'</button>').join('')+'</div>') : '<span></span>';
-  const perLbl='<b>'+esc(curName)+'</b>'+(prevName?' · сравнение с '+esc(prevName):' · нет предыдущего периода');
-  const perBar='<div class="lb-period">'+perSel+'<div class="lb-period-lbl"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'+perLbl+'</div></div>';
   const strip='<div class="px-ov lb-ops-strip">'
     +'<div class="px-ov-cell"><div class="px-ov-l">Медиана · '+esc(NAMES[cfg.k])+'</div><div class="px-ov-v">'+fmtV(med).replace('%','<small>%</small>')+'</div><div class="px-ov-ctx">среднее '+fmtV(avg)+'</div></div>'
     +'<div class="px-ov-cell"><div class="px-ov-l">Лидер</div><div class="px-ov-v" style="font-size:19px;color:var(--pos)">'+esc(leader.proj.name)+'</div><div class="px-ov-ctx">'+fmtV(leader.val)+'</div></div>'
