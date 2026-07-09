@@ -12452,12 +12452,18 @@ function _dlInsight(over,today,weekN,futureN,done,unassigned){
       <div><div class="n" style="color:var(--pos)">${done}</div><div class="k">готово</div></div>
     </div></div>`;
 }
+function _actResp(a){
+  var id = a.by || null;
+  if(!id && a.pid){ var pr=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(p){return String(p.id)===String(a.pid);}); if(pr && pr.lead_id) id=pr.lead_id; }
+  if(!id) return {id:null,n:'Команда',c:'var(--txt-3)',avatar:null};
+  var w=_who(id); return {id:id, n:(w.n&&w.n!=='—')?w.n:'—', c:w.c, avatar:w.avatar};
+}
 function _actFiltered(){
   var q=(agDlSearch||'').trim().toLowerCase();
   return DL_ACT.filter(function(a){
     if(agDlType!=='all' && (a.type||'stage')!==agDlType) return false;
     if(agDlProj!=='all' && a.project!==agDlProj) return false;
-    if(agDlResp!=='all'){ if(agDlResp==='__none'){ if(a.by) return false; } else if(String(a.by)!==String(agDlResp)) return false; }
+    if(agDlResp!=='all'){ var _rid=_actResp(a).id; if(agDlResp==='__none'){ if(_rid) return false; } else if(String(_rid)!==String(agDlResp)) return false; }
     if(agDlFrom && a.ts && String(a.ts).slice(0,10) < agDlFrom) return false;
     if(agDlTo && a.ts && String(a.ts).slice(0,10) > agDlTo) return false;
     if(q){ var hay=((a.txt||'')+' '+(a.tag||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
@@ -12487,9 +12493,9 @@ function renderDeadlines(){
     var _AF=_actFiltered();
     body = _AF.length ? `<div class="act-feed">${_AF.map(a=>{
       const ic=a.k==='start'?'<path d="M5 3l14 9-14 9z"/>':a.k==='done'?'<path d="M20 6L9 17l-5-5"/>':'<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>';
-      const w=a.by?_who(a.by):null; const known=w&&w.n&&w.n!=='—';
-      const who=known?w.n:'Команда';
-      const whoAv=known?`<span class="act-who-av" style="background:${w.c}">${((w.n||'?')[0]||'?').toUpperCase()}</span>`:'<span class="act-who-av tm">К</span>';
+      const R=_actResp(a); const known=R.n&&R.n!=='—'&&R.n!=='Команда';
+      const who=known?R.n:'Команда';
+      const whoAv=known?`<span class="act-who-av" style="background:${R.c}">${((R.n||'?')[0]||'?').toUpperCase()}</span>`:'<span class="act-who-av tm">К</span>';
       const SL=s=>({wait:'ожидание',hold:'пауза',active:'в работе',done:'готово',review:'проверка'}[s]||s||'—');
       const SC=s=>({wait:'var(--txt-3)',hold:'var(--warn)',active:'var(--accent)',done:'var(--pos)',review:'var(--violet)'}[s]||'var(--txt-3)');
       const trans=(a.from||a.to)?`<div class="act-trans"><span class="st" style="color:${SC(a.from)};border-color:${SC(a.from)}55">${SL(a.from)}</span><svg class="ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="st" style="color:${SC(a.to)};border-color:${SC(a.to)}55;background:${SC(a.to)}14">${SL(a.to)}</span></div>`:'';
