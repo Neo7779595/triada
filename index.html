@@ -1807,6 +1807,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .lb-ops-strip .px-ov-cell{min-height:116px;padding:16px 18px 14px}
 .lb-ops-strip .px-ov-ctx{padding-top:11px;font-size:12px}
 @media(max-width:1000px){.lb-ops-strip{grid-template-columns:repeat(2,1fr)}}
+.lb-ops-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lb-ops-toolbar .dd{flex:none}
+.lb-ops-toolbar .dd-btn{padding:8px 12px}
+.lb-ops-toolbar .lb-ops-sort{flex:1;min-width:0}
 .lb-ops-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:22px 0 12px}
 .lb-ops-sort{display:inline-flex;gap:4px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:4px}
 .lb-ops-sort.wrap{flex-wrap:wrap}
@@ -11855,6 +11859,7 @@ function lbApplyPeriod(){
   all.forEach(r=>{ if(_smmLbPeriod!=='__latest' && r.period!==_smmLbPeriod) return; const k=String(r.proj.id); if(seen.has(k)) return; seen.add(k); out.push({proj:r.proj, reportId:r.reportId, m:r.m}); });
   _smmLbData=out;
 }
+function smmSetLbPeriodByVal(v){ if(v==='__latest'){ smmSetLbPeriodIdx(-1); return; } const _ix=_smmLbPeriods.findIndex(function(pp){return pp.period===v;}); smmSetLbPeriodIdx(_ix>=0?_ix:-1); }
 function smmSetLbPeriodIdx(i){ _smmLbPeriod=(i<0?'__latest':((_smmLbPeriods[i]&&_smmLbPeriods[i].period)||'__latest')); _smmLbAnim=true; if(typeof _closePops==='function')_closePops(); lbApplyPeriod(); lbPaint(); }
 function smmSetLbMetric(k){ _smmLbMetric=k; _smmLbAnim=true; if(typeof _closePops==='function')_closePops(); lbPaint(); }
 function smmToggleLbMenu(e){ if(e&&e.stopPropagation)e.stopPropagation(); _smmLbMenuOpen=!_smmLbMenuOpen; _smmLbAnim=false; lbRender(); }
@@ -11953,14 +11958,14 @@ function renderSmmLbSimple(){
   else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); const _pn=(_ix>=0&&_smmLbPeriods[_ix+1])?_smmLbPeriods[_ix+1].period:null; if(_pn){ const sn=new Set(); _all.forEach(r=>{ if(r.period!==_pn)return; const k=String(r.proj.id); if(sn.has(k))return; sn.add(k); prevMap[k]=r.m; }); } }
   const curName=_smmLbPeriod==='__latest'?'последний отчёт':_smmLbPeriod;
   let prevName=null; if(_smmLbPeriod==='__latest'){ prevName=Object.keys(prevMap).length?'предыдущим отчётом':null; } else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); if(_ix>=0&&_smmLbPeriods[_ix+1]) prevName=_smmLbPeriods[_ix+1].period; }
-  const perSel=_smmLbPeriods.length ? ('<div class="lb-ops-sort wrap"><button class="'+(_smmLbPeriod==='__latest'?'on':'')+'" onclick="smmSetLbPeriodIdx(-1)">Последний</button>'+_smmLbPeriods.map((pp,i)=>'<button class="'+(_smmLbPeriod===pp.period?'on':'')+'" onclick="smmSetLbPeriodIdx('+i+')">'+esc(pp.period)+'</button>').join('')+'</div>') : '<span></span>';
-  const perLbl='<b>'+esc(curName)+'</b>'+(prevName?' · сравнение с '+esc(prevName):' · нет предыдущего периода');
-  const perBar='<div class="lb-period">'+perSel+'<div class="lb-period-lbl"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'+perLbl+'</div></div>';
+  const perOptsArr=[['__latest','Последний отчёт']].concat(_smmLbPeriods.map(pp=>[pp.period,pp.period]));
+  const perLabel=_smmLbPeriod==='__latest'?'Последний':_smmLbPeriod;
+  const perDD=_dd('smmlb-per','Период',perLabel,perOptsArr,_smmLbPeriod,'smmSetLbPeriodByVal');
   const metricBtns=M.map(mc=>'<button class="'+(mc.k===cfg.k?'on':'')+'" onclick="smmSetLbMetric(\''+mc.k+'\')">'+SHORT[mc.k]+'</button>').join('');
-  const headBar='<div class="lb-ops-head"><div class="lb-ops-sort wrap">'+metricBtns+'</div><div class="lb-ops-legend">рейтинг по метрике · '+esc(NAMES[cfg.k])+'</div></div>';
-  const shell=inner=>perBar+headBar+inner;
+  const headBar='<div class="lb-ops-head"><div class="lb-ops-toolbar">'+perDD+'<div class="lb-ops-sort wrap">'+metricBtns+'</div></div></div>';
+  const shell=inner=>headBar+inner;
   if(_smmLbData===null) return shell('<div class="lb-load">Загрузка рейтинга…</div>');
-  if(!_all.length) return perBar+'<div class="lb-load">SMM-отчётов в агентстве пока нет<br><span style="opacity:.6">создайте отчёты в проектах — они появятся здесь</span></div>';
+  if(!_all.length) return headBar+'<div class="lb-load">SMM-отчётов в агентстве пока нет<br><span style="opacity:.6">создайте отчёты в проектах — они появятся здесь</span></div>';
   const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m)})).filter(r=>r.val!=null);
   if(!_smmLbData.length) return shell('<div class="lb-load">За период «'+esc(curName)+'» отчётов нет<br><span style="opacity:.6">выберите другой период выше</span></div>');
   if(!rows.length) return shell('<div class="lb-load">Нет данных по метрике «'+esc(NAMES[cfg.k])+'» за «'+esc(curName)+'»<br><span style="opacity:.6">попробуйте другую метрику или период</span></div>');
@@ -11997,7 +12002,7 @@ function renderSmmLbSimple(){
   }).join('');
   const secHead=secM.map(mc=>'<span class="c">'+SHORT[mc.k]+'</span>').join('');
   const headerRow='<div class="lb-oprow lb-ophead"><span>#</span><span>Проект</span><span class="c">'+esc(NAMES[cfg.k])+'</span>'+secHead+'</div>';
-  return perBar+strip+headBar+'<div class="lb-oplist">'+headerRow+body+'</div>';
+  return strip+headBar+'<div class="lb-oplist">'+headerRow+body+'</div>';
 }
 /* Операционная эффективность: реальные метрики по этапам и задачам из истории (window._teamRaw) */
 function computeProjectOps(period){
@@ -12052,9 +12057,9 @@ function renderOpsLb(){
   const fastest=measured[0], slowest=measured.length>1?measured[measured.length-1]:null;
   const totOverdue=O.rows.reduce((s,r)=>s+r.overdue,0);
   const W=O.win;
-  const perBtns=[['7d','7 дней'],['30d','30 дней'],['90d','90 дней'],['all','Всё время']].map(x=>'<button class="'+(_opsPeriod===x[0]?'on':'')+'" onclick="setOpsPeriod(\''+x[0]+'\')">'+x[1]+'</button>').join('');
-  const perLbl=W.days==null?'<b>за всё время</b> · все замеры активности':('<b>за '+W.label+'</b> · '+W.range+(O.hasPrev?' · сравнение с предыдущим периодом':''));
-  const perBar='<div class="lb-period"><div class="lb-ops-sort wrap">'+perBtns+'</div><div class="lb-period-lbl"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'+perLbl+'</div></div>';
+  const _opsOpts=[['7d','7 дней'],['30d','30 дней'],['90d','90 дней'],['all','Всё время']];
+  const _opsLbl=(_opsOpts.find(function(x){return x[0]===_opsPeriod;})||_opsOpts[3])[1];
+  const perDD=_dd('opslb-per','Период',_opsLbl,_opsOpts,_opsPeriod,'setOpsPeriod');
   const esc=v=>_ddH(v);
   const strip='<div class="px-ov lb-ops-strip">'
     +'<div class="px-ov-cell"><div class="px-ov-l">Медиана скорости</div><div class="px-ov-v">'+(O.bench!=null?_cycDur(O.bench):'—')+'</div><div class="px-ov-ctx">типичный цикл этапа/задачи</div></div>'
@@ -12063,7 +12068,7 @@ function renderOpsLb(){
     +'<div class="px-ov-cell"><div class="px-ov-l">Просрочено всего</div><div class="px-ov-v"'+(totOverdue>0?' style="color:var(--neg)"':'')+'>'+totOverdue+'</div><div class="px-ov-ctx">'+O.measured+' из '+O.total+' с замерами</div></div>'
   +'</div>';
   const sortBtns=['speed','score','throughput','progress','overdue'].map(k=>'<button class="'+(sort===k?'on':'')+'" onclick="setOpsSort(\''+k+'\')">'+MET[k].l+'</button>').join('');
-  const head='<div class="lb-ops-head"><div class="lb-ops-sort">'+sortBtns+'</div><div class="lb-ops-legend">'+cfg.desc+'</div></div>';
+  const head='<div class="lb-ops-head"><div class="lb-ops-toolbar">'+perDD+'<div class="lb-ops-sort">'+sortBtns+'</div></div></div>';
   const body=rows.map(r=>{
     const vcol=r.verdict==='fast'?'var(--pos)':r.verdict==='ok'?'var(--accent)':r.verdict==='slow'?'var(--warn)':'var(--txt-3)';
     const vlab=r.verdict==='fast'?'быстро':r.verdict==='ok'?'норма':r.verdict==='slow'?'медленно':'нет данных';
@@ -12084,7 +12089,7 @@ function renderOpsLb(){
     +'</div>';
   }).join('');
   const headerRow='<div class="lb-oprow lb-ophead"><span>#</span><span>Проект</span><span class="c">'+cfg.l+'</span><span class="c">Выработка</span><span class="c">Прогресс</span><span class="c">Просрочено</span></div>';
-  return perBar+strip+head+'<div class="lb-oplist">'+headerRow+body+'</div>';
+  return strip+head+'<div class="lb-oplist">'+headerRow+body+'</div>';
 }
 
 function smmRenderLb(){
