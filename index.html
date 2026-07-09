@@ -12445,6 +12445,8 @@ function renderDeadlines(){
   const _team=(typeof TEAM!=='undefined'?TEAM:[]);
   const respOpts=[['all','Все исполнители'],['__none','Не назначен']].concat(_team.map(m=>[m._id,m.name]));
   const respLabel = agDlResp==='all'?'Все':(agDlResp==='__none'?'Не назначен':((_team.find(m=>m._id===agDlResp)||{}).name||'—'));
+  const statusOpts=[['all','Все'],['overdue','Просрочены'],['today','Сегодня'],['week','Неделя'],['future','Будущие'],['done','Выполненные']];
+  const statusLbl=(statusOpts.find(x=>x[0]===agDlFilter)||statusOpts[0])[1];
 
   let body;
   if(agDlView==='activity'){
@@ -12498,13 +12500,7 @@ function renderDeadlines(){
     </div>
 
     <div class="toolbar dl-controls tb-proj" style="margin-top:-4px">
-      ${agDlView==='deadlines'?`<div class="segm">
-        <button class="${onF('all')}" onclick="setDlFilter('all')">Все</button>
-        <button class="${onF('overdue')}" onclick="setDlFilter('overdue')"><span class="d" style="background:var(--neg)"></span>Просрочены</button>
-        <button class="${onF('today')}" onclick="setDlFilter('today')"><span class="d" style="background:var(--accent)"></span>Сегодня</button>
-        <button class="${onF('week')}" onclick="setDlFilter('week')"><span class="d" style="background:var(--warn)"></span>Неделя</button>
-        <button class="${onF('future')}" onclick="setDlFilter('future')">Будущие</button>
-      </div>
+      ${agDlView==='deadlines'?`${_dd('dlstatus','Срок',statusLbl,statusOpts,agDlFilter,'setDlFilter')}
       ${_dd('dltype','Тип', (agDlType==='all'?'Все':agDlType==='stage'?'Этапы':'Задачи'), [['all','Все типы'],['stage','Этапы'],['task','Задачи']], agDlType, 'setDlType')}
       ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}`:''}
       <div class="flex1"></div>
