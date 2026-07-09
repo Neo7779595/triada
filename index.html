@@ -2246,6 +2246,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-head.cp-pick:hover{background:rgba(55,230,200,.24)!important;box-shadow:inset 0 0 0 2px var(--accent)}
 .cp-head.cp-pick-off{opacity:.35;cursor:not-allowed}
 @keyframes cpTplPickPulse{50%{box-shadow:inset 0 0 0 2px var(--accent)}}
+.cp-head.cp-flash{animation:cpHeadFlash 1.4s ease-out both;position:relative;z-index:5}
+@keyframes cpHeadFlash{0%{background:var(--accent);color:var(--accent-ink);box-shadow:0 0 0 3px var(--accent),0 0 32px 4px rgba(55,230,200,.5)}30%{background:var(--accent-dim);color:var(--accent);box-shadow:0 0 0 2px var(--accent-line),0 0 22px 2px rgba(55,230,200,.3)}100%{background:transparent;box-shadow:none}}
 
 .cp-tplm-add{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:10px;color:var(--accent);font-size:14.5px;font-weight:600;padding:11px;cursor:pointer;font-family:var(--font)}
 .cp-tplm-add svg{width:15px;height:15px}
@@ -9370,7 +9372,7 @@ function cpTplPickHead(e,ci){
   cpTplApply(ci,id);
   return true;
 }
-function cpTplApply(ci,id){ const t=cpTplAll().find(function(x){return x.id===id;}); const col=cpColAt(ci); if(!t||!col)return; if(col.sys==='pub'){ if(typeof toast==='function')toast('Системную колонку менять нельзя'); cpCloseFloat(); pd2Close(); return; } col.type='select'; col.opts=JSON.parse(JSON.stringify(t.opts||[])); cpCloseFloat(); pd2Close(); cpSave(); cpRerender(); if(typeof toast==='function')toast('Применён шаблон «'+t.name+'»'); }
+function cpTplApply(ci,id){ const t=cpTplAll().find(function(x){return x.id===id;}); const col=cpColAt(ci); if(!t||!col)return; if(col.sys==='pub'){ if(typeof toast==='function')toast('Системную колонку менять нельзя'); cpCloseFloat(); pd2Close(); return; } const wasType=col.type; col.type='select'; col.opts=JSON.parse(JSON.stringify(t.opts||[])); const colId=col.id; cpCloseFloat(); pd2Close(); cpSave(); cpRerender(); const optN=(col.opts||[]).length; const optWord=(optN%10===1&&optN%100!==11)?'вариант':((optN%10>=2&&optN%10<=4&&(optN%100<10||optN%100>=20))?'варианта':'вариантов'); const typeChg=(wasType!=='select')?' · тип: список':''; if(typeof toast==='function')toast('«'+(col.name||'—')+'» — '+optN+' '+optWord+typeChg); setTimeout(function(){ const el=document.querySelector('.cp-head[data-c="'+ci+'"]'); if(!el)return; el.classList.add('cp-flash'); setTimeout(function(){el.classList.remove('cp-flash');},1400); },30); }
 function cpTplSaveCol(ci){ const col=cpColAt(ci); if(!col||col.type!=='select'||!(col.opts||[]).length){ if(typeof toast==='function')toast('Это не колонка-список'); cpCloseFloat(); return; } cpTplDraft={id:cpUid(),name:col.name||'',opts:JSON.parse(JSON.stringify(col.opts))}; cpCloseFloat(); cpTplEditRender(); }
 
 /* ===================== КОНТЕНТ-ПЛАН · ОБЪЕДИНЕНИЕ ЯЧЕЕК (горизонтально, в пределах строки) ===================== */
