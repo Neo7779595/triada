@@ -8052,7 +8052,8 @@ function cpSheetsBar(d){
 }
 
 /* ---- floating menu ---- */
-function cpCloseFloat(){ document.querySelectorAll('.cp-pop').forEach(e=>e.remove()); document.removeEventListener('click',cpCloseFloat); }
+function cpCloseFloat(){ document.querySelectorAll('.cp-pop').forEach(e=>e.remove()); document.removeEventListener('click',cpCloseFloat); document.removeEventListener('mousedown',cpCloseFloatMd,true); }
+function cpCloseFloatMd(e){ var pop=document.querySelector('.cp-pop'); if(pop && !pop.contains(e.target) && !(e.target.closest&&e.target.closest('.cp-chip-car'))) cpCloseFloat(); }
 function cpFloat(anchor,html){
   cpCloseFloat();
   const r=anchor.getBoundingClientRect();
@@ -8064,7 +8065,7 @@ function cpFloat(anchor,html){
   if(left+w>window.innerWidth-8) left=window.innerWidth-8-w;
   if(top+hh>window.innerHeight-8) top=r.top-hh-5;
   d.style.left=Math.max(8,left)+'px'; d.style.top=Math.max(8,top)+'px';
-  setTimeout(()=>document.addEventListener('click',cpCloseFloat,{once:true}),0);
+  setTimeout(()=>{document.addEventListener('click',cpCloseFloat,{once:true});document.addEventListener('mousedown',cpCloseFloatMd,true);},0);
 }
 
 /* ---- selection / editing ---- */
@@ -8170,7 +8171,7 @@ function cpKey(e){
 
 /* ---- select option menu ---- */
 function cpChipCarDown(e,el){ if(e&&e.stopPropagation)e.stopPropagation(); }
-function cpChipCarOpen(e,el){ if(e){ e.stopPropagation(); e.preventDefault(); } const cell=el&&el.closest?el.closest('.cp-cell'):null; if(!cell)return; const r=+cell.dataset.r, c=+cell.dataset.c; if(isNaN(r)||isNaN(c))return; cpSel={r,c}; cpSelEnd=null; cpRowSel=new Set(); cpColSel=new Set(); if(typeof cpSelectMenu==='function') cpSelectMenu(r,c,cell); }
+function cpChipCarOpen(e,el){ if(e){ e.stopPropagation(); e.preventDefault(); } if(document.querySelector('.cp-pop')){ cpCloseFloat(); return; } const cell=el&&el.closest?el.closest('.cp-cell'):null; if(!cell)return; const r=+cell.dataset.r, c=+cell.dataset.c; if(isNaN(r)||isNaN(c))return; cpSel={r,c}; cpSelEnd=null; cpRowSel=new Set(); cpColSel=new Set(); if(typeof cpSelectMenu==='function') cpSelectMenu(r,c,cell); }
 function cpSelectMenu(r,c,anchor){
   const col=cpColAt(c);
   let h='<div class="ttl">Статус</div>';
