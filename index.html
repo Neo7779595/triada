@@ -10711,14 +10711,26 @@ function pd2RepType(v){pd2Rep=v;document.querySelectorAll('#pd2-rtseg button').f
 function pdSaveReport(){
   const period=_v('pd2-period')||'';
   const title=_v('pd2-title')||`${pd2Rep==='PERF'?'Performance':'SMM'}${period?' · '+period:''}`;
+  const kind=pd2Rep;
   let payload;
-  if(pd2Rep==='PERF'){
+  if(kind==='PERF'){
     payload={period, rost:_v('rp-rost'),traf:_v('rp-traf'),chek:_v('rp-chek'),fakt:_v('rp-fakt'),baza:_v('rp-baza'),note:_v('rp-note')};
   } else {
     payload=smmEmptyPayload();
     payload.period=period;
   }
-  if(window.tReportAdd) window.tReportAdd(PROJECTS[pdIdx].id,{title,kind:pd2Rep,payload});
+  if(window.tReportAdd){
+    window.tReportAdd(PROJECTS[pdIdx].id,{title,kind,payload});
+    // SMM: сразу открыть редактор данных, чтобы пользователь не жал «Открыть» вручную
+    if(kind==='SMM'){
+      setTimeout(function(){
+        const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null;
+        if(!p||!p._reports||!p._reports.length) return;
+        const newest=p._reports.find(function(r){return r&&r.kind==='SMM';});
+        if(newest && typeof openSMM==='function') openSMM(newest);
+      },80);
+    }
+  }
   else { pd2Close(); toast('Нужен бэкенд'); }
 }
 function pdReportDel(id){ if(window.tReportDel) window.tReportDel(id); }
