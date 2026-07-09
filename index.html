@@ -4162,6 +4162,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .ph-pulse .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
 .px-ov{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:22px}
 .px-ov-cell{background:var(--bg-1);padding:22px 24px 18px;display:flex;flex-direction:column;min-height:152px}
+.px-ov-fchip{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:5px;border:1px solid var(--accent-line);margin-left:6px;vertical-align:middle;font-family:var(--mono)}
 .px-ov-l{font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
 .px-ov-v{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.04em;line-height:1;margin-top:14px;display:flex;align-items:baseline;gap:6px}
 .px-ov-v small{font-size:18px;font-weight:500;color:var(--txt-3)}
@@ -6804,7 +6805,11 @@ function renderProjects(){
   const svcs=[...new Set(PROJECTS.map(p=>p.svc).filter(Boolean))];
   const _tmL=(typeof TEAM!=='undefined'?TEAM:[]); const leadOpts=[['all','Все'],['__none','Не назначен']].concat(_tmL.map(m=>[m._id,m.name])); const leadLbl=agLead==='all'?'Все':(agLead==='__none'?'Не назначен':((_tmL.find(m=>m._id===agLead)||{}).name||'—'));
   const on=f=>agFilter===f?'on':'';
-  const _act=PROJECTS.filter(p=>p.status==='active'), _done=PROJECTS.filter(p=>p.status==='done');
+  // GLOBAL (для сайдбара и модулей) — всегда по всей базе
+  const _actAll=PROJECTS.filter(p=>p.status==='active'), _doneAll=PROJECTS.filter(p=>p.status==='done');
+  // SCOPED (для верхних карточек) — учитывает применённые фильтры
+  const _act=list.filter(p=>p.status==='active'), _done=list.filter(p=>p.status==='done');
+  const _hasFilt=(agCat!=='all'||agSvc!=='all'||agLead!=='all'||agCplx!=='all'||(agQ||'').trim()!==''||agFilter!=='active'&&agFilter!=='all');
   const _avg=(()=>{const _d=_act.reduce((s,p)=>s+(parseInt(p.stages)||0),0),_t=_act.reduce((s,p)=>s+(parseInt((p.stages||'0 / 0').split('/')[1])||0),0);return _t?Math.round(100*_d/_t):0;})();
   const _stDone=_act.reduce((s,p)=>s+(parseInt(p.stages)||0),0);
   const _mrrTot=_act.reduce((s,p)=>s+(p.mrr||0),0), _costTot=_act.reduce((s,p)=>s+(p.cost||0),0);
@@ -6815,9 +6820,10 @@ function renderProjects(){
   const _queue=_act.reduce((s,p)=>s+((p._pipeline&&p._pipeline.wait)||0),0);
   const _stTot=_act.reduce((s,p)=>s+(parseInt((p.stages||'0 / 0').split('/')[1])||0),0);
   const _maxMo=_act.reduce((m,p)=>Math.max(m,_ltvOf(p).months||0),0);
-  const _nb=document.getElementById('ag-proj-ct'); if(_nb)_nb.textContent=_act.length;
-  const _mA=document.getElementById('m-proj-act'); if(_mA)_mA.textContent=_act.length;
-  const _mD=document.getElementById('m-proj-done'); if(_mD)_mD.textContent=_done.length;
+  // сайдбар — всегда полный счёт
+  const _nb=document.getElementById('ag-proj-ct'); if(_nb)_nb.textContent=_actAll.length;
+  const _mA=document.getElementById('m-proj-act'); if(_mA)_mA.textContent=_actAll.length;
+  const _mD=document.getElementById('m-proj-done'); if(_mD)_mD.textContent=_doneAll.length;
   const _mT=document.getElementById('m-proj-all'); if(_mT)_mT.textContent=PROJECTS.length;
   document.getElementById('content-ag').innerHTML=`
     <div class="ph">
@@ -6827,7 +6833,7 @@ function renderProjects(){
 
     <div class="px-ov">
       <div class="px-ov-cell">
-        <div class="px-ov-l">Активный портфель</div>
+        <div class="px-ov-l">Активный портфель${_hasFilt?' <span class="px-ov-fchip">по фильтру</span>':''}</div>
         <div class="px-ov-v">${_act.length}</div>
         <div class="px-ov-comp">${(_stDone||_wip||_queue)?`${_stDone?`<i style="flex:${_stDone};background:var(--accent)"></i>`:''}${_wip?`<i style="flex:${_wip};background:var(--violet)"></i>`:''}${_queue?`<i style="flex:${_queue};background:var(--bg-3)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
         <div class="px-ov-ctx">${_stDone} готово · ${_wip} в работе · ${_queue} в очереди</div>
