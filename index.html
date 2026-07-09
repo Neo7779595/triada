@@ -4783,6 +4783,24 @@ button:active{transform:translateY(.5px) scale(.99)}
 .act-x-t .act-type{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:6px;margin-left:9px;vertical-align:middle}
 .act-x-t .act-type.st{color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line)}
 .act-x-t .act-type.tk{color:var(--txt-2);background:var(--bg-2);border:1px solid var(--line-2)}
+
+/* SMM · Концепт 1 (ER-герой + сетка со спарклайнами) */
+.smm1-body{display:grid;grid-template-columns:232px 1fr;gap:12px;margin-top:12px}
+.smm1-hero{background:linear-gradient(150deg,rgba(55,230,200,.06),transparent 55%),var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;min-height:120px}
+.smm1-hero-top .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
+.smm1-hero-top .v{font-size:36px;font-weight:800;font-family:var(--mono);letter-spacing:-2px;line-height:1;display:block;margin-top:5px}
+.smm1-hero-top .d{font-size:12px;font-weight:600;font-family:var(--mono);margin-top:5px;display:block}
+.smm1-spark{width:100%;height:42px;display:block;margin-top:8px;overflow:visible}
+.smm1-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px}
+.smm1-cell{background:var(--bg-2);border:1px solid var(--line);border-radius:13px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.smm1-cell .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.smm1-cell .top .k{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smm1-cell .top .d{font-size:11px;font-weight:700;font-family:var(--mono);white-space:nowrap;flex:none}
+.smm1-cell .v{font-size:21px;font-weight:800;font-family:var(--mono);letter-spacing:-.5px;color:var(--txt);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smm1-cell .spark{display:flex;align-items:flex-end;gap:3px;height:20px;margin-top:8px}
+.smm1-cell .spark i{flex:1;border-radius:2px;background:var(--bg-3);min-height:2px}
+@container (max-width:600px){.smm1-body{grid-template-columns:1fr}}
+@media(max-width:820px){.smm1-body{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -6579,10 +6597,8 @@ const _hGauge=(pct,col,dim)=>{
 function _pjhFit(){ requestAnimationFrame(function(){ var els=document.querySelectorAll('.pjh-name-t'); for(var i=0;i<els.length;i++){ var el=els[i]; var fs=15; el.style.fontSize=fs+'px'; var g=0; while(el.scrollWidth>el.clientWidth+0.5 && fs>11 && g<20){ fs-=0.5; el.style.fontSize=fs+'px'; g++; } } }); }
 window.addEventListener('resize',function(){ clearTimeout(window._pjhFitT); window._pjhFitT=setTimeout(_pjhFit,150); });
 function _pjhSmm(p){
-  // Реальные SMM-данные: последний отчёт проекта из _smmLbAll (загружается smmLoadLb),
-  // тренд-цвет — сравнение с предыдущим отчётом того же проекта.
   var all=(typeof _smmLbAll!=='undefined'&&_smmLbAll)?_smmLbAll:[];
-  var mine=all.filter(function(r){return r.proj&&String(r.proj.id)===String(p.id);}); // уже отсортированы по свежести (desc)
+  var mine=all.filter(function(r){return r.proj&&String(r.proj.id)===String(p.id);}); // desc
   if(!mine.length) return {has:false};
   var cur=mine[0].m||{}, prev=(mine[1]&&mine[1].m)||null;
   var sum=function(m,keys){ var t=null; keys.forEach(function(k){ if(m&&m[k]!=null){ t=(t||0)+Number(m[k]); } }); return t; };
@@ -6596,14 +6612,25 @@ function _pjhSmm(p){
   var nf=function(n){ return n==null?'—':(Math.round(Number(n))+'').replace(/\B(?=(\d{3})+(?!\d))/g,'\u00A0'); };
   var pf=function(n){ return n==null?'—':(Number(n).toFixed(1).replace('.',',')+'%'); };
   function trd(c,pv){ if(c==null||pv==null) return {c:'var(--txt)',a:''}; var d=Number(c)-Number(pv), eps=Math.max(1e-9,Math.abs(Number(pv))*0.005); return d>eps?{c:'var(--pos)',a:'↑'}:(d<-eps?{c:'var(--neg)',a:'↓'}:{c:'var(--warn)',a:'→'}); }
-  function cell(key,fmt){ var cv=G[key](cur), pv=prev?G[key](prev):null; var t=trd(cv,pv); return {v:fmt(cv), c:t.c, a:t.a}; }
-  var er=cell('er',pf), aud=cell('aud',nf), reach=cell('reach',nf), views=cell('views',nf), content=cell('content',nf);
+  function dPP(c,pv){ if(c==null||pv==null) return ''; var d=Number(c)-Number(pv); return (d>0.05?'↑ +':d<-0.05?'↓ −':'→ ')+Math.abs(d).toFixed(1).replace('.',',')+' п.п.'; }
+  function dPct(c,pv){ if(c==null||pv==null||Number(pv)===0) return ''; var d=(Number(c)-Number(pv))/Number(pv)*100; var a=d>0.5?'↑ +':d<-0.5?'↓ −':'→ '; return a+(Math.abs(d)<0.5?'0':Math.round(Math.abs(d)))+'%'; }
+  function ser(getter){ return mine.slice(0,6).reverse().map(function(r){ var v=getter(r.m); return v==null?null:Number(v); }); }
+  function norm(series){ var vals=series.filter(function(v){return v!=null;}); if(!vals.length) return series.map(function(){return 40;}); var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),rng=(mx-mn)||1; return series.map(function(v){ return v==null?12:Math.round(((v-mn)/rng)*78+18); }); }
+  function areaP(series,w,h){ var n=norm(series); if(n.length<2) n=[n[0]||40,n[0]||40]; var step=w/(n.length-1); var pts=n.map(function(y,i){ return (i*step).toFixed(0)+' '+(h-(y/100*h)).toFixed(1); }); var line='M '+pts.join(' L '); return {line:line, area:line+' L '+w+' '+h+' L 0 '+h+' Z'}; }
+  function cell(key,fmt,dfn){ var cv=G[key](cur), pv=prev?G[key](prev):null; var t=trd(cv,pv); return {v:fmt(cv), c:t.c, a:t.a, d:dfn(cv,pv), bars:norm(ser(G[key])) }; }
+  var er=cell('er',pf,dPP), aud=cell('aud',nf,dPct), reach=cell('reach',nf,dPct), views=cell('views',nf,dPct), content=cell('content',nf,dPct);
+  var erSp=areaP(ser(G.er),220,44);
   return {has:true,
-    er:er.v, erC:er.c, erA:er.a,
-    aud:aud.v, audC:aud.c, audA:aud.a,
-    reach:reach.v, reachC:reach.c, reachA:reach.a,
-    views:views.v, viewsC:views.c, viewsA:views.a,
-    traffic:content.v, trafficC:content.c, trafficA:content.a };
+    er:er.v, erC:er.c, erA:er.a, erD:er.d, erLine:erSp.line, erArea:erSp.area,
+    aud:aud.v, audC:aud.c, audA:aud.a, audD:aud.d, audBars:aud.bars,
+    reach:reach.v, reachC:reach.c, reachA:reach.a, reachD:reach.d, reachBars:reach.bars,
+    views:views.v, viewsC:views.c, viewsA:views.a, viewsD:views.d, viewsBars:views.bars,
+    traffic:content.v, trafficC:content.c, trafficA:content.a, trafficD:content.d, trafficBars:content.bars };
+}
+function _smmCell(l,v,c,d,bars){
+  bars=bars||[]; var n=bars.length;
+  var b=bars.map(function(h,i){ return '<i style="height:'+Math.max(8,h)+'%;background:'+(i===n-1?c:'var(--bg-3)')+'"></i>'; }).join('');
+  return '<div class="smm1-cell"><div class="top"><span class="k">'+l+'</span>'+(d?('<span class="d" style="color:'+c+'">'+d+'</span>'):'')+'</div><div class="v">'+v+'</div><div class="spark">'+b+'</div></div>';
 }
 const _projCard=(p)=>{
   const idx=PROJECTS.indexOf(p);
@@ -6713,12 +6740,12 @@ const _projCard=(p)=>{
         <div class="pjh-smm">${_smm.has?`
           <div class="pjh-smm-in">
             <div class="pjh-smm-hd"><span class="eyebrow">SMM · последний отчёт</span></div>
-            <div class="pjh-smm-body">
-              <div class="pjh-smm-k"><div class="cap"><span class="kk">ER</span></div><div class="body"><span class="vv" style="color:${_smm.erC}"><span class="arr">${_smm.erA}</span>${_smm.er}</span></div></div>
-              <div class="pjh-smm-k"><div class="cap"><span class="kk">Аудитория</span></div><div class="body"><span class="vv" style="color:${_smm.audC}"><span class="arr">${_smm.audA}</span>${_smm.aud}</span></div></div>
-              <div class="pjh-smm-k"><div class="cap"><span class="kk">Охват</span></div><div class="body"><span class="vv" style="color:${_smm.reachC}"><span class="arr">${_smm.reachA}</span>${_smm.reach}</span></div></div>
-              <div class="pjh-smm-k"><div class="cap"><span class="kk">Просмотры</span></div><div class="body"><span class="vv" style="color:${_smm.viewsC}"><span class="arr">${_smm.viewsA}</span>${_smm.views}</span></div></div>
-              <div class="pjh-smm-k"><div class="cap"><span class="kk">Контент</span></div><div class="body"><span class="vv" style="color:${_smm.trafficC}"><span class="arr">${_smm.trafficA}</span>${_smm.traffic}</span></div></div>
+            <div class="smm1-body">
+              <div class="smm1-hero">
+                <div class="smm1-hero-top"><span class="k">Вовлечённость · ER</span><span class="v" style="color:${_smm.erC}">${_smm.er}</span><span class="d" style="color:${_smm.erC}">${_smm.erD}</span></div>
+                <svg class="smm1-spark" viewBox="0 0 220 44" preserveAspectRatio="none"><defs><linearGradient id="smmg${idx}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${_smm.erC}" stop-opacity="0.3"/><stop offset="1" stop-color="${_smm.erC}" stop-opacity="0"/></linearGradient></defs><path d="${_smm.erArea}" fill="url(#smmg${idx})"/><path d="${_smm.erLine}" fill="none" stroke="${_smm.erC}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="smm1-grid">${_smmCell('Аудитория',_smm.aud,_smm.audC,_smm.audD,_smm.audBars)}${_smmCell('Охват',_smm.reach,_smm.reachC,_smm.reachD,_smm.reachBars)}${_smmCell('Просмотры',_smm.views,_smm.viewsC,_smm.viewsD,_smm.viewsBars)}${_smmCell('Контент',_smm.traffic,_smm.trafficC,_smm.trafficD,_smm.trafficBars)}</div>
             </div>
           </div>
         `:`<div class="pjh-smm-empty">Нет SMM-отчёта по проекту</div>`}</div>
