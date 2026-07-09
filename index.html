@@ -2231,6 +2231,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-tplm-ib svg{width:15px;height:15px}
 .cp-tplm-ib:hover{border-color:var(--accent-line);color:var(--txt)}
 .cp-tplm-ib.del:hover{border-color:color-mix(in srgb,var(--neg) 50%,transparent);color:var(--neg)}
+.cp-tplm-use{display:inline-flex;align-items:center;gap:6px;background:var(--accent-dim);border:1px solid var(--accent-line);color:var(--accent);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:var(--font);letter-spacing:.01em;transition:background .14s,border-color .14s}
+.cp-tplm-use svg{width:14px;height:14px}
+.cp-tplm-use:hover{background:rgba(55,230,200,.22);border-color:var(--accent)}
+.cp-tpl-pickcol{display:flex;align-items:center;gap:9px;padding:8px 10px;text-align:left;width:100%}
+.cp-tpl-pickcol .ti{width:16px;height:16px;color:var(--txt-3);flex:none}
+.cp-tpl-pickcol .ti svg{width:14px;height:14px}
+.cp-tpl-pickcol .nm{flex:1;font-size:13.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-tpl-pickcol .sub{font-size:11px;color:var(--txt-3);font-family:var(--mono)}
 .cp-tplm-add{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:10px;color:var(--accent);font-size:14.5px;font-weight:600;padding:11px;cursor:pointer;font-family:var(--font)}
 .cp-tplm-add svg{width:15px;height:15px}
 .cp-tple-l{display:block;font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-3);margin:14px 0 7px}
@@ -9276,7 +9284,7 @@ function cpTplManager(){
   if(!all.length)h+='<div class="cp-tplm-empty">Пока нет шаблонов — создайте первый ниже.</div>';
   all.forEach(function(t){
     h+='<div class="cp-tplm-item"><span class="cp-tplm-ic">'+cpTplIcon(t.name,'tag')+'</span><div class="cp-tplm-main"><div class="cp-tplm-iname">'+_ddH(t.name)+'</div><div class="cp-tplm-chips">'+cpTplChips(t)+'</div></div>'
-      +'<div class="cp-tplm-iact"><button class="cp-tplm-ib" title="Изменить" onclick="cpTplEdit(\''+t.id+'\')">'+CP_IC.edit+'</button><button class="cp-tplm-ib del" title="Удалить" onclick="cpTplDelete(\''+t.id+'\')">'+CP_IC.trash+'</button></div></div>';
+      +'<div class="cp-tplm-iact"><button class="cp-tplm-use" title="Применить к колонке" onclick="cpTplUse(event,\''+t.id+'\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Использовать</button><button class="cp-tplm-ib" title="Изменить" onclick="cpTplEdit(\''+t.id+'\')">'+CP_IC.edit+'</button><button class="cp-tplm-ib del" title="Удалить" onclick="cpTplDelete(\''+t.id+'\')">'+CP_IC.trash+'</button></div></div>';
   });
   h+='</div><button class="cp-tplm-add" onclick="cpTplEdit(null)">'+CP_IC.plus+'Новый шаблон</button></div>';
   pd2Open(h);
@@ -9312,6 +9320,23 @@ function cpTplApplyOpen(ci){
   h+='</div><button class="cp-tplm-add ghost" onclick="cpTplManager()">'+CP_IC.tpl+'Управление шаблонами</button></div>';
   pd2Open(h);
 }
+function cpTplUse(e,id){
+  if(e&&e.stopPropagation)e.stopPropagation();
+  const t=cpTplAll().find(function(x){return x.id===id;}); if(!t)return;
+  const sh=cpSheet(); const cols=(sh&&sh.cols)||[];
+  const usable=cols.map(function(c,i){return {c:c,i:i};}).filter(function(x){return x.c.sys!=='pub';});
+  if(!usable.length){ if(typeof toast==='function')toast('В таблице нет колонок для применения'); return; }
+  // build column picker popup
+  let html='<div class="ttl">Применить «'+_ddH(t.name)+'» к колонке</div>';
+  usable.forEach(function(x){
+    const isSel=x.c.type==='select';
+    const meta=isSel?'список':'станет списком';
+    html+='<button class="cp-popi cp-tpl-pickcol" onclick="cpTplApplyPick(\''+id+'\','+x.i+')"><span class="ti">'+CP_TYICON(x.c.type)+'</span><span class="nm">'+_ddH(x.c.name||'—')+'</span><span class="sub">'+meta+'</span></button>';
+  });
+  const anchor=(e&&e.currentTarget)||(e&&e.target&&e.target.closest&&e.target.closest('button'))||document.body;
+  cpFloat(anchor,html);
+}
+function cpTplApplyPick(id,ci){ cpCloseFloat(); pd2Close(); cpTplApply(ci,id); }
 function cpTplApply(ci,id){ const t=cpTplAll().find(function(x){return x.id===id;}); const col=cpColAt(ci); if(!t||!col)return; if(col.sys==='pub'){ if(typeof toast==='function')toast('Системную колонку менять нельзя'); cpCloseFloat(); pd2Close(); return; } col.type='select'; col.opts=JSON.parse(JSON.stringify(t.opts||[])); cpCloseFloat(); pd2Close(); cpSave(); cpRerender(); if(typeof toast==='function')toast('Применён шаблон «'+t.name+'»'); }
 function cpTplSaveCol(ci){ const col=cpColAt(ci); if(!col||col.type!=='select'||!(col.opts||[]).length){ if(typeof toast==='function')toast('Это не колонка-список'); cpCloseFloat(); return; } cpTplDraft={id:cpUid(),name:col.name||'',opts:JSON.parse(JSON.stringify(col.opts))}; cpCloseFloat(); cpTplEditRender(); }
 
