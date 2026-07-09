@@ -4728,6 +4728,10 @@ button:active{transform:translateY(.5px) scale(.99)}
 .act-x-time .ex{font-size:12px;font-weight:600;color:var(--txt-2);font-family:var(--mono);white-space:nowrap}
 .act-x-time .rel{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:2px;white-space:nowrap}
 @media(max-width:860px){.act-row-x{grid-template-columns:44px minmax(0,1fr) auto}.act-trans{grid-column:2/-1;justify-content:flex-start;margin-top:2px}}
+
+.act-x-t .act-type{display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:6px;margin-left:9px;vertical-align:middle}
+.act-x-t .act-type.st{color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line)}
+.act-x-t .act-type.tk{color:var(--txt-2);background:var(--bg-2);border:1px solid var(--line-2)}
 </style>
 </head>
 <body>
@@ -12448,6 +12452,18 @@ function _dlInsight(over,today,weekN,futureN,done,unassigned){
       <div><div class="n" style="color:var(--pos)">${done}</div><div class="k">готово</div></div>
     </div></div>`;
 }
+function _actFiltered(){
+  var q=(agDlSearch||'').trim().toLowerCase();
+  return DL_ACT.filter(function(a){
+    if(agDlType!=='all' && (a.type||'stage')!==agDlType) return false;
+    if(agDlProj!=='all' && a.project!==agDlProj) return false;
+    if(agDlResp!=='all'){ if(agDlResp==='__none'){ if(a.by) return false; } else if(String(a.by)!==String(agDlResp)) return false; }
+    if(agDlFrom && a.ts && String(a.ts).slice(0,10) < agDlFrom) return false;
+    if(agDlTo && a.ts && String(a.ts).slice(0,10) > agDlTo) return false;
+    if(q){ var hay=((a.txt||'')+' '+(a.tag||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+    return true;
+  });
+}
 function _actExact(ts){ var d=new Date(ts); if(isNaN(d.getTime())) return ''; var M=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']; return d.getDate()+' '+M[d.getMonth()]+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
 function renderDeadlines(){
   const FILT=_dlFiltered();
@@ -12468,7 +12484,8 @@ function renderDeadlines(){
 
   let body;
   if(agDlView==='activity'){
-    body = DL_ACT.length ? `<div class="act-feed">${DL_ACT.map(a=>{
+    var _AF=_actFiltered();
+    body = _AF.length ? `<div class="act-feed">${_AF.map(a=>{
       const ic=a.k==='start'?'<path d="M5 3l14 9-14 9z"/>':a.k==='done'?'<path d="M20 6L9 17l-5-5"/>':'<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>';
       const w=a.by?_who(a.by):null; const known=w&&w.n&&w.n!=='—';
       const who=known?w.n:'Команда';
@@ -12477,9 +12494,9 @@ function renderDeadlines(){
       const SC=s=>({wait:'var(--txt-3)',hold:'var(--warn)',active:'var(--accent)',done:'var(--pos)',review:'var(--violet)'}[s]||'var(--txt-3)');
       const trans=(a.from||a.to)?`<div class="act-trans"><span class="st" style="color:${SC(a.from)};border-color:${SC(a.from)}55">${SL(a.from)}</span><svg class="ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="st" style="color:${SC(a.to)};border-color:${SC(a.to)}55;background:${SC(a.to)}14">${SL(a.to)}</span></div>`:'';
       const ex=a.ts?_actExact(a.ts):'';
-      return `<div class="act-row act-row-x"><div class="act-ic ${a.k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></div><div class="act-x-main"><div class="act-x-t">${a.txt}</div><div class="act-x-sub">${whoAv}<span class="who">${who}</span><span class="sep">·</span>${a.tag}</div></div>${trans}<div class="act-x-time"><div class="ex">${ex}</div><div class="rel">${a.t}</div></div></div>`;
+      return `<div class="act-row act-row-x"><div class="act-ic ${a.k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></div><div class="act-x-main"><div class="act-x-t">${a.txt}<span class="act-type ${a.type==='task'?'tk':'st'}">${a.type==='task'?'задача':'этап'}</span></div><div class="act-x-sub">${whoAv}<span class="who">${who}</span><span class="sep">·</span>${a.tag}</div></div>${trans}<div class="act-x-time"><div class="ex">${ex}</div><div class="rel">${a.t}</div></div></div>`;
     }).join('')}</div>`
-    : '<div class="modph"><h3>Пока нет активности</h3><p>Как только команда начнёт или завершит этап — события появятся здесь.</p></div>';
+    : (DL_ACT.length ? '<div class="modph"><h3>Ничего не найдено</h3><p>Под выбранные фильтры активности нет — измените проект, исполнителя, тип или период.</p></div>' : '<div class="modph"><h3>Пока нет активности</h3><p>Как только команда начнёт или завершит этап — события появятся здесь.</p></div>');
   }else{
     const grouped = agDlGroup==='project' ? _dlByProject(FILT) : _dlByUrgency(FILT);
     body = grouped || (agDlResp!=='all'
@@ -12525,9 +12542,9 @@ function renderDeadlines(){
     </div>
 
     <div class="toolbar dl-controls tb-proj" style="margin-top:-4px">
-      ${agDlView==='deadlines'?`${_dd('dlstatus','Срок',statusLbl,statusOpts,agDlFilter,'setDlFilter')}
+      ${agDlView==='deadlines'?_dd('dlstatus','Срок',statusLbl,statusOpts,agDlFilter,'setDlFilter'):''}
       ${_dd('dltype','Тип', (agDlType==='all'?'Все':agDlType==='stage'?'Этапы':'Задачи'), [['all','Все типы'],['stage','Этапы'],['task','Задачи']], agDlType, 'setDlType')}
-      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}`:''}
+      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
       <div class="flex1"></div>
       <div class="segm">
         <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
@@ -15457,7 +15474,7 @@ window.tLoadDeadlines = async () => {
   const [st, tk, hist] = await Promise.all([
     SB.from('project_stages').select('id,name,status,due_date,due_time,project_id, projects(name,logo,logo_url)').not('due_date','is',null),
     SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,project_id, projects(name,logo,logo_url)').not('due_date','is',null),
-    SB.from('stage_history').select('stage_name,old_status,new_status,created_at,changed_by, projects(name)').order('created_at',{ascending:false}).limit(60)
+    SB.from('stage_history').select('stage_name,old_status,new_status,created_at,changed_by,project_id, projects(name)').order('created_at',{ascending:false}).limit(60)
   ]);
   const _push = (label, status, due, projObj, id, type, assignee, dueTime, doneAt, pid, spent) => {
     const d = due ? new Date(due+'T00:00:00') : null;
@@ -15483,7 +15500,7 @@ window.tLoadDeadlines = async () => {
       if(h.new_status==='wait' && (!h.old_status || h.old_status==='wait')) return; // создание этапа — не событие смены статуса
       const k = h.new_status==='done' ? 'done' : h.new_status==='active' ? 'start' : 'back';
       const verb = k==='done' ? 'Этап завершён' : k==='start' ? 'Этап взят в работу' : 'Этап возвращён в ожидание';
-      DL_ACT.push({ txt:verb, tag:(h.stage_name||'—')+' · '+((h.projects&&h.projects.name)||'—'), t:tAgo(h.created_at), k, by:h.changed_by||null, ts:h.created_at, from:h.old_status||null, to:h.new_status||null });
+      DL_ACT.push({ txt:verb, tag:(h.stage_name||'—')+' · '+((h.projects&&h.projects.name)||'—'), t:tAgo(h.created_at), k, by:h.changed_by||null, ts:h.created_at, from:h.old_status||null, to:h.new_status||null, project:((h.projects&&h.projects.name)||'—'), pid:h.project_id||null, type:'stage' });
     });
   }
 };
