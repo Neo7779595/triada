@@ -2014,6 +2014,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-cell:has(.cp-chip-full){padding:5px}
 .cp-chip.cp-chip-full{display:flex;align-items:center;flex:1;align-self:stretch;min-width:0;max-width:none;margin:0;padding:0 12px;border-radius:7px;font-size:13.5px;font-weight:500;gap:7px}
 .cp-chip-full .d{width:6px;height:6px}
+.cp-chip.cp-chip-full{padding-right:26px;position:relative}
+.cp-chip-car{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:14px;height:14px;opacity:.65;flex:none;transition:opacity .14s,transform .18s}
+.cp-cell:hover .cp-chip-car{opacity:1}
+.cp-cell.cp-al-l>*{margin-right:auto} .cp-cell.cp-al-c{justify-content:center;text-align:center} .cp-cell.cp-al-c>*{margin-left:auto;margin-right:auto} .cp-cell.cp-al-r{justify-content:flex-end;text-align:right} .cp-cell.cp-al-r>*{margin-left:auto}
 .cp-chip-full .cp-chip-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .cp-lnk{display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-size:13.5px;text-decoration:none}
 .cp-lnk-fav{width:15px;height:15px;border-radius:3px;flex:none;object-fit:contain;background:var(--bg-3)}
@@ -7912,7 +7916,7 @@ function cpRerender(){ if(pdTabCur==='content') renderPd(); }
 
 function cpFmtDate(v){ if(!v)return ''; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v); return m?(m[3]+'.'+m[2]+'.'+m[1]):v; }
 function cpFmtMoney(v,col){ const n=cpNum(v); if(isNaN(n)) return _ddH(String(v)); const g=n.toLocaleString('ru-RU',{maximumFractionDigits:2}); return g+' '+((col&&col.cur==='usd')?'$':'сумм'); }
-function cpChip(col,v){ const o=(col.opts||[]).find(x=>x.v===v); const pal=CP_PAL[o?o.c:'gray']; return '<span class="cp-chip cp-chip-full" style="background:'+pal[0]+';color:'+pal[1]+'"><span class="d"></span><span class="cp-chip-t">'+_ddH(v)+'</span></span>'; }
+function cpChip(col,v){ const o=(col.opts||[]).find(x=>x.v===v); const pal=CP_PAL[o?o.c:'gray']; return '<span class="cp-chip cp-chip-full" style="background:'+pal[0]+';color:'+pal[1]+'"><span class="d"></span><span class="cp-chip-t">'+_ddH(v)+'</span><svg class="cp-chip-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>'; }
 function cpCellView(col,v){
   if(v==null||v==='') { if(col.type==='check') v=false; else return ''; }
   if(col.type==='select') return cpChip(col,v);
@@ -8003,7 +8007,7 @@ function cpRender(p){
     cols.forEach((col,ci)=>{
       if(mInfo&&mInfo.covered.has(ci))return;
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
-      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(col.type==='check'?' cp-cchk':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'')+((mInfo&&mInfo.anchorW[ci]!=null)?' cp-merged':'');
+      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(col.type==='check'?' cp-cchk':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'')+((mInfo&&mInfo.anchorW[ci]!=null)?' cp-merged':'')+(col.align?(' cp-al-'+col.align):'');
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
       html+='<div class="'+cls+'" style="width:'+((mInfo&&mInfo.anchorW[ci]!=null)?mInfo.anchorW[ci]:col.w)+'px'+_rh+'" data-r="'+ri+'" data-c="'+ci+'" onmousedown="cpCellDown(event,'+ri+','+ci+')" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
     });
@@ -8237,6 +8241,12 @@ function cpColMenu(e,ci){
     h+='</div>';
     if(col.type==='money'){ h+='<div class="cpm-label">Валюта</div><div class="cpm-types"><button class="cpm-type'+((col.cur||'uzs')==='uzs'?' on':'')+'" onclick="cpColCur('+ci+',\'uzs\')"><span>сумм</span></button><button class="cpm-type'+(col.cur==='usd'?' on':'')+'" onclick="cpColCur('+ci+',\'usd\')"><span>$ USD</span></button></div>'; }
     h+='<div class="cpm-sep"></div>';
+    h+='<div class="cpm-label">Выравнивание</div><div class="cpm-types cpm-align">'
+      +'<button class="cpm-type'+((col.align||'l')==='l'?' on':'')+'" title="По левому краю" onclick="cpColAlign('+ci+',\'l\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></button>'
+      +'<button class="cpm-type'+(col.align==='c'?' on':'')+'" title="По центру" onclick="cpColAlign('+ci+',\'c\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M5 18h14"/></svg></button>'
+      +'<button class="cpm-type'+(col.align==='r'?' on':'')+'" title="По правому краю" onclick="cpColAlign('+ci+',\'r\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M10 12h10M7 18h13"/></svg></button>'
+      +'</div>';
+    h+='<div class="cpm-sep"></div>';
     h+='<button class="cpm-item" onclick="cpColIns('+ci+',0)">'+I.il+'Вставить слева</button>';
     h+='<button class="cpm-item" onclick="cpColIns('+ci+',1)">'+I.ir+'Вставить справа</button>';
     h+='<div class="cpm-sep"></div>';
@@ -8250,6 +8260,7 @@ function cpColMenu(e,ci){
 function cpColRename(ci){ cpCloseFloat(); cpHeadEd=cpColAt(ci).id; cpRerender(); setTimeout(()=>{const i=document.getElementById('cp-hed');if(i){i.focus();i.select();}},0); }
 function cpHeadKey(e,ci){ if(e.key==='Enter'){e.preventDefault();cpHeadCommit(ci);} else if(e.key==='Escape'){cpHeadEd=null;cpRerender();} }
 function cpHeadCommit(ci){ const i=document.getElementById('cp-hed'); const col=cpColAt(ci); if(i&&col){const t=i.value.trim(); if(t)col.name=t;} cpHeadEd=null; cpSave(); cpRerender(); }
+function cpColAlign(ci,dir){ const col=cpColAt(ci); if(!col)return; if(col.align===dir)delete col.align; else col.align=dir; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColType(ci,t){ const col=cpColAt(ci); if(col&&col.sys==='pub'){if(typeof toast==='function')toast('Тип колонки публикации менять нельзя');cpCloseFloat();return;} col.type=t; if(t==='select'&&(!col.opts||!col.opts.length))col.opts=[{v:'Вариант',c:'gray'}]; if(t==='money'&&!col.cur)col.cur='uzs'; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColCur(ci,cur){ const col=cpColAt(ci); if(col)col.cur=cur; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColIns(ci,side){ const sh=cpSheet(); sh.cols.splice(ci+(side?1:0),0,{id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpCloseFloat(); cpSave(); cpRerender(); }
