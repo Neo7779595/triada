@@ -13237,25 +13237,28 @@ function _cycTipShow(e,i){
 function _cycTipMove(e){ const el=document.getElementById('cyc-tip'); if(!el||el.style.display==='none') return; const p=14,w=el.offsetWidth,hh=el.offsetHeight; let x=e.clientX+p,y=e.clientY+p; if(x+w>window.innerWidth-8)x=e.clientX-w-p; if(y+hh>window.innerHeight-8)y=e.clientY-hh-p; el.style.left=x+'px'; el.style.top=y+'px'; }
 function _cycTipHide(){ const el=document.getElementById('cyc-tip'); if(el) el.style.display='none'; }
 /* ——— фильтры аналитических блоков Циклов (период / сортировка / поиск) ——— */
-let REV_SORT='desc', REV_Q='', REV_PERIOD='all', REV_ASG='all';
-let WORK_SORT='desc', WORK_Q='', WORK_PERIOD='all', WORK_ASG='all';
+let REV_SORT='desc', REV_Q='', REV_PERIOD='all', REV_ASG='all', REV_PROJ='all';
+let WORK_SORT='desc', WORK_Q='', WORK_PERIOD='all', WORK_ASG='all', WORK_PROJ='all';
 function revSetSort(v){REV_SORT=v;renderCycles();}
 function revSetPeriod(v){REV_PERIOD=v;renderCycles();}
 function revSetAsg(v){REV_ASG=v;renderCycles();}
+function revSetProj(v){REV_PROJ=v;renderCycles();}
 function revSearch(v){REV_Q=v;renderCycles();_cycRestoreFocus('rev-q');}
 function workSetSort(v){WORK_SORT=v;renderCycles();}
 function workSetPeriod(v){WORK_PERIOD=v;renderCycles();}
 function workSetAsg(v){WORK_ASG=v;renderCycles();}
-function revResetFilters(){REV_SORT='desc';REV_Q='';REV_PERIOD='all';REV_ASG='all';renderCycles();}
-function workResetFilters(){WORK_SORT='desc';WORK_Q='';WORK_PERIOD='all';WORK_ASG='all';renderCycles();}
+function workSetProj(v){WORK_PROJ=v;renderCycles();}
+function revResetFilters(){REV_SORT='desc';REV_Q='';REV_PERIOD='all';REV_ASG='all';REV_PROJ='all';renderCycles();}
+function workResetFilters(){WORK_SORT='desc';WORK_Q='';WORK_PERIOD='all';WORK_ASG='all';WORK_PROJ='all';renderCycles();}
 function workSearch(v){WORK_Q=v;renderCycles();_cycRestoreFocus('work-q');}
 function _cycRestoreFocus(id){ requestAnimationFrame(()=>{ const el=document.getElementById(id); if(el){ el.focus(); const L=el.value.length; try{el.setSelectionRange(L,L);}catch(_){} } }); }
-function _cycFilterTasks(list,period,q,sort,asg){
+function _cycFilterTasks(list,period,q,sort,asg,proj){
   const now=Date.now(); const cut=(period&&period!=='all')?(now-parseInt(period)*86400000):0;
   let r=(list||[]).filter(t=>{
     if(cut && t.date && new Date(t.date).getTime()<cut) return false;
     if(asg && asg!=='all'){ if(asg==='__none'){ if(t.asg) return false; } else if(String(t.asg||'')!==String(asg)) return false; }
-    if(q){ const s=q.toLowerCase().trim(); if(s && !(((t.title||'')+' '+(t.stage||'')).toLowerCase().includes(s))) return false; }
+    if(proj && proj!=='all'){ if(String(t.project||'')!==String(proj)) return false; }
+    if(q){ const s=q.toLowerCase().trim(); if(s && !(((t.title||'')+' '+(t.stage||'')+' '+(t.project||'')).toLowerCase().includes(s))) return false; }
     return true;
   });
   return r.slice().sort((a,b)=> sort==='asc'?a.sec-b.sec:b.sec-a.sec);
@@ -13272,11 +13275,14 @@ function _cycFilterStages(list,q,sort){
 const _cycPeriodOpts=[['all','Всё время'],['7','7 дней'],['30','30 дней'],['90','90 дней']];
 const _cycSortOpts=[['desc','Дольше сверху'],['asc','Короче сверху']];
 const _cycLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
-function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA,reset){
+function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA,reset,proj,setPr){
   const asgOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
-  const _active=(sort!=='desc')||!!q||(period!=='all')||(asg!=='all');
+  const _prNames=[...new Set((typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>p.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+  const projOpts=[['all','Все проекты']].concat(_prNames.map(n=>[n,n]));
+  const _active=(sort!=='desc')||!!q||(period!=='all')||(asg!=='all')||(proj&&proj!=='all');
   return `<div class="cyc-filters">`
     +`<div class="search cyc-search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="${pfx}-q" placeholder="Поиск по задаче или этапу…" value="${(q||'').replace(/"/g,'&quot;')}" oninput="${setQ}(this.value)" autocomplete="off" spellcheck="false"></div>`
+    +(setPr?_dd(pfx+'prj','Проект',_cycLbl(projOpts,proj||'all'),projOpts,proj||'all',setPr):'')
     +_dd(pfx+'asg','Исполнитель',_cycLbl(asgOpts,asg),asgOpts,asg,setA)
     +_dd(pfx+'per','Период',_cycLbl(_cycPeriodOpts,period),_cycPeriodOpts,period,setP)
     +_dd(pfx+'srt','Сортировка',_cycLbl(_cycSortOpts,sort),_cycSortOpts,sort,setS)
@@ -13285,9 +13291,9 @@ function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA,reset){
 }
 function renderCycles(){
   const C = CYCLES; window._cycChart = C.chartStages;
-  const _revTasksF=_cycFilterTasks(C.reviewTasks,REV_PERIOD,REV_Q,REV_SORT,REV_ASG);
+  const _revTasksF=_cycFilterTasks(C.reviewTasks,REV_PERIOD,REV_Q,REV_SORT,REV_ASG,REV_PROJ);
   const _revStagesF=_cycStagesFromTasks(_revTasksF,REV_SORT);
-  const _workTasksF=_cycFilterTasks(C.workTopTasks,WORK_PERIOD,WORK_Q,WORK_SORT,WORK_ASG);
+  const _workTasksF=_cycFilterTasks(C.workTopTasks,WORK_PERIOD,WORK_Q,WORK_SORT,WORK_ASG,WORK_PROJ);
   const _workStagesF=_cycStagesFromTasks(_workTasksF,WORK_SORT);
   if(!document.getElementById('cyc-tip')){ const _t=document.createElement('div'); _t.id='cyc-tip'; document.body.appendChild(_t); }
   const has = C.stages.length>0;
@@ -13396,7 +13402,7 @@ function renderCycles(){
           <div class="px-ov-cell"><div class="px-ov-l">Суммарно</div><div class="px-ov-v">${_cycDur(C.reviewTotalSec*1000)}</div><div class="px-ov-ctx">всего на согласовании</div></div>
           <div class="px-ov-cell"><div class="px-ov-l">Задач проходило</div><div class="px-ov-v">${C.reviewCount}</div><div class="px-ov-ctx">через утверждение</div></div>
         </div>
-        ${_cycFilterBar('rev',REV_PERIOD,REV_SORT,REV_Q,REV_ASG,'revSetPeriod','revSetSort','revSearch','revSetAsg','revResetFilters')}
+        ${_cycFilterBar('rev',REV_PERIOD,REV_SORT,REV_Q,REV_ASG,'revSetPeriod','revSetSort','revSearch','revSetAsg','revResetFilters',REV_PROJ,'revSetProj')}
         <div class="rev-grid">
           <div>
             <div class="eyebrow" style="margin-bottom:10px">Этапы дольше всего на утверждении <span class="cyc-cnt">${_revStagesF.length}</span></div>
@@ -13437,7 +13443,7 @@ function renderCycles(){
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
           <div>Концентрация: <b>${C.workParetoPct}%</b> задач забирают <b>80%</b> рабочего времени${C.workParetoPct>0&&C.workParetoPct<=25?' — высокая концентрация, крупные задачи стоит дробить на подзадачи':(C.workParetoPct>=50?' — нагрузка распределена равномерно':'')}</div>
         </div>
-        ${_cycFilterBar('work',WORK_PERIOD,WORK_SORT,WORK_Q,WORK_ASG,'workSetPeriod','workSetSort','workSearch','workSetAsg','workResetFilters')}
+        ${_cycFilterBar('work',WORK_PERIOD,WORK_SORT,WORK_Q,WORK_ASG,'workSetPeriod','workSetSort','workSearch','workSetAsg','workResetFilters',WORK_PROJ,'workSetProj')}
         <div class="rev-grid">
           <div>
             <div class="eyebrow" style="margin-bottom:10px">Где уходит время · по этапам <span class="cyc-cnt">${_workStagesF.length}</span></div>
@@ -13454,7 +13460,7 @@ function renderCycles(){
             <div class="eyebrow" style="margin-bottom:10px">Самые трудоёмкие задачи <span class="cyc-cnt">${_workTasksF.length}</span></div>
             <div class="cyc-scroll">
             ${_workTasksF.length?_workTasksF.map((t,i)=>`<div class="rev-row" style="animation-delay:${Math.min(i,12)*30}ms">
-              <div style="min-width:0"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.done?' · <span style="color:var(--pos)">готово</span>':''}</div></div>
+              <div style="min-width:0"><div class="rev-nm">${_ddH(t.title)}</div><div class="rev-sub">${_ddH(t.stage)}${t.project?' · '+_ddH(t.project):''}${t.done?' · <span style="color:var(--pos)">готово</span>':''}</div></div>
               <div class="rev-val" style="color:var(--accent)">${_cycDur(t.sec*1000)}</div>
             </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
             </div>
@@ -16500,7 +16506,7 @@ window.tLoadCycles = async () => {
   const _stNm={}; (sr.data||[]).forEach(st=>{ if(st&&st.id!=null) _stNm[st.id]=st.name; });
   const _revEl=(t)=>{ let v=t.review_spent||0; if(t.review_started) v+=Math.max(0,Math.round((now-new Date(t.review_started).getTime())/1000)); return v; };
   const _rtasks=(tr.data||[]);
-  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',onReview:!!t.review_started,date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
+  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,onReview:!!t.review_started,date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
   const _sg={}; _rtasks.forEach(t=>{ const sec=_revEl(t); if(sec<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_sg[nm]||(_sg[nm]={name:nm,total:0,count:0})); _sg[nm].total+=sec; _sg[nm].count++; });
   const reviewStages=Object.values(_sg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count)})).sort((a,b)=>b.total-a.total);
   const reviewNow=_rtasks.filter(t=>t.status==='review').length;
@@ -16520,7 +16526,7 @@ window.tLoadCycles = async () => {
   const workDoneAvgSec=workDoneCount?Math.round(_wdone.reduce((a,t)=>a+_workEl(t),0)/workDoneCount):0;
   const _wstg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_wstg[nm]||(_wstg[nm]={name:nm,total:0,count:0})); _wstg[nm].total+=v; _wstg[nm].count++; });
   const workStages=Object.values(_wstg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total);
-  const workTopTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_workEl(t),stage:_stNm[t.stage_id]||'—',done:t.status==='done',date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
+  const workTopTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_workEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,done:t.status==='done',date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
   const _wasg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const aid=t.assignee_id||'__none'; (_wasg[aid]||(_wasg[aid]={id:aid,total:0,count:0})); _wasg[aid].total+=v; _wasg[aid].count++; });
   const _tmName=(id)=>{ if(id==='__none')return 'Не назначен'; const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?m.name:'—'; };
   const workByAsg=Object.values(_wasg).map(x=>({name:_tmName(x.id),total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total).slice(0,8);
