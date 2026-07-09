@@ -11846,6 +11846,14 @@ function renderSmmLbSimple(){
   const belowAvg=vals.filter(v=>v<avg).length;
   const leader=rows[0], last=rows[rows.length-1];
   const secM=['er','reach','followers'].map(k=>M.find(x=>x.k===k)).filter(Boolean);
+  const _all=_smmLbAll||[]; const prevMap={};
+  if(_smmLbPeriod==='__latest'){ const byP={}; _all.forEach(r=>{ const k=String(r.proj.id); (byP[k]||(byP[k]=[])).push(r); }); Object.keys(byP).forEach(k=>{ const arr=byP[k].slice().sort((a,b)=>a.ts<b.ts?1:(a.ts>b.ts?-1:0)); if(arr[1])prevMap[k]=arr[1].m; }); }
+  else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); const _pn=(_ix>=0&&_smmLbPeriods[_ix+1])?_smmLbPeriods[_ix+1].period:null; if(_pn){ const sn=new Set(); _all.forEach(r=>{ if(r.period!==_pn)return; const k=String(r.proj.id); if(sn.has(k))return; sn.add(k); prevMap[k]=r.m; }); } }
+  const curName=_smmLbPeriod==='__latest'?'последний отчёт':_smmLbPeriod;
+  let prevName=null; if(_smmLbPeriod==='__latest'){ prevName=Object.keys(prevMap).length?'предыдущим отчётом':null; } else { const _ix=_smmLbPeriods.findIndex(pp=>pp.period===_smmLbPeriod); if(_ix>=0&&_smmLbPeriods[_ix+1]) prevName=_smmLbPeriods[_ix+1].period; }
+  const perSel=_smmLbPeriods.length>=2 ? ('<div class="lb-ops-sort wrap"><button class="'+(_smmLbPeriod==='__latest'?'on':'')+'" onclick="smmSetLbPeriodIdx(-1)">Последний</button>'+_smmLbPeriods.map((pp,i)=>'<button class="'+(_smmLbPeriod===pp.period?'on':'')+'" onclick="smmSetLbPeriodIdx('+i+')">'+esc(pp.period)+'</button>').join('')+'</div>') : '<span></span>';
+  const perLbl='<b>'+esc(curName)+'</b>'+(prevName?' · сравнение с '+esc(prevName):' · нет предыдущего периода');
+  const perBar='<div class="lb-period">'+perSel+'<div class="lb-period-lbl"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'+perLbl+'</div></div>';
   const strip='<div class="px-ov lb-ops-strip">'
     +'<div class="px-ov-cell"><div class="px-ov-l">Медиана · '+esc(NAMES[cfg.k])+'</div><div class="px-ov-v">'+fmtV(med).replace('%','<small>%</small>')+'</div><div class="px-ov-ctx">среднее '+fmtV(avg)+'</div></div>'
     +'<div class="px-ov-cell"><div class="px-ov-l">Лидер</div><div class="px-ov-v" style="font-size:19px;color:var(--pos)">'+esc(leader.proj.name)+'</div><div class="px-ov-ctx">'+fmtV(leader.val)+'</div></div>'
@@ -11854,6 +11862,7 @@ function renderSmmLbSimple(){
   +'</div>';
   const body=rows.map(r=>{
     const t=(r.val-minV)/((maxV-minV)||1);
+    let dChip=''; const _pm=prevMap[String(r.proj.id)]; const _pv=_pm?cfg.get(_pm):null; if(_pv!=null&&r.val!=null&&_pv!==0){ const dv=(r.val-_pv)/Math.abs(_pv); const up=dv>0.005,dn=dv<-0.005,pc=Math.round(Math.abs(dv)*100); dChip=up?'<span class="lb-opd up">\u25B2'+pc+'%</span>':(dn?'<span class="lb-opd dn">\u25BC'+pc+'%</span>':'<span class="lb-opd fl">\u2248</span>'); }
     const hcol=t>=.66?'var(--pos)':t>=.33?'var(--accent)':'var(--txt-2)';
     const bw=_tClamp(Math.round(Math.abs(r.val)/maxAbs*100),3,100);
     const rk=r.rank<=3?'<span class="lb-medal m'+r.rank+'">'+r.rank+'</span>':'<span class="lb-rk">'+r.rank+'</span>';
@@ -11863,13 +11872,13 @@ function renderSmmLbSimple(){
     return '<div class="lb-oprow">'
       +rk
       +'<span class="lb-opproj">'+ic+'<span class="lb-opnm">'+esc(r.proj.name)+'</span></span>'
-      +'<span class="lb-opmetric"><b style="color:'+hcol+'">'+fmtV(r.val).replace('%','<small>%</small>')+'</b><span class="lb-opbar"><i style="width:'+bw+'%;background:'+hcol+'"></i></span></span>'
+      +'<span class="lb-opmetric"><span class="lb-opvrow"><b style="color:'+hcol+'">'+fmtV(r.val).replace('%','<small>%</small>')+'</b>'+dChip+'</span><span class="lb-opbar"><i style="width:'+bw+'%;background:'+hcol+'"></i></span></span>'
       +secCols
     +'</div>';
   }).join('');
   const secHead=secM.map(mc=>'<span class="c">'+SHORT[mc.k]+'</span>').join('');
   const headerRow='<div class="lb-oprow lb-ophead"><span>#</span><span>Проект</span><span class="c">'+esc(NAMES[cfg.k])+'</span>'+secHead+'</div>';
-  return strip+headBar+'<div class="lb-oplist">'+headerRow+body+'</div>';
+  return perBar+strip+headBar+'<div class="lb-oplist">'+headerRow+body+'</div>';
 }
 /* Операционная эффективность: реальные метрики по этапам и задачам из истории (window._teamRaw) */
 function computeProjectOps(period){
