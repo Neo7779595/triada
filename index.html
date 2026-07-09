@@ -7586,7 +7586,7 @@ function renderPd(){
   } else if(pdTabCur==='deadlines'){
     h=_pdDeadlinesHTML(p);
   } else {
-    h=(p._history&&p._history.length)?actFeed(p._history):'<div class="pk-empty" style="padding:44px 0">История пуста — события появятся при смене статусов этапов.</div>';
+    h=(p._history&&p._history.length)?_histFeedX(p._history,p):'<div class="pk-empty" style="padding:44px 0">История пуста — события появятся при смене статусов этапов.</div>';
   }
   const body=document.getElementById('pd-body');
   const _same=(window._pdLastTab===pdTabCur)&&(window._pdLastProj===p.id);   // ререндер той же вкладки: без повторной анимации входа и без сброса скролла
@@ -11792,8 +11792,8 @@ function lbPaint(){
 function lbControlsHTML(){
   const M=SMM_LB_METRICS, cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
   const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват Reels + Stories',followers:'Прирост подписчиков'};
-  const nfK=v=>{ v=Math.round(Number(v)||0); const a=Math.abs(v); return a>=1000?((v/1000).toFixed(a>=10000?0:1).replace('.',',').replace(',0','')+'K'):String(v); };
-  const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',','):(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
+  const nfK=v=>{ v=Math.round(Number(v)||0); return String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' '); };
+  const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
   const I_SEARCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>';
   const sUp=_smmLbSortDir==='asc'?'var(--accent)':'var(--txt-3)';
   const sDn=_smmLbSortDir==='desc'?'var(--accent)':'var(--txt-3)';
@@ -11859,9 +11859,9 @@ function renderSmmLbSimple(){
   const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват Reels + Stories',followers:'Прирост подписчиков'};
   const SHORT={er:'ER',lr:'Лайки',tr:'Комменты',shr:'Репосты',sr:'Сохран.',reach:'Охват',followers:'Подписчики'};
   const cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
-  const nfK=v=>{ v=Math.round(Number(v)||0); const a=Math.abs(v); return a>=1000?((v/1000).toFixed(a>=10000?0:1).replace('.',',').replace(',0','')+'K'):String(v); };
+  const nfK=v=>{ v=Math.round(Number(v)||0); return String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' '); };
   const fmtV=(v,mc)=>{ mc=mc||cfg; if(v==null)return '—'; return mc.pct?(+v).toFixed(2).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)); };
-  const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',','):(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
+  const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
   const esc=v=>_ddH(v);
   const _all=_smmLbAll||[]; const prevMap={};
   if(_smmLbPeriod==='__latest'){ const byP={}; _all.forEach(r=>{ const k=String(r.proj.id); (byP[k]||(byP[k]=[])).push(r); }); Object.keys(byP).forEach(k=>{ const arr=byP[k].slice().sort((a,b)=>a.ts<b.ts?1:(a.ts>b.ts?-1:0)); if(arr[1])prevMap[k]=arr[1].m; }); }
@@ -12005,9 +12005,9 @@ function renderOpsLb(){
 function smmRenderLb(){
   const M=SMM_LB_METRICS, cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
   const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват Reels + Stories',followers:'Прирост подписчиков'};
-  const nfK=v=>{ v=Math.round(Number(v)||0); const a=Math.abs(v); return a>=1000?((v/1000).toFixed(a>=10000?0:1).replace('.',',').replace(',0','')+'K'):String(v); };
+  const nfK=v=>{ v=Math.round(Number(v)||0); return String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' '); };
   const fmtV=(v,mc)=>{ mc=mc||cfg; return mc.pct?(+v).toFixed(2).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)); };
-  const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',','):(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
+  const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
   const SVG_MEDAL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="15" r="6"/><path d="M9 9.5L6.5 3M15 9.5l2.5-6.5M9.5 3h5"/></svg>';
   const I_UP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>';
   const I_DOWN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 9v8H9"/></svg>';
@@ -15104,6 +15104,22 @@ function clNav(m){
   document.querySelectorAll('#app-cl .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.cm===m));
   if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else if(m==='passport') renderClPassport(); else renderClUpdates();
 }
+function _histFeedX(items, proj){
+  const SL=s=>({wait:'ожидание',hold:'пауза',active:'в работе',done:'готово',review:'проверка'}[s]||s||'—');
+  const SC=s=>({wait:'var(--txt-3)',hold:'var(--warn)',active:'var(--accent)',done:'var(--pos)',review:'var(--violet)'}[s]||'var(--txt-3)');
+  const rows=items.map(a=>{
+    const ic=a.k==='start'?'<path d="M5 3l14 9-14 9z"/>':a.k==='done'?'<path d="M20 6L9 17l-5-5"/>':'<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>';
+    var byId=a.by||null; if(!byId && proj && proj.lead_id) byId=proj.lead_id;
+    var R=byId?(typeof _who==='function'?_who(byId):{n:'—',c:'var(--accent)',avatar:null}):{n:'Команда',c:'var(--txt-3)',avatar:null};
+    var known=R.n && R.n!=='—' && R.n!=='Команда';
+    var who=known?R.n:'Команда';
+    var whoAv=known?('<span class="act-who-av" style="background:'+R.c+'">'+(((R.n||'?')[0]||'?').toUpperCase())+'</span>'):'<span class="act-who-av tm">К</span>';
+    var trans=(a.from||a.to)?('<div class="act-trans"><span class="st" style="color:'+SC(a.from)+';border-color:'+SC(a.from)+'55">'+SL(a.from)+'</span><svg class="ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="st" style="color:'+SC(a.to)+';border-color:'+SC(a.to)+'55;background:'+SC(a.to)+'14">'+SL(a.to)+'</span></div>'):'';
+    var ex=a.ts?_actExact(a.ts):'';
+    return '<div class="act-row act-row-x"><div class="act-ic '+a.k+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'+ic+'</svg></div><div class="act-x-main"><div class="act-x-t">'+a.txt+'<span class="act-type st">этап</span></div><div class="act-x-sub">'+whoAv+'<span class="who">'+who+'</span><span class="sep">·</span>'+a.tag+'</div></div>'+trans+'<div class="act-x-time"><div class="ex">'+ex+'</div><div class="rel">'+a.t+'</div></div></div>';
+  }).join('');
+  return '<div class="act-feed">'+rows+'</div>';
+}
 function actFeed(items){
   return `<div class="act-feed">${items.map(a=>`<div class="act-row"><div class="act-ic ${a.k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ACT_IC[a.k]}</svg></div><div style="flex:1;min-width:0"><div class="act-txt">${a.txt}</div><div class="act-tag">${a.tag}</div></div><div class="act-t">${a.t}</div></div>`).join('')}</div>`;
 }
@@ -15790,7 +15806,7 @@ window.tLoadProjectWork = async (projectId) => {
     SB.from('project_stages').select('*').eq('project_id',projectId).order('idx'),
     SB.from('project_tasks').select('*').eq('project_id',projectId).order('idx'),
     SB.from('reports').select('*').eq('project_id',projectId).order('published_at',{ascending:false}),
-    SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40),
+    SB.from('stage_history').select('stage_name,old_status,new_status,created_at,changed_by').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40),
     SB.from('project_cycles').select('id,cycle_no,period_start,period_end,snapshot,archived_at').eq('project_id',projectId).order('cycle_no',{ascending:false}) ]);
   { const _prevSt=p._stages||[]; p._stages = st.data||[];
     _prevSt.forEach(x=>{ if(x&&String(x.id).indexOf('tmp_')===0) p._stages.push(x); }); }        // не теряем этапы, ждущие подтверждения сервера
@@ -15806,7 +15822,7 @@ window.tLoadProjectWork = async (projectId) => {
     _prevRp.forEach(x=>{ if(x&&String(x.id).indexOf('tmp_')===0) p._reports.unshift(x); }); }    // не теряем отчёты, ждущие подтверждения сервера
   p._history = (hs.data||[]).filter(h => !(h.new_status==='wait' && (!h.old_status || h.old_status==='wait'))).map(h => { const k = h.new_status==='done'?'done':h.new_status==='active'?'start':'back';
     const txt = k==='done'?'Этап завершён':k==='start'?'Команда начала этап':'Этап возвращён в ожидание';
-    return { txt, tag:h.stage_name||'—', t:tAgo(h.created_at), k }; });
+    return { txt, tag:h.stage_name||'—', t:tAgo(h.created_at), k, ts:h.created_at||null, from:h.old_status||null, to:h.new_status||null, by:h.changed_by||null, type:'stage' }; });
 };
 window.tProjectComplete = async (pid) => { try {
   const {error}=await SB.from('projects').update({status:'done'}).eq('id',pid); if(error)throw error;
