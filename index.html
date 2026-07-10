@@ -6700,7 +6700,7 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
   return `<div class="dd${right?' right':''}" id="dd-${key}">`
     +`<button class="dd-btn" onclick="event.stopPropagation();ddToggle('${key}')"><span class="dd-k">${label}</span><span class="dd-v">${_ddH(valLabel)}</span>${caret}</button>`
     +`<div class="dd-menu">`
-    +opts.map(o=>`<button class="dd-opt ${curVal===o[0]?'on':''}" onclick="_closePops();${setter}('${_ddEsc(o[0])}')">${_ddH(o[1])}${ck}</button>`).join('')
+    +opts.map(o=>`<button class="dd-opt ${curVal===o[0]?'on':''}" onclick="_closePops();${setter}('${_ddEsc(o[0])}');setTimeout(_closePops,0)">${_ddH(o[1])}${ck}</button>`).join('')
     +`</div></div>`;
 }
 function _closePops(){ if(typeof _ddPortalRelease==='function'){ try{ _ddPortalRelease(); }catch(_){} } document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
@@ -6761,8 +6761,14 @@ window.addEventListener('resize',function(){ if(document.querySelector('.dd.open
       if(document.querySelector('.dd-menu.dd-portal')||document.querySelector('.dd.open')) _closePops();
     }).observe(el,{childList:true});
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ _watch('content-ag'); _watch('content-cl'); _watch('pd-body'); });
-  else { _watch('content-ag'); _watch('content-cl'); _watch('pd-body'); }
+  function _watchDeep(id){
+    var el=document.getElementById(id); if(!el) return;
+    new MutationObserver(function(){
+      if(document.querySelector('.dd-menu.dd-portal')||document.querySelector('.dd.open')) _closePops();
+    }).observe(el,{childList:true,subtree:true});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ _watch('content-ag'); _watch('content-cl'); _watchDeep('ov-proj'); _watchDeep('ov-pd2'); });
+  else { _watch('content-ag'); _watch('content-cl'); _watchDeep('ov-proj'); _watchDeep('ov-pd2'); }
 })();
 document.addEventListener('mousedown',function(e){
   if(!document.querySelector('.dd.open')) return;
@@ -6791,7 +6797,7 @@ function _ddSel(id, opts, cur, cb, ph){
 function _ddSelPick(id,v,l){
   const h=document.getElementById(id); if(h)h.value=v;
   const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; }
-  if(typeof _closePops==='function') _closePops();
+  if(typeof _closePops==='function'){ _closePops(); setTimeout(_closePops,0); }
   const cb=window._DDSEL_CB[id]; if(typeof cb==='function'){ try{ cb(v); }catch(e){} }
 }
 
@@ -6848,7 +6854,7 @@ function selToggle(id){
     }
   }
 }
-function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } if(typeof _closePops==='function') _closePops(); if(id==='qt-proj'&&typeof _qtOnProject==='function')_qtOnProject(v); }
+function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } if(typeof _closePops==='function'){ _closePops(); setTimeout(_closePops,0); } if(id==='qt-proj'&&typeof _qtOnProject==='function')_qtOnProject(v); }
 function selSync(id){ const h=document.getElementById(id); if(!h)return; const lblEl=document.getElementById(id+'-lbl'); if(!lblEl)return; const v=h.value; let lbl=v; const menu=document.getElementById('seldd-'+id); if(menu){ menu.querySelectorAll('.dd-opt').forEach(function(o){ var on=String(o.dataset.v)===String(v); o.classList.toggle('on',on); if(on)lbl=o.dataset.l; }); } lblEl.textContent=lbl; lblEl.style.color=''; lblEl.style.fontWeight=''; }
 function _tagList(kind, fallback, cur){
   let arr=((typeof PROJECT_TAGS!=='undefined' && PROJECT_TAGS[kind])?PROJECT_TAGS[kind]:[]).slice();
