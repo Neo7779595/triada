@@ -6779,12 +6779,28 @@ document.addEventListener('mousedown',function(e){
   _closePops();
 },true);
 // Делегированный клик по .dd-opt — гарантированное закрытие после любого выбора
+function _ddNuke(){
+  // Брутфорс: удалить ВСЕ портальные меню из body
+  document.querySelectorAll('.dd-menu.dd-portal').forEach(function(m){ try{ m.remove(); }catch(_){} });
+  document.querySelectorAll('.dd.open').forEach(function(el){ el.classList.remove('open'); });
+  // Убрать сироток-плейсхолдеров (span display:none внутри .dd)
+  document.querySelectorAll('.dd > span[style*="display: none"]').forEach(function(ph){ try{ ph.remove(); }catch(_){} });
+}
 document.addEventListener('click',function(e){
   var t=e.target; if(!t||!t.closest) return;
   var opt=t.closest('.dd-opt'); if(!opt) return;
-  // Дадим синхронному коду доработать (setter), потом принудительно закрываем
-  setTimeout(function(){ if(typeof _closePops==='function') _closePops(); },0);
-  setTimeout(function(){ if(typeof _closePops==='function') _closePops(); },50);
+  // Синхронное закрытие + два асинхронных прохода (после setter и после его re-render)
+  if(typeof _closePops==='function'){ try{ _closePops(); }catch(_){} }
+  setTimeout(function(){ if(typeof _closePops==='function'){ try{_closePops();}catch(_){}} _ddNuke(); },0);
+  setTimeout(function(){ if(typeof _closePops==='function'){ try{_closePops();}catch(_){}} _ddNuke(); },50);
+  setTimeout(_ddNuke,150);
+},true);
+// Эскейп-люк: если по какой-то причине меню осталось, клик где-то ещё — уничтожаем всё
+document.addEventListener('click',function(e){
+  if(!document.querySelector('.dd-menu.dd-portal')) return;
+  var t=e.target; if(!t||!t.closest) return;
+  if(t.closest('.dd-menu')||t.closest('.dd-btn')) return;
+  _ddNuke();
 },true);
 const _attr=v=>_ddH(v).replace(/"/g,'&quot;');
 /* Кастомный дропдаун в фирменном стиле с произвольным колбэком.
