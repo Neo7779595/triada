@@ -18148,514 +18148,7 @@ window.renderKPI = async () => {
 };
 /* ═══ /Синхронизация ═══ */
 
-/* ═══════════ KPI v2 · дружелюбный одноэкранный дашборд ═══════════
-   Отказываемся от 7-блочной структуры Точка А/Цель/Минимум/RPM/RMP/Прогноз/Мониторинг/Статистика.
-   Одна страница, 4 секции сверху вниз, без жаргона, с встроенной подсказкой.
-*/
 
-window._kpi2 = { period: null, section4Tab: 'member' };
-
-/* Единый рендер точки входа — переопределяет всё что было */
-window.renderKPI = async () => {
-  const el = document.getElementById('content-ag'); if(!el) return;
-  el.innerHTML = _kpi2ShellHTML();
-  // Параллельная подгрузка всех необходимых источников
-  const jobs = [];
-  if (!window.OVERVIEW || typeof window.OVERVIEW.deadlineDone === 'undefined') if (window.tLoadOverview) jobs.push(window.tLoadOverview().catch(()=>{}));
-  if (!window.FINANCE  || typeof window.FINANCE.totalMrr === 'undefined')      if (window.tLoadFinance)  jobs.push(window.tLoadFinance().catch(()=>{}));
-  if (!window._kpiMembers) if (window._kpiLoadMembers) jobs.push(_kpiLoadMembers().catch(()=>{}));
-  if (!window._kpiTeams)   jobs.push(kpiFetchTeams().then(x => window._kpiTeams = x).catch(()=>window._kpiTeams=[]));
-  jobs.push(kpiFetchPeriods({ limit: 10 }).then(x => _kpi2.periods = x || []));
-  await Promise.all(jobs);
-  _kpi2.period = _kpi2.periods.find(p => p.status==='active') || _kpi2.periods.find(p => p.status==='planning') || _kpi2.periods[0] || null;
-
-  // Заполняем секции
-  _kpi2FillTopbar();
-  _kpi2FillStatus();
-  _kpi2FillIssues();
-  _kpi2FillGoals();
-  _kpi2FillRanking(_kpi2.section4Tab);
-};
-
-window._kpi2ShellHTML = () => `
-  <style>
-    .kpi2-wrap{display:flex;flex-direction:column;gap:16px;padding:0 4px}
-    .kpi2-topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-    .kpi2-title{font-size:22px;font-weight:800;letter-spacing:-.015em}
-    .kpi2-title b{background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
-    .kpi2-topbar-r{display:flex;gap:8px;align-items:center}
-    .kpi2-help-btn{padding:8px 12px;font-size:12.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--txt-2);cursor:pointer;transition:all .16s;display:inline-flex;align-items:center;gap:6px}
-    .kpi2-help-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
-    .kpi2-help{padding:18px 22px;background:linear-gradient(135deg, rgba(138,143,255,.08), rgba(55,230,200,.04));border:1px solid var(--line);border-radius:14px;font-size:13.5px;line-height:1.7;color:var(--txt-2)}
-    .kpi2-help h4{font-size:14px;margin:0 0 10px;color:var(--txt-1);letter-spacing:-.005em}
-    .kpi2-help p{margin:0 0 6px}
-    .kpi2-help b{color:var(--txt-1)}
-
-    /* ── Секция 1: Как дела ── */
-    .kpi2-status{padding:22px 26px;background:linear-gradient(135deg,var(--panel-2),var(--panel-3));border:1px solid var(--line);border-radius:16px;position:relative;overflow:hidden}
-    .kpi2-status::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 90% 0%, var(--_glow, rgba(138,143,255,.14)), transparent 55%);pointer-events:none}
-    .kpi2-status-head{display:flex;align-items:center;gap:14px;margin-bottom:16px;position:relative}
-    .kpi2-status-eb{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--txt-3);font-weight:700}
-    .kpi2-status-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:24px;font-weight:700;font-size:13px}
-    .kpi2-status-badge .d{width:8px;height:8px;border-radius:50%;box-shadow:0 0 6px 0 currentColor}
-    .kpi2-status-h{font-size:20px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px}
-    .kpi2-status-sub{color:var(--txt-3);font-size:12.5px}
-    .kpi2-tiles{display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-top:16px;position:relative}
-    .kpi2-tile{padding:14px 16px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:all .16s var(--ease-out)}
-    .kpi2-tile:hover{border-color:rgba(138,143,255,.24);transform:translateY(-1px)}
-    .kpi2-tile-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:600;margin-bottom:6px}
-    .kpi2-tile-v{font-family:var(--mono);font-size:26px;font-weight:800;letter-spacing:-.02em;color:var(--txt-1)}
-    .kpi2-tile-v .u{font-size:14px;font-weight:600;color:var(--txt-3);margin-left:2px}
-    .kpi2-tile-sub{margin-top:4px;font-size:11px;color:var(--txt-3);font-family:var(--mono)}
-    .kpi2-tile-arrow{margin-left:5px;font-size:11px;font-weight:700}
-    .kpi2-tile.pos{--_glow: rgba(55,230,200,.12)}
-    .kpi2-tile.warn .kpi2-tile-v{color:var(--warn)}
-    .kpi2-tile.neg .kpi2-tile-v{color:var(--neg)}
-
-    /* ── Секция 2: Что делать сейчас ── */
-    .kpi2-card{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
-    .kpi2-card-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px}
-    .kpi2-card-t{font-size:15px;font-weight:700;letter-spacing:-.005em}
-    .kpi2-card-c{color:var(--txt-3);font-size:12.5px}
-    .kpi2-issues-list{display:flex;flex-direction:column;gap:8px}
-    .kpi2-issue{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;transition:all .14s}
-    .kpi2-issue:hover{border-color:rgba(255,255,255,.1)}
-    .kpi2-issue-ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;font-size:16px}
-    .kpi2-issue.neg .kpi2-issue-ic{background:rgba(242,102,102,.13);color:var(--neg)}
-    .kpi2-issue.warn .kpi2-issue-ic{background:rgba(227,181,103,.13);color:var(--warn)}
-    .kpi2-issue.info .kpi2-issue-ic{background:rgba(91,200,245,.13);color:#5BC8F5}
-    .kpi2-issue-b{flex:1;min-width:0}
-    .kpi2-issue-t{font-size:13.5px;font-weight:600;color:var(--txt-1);line-height:1.4}
-    .kpi2-issue-s{font-size:11.5px;color:var(--txt-3);margin-top:2px}
-    .kpi2-issue-btn{padding:6px 12px;font-size:11.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--txt-2);cursor:pointer;flex:none;transition:all .14s}
-    .kpi2-issue-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
-    .kpi2-issues-none{padding:24px;text-align:center;color:var(--txt-3);font-size:13px}
-    .kpi2-issues-none b{color:var(--pos)}
-
-    /* ── Секция 3: Мои цели ── */
-    .kpi2-goals-list{display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:10px}
-    .kpi2-goal{padding:14px 16px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;gap:8px}
-    .kpi2-goal-t{font-size:13.5px;font-weight:700;color:var(--txt-1);letter-spacing:-.005em}
-    .kpi2-goal-v{display:flex;align-items:baseline;gap:10px;font-family:var(--mono)}
-    .kpi2-goal-cur{font-size:20px;font-weight:800;color:var(--txt-1)}
-    .kpi2-goal-arrow{color:var(--txt-3);font-size:14px}
-    .kpi2-goal-tgt{font-size:15px;color:var(--accent);font-weight:700}
-    .kpi2-goal-bar{height:6px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;margin-top:4px}
-    .kpi2-goal-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .35s var(--ease-out);border-radius:4px}
-    .kpi2-goal.warn .kpi2-goal-fill{background:linear-gradient(90deg,var(--warn),#E3B567)}
-    .kpi2-goal.neg .kpi2-goal-fill{background:linear-gradient(90deg,var(--neg),#F26666)}
-    .kpi2-goal-hint{font-size:11.5px;color:var(--txt-3);display:flex;align-items:center;gap:6px}
-    .kpi2-goal-hint .kpi2-goal-status{font-weight:700}
-    .kpi2-goal.pos .kpi2-goal-status{color:var(--pos)}
-    .kpi2-goal.warn .kpi2-goal-status{color:var(--warn)}
-    .kpi2-goal.neg .kpi2-goal-status{color:var(--neg)}
-    .kpi2-add-goal{margin-top:10px;padding:12px;background:transparent;border:1.5px dashed rgba(138,143,255,.28);border-radius:11px;color:var(--txt-2);font-size:13px;font-weight:600;cursor:pointer;transition:all .14s;width:100%}
-    .kpi2-add-goal:hover{border-color:rgba(138,143,255,.5);color:var(--txt-1);background:rgba(138,143,255,.04)}
-
-    /* ── Секция 4: Кто как работает ── */
-    .kpi2-rank-tabs{display:inline-flex;gap:3px;padding:3px;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;margin-bottom:14px}
-    .kpi2-rank-tab{padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s}
-    .kpi2-rank-tab:hover{color:var(--txt-1)}
-    .kpi2-rank-tab.on{background:var(--panel-2);color:var(--txt-1);box-shadow:0 0 0 1px rgba(138,143,255,.18)}
-    .kpi2-rank-list{display:flex;flex-direction:column;gap:6px}
-    .kpi2-rank-row{display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--panel-3);border:1px solid transparent;border-radius:11px;transition:all .14s;cursor:pointer}
-    .kpi2-rank-row:hover{border-color:var(--line);background:rgba(255,255,255,.015)}
-    .kpi2-rank-n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--txt-3);width:22px;text-align:right;flex:none}
-    .kpi2-rank-av{width:34px;height:34px;border-radius:9px;flex:none;overflow:hidden;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--accent);position:relative;isolation:isolate}
-    .kpi2-rank-av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
-    .kpi2-rank-nm{flex:1;min-width:0}
-    .kpi2-rank-nm b{font-size:13.5px;font-weight:600;color:var(--txt-1);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .kpi2-rank-nm span{font-size:11.5px;color:var(--txt-3)}
-    .kpi2-rank-score{display:flex;align-items:center;gap:10px;flex:none}
-    .kpi2-rank-stars{color:var(--warn);font-size:14px;letter-spacing:2px}
-    .kpi2-rank-num{font-family:var(--mono);font-size:16px;font-weight:800;color:var(--txt-1);min-width:36px;text-align:right}
-    .kpi2-rank-trend{font-family:var(--mono);font-size:12px;font-weight:600;min-width:44px;text-align:right}
-    .kpi2-rank-trend.pos{color:var(--pos)}
-    .kpi2-rank-trend.neg{color:var(--neg)}
-    .kpi2-rank-trend.flat{color:var(--txt-3)}
-    .kpi2-empty{padding:24px;text-align:center;color:var(--txt-3);font-size:13px}
-  </style>
-  <div class="kpi2-wrap">
-    <div class="kpi2-topbar">
-      <div class="kpi2-title">Панель <b>KPI</b> · <span id="kpi2-period">…</span></div>
-      <div class="kpi2-topbar-r">
-        <div id="kpi2-period-picker"></div>
-        <button class="kpi2-help-btn" onclick="kpi2ToggleHelp()">? Как работать</button>
-      </div>
-    </div>
-    <div class="kpi2-help" id="kpi2-help" style="display:none">
-      <h4>Как читать эту панель</h4>
-      <p><b>Наверху</b> — общее состояние агентства одним взглядом. Зелёная точка = всё хорошо, жёлтая = требует внимания, красная = проблема.</p>
-      <p><b>«Что делать сейчас»</b> — конкретные точки риска: просрочки, проекты под угрозой, сотрудники с падением. Нажми «Открыть» чтобы перейти к делу.</p>
-      <p><b>«Мои цели»</b> — куда стремимся к концу периода и как идём. Хочешь новую цель — жми «+ Добавить цель», выбери метрику и целевое значение.</p>
-      <p><b>«Кто как работает»</b> — рейтинг сотрудников/команд/проектов. Оценка 0–100, звёзды визуально, стрелка = тренд относительно прошлой недели.</p>
-    </div>
-    <div id="kpi2-status" class="kpi2-status"></div>
-    <div id="kpi2-issues" class="kpi2-card"></div>
-    <div id="kpi2-goals"  class="kpi2-card"></div>
-    <div id="kpi2-ranking" class="kpi2-card"></div>
-  </div>
-`;
-
-window.kpi2ToggleHelp = () => {
-  const el = document.getElementById('kpi2-help'); if(!el) return;
-  el.style.display = el.style.display === 'none' ? '' : 'none';
-};
-
-/* Верхняя панель — период */
-window._kpi2FillTopbar = () => {
-  const p = _kpi2.period;
-  const t = document.getElementById('kpi2-period');
-  if (t) t.textContent = p ? p.name : 'Период не создан';
-  const picker = document.getElementById('kpi2-period-picker');
-  if (picker){
-    if (!p){
-      picker.innerHTML = `<button class="kpi2-help-btn" onclick="kpiCreateDefaultPeriod().then(()=>renderKPI())" style="color:var(--txt-1);border-color:rgba(138,143,255,.28)">+ Создать период</button>`;
-    } else {
-      const opts = _kpi2.periods.map(x => [x.id, `${x.name} · ${{active:'активный',planning:'планирование',closed:'закрыт'}[x.status]||x.status}`]);
-      picker.innerHTML = _ddSel('kpi2-period-sel', opts, p.id, (v) => { _kpi2.period = _kpi2.periods.find(x => x.id === v); renderKPI(); });
-    }
-  }
-};
-
-/* Секция 1: статус агентства */
-window._kpi2FillStatus = async () => {
-  const box = document.getElementById('kpi2-status'); if(!box) return;
-  const [ph, od, vel, ot] = await Promise.all([
-    kpiComputePortfolioHealth('agency'),
-    kpiComputeOntimeDelivery('agency'),
-    kpiComputeVelocity30d('agency'),
-    kpiComputeOtkaty('agency'),
-  ]);
-  const health = ph.value;
-  let statusLabel, statusColor, statusGlow, subLabel;
-  if (health == null){
-    statusLabel = 'Пока нет данных'; statusColor = 'var(--txt-3)'; statusGlow = 'rgba(255,255,255,.06)';
-    subLabel = 'Как появятся активные проекты — покажем состояние';
-  } else if (health >= 80){
-    statusLabel = 'Всё хорошо'; statusColor = 'var(--pos)'; statusGlow = 'rgba(55,230,200,.18)';
-    subLabel = 'Портфель в норме, продолжайте в том же духе';
-  } else if (health >= 50){
-    statusLabel = 'Требует внимания'; statusColor = 'var(--warn)'; statusGlow = 'rgba(227,181,103,.16)';
-    subLabel = 'Есть проекты под риском — посмотрите ниже что делать';
-  } else {
-    statusLabel = 'Красная зона'; statusColor = 'var(--neg)'; statusGlow = 'rgba(242,102,102,.16)';
-    subLabel = 'Половина или больше проектов в риске — срочно разберитесь';
-  }
-  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done');
-  const isStale = p => p._lastActDays != null && p._lastActDays >= 14;
-  const risk = P.filter(p => p._overdue || isStale(p)).length;
-  const okN = P.length - risk;
-
-  box.style.setProperty('--_glow', statusGlow);
-  const fmt = (v, unit) => v==null?'—':(unit==='%'?Math.round(v)+'%':unit==='ч'?Math.round(v*10)/10+'ч':Math.round(v));
-  box.innerHTML = `
-    <div class="kpi2-status-head">
-      <div>
-        <div class="kpi2-status-eb">общее состояние агентства</div>
-        <div class="kpi2-status-h">${statusLabel}</div>
-        <div class="kpi2-status-sub">${subLabel} · ${okN} в норме, ${risk} под риском из ${P.length}</div>
-      </div>
-      <div class="kpi2-status-badge" style="background:${statusColor}22;color:${statusColor}"><span class="d" style="background:${statusColor}"></span>${health==null?'—':health+'%'}</div>
-    </div>
-    <div class="kpi2-tiles">
-      <div class="kpi2-tile ${_kpi2ClassFor('portfolio_health', health, 'up')}" onclick="agNav('overview')">
-        <div class="kpi2-tile-l">здоровье</div>
-        <div class="kpi2-tile-v">${fmt(health,'%')}</div>
-        <div class="kpi2-tile-sub">открыть Сводку →</div>
-      </div>
-      <div class="kpi2-tile ${_kpi2ClassFor('ontime_delivery', od.value, 'up')}" onclick="agNav('deadlines')">
-        <div class="kpi2-tile-l">в срок</div>
-        <div class="kpi2-tile-v">${fmt(od.value,'%')}</div>
-        <div class="kpi2-tile-sub">открыть Дедлайны →</div>
-      </div>
-      <div class="kpi2-tile" onclick="agNav('cycles')">
-        <div class="kpi2-tile-l">выработка 30д</div>
-        <div class="kpi2-tile-v">${fmt(vel.value)}</div>
-        <div class="kpi2-tile-sub">этапы и задачи</div>
-      </div>
-      <div class="kpi2-tile ${_kpi2ClassFor('otkaty', ot.value, 'down')}" onclick="agNav('cycles')">
-        <div class="kpi2-tile-l">откаты</div>
-        <div class="kpi2-tile-v">${fmt(ot.value,'%')}</div>
-        <div class="kpi2-tile-sub">возвраты на доработку</div>
-      </div>
-    </div>
-  `;
-};
-
-window._kpi2ClassFor = (key, val, dir) => {
-  if (val == null) return '';
-  const m = KPI_METRICS[key]; if(!m) return '';
-  const n = kpiNormalize(key, val);
-  if (n == null) return '';
-  return n >= 70 ? 'pos' : n >= 40 ? 'warn' : 'neg';
-};
-
-/* Секция 2: конкретные проблемы */
-window._kpi2FillIssues = () => {
-  const box = document.getElementById('kpi2-issues'); if(!box) return;
-  const issues = [];
-  const O = window.OVERVIEW || {};
-  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
-
-  // Просрочки
-  const overdueTasks = (O.overdueTasks || 0);
-  const overdueStages = (O.overdueStages || 0);
-  const overdueTotal = overdueTasks + overdueStages;
-  if (overdueTotal > 0){
-    issues.push({
-      sev: overdueTotal > 15 ? 'neg' : 'warn',
-      ic: '⏰',
-      t: `Просрочено ${overdueTotal} ${overdueTotal===1?'элемент':'элементов'}: ${overdueStages} этапов и ${overdueTasks} задач`,
-      s: 'Сдвиньте сроки или ускорьте выполнение',
-      action: 'Смотреть',
-      onclick: `agNav('deadlines')`,
-    });
-  }
-
-  // Проекты под риском
-  const isStale = p => p._lastActDays != null && p._lastActDays >= 14;
-  const riskyProjects = P.filter(p => p.status !== 'done' && (p._overdue || isStale(p))).slice(0, 5);
-  if (riskyProjects.length){
-    const names = riskyProjects.slice(0, 3).map(p => p.name).join(', ');
-    const more = riskyProjects.length > 3 ? ` и ещё ${riskyProjects.length - 3}` : '';
-    issues.push({
-      sev: riskyProjects.length >= 3 ? 'neg' : 'warn',
-      ic: '⚠️',
-      t: `${riskyProjects.length} ${riskyProjects.length===1?'проект под риском':'проекта под риском'}: ${names}${more}`,
-      s: 'Есть просрочки или застой более 2 недель',
-      action: 'Открыть',
-      onclick: `agNav('projects')`,
-    });
-  }
-
-  // Rework — если много переходов назад
-  const trans = (O.trans || 0) + (O.tTrans || 0);
-  const rework = (O.rework || 0) + (O.tRework || 0);
-  if (trans && rework/trans > 0.15){
-    const pct = Math.round(100*rework/trans);
-    issues.push({
-      sev: pct >= 25 ? 'neg' : 'warn',
-      ic: '↺',
-      t: `Высокий процент откатов: ${pct}% работ возвращаются на доработку`,
-      s: 'Смотрите Циклы чтобы понять на каких этапах откаты',
-      action: 'Циклы',
-      onclick: `agNav('cycles')`,
-    });
-  }
-
-  // Финансы: концентрация выручки
-  const active = P.filter(p => p.status !== 'done' && p.status !== 'blocked');
-  const mrrTotal = active.reduce((s,p) => s + (+p.mrr || 0), 0);
-  if (mrrTotal > 0){
-    const top = active.slice().sort((a,b) => (+b.mrr||0) - (+a.mrr||0))[0];
-    const topShare = Math.round(100*(+top.mrr||0)/mrrTotal);
-    if (topShare >= 40){
-      issues.push({
-        sev: topShare >= 60 ? 'neg' : 'warn',
-        ic: '💰',
-        t: `${topShare}% выручки — с одного клиента (${top.name})`,
-        s: 'Диверсифицируйте портфель — риск потерять крупного клиента',
-        action: 'Финансы',
-        onclick: `agNav('finance')`,
-      });
-    }
-  }
-
-  if (!issues.length){
-    box.innerHTML = `
-      <div class="kpi2-card-h">
-        <div class="kpi2-card-t">Что делать сейчас</div>
-      </div>
-      <div class="kpi2-issues-none"><b>Всё чисто</b> · нет активных проблем требующих внимания. Продолжайте в том же духе.</div>
-    `;
-    return;
-  }
-
-  box.innerHTML = `
-    <div class="kpi2-card-h">
-      <div class="kpi2-card-t">Что делать сейчас</div>
-      <div class="kpi2-card-c">${issues.length} ${issues.length===1?'точка внимания':'точек внимания'}</div>
-    </div>
-    <div class="kpi2-issues-list">
-      ${issues.map(i => `
-        <div class="kpi2-issue ${i.sev}">
-          <div class="kpi2-issue-ic">${i.ic}</div>
-          <div class="kpi2-issue-b"><div class="kpi2-issue-t">${i.t}</div><div class="kpi2-issue-s">${i.s}</div></div>
-          <button class="kpi2-issue-btn" onclick="${i.onclick}">${i.action} →</button>
-        </div>
-      `).join('')}
-    </div>
-  `;
-};
-
-/* Секция 3: цели агентства (простая версия) */
-window._kpi2FillGoals = async () => {
-  const box = document.getElementById('kpi2-goals'); if(!box) return;
-  const p = _kpi2.period;
-  if (!p){
-    box.innerHTML = `<div class="kpi2-card-h"><div class="kpi2-card-t">Мои цели</div></div><div class="kpi2-issues-none">Сначала создайте период — тогда сможете задать цели.</div>`;
-    return;
-  }
-  // Тянем все agency-цели по периоду
-  const targets = await kpiFetchTargets(p.id, { scope_kind: 'agency' });
-  const now = Date.now();
-  const startMs = new Date(p.start_date+'T00:00:00').getTime();
-  const endMs   = new Date(p.end_date  +'T23:59:59').getTime();
-  const pctTime = 100 * (now - startMs) / Math.max(1, endMs - startMs);
-
-  const goalHTML = async (t) => {
-    const M = KPI_METRICS[t.metric_key]; if(!M) return '';
-    // Текущее значение
-    const fnName = _kpiFnMap[t.metric_key] || '';
-    let cur = t.baseline;
-    try { const fn = window[fnName]; if(fn){ const r = await fn('agency', null); if(r && r.value != null) cur = r.value; } } catch(e){}
-    const total = (t.target || 0) - (t.baseline || 0);
-    const done  = (cur || 0) - (t.baseline || 0);
-    const progress = total === 0 ? (cur >= t.target ? 100 : 0) : Math.max(0, Math.min(100, Math.round(100*done/total)));
-    const onTrack = progress >= pctTime - 10;
-    const behind = progress < pctTime - 25;
-    const cls = onTrack ? 'pos' : behind ? 'neg' : 'warn';
-    const status = onTrack ? '✓ в темпе' : behind ? '⚠ отстаём' : '~ идём медленно';
-    const fmt = v => v==null?'—':(M.unit==='%'?Math.round(v*10)/10+'%':M.unit==='ч'?Math.round(v*10)/10+'ч':M.unit==='$'?'$'+Math.round(v):Math.round(v));
-    return `
-      <div class="kpi2-goal ${cls}">
-        <div class="kpi2-goal-t">${M.label}</div>
-        <div class="kpi2-goal-v">
-          <span class="kpi2-goal-cur">${fmt(cur)}</span>
-          <span class="kpi2-goal-arrow">→</span>
-          <span class="kpi2-goal-tgt">${fmt(t.target)}</span>
-        </div>
-        <div class="kpi2-goal-bar"><div class="kpi2-goal-fill" style="width:${progress}%"></div></div>
-        <div class="kpi2-goal-hint">
-          <span>прошло ${Math.round(pctTime)}% времени</span>
-          <span>·</span>
-          <span class="kpi2-goal-status">${status}</span>
-        </div>
-      </div>`;
-  };
-
-  const cards = await Promise.all(targets.filter(t => t.target != null).map(goalHTML));
-  const canEdit = kpiCan('set_target', 'agency', null);
-  box.innerHTML = `
-    <div class="kpi2-card-h">
-      <div class="kpi2-card-t">Мои цели · ${p.name}</div>
-      <div class="kpi2-card-c">до ${p.end_date}</div>
-    </div>
-    ${cards.length ? `<div class="kpi2-goals-list">${cards.join('')}</div>` : `<div class="kpi2-issues-none">Пока не задано ни одной цели. Задайте первую — увидим прогресс.</div>`}
-    ${canEdit ? `<button class="kpi2-add-goal" onclick="kpi2NewGoal()">+ Добавить цель</button>` : ''}
-  `;
-};
-
-/* Простая модалка добавления цели через prompt */
-window.kpi2NewGoal = async () => {
-  const p = _kpi2.period; if(!p) return;
-  const agencyKeys = Object.entries(KPI_METRICS).filter(([k,m]) => m.scope.includes('agency')).map(([k,m]) => ({k, m}));
-  const choices = agencyKeys.map((x, i) => `${i+1}. ${x.m.label}${x.m.dir==='down'?' (снижать)':' (повышать)'} — сейчас ${x.m.unit || 'ед.'}`).join('\n');
-  const idxStr = prompt('Что улучшаем?\n\n' + choices + '\n\nВведите номер:');
-  const idx = parseInt(idxStr, 10);
-  if (isNaN(idx) || idx < 1 || idx > agencyKeys.length) return;
-  const {k, m} = agencyKeys[idx-1];
-  const fnName = _kpiFnMap[k];
-  let baseline = null;
-  try { const fn = window[fnName]; if(fn){ const r = await fn('agency', null); if(r && r.value != null) baseline = r.value; } } catch(e){}
-  const baseStr = baseline==null?'':' (сейчас ' + baseline + (m.unit||'') + ')';
-  const tgtStr = prompt(`Какое значение хотим достичь к ${p.end_date}?${baseStr}\n\nВведите число:`);
-  if (!tgtStr) return;
-  const tgt = Number(String(tgtStr).replace(',', '.'));
-  if (isNaN(tgt)) { toast('Не число'); return; }
-  await kpiUpsertTarget({ period_id: p.id, scope_kind: 'agency', scope_id: null, metric_key: k, baseline: baseline, target: tgt });
-  if (typeof toast==='function') toast('Цель сохранена');
-  _kpi2FillGoals();
-};
-
-/* Секция 4: рейтинг сотрудников/команд/проектов */
-window._kpi2Score = async (scope, id) => {
-  const from = new Date(Date.now() - 30*86400000).toISOString();
-  const to   = new Date().toISOString();
-  const res = await kpiComputeOpsAll(scope, id, from, to);
-  const scores = [];
-  Object.entries(res).forEach(([k, r]) => {
-    if (r && r.value != null){
-      const s = kpiNormalize(k, r.value);
-      if (s != null) scores.push(s);
-    }
-  });
-  if (!scores.length) return null;
-  return Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
-};
-
-window._kpi2Trend = async (scope, id) => {
-  const now = Date.now();
-  const [thisWeek, prevWeek] = await Promise.all([
-    kpiComputeOpsAll(scope, id, new Date(now - 7*86400000).toISOString(), new Date(now).toISOString()),
-    kpiComputeOpsAll(scope, id, new Date(now - 14*86400000).toISOString(), new Date(now - 7*86400000).toISOString()),
-  ]);
-  const avgOf = res => {
-    const arr = [];
-    Object.entries(res).forEach(([k,r]) => { if (r && r.value != null){ const s = kpiNormalize(k, r.value); if (s!=null) arr.push(s); } });
-    return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
-  };
-  const tw = avgOf(thisWeek), pw = avgOf(prevWeek);
-  if (tw == null || pw == null) return { d:0, sign:'flat', txt:'—' };
-  const d = tw - pw;
-  return { d, sign: d > 2 ? 'pos' : d < -2 ? 'neg' : 'flat', txt: (d>0?'+':'')+Math.round(d) };
-};
-
-window._kpi2Stars = (score) => {
-  if (score == null) return '☆☆☆☆☆';
-  const n = score >= 90 ? 5 : score >= 75 ? 4 : score >= 55 ? 3 : score >= 35 ? 2 : 1;
-  return '★'.repeat(n) + '☆'.repeat(5 - n);
-};
-
-window._kpi2FillRanking = async (scope) => {
-  const box = document.getElementById('kpi2-ranking'); if(!box) return;
-  _kpi2.section4Tab = scope;
-  const rows = _kpiScopeRows(scope).slice(0, 20);
-  // Skeleton
-  box.innerHTML = `
-    <div class="kpi2-card-h">
-      <div class="kpi2-card-t">Кто как работает</div>
-      <div class="kpi2-card-c">оценка 0–100 по операционным метрикам за 30 дней</div>
-    </div>
-    <div class="kpi2-rank-tabs">
-      ${['member','team','project'].map(k => `<div class="kpi2-rank-tab${k===scope?' on':''}" onclick="_kpi2FillRanking('${k}')">${{member:'Сотрудники',team:'Команды',project:'Проекты'}[k]}</div>`).join('')}
-    </div>
-    <div class="kpi2-rank-list">
-      ${rows.length ? rows.map(() => `<div class="kpi2-rank-row"><div class="kpi2-rank-n">…</div><div class="kpi2-rank-av"></div><div class="kpi2-rank-nm"><b>…</b><span>…</span></div></div>`).join('') : `<div class="kpi2-empty">Нет данных для этого уровня</div>`}
-    </div>
-  `;
-  if (!rows.length) return;
-
-  const enriched = await Promise.all(rows.map(async r => {
-    const [score, trend] = await Promise.all([_kpi2Score(scope, r.id), _kpi2Trend(scope, r.id)]);
-    return { r, score, trend };
-  }));
-  enriched.sort((a,b) => (b.score ?? -1) - (a.score ?? -1));
-
-  const listEl = box.querySelector('.kpi2-rank-list');
-  const avatarHTML = r => r.avatarUrl && /^https?:\/\//i.test(r.avatarUrl)
-    ? `<div class="kpi2-rank-av"><img src="${r.avatarUrl}" onerror="this.remove()"></div>`
-    : `<div class="kpi2-rank-av" style="color:${r.color||'var(--accent)'}">${r.initials || '?'}</div>`;
-
-  listEl.innerHTML = enriched.map((e, i) => `
-    <div class="kpi2-rank-row">
-      <div class="kpi2-rank-n">${i+1}</div>
-      ${avatarHTML(e.r)}
-      <div class="kpi2-rank-nm">
-        <b>${e.r.name}</b>
-        <span>${e.r.subtitle||''}</span>
-      </div>
-      <div class="kpi2-rank-score">
-        <div class="kpi2-rank-stars">${_kpi2Stars(e.score)}</div>
-        <div class="kpi2-rank-num">${e.score==null?'—':e.score}</div>
-        <div class="kpi2-rank-trend ${e.trend.sign}">${e.trend.sign==='pos'?'↗':e.trend.sign==='neg'?'↘':'→'} ${e.trend.txt}</div>
-      </div>
-    </div>
-  `).join('');
-};
-
-/* ═══════════ /KPI v2 ═══════════ */
 
 
 
@@ -21810,6 +21303,515 @@ if (window.LIVE){
   const lg = document.getElementById('lg-login'); if (lg) lg.setAttribute('placeholder','Email');
   (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(ses.user); })();
 }
+
+/* ═══════════ KPI v2 · дружелюбный одноэкранный дашборд ═══════════
+   Отказываемся от 7-блочной структуры Точка А/Цель/Минимум/RPM/RMP/Прогноз/Мониторинг/Статистика.
+   Одна страница, 4 секции сверху вниз, без жаргона, с встроенной подсказкой.
+*/
+
+window._kpi2 = { period: null, section4Tab: 'member' };
+
+/* Единый рендер точки входа — переопределяет всё что было */
+window.renderKPI = async () => {
+  const el = document.getElementById('content-ag'); if(!el) return;
+  el.innerHTML = _kpi2ShellHTML();
+  // Параллельная подгрузка всех необходимых источников
+  const jobs = [];
+  if (!window.OVERVIEW || typeof window.OVERVIEW.deadlineDone === 'undefined') if (window.tLoadOverview) jobs.push(window.tLoadOverview().catch(()=>{}));
+  if (!window.FINANCE  || typeof window.FINANCE.totalMrr === 'undefined')      if (window.tLoadFinance)  jobs.push(window.tLoadFinance().catch(()=>{}));
+  if (!window._kpiMembers) if (window._kpiLoadMembers) jobs.push(_kpiLoadMembers().catch(()=>{}));
+  if (!window._kpiTeams)   jobs.push(kpiFetchTeams().then(x => window._kpiTeams = x).catch(()=>window._kpiTeams=[]));
+  jobs.push(kpiFetchPeriods({ limit: 10 }).then(x => _kpi2.periods = x || []));
+  await Promise.all(jobs);
+  _kpi2.period = _kpi2.periods.find(p => p.status==='active') || _kpi2.periods.find(p => p.status==='planning') || _kpi2.periods[0] || null;
+
+  // Заполняем секции
+  _kpi2FillTopbar();
+  _kpi2FillStatus();
+  _kpi2FillIssues();
+  _kpi2FillGoals();
+  _kpi2FillRanking(_kpi2.section4Tab);
+};
+
+window._kpi2ShellHTML = () => `
+  <style>
+    .kpi2-wrap{display:flex;flex-direction:column;gap:16px;padding:0 4px}
+    .kpi2-topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+    .kpi2-title{font-size:22px;font-weight:800;letter-spacing:-.015em}
+    .kpi2-title b{background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .kpi2-topbar-r{display:flex;gap:8px;align-items:center}
+    .kpi2-help-btn{padding:8px 12px;font-size:12.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--txt-2);cursor:pointer;transition:all .16s;display:inline-flex;align-items:center;gap:6px}
+    .kpi2-help-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
+    .kpi2-help{padding:18px 22px;background:linear-gradient(135deg, rgba(138,143,255,.08), rgba(55,230,200,.04));border:1px solid var(--line);border-radius:14px;font-size:13.5px;line-height:1.7;color:var(--txt-2)}
+    .kpi2-help h4{font-size:14px;margin:0 0 10px;color:var(--txt-1);letter-spacing:-.005em}
+    .kpi2-help p{margin:0 0 6px}
+    .kpi2-help b{color:var(--txt-1)}
+
+    /* ── Секция 1: Как дела ── */
+    .kpi2-status{padding:22px 26px;background:linear-gradient(135deg,var(--panel-2),var(--panel-3));border:1px solid var(--line);border-radius:16px;position:relative;overflow:hidden}
+    .kpi2-status::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 90% 0%, var(--_glow, rgba(138,143,255,.14)), transparent 55%);pointer-events:none}
+    .kpi2-status-head{display:flex;align-items:center;gap:14px;margin-bottom:16px;position:relative}
+    .kpi2-status-eb{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--txt-3);font-weight:700}
+    .kpi2-status-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:24px;font-weight:700;font-size:13px}
+    .kpi2-status-badge .d{width:8px;height:8px;border-radius:50%;box-shadow:0 0 6px 0 currentColor}
+    .kpi2-status-h{font-size:20px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px}
+    .kpi2-status-sub{color:var(--txt-3);font-size:12.5px}
+    .kpi2-tiles{display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-top:16px;position:relative}
+    .kpi2-tile{padding:14px 16px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:all .16s var(--ease-out)}
+    .kpi2-tile:hover{border-color:rgba(138,143,255,.24);transform:translateY(-1px)}
+    .kpi2-tile-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:600;margin-bottom:6px}
+    .kpi2-tile-v{font-family:var(--mono);font-size:26px;font-weight:800;letter-spacing:-.02em;color:var(--txt-1)}
+    .kpi2-tile-v .u{font-size:14px;font-weight:600;color:var(--txt-3);margin-left:2px}
+    .kpi2-tile-sub{margin-top:4px;font-size:11px;color:var(--txt-3);font-family:var(--mono)}
+    .kpi2-tile-arrow{margin-left:5px;font-size:11px;font-weight:700}
+    .kpi2-tile.pos{--_glow: rgba(55,230,200,.12)}
+    .kpi2-tile.warn .kpi2-tile-v{color:var(--warn)}
+    .kpi2-tile.neg .kpi2-tile-v{color:var(--neg)}
+
+    /* ── Секция 2: Что делать сейчас ── */
+    .kpi2-card{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+    .kpi2-card-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px}
+    .kpi2-card-t{font-size:15px;font-weight:700;letter-spacing:-.005em}
+    .kpi2-card-c{color:var(--txt-3);font-size:12.5px}
+    .kpi2-issues-list{display:flex;flex-direction:column;gap:8px}
+    .kpi2-issue{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;transition:all .14s}
+    .kpi2-issue:hover{border-color:rgba(255,255,255,.1)}
+    .kpi2-issue-ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;font-size:16px}
+    .kpi2-issue.neg .kpi2-issue-ic{background:rgba(242,102,102,.13);color:var(--neg)}
+    .kpi2-issue.warn .kpi2-issue-ic{background:rgba(227,181,103,.13);color:var(--warn)}
+    .kpi2-issue.info .kpi2-issue-ic{background:rgba(91,200,245,.13);color:#5BC8F5}
+    .kpi2-issue-b{flex:1;min-width:0}
+    .kpi2-issue-t{font-size:13.5px;font-weight:600;color:var(--txt-1);line-height:1.4}
+    .kpi2-issue-s{font-size:11.5px;color:var(--txt-3);margin-top:2px}
+    .kpi2-issue-btn{padding:6px 12px;font-size:11.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--txt-2);cursor:pointer;flex:none;transition:all .14s}
+    .kpi2-issue-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
+    .kpi2-issues-none{padding:24px;text-align:center;color:var(--txt-3);font-size:13px}
+    .kpi2-issues-none b{color:var(--pos)}
+
+    /* ── Секция 3: Мои цели ── */
+    .kpi2-goals-list{display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:10px}
+    .kpi2-goal{padding:14px 16px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;gap:8px}
+    .kpi2-goal-t{font-size:13.5px;font-weight:700;color:var(--txt-1);letter-spacing:-.005em}
+    .kpi2-goal-v{display:flex;align-items:baseline;gap:10px;font-family:var(--mono)}
+    .kpi2-goal-cur{font-size:20px;font-weight:800;color:var(--txt-1)}
+    .kpi2-goal-arrow{color:var(--txt-3);font-size:14px}
+    .kpi2-goal-tgt{font-size:15px;color:var(--accent);font-weight:700}
+    .kpi2-goal-bar{height:6px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;margin-top:4px}
+    .kpi2-goal-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .35s var(--ease-out);border-radius:4px}
+    .kpi2-goal.warn .kpi2-goal-fill{background:linear-gradient(90deg,var(--warn),#E3B567)}
+    .kpi2-goal.neg .kpi2-goal-fill{background:linear-gradient(90deg,var(--neg),#F26666)}
+    .kpi2-goal-hint{font-size:11.5px;color:var(--txt-3);display:flex;align-items:center;gap:6px}
+    .kpi2-goal-hint .kpi2-goal-status{font-weight:700}
+    .kpi2-goal.pos .kpi2-goal-status{color:var(--pos)}
+    .kpi2-goal.warn .kpi2-goal-status{color:var(--warn)}
+    .kpi2-goal.neg .kpi2-goal-status{color:var(--neg)}
+    .kpi2-add-goal{margin-top:10px;padding:12px;background:transparent;border:1.5px dashed rgba(138,143,255,.28);border-radius:11px;color:var(--txt-2);font-size:13px;font-weight:600;cursor:pointer;transition:all .14s;width:100%}
+    .kpi2-add-goal:hover{border-color:rgba(138,143,255,.5);color:var(--txt-1);background:rgba(138,143,255,.04)}
+
+    /* ── Секция 4: Кто как работает ── */
+    .kpi2-rank-tabs{display:inline-flex;gap:3px;padding:3px;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;margin-bottom:14px}
+    .kpi2-rank-tab{padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s}
+    .kpi2-rank-tab:hover{color:var(--txt-1)}
+    .kpi2-rank-tab.on{background:var(--panel-2);color:var(--txt-1);box-shadow:0 0 0 1px rgba(138,143,255,.18)}
+    .kpi2-rank-list{display:flex;flex-direction:column;gap:6px}
+    .kpi2-rank-row{display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--panel-3);border:1px solid transparent;border-radius:11px;transition:all .14s;cursor:pointer}
+    .kpi2-rank-row:hover{border-color:var(--line);background:rgba(255,255,255,.015)}
+    .kpi2-rank-n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--txt-3);width:22px;text-align:right;flex:none}
+    .kpi2-rank-av{width:34px;height:34px;border-radius:9px;flex:none;overflow:hidden;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--accent);position:relative;isolation:isolate}
+    .kpi2-rank-av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+    .kpi2-rank-nm{flex:1;min-width:0}
+    .kpi2-rank-nm b{font-size:13.5px;font-weight:600;color:var(--txt-1);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi2-rank-nm span{font-size:11.5px;color:var(--txt-3)}
+    .kpi2-rank-score{display:flex;align-items:center;gap:10px;flex:none}
+    .kpi2-rank-stars{color:var(--warn);font-size:14px;letter-spacing:2px}
+    .kpi2-rank-num{font-family:var(--mono);font-size:16px;font-weight:800;color:var(--txt-1);min-width:36px;text-align:right}
+    .kpi2-rank-trend{font-family:var(--mono);font-size:12px;font-weight:600;min-width:44px;text-align:right}
+    .kpi2-rank-trend.pos{color:var(--pos)}
+    .kpi2-rank-trend.neg{color:var(--neg)}
+    .kpi2-rank-trend.flat{color:var(--txt-3)}
+    .kpi2-empty{padding:24px;text-align:center;color:var(--txt-3);font-size:13px}
+  </style>
+  <div class="kpi2-wrap">
+    <div class="kpi2-topbar">
+      <div class="kpi2-title">Панель <b>KPI</b> · <span id="kpi2-period">…</span></div>
+      <div class="kpi2-topbar-r">
+        <div id="kpi2-period-picker"></div>
+        <button class="kpi2-help-btn" onclick="kpi2ToggleHelp()">? Как работать</button>
+      </div>
+    </div>
+    <div class="kpi2-help" id="kpi2-help" style="display:none">
+      <h4>Как читать эту панель</h4>
+      <p><b>Наверху</b> — общее состояние агентства одним взглядом. Зелёная точка = всё хорошо, жёлтая = требует внимания, красная = проблема.</p>
+      <p><b>«Что делать сейчас»</b> — конкретные точки риска: просрочки, проекты под угрозой, сотрудники с падением. Нажми «Открыть» чтобы перейти к делу.</p>
+      <p><b>«Мои цели»</b> — куда стремимся к концу периода и как идём. Хочешь новую цель — жми «+ Добавить цель», выбери метрику и целевое значение.</p>
+      <p><b>«Кто как работает»</b> — рейтинг сотрудников/команд/проектов. Оценка 0–100, звёзды визуально, стрелка = тренд относительно прошлой недели.</p>
+    </div>
+    <div id="kpi2-status" class="kpi2-status"></div>
+    <div id="kpi2-issues" class="kpi2-card"></div>
+    <div id="kpi2-goals"  class="kpi2-card"></div>
+    <div id="kpi2-ranking" class="kpi2-card"></div>
+  </div>
+`;
+
+window.kpi2ToggleHelp = () => {
+  const el = document.getElementById('kpi2-help'); if(!el) return;
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+};
+
+/* Верхняя панель — период */
+window._kpi2FillTopbar = () => {
+  const p = _kpi2.period;
+  const t = document.getElementById('kpi2-period');
+  if (t) t.textContent = p ? p.name : 'Период не создан';
+  const picker = document.getElementById('kpi2-period-picker');
+  if (picker){
+    if (!p){
+      picker.innerHTML = `<button class="kpi2-help-btn" onclick="kpiCreateDefaultPeriod().then(()=>renderKPI())" style="color:var(--txt-1);border-color:rgba(138,143,255,.28)">+ Создать период</button>`;
+    } else {
+      const opts = _kpi2.periods.map(x => [x.id, `${x.name} · ${{active:'активный',planning:'планирование',closed:'закрыт'}[x.status]||x.status}`]);
+      picker.innerHTML = _ddSel('kpi2-period-sel', opts, p.id, (v) => { _kpi2.period = _kpi2.periods.find(x => x.id === v); renderKPI(); });
+    }
+  }
+};
+
+/* Секция 1: статус агентства */
+window._kpi2FillStatus = async () => {
+  const box = document.getElementById('kpi2-status'); if(!box) return;
+  const [ph, od, vel, ot] = await Promise.all([
+    kpiComputePortfolioHealth('agency'),
+    kpiComputeOntimeDelivery('agency'),
+    kpiComputeVelocity30d('agency'),
+    kpiComputeOtkaty('agency'),
+  ]);
+  const health = ph.value;
+  let statusLabel, statusColor, statusGlow, subLabel;
+  if (health == null){
+    statusLabel = 'Пока нет данных'; statusColor = 'var(--txt-3)'; statusGlow = 'rgba(255,255,255,.06)';
+    subLabel = 'Как появятся активные проекты — покажем состояние';
+  } else if (health >= 80){
+    statusLabel = 'Всё хорошо'; statusColor = 'var(--pos)'; statusGlow = 'rgba(55,230,200,.18)';
+    subLabel = 'Портфель в норме, продолжайте в том же духе';
+  } else if (health >= 50){
+    statusLabel = 'Требует внимания'; statusColor = 'var(--warn)'; statusGlow = 'rgba(227,181,103,.16)';
+    subLabel = 'Есть проекты под риском — посмотрите ниже что делать';
+  } else {
+    statusLabel = 'Красная зона'; statusColor = 'var(--neg)'; statusGlow = 'rgba(242,102,102,.16)';
+    subLabel = 'Половина или больше проектов в риске — срочно разберитесь';
+  }
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done');
+  const isStale = p => p._lastActDays != null && p._lastActDays >= 14;
+  const risk = P.filter(p => p._overdue || isStale(p)).length;
+  const okN = P.length - risk;
+
+  box.style.setProperty('--_glow', statusGlow);
+  const fmt = (v, unit) => v==null?'—':(unit==='%'?Math.round(v)+'%':unit==='ч'?Math.round(v*10)/10+'ч':Math.round(v));
+  box.innerHTML = `
+    <div class="kpi2-status-head">
+      <div>
+        <div class="kpi2-status-eb">общее состояние агентства</div>
+        <div class="kpi2-status-h">${statusLabel}</div>
+        <div class="kpi2-status-sub">${subLabel} · ${okN} в норме, ${risk} под риском из ${P.length}</div>
+      </div>
+      <div class="kpi2-status-badge" style="background:${statusColor}22;color:${statusColor}"><span class="d" style="background:${statusColor}"></span>${health==null?'—':health+'%'}</div>
+    </div>
+    <div class="kpi2-tiles">
+      <div class="kpi2-tile ${_kpi2ClassFor('portfolio_health', health, 'up')}" onclick="agNav('overview')">
+        <div class="kpi2-tile-l">здоровье</div>
+        <div class="kpi2-tile-v">${fmt(health,'%')}</div>
+        <div class="kpi2-tile-sub">открыть Сводку →</div>
+      </div>
+      <div class="kpi2-tile ${_kpi2ClassFor('ontime_delivery', od.value, 'up')}" onclick="agNav('deadlines')">
+        <div class="kpi2-tile-l">в срок</div>
+        <div class="kpi2-tile-v">${fmt(od.value,'%')}</div>
+        <div class="kpi2-tile-sub">открыть Дедлайны →</div>
+      </div>
+      <div class="kpi2-tile" onclick="agNav('cycles')">
+        <div class="kpi2-tile-l">выработка 30д</div>
+        <div class="kpi2-tile-v">${fmt(vel.value)}</div>
+        <div class="kpi2-tile-sub">этапы и задачи</div>
+      </div>
+      <div class="kpi2-tile ${_kpi2ClassFor('otkaty', ot.value, 'down')}" onclick="agNav('cycles')">
+        <div class="kpi2-tile-l">откаты</div>
+        <div class="kpi2-tile-v">${fmt(ot.value,'%')}</div>
+        <div class="kpi2-tile-sub">возвраты на доработку</div>
+      </div>
+    </div>
+  `;
+};
+
+window._kpi2ClassFor = (key, val, dir) => {
+  if (val == null) return '';
+  const m = KPI_METRICS[key]; if(!m) return '';
+  const n = kpiNormalize(key, val);
+  if (n == null) return '';
+  return n >= 70 ? 'pos' : n >= 40 ? 'warn' : 'neg';
+};
+
+/* Секция 2: конкретные проблемы */
+window._kpi2FillIssues = () => {
+  const box = document.getElementById('kpi2-issues'); if(!box) return;
+  const issues = [];
+  const O = window.OVERVIEW || {};
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+
+  // Просрочки
+  const overdueTasks = (O.overdueTasks || 0);
+  const overdueStages = (O.overdueStages || 0);
+  const overdueTotal = overdueTasks + overdueStages;
+  if (overdueTotal > 0){
+    issues.push({
+      sev: overdueTotal > 15 ? 'neg' : 'warn',
+      ic: '⏰',
+      t: `Просрочено ${overdueTotal} ${overdueTotal===1?'элемент':'элементов'}: ${overdueStages} этапов и ${overdueTasks} задач`,
+      s: 'Сдвиньте сроки или ускорьте выполнение',
+      action: 'Смотреть',
+      onclick: `agNav('deadlines')`,
+    });
+  }
+
+  // Проекты под риском
+  const isStale = p => p._lastActDays != null && p._lastActDays >= 14;
+  const riskyProjects = P.filter(p => p.status !== 'done' && (p._overdue || isStale(p))).slice(0, 5);
+  if (riskyProjects.length){
+    const names = riskyProjects.slice(0, 3).map(p => p.name).join(', ');
+    const more = riskyProjects.length > 3 ? ` и ещё ${riskyProjects.length - 3}` : '';
+    issues.push({
+      sev: riskyProjects.length >= 3 ? 'neg' : 'warn',
+      ic: '⚠️',
+      t: `${riskyProjects.length} ${riskyProjects.length===1?'проект под риском':'проекта под риском'}: ${names}${more}`,
+      s: 'Есть просрочки или застой более 2 недель',
+      action: 'Открыть',
+      onclick: `agNav('projects')`,
+    });
+  }
+
+  // Rework — если много переходов назад
+  const trans = (O.trans || 0) + (O.tTrans || 0);
+  const rework = (O.rework || 0) + (O.tRework || 0);
+  if (trans && rework/trans > 0.15){
+    const pct = Math.round(100*rework/trans);
+    issues.push({
+      sev: pct >= 25 ? 'neg' : 'warn',
+      ic: '↺',
+      t: `Высокий процент откатов: ${pct}% работ возвращаются на доработку`,
+      s: 'Смотрите Циклы чтобы понять на каких этапах откаты',
+      action: 'Циклы',
+      onclick: `agNav('cycles')`,
+    });
+  }
+
+  // Финансы: концентрация выручки
+  const active = P.filter(p => p.status !== 'done' && p.status !== 'blocked');
+  const mrrTotal = active.reduce((s,p) => s + (+p.mrr || 0), 0);
+  if (mrrTotal > 0){
+    const top = active.slice().sort((a,b) => (+b.mrr||0) - (+a.mrr||0))[0];
+    const topShare = Math.round(100*(+top.mrr||0)/mrrTotal);
+    if (topShare >= 40){
+      issues.push({
+        sev: topShare >= 60 ? 'neg' : 'warn',
+        ic: '💰',
+        t: `${topShare}% выручки — с одного клиента (${top.name})`,
+        s: 'Диверсифицируйте портфель — риск потерять крупного клиента',
+        action: 'Финансы',
+        onclick: `agNav('finance')`,
+      });
+    }
+  }
+
+  if (!issues.length){
+    box.innerHTML = `
+      <div class="kpi2-card-h">
+        <div class="kpi2-card-t">Что делать сейчас</div>
+      </div>
+      <div class="kpi2-issues-none"><b>Всё чисто</b> · нет активных проблем требующих внимания. Продолжайте в том же духе.</div>
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="kpi2-card-h">
+      <div class="kpi2-card-t">Что делать сейчас</div>
+      <div class="kpi2-card-c">${issues.length} ${issues.length===1?'точка внимания':'точек внимания'}</div>
+    </div>
+    <div class="kpi2-issues-list">
+      ${issues.map(i => `
+        <div class="kpi2-issue ${i.sev}">
+          <div class="kpi2-issue-ic">${i.ic}</div>
+          <div class="kpi2-issue-b"><div class="kpi2-issue-t">${i.t}</div><div class="kpi2-issue-s">${i.s}</div></div>
+          <button class="kpi2-issue-btn" onclick="${i.onclick}">${i.action} →</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+};
+
+/* Секция 3: цели агентства (простая версия) */
+window._kpi2FillGoals = async () => {
+  const box = document.getElementById('kpi2-goals'); if(!box) return;
+  const p = _kpi2.period;
+  if (!p){
+    box.innerHTML = `<div class="kpi2-card-h"><div class="kpi2-card-t">Мои цели</div></div><div class="kpi2-issues-none">Сначала создайте период — тогда сможете задать цели.</div>`;
+    return;
+  }
+  // Тянем все agency-цели по периоду
+  const targets = await kpiFetchTargets(p.id, { scope_kind: 'agency' });
+  const now = Date.now();
+  const startMs = new Date(p.start_date+'T00:00:00').getTime();
+  const endMs   = new Date(p.end_date  +'T23:59:59').getTime();
+  const pctTime = 100 * (now - startMs) / Math.max(1, endMs - startMs);
+
+  const goalHTML = async (t) => {
+    const M = KPI_METRICS[t.metric_key]; if(!M) return '';
+    // Текущее значение
+    const fnName = _kpiFnMap[t.metric_key] || '';
+    let cur = t.baseline;
+    try { const fn = window[fnName]; if(fn){ const r = await fn('agency', null); if(r && r.value != null) cur = r.value; } } catch(e){}
+    const total = (t.target || 0) - (t.baseline || 0);
+    const done  = (cur || 0) - (t.baseline || 0);
+    const progress = total === 0 ? (cur >= t.target ? 100 : 0) : Math.max(0, Math.min(100, Math.round(100*done/total)));
+    const onTrack = progress >= pctTime - 10;
+    const behind = progress < pctTime - 25;
+    const cls = onTrack ? 'pos' : behind ? 'neg' : 'warn';
+    const status = onTrack ? '✓ в темпе' : behind ? '⚠ отстаём' : '~ идём медленно';
+    const fmt = v => v==null?'—':(M.unit==='%'?Math.round(v*10)/10+'%':M.unit==='ч'?Math.round(v*10)/10+'ч':M.unit==='$'?'$'+Math.round(v):Math.round(v));
+    return `
+      <div class="kpi2-goal ${cls}">
+        <div class="kpi2-goal-t">${M.label}</div>
+        <div class="kpi2-goal-v">
+          <span class="kpi2-goal-cur">${fmt(cur)}</span>
+          <span class="kpi2-goal-arrow">→</span>
+          <span class="kpi2-goal-tgt">${fmt(t.target)}</span>
+        </div>
+        <div class="kpi2-goal-bar"><div class="kpi2-goal-fill" style="width:${progress}%"></div></div>
+        <div class="kpi2-goal-hint">
+          <span>прошло ${Math.round(pctTime)}% времени</span>
+          <span>·</span>
+          <span class="kpi2-goal-status">${status}</span>
+        </div>
+      </div>`;
+  };
+
+  const cards = await Promise.all(targets.filter(t => t.target != null).map(goalHTML));
+  const canEdit = kpiCan('set_target', 'agency', null);
+  box.innerHTML = `
+    <div class="kpi2-card-h">
+      <div class="kpi2-card-t">Мои цели · ${p.name}</div>
+      <div class="kpi2-card-c">до ${p.end_date}</div>
+    </div>
+    ${cards.length ? `<div class="kpi2-goals-list">${cards.join('')}</div>` : `<div class="kpi2-issues-none">Пока не задано ни одной цели. Задайте первую — увидим прогресс.</div>`}
+    ${canEdit ? `<button class="kpi2-add-goal" onclick="kpi2NewGoal()">+ Добавить цель</button>` : ''}
+  `;
+};
+
+/* Простая модалка добавления цели через prompt */
+window.kpi2NewGoal = async () => {
+  const p = _kpi2.period; if(!p) return;
+  const agencyKeys = Object.entries(KPI_METRICS).filter(([k,m]) => m.scope.includes('agency')).map(([k,m]) => ({k, m}));
+  const choices = agencyKeys.map((x, i) => `${i+1}. ${x.m.label}${x.m.dir==='down'?' (снижать)':' (повышать)'} — сейчас ${x.m.unit || 'ед.'}`).join('\n');
+  const idxStr = prompt('Что улучшаем?\n\n' + choices + '\n\nВведите номер:');
+  const idx = parseInt(idxStr, 10);
+  if (isNaN(idx) || idx < 1 || idx > agencyKeys.length) return;
+  const {k, m} = agencyKeys[idx-1];
+  const fnName = _kpiFnMap[k];
+  let baseline = null;
+  try { const fn = window[fnName]; if(fn){ const r = await fn('agency', null); if(r && r.value != null) baseline = r.value; } } catch(e){}
+  const baseStr = baseline==null?'':' (сейчас ' + baseline + (m.unit||'') + ')';
+  const tgtStr = prompt(`Какое значение хотим достичь к ${p.end_date}?${baseStr}\n\nВведите число:`);
+  if (!tgtStr) return;
+  const tgt = Number(String(tgtStr).replace(',', '.'));
+  if (isNaN(tgt)) { toast('Не число'); return; }
+  await kpiUpsertTarget({ period_id: p.id, scope_kind: 'agency', scope_id: null, metric_key: k, baseline: baseline, target: tgt });
+  if (typeof toast==='function') toast('Цель сохранена');
+  _kpi2FillGoals();
+};
+
+/* Секция 4: рейтинг сотрудников/команд/проектов */
+window._kpi2Score = async (scope, id) => {
+  const from = new Date(Date.now() - 30*86400000).toISOString();
+  const to   = new Date().toISOString();
+  const res = await kpiComputeOpsAll(scope, id, from, to);
+  const scores = [];
+  Object.entries(res).forEach(([k, r]) => {
+    if (r && r.value != null){
+      const s = kpiNormalize(k, r.value);
+      if (s != null) scores.push(s);
+    }
+  });
+  if (!scores.length) return null;
+  return Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+};
+
+window._kpi2Trend = async (scope, id) => {
+  const now = Date.now();
+  const [thisWeek, prevWeek] = await Promise.all([
+    kpiComputeOpsAll(scope, id, new Date(now - 7*86400000).toISOString(), new Date(now).toISOString()),
+    kpiComputeOpsAll(scope, id, new Date(now - 14*86400000).toISOString(), new Date(now - 7*86400000).toISOString()),
+  ]);
+  const avgOf = res => {
+    const arr = [];
+    Object.entries(res).forEach(([k,r]) => { if (r && r.value != null){ const s = kpiNormalize(k, r.value); if (s!=null) arr.push(s); } });
+    return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+  };
+  const tw = avgOf(thisWeek), pw = avgOf(prevWeek);
+  if (tw == null || pw == null) return { d:0, sign:'flat', txt:'—' };
+  const d = tw - pw;
+  return { d, sign: d > 2 ? 'pos' : d < -2 ? 'neg' : 'flat', txt: (d>0?'+':'')+Math.round(d) };
+};
+
+window._kpi2Stars = (score) => {
+  if (score == null) return '☆☆☆☆☆';
+  const n = score >= 90 ? 5 : score >= 75 ? 4 : score >= 55 ? 3 : score >= 35 ? 2 : 1;
+  return '★'.repeat(n) + '☆'.repeat(5 - n);
+};
+
+window._kpi2FillRanking = async (scope) => {
+  const box = document.getElementById('kpi2-ranking'); if(!box) return;
+  _kpi2.section4Tab = scope;
+  const rows = _kpiScopeRows(scope).slice(0, 20);
+  // Skeleton
+  box.innerHTML = `
+    <div class="kpi2-card-h">
+      <div class="kpi2-card-t">Кто как работает</div>
+      <div class="kpi2-card-c">оценка 0–100 по операционным метрикам за 30 дней</div>
+    </div>
+    <div class="kpi2-rank-tabs">
+      ${['member','team','project'].map(k => `<div class="kpi2-rank-tab${k===scope?' on':''}" onclick="_kpi2FillRanking('${k}')">${{member:'Сотрудники',team:'Команды',project:'Проекты'}[k]}</div>`).join('')}
+    </div>
+    <div class="kpi2-rank-list">
+      ${rows.length ? rows.map(() => `<div class="kpi2-rank-row"><div class="kpi2-rank-n">…</div><div class="kpi2-rank-av"></div><div class="kpi2-rank-nm"><b>…</b><span>…</span></div></div>`).join('') : `<div class="kpi2-empty">Нет данных для этого уровня</div>`}
+    </div>
+  `;
+  if (!rows.length) return;
+
+  const enriched = await Promise.all(rows.map(async r => {
+    const [score, trend] = await Promise.all([_kpi2Score(scope, r.id), _kpi2Trend(scope, r.id)]);
+    return { r, score, trend };
+  }));
+  enriched.sort((a,b) => (b.score ?? -1) - (a.score ?? -1));
+
+  const listEl = box.querySelector('.kpi2-rank-list');
+  const avatarHTML = r => r.avatarUrl && /^https?:\/\//i.test(r.avatarUrl)
+    ? `<div class="kpi2-rank-av"><img src="${r.avatarUrl}" onerror="this.remove()"></div>`
+    : `<div class="kpi2-rank-av" style="color:${r.color||'var(--accent)'}">${r.initials || '?'}</div>`;
+
+  listEl.innerHTML = enriched.map((e, i) => `
+    <div class="kpi2-rank-row">
+      <div class="kpi2-rank-n">${i+1}</div>
+      ${avatarHTML(e.r)}
+      <div class="kpi2-rank-nm">
+        <b>${e.r.name}</b>
+        <span>${e.r.subtitle||''}</span>
+      </div>
+      <div class="kpi2-rank-score">
+        <div class="kpi2-rank-stars">${_kpi2Stars(e.score)}</div>
+        <div class="kpi2-rank-num">${e.score==null?'—':e.score}</div>
+        <div class="kpi2-rank-trend ${e.trend.sign}">${e.trend.sign==='pos'?'↗':e.trend.sign==='neg'?'↘':'→'} ${e.trend.txt}</div>
+      </div>
+    </div>
+  `).join('');
+};
+
+/* ═══════════ /KPI v2 ═══════════ */
 </script>
 <script>
 /* ===== Премиум-слой: клавиатурная доступность + мобильная навигация ===== */
