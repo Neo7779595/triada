@@ -6700,7 +6700,7 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
     +opts.map(o=>`<button class="dd-opt ${curVal===o[0]?'on':''}" onclick="_closePops();${setter}('${_ddEsc(o[0])}')">${_ddH(o[1])}${ck}</button>`).join('')
     +`</div></div>`;
 }
-function _closePops(){ document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
+function _closePops(){ if(typeof _ddPortalRelease==='function'){ try{ _ddPortalRelease(); }catch(_){} } document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
 function _ddPortalRelease(){ document.querySelectorAll('.dd-menu.dd-portal').forEach(function(m){ var home=m.__ddHome; if(home && home.parentNode && document.body.contains(home)){ home.parentNode.insertBefore(m,home); home.parentNode.removeChild(home); m.__ddHome=null; m.classList.remove('dd-portal'); m.style.left=''; m.style.top=''; m.style.minWidth=''; } else { if(m.parentNode) m.parentNode.removeChild(m); } }); document.querySelectorAll('.dd.open').forEach(function(el){ el.classList.remove('open'); }); }
 function ddToggle(k){
   const el=document.getElementById('dd-'+k);if(!el)return;
@@ -6748,8 +6748,7 @@ function ddToggle(k){
   }
 }
 // Хук: когда _closePops убирает .open с .dd — вернуть меню в родителя
-var _prev_closePops=_closePops;
-_closePops=function(){ _ddPortalRelease(); return _prev_closePops.apply(this,arguments); };
+/* _closePops уже вызывает _ddPortalRelease напрямую */
 window.addEventListener('scroll',function(e){ if(!document.querySelector('.dd.open')) return; var t=e.target; if(t&&t.closest&&(t.closest('.dd-menu')||t.closest('.dd.open'))) return; _closePops(); },true);
 window.addEventListener('resize',function(){ if(document.querySelector('.dd.open')) _closePops(); });
 (function(){
