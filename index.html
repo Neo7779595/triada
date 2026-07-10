@@ -3178,6 +3178,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .np-team-btn:hover{border-color:var(--accent-line);color:var(--txt)}
 .np-team-btn svg{flex:none;width:16px;height:16px}
 .np-chips{display:flex;flex-wrap:wrap;gap:6px}
+/* Множественные ответственные — метка главного */
+.np-chip[data-main="1"]{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+.np-chip .np-chip-main{color:var(--accent);font-size:12px;margin-right:4px}
+.np-chip-star{background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:14px;padding:0 4px;line-height:1;margin-left:2px;transition:color .14s}
+.np-chip-star:hover{color:var(--accent)}
 .np-chip{display:inline-flex;align-items:center;gap:7px;padding:4px 6px 4px 4px;border:1px solid var(--line-2);border-radius:20px;font-size:13.5px;color:var(--txt)}
 .np-chip-av{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;overflow:hidden}
 .np-chip-av img{width:100%;height:100%;object-fit:cover}
@@ -6136,7 +6141,7 @@ function projSettings(i){
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pj-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
-      <div class="fld2">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}<div class="fld"><label>Ответственный</label>${selField('pj-lead',leadOpts,(p.lead_id||''))}</div></div>
+      <div class="fld">${tagCombo('pj-cat','Категория (тег)',cats,(p.cat==='—'?'':p.cat),'Выбери или создай','category')}</div><div class="fld"><label>Ответственные <small style="color:var(--txt-3);font-weight:400;margin-left:6px">первый в списке — главный</small></label><div id="pj-leads" class="np-team"></div></div>
       <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML(false)}</div>
       <div class="fld"><label>Команда проекта</label><div id="np-team" class="np-team"></div></div>
       <div class="fld"><label>Срок договора</label><div class="np-ct" id="np-contract">
@@ -6155,6 +6160,11 @@ function projSettings(i){
     </div>
     <div class="modal-f">${agIsOwner()?`<button class="btn-ghost" style="margin-right:auto;color:var(--neg)" onclick="pjDeleteProject(${i})">Удалить</button>`:''}<button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjSaveSettings(${i})">Сохранить</button></div></div>`);
   window.NP_TEAM=new Set((((p&&p._team)||[]).map(t=>t._id)));
+  // Инициализируем список ответственных: сохраняем порядок массива p.leads (первый = главный).
+  var _pLeads=Array.isArray(p&&p.leads)?p.leads.slice():[];
+  if(!_pLeads.length && p&&p.lead_id) _pLeads=[p.lead_id];
+  window.NP_LEADS=_pLeads.slice();
+  if(typeof pjRenderLeads==='function') pjRenderLeads();
   if(typeof npRenderTeam==='function') npRenderTeam();
   if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_members').select('member_id').eq('project_id',p.id).then(r=>{ if(r&&r.data){ window.NP_TEAM=new Set(r.data.map(x=>x.member_id)); if(typeof npRenderTeam==='function') npRenderTeam(); } }); }catch(_e){} }
   npContractInit();
@@ -6168,7 +6178,7 @@ async function pjSaveSettings(i){
   const svcsArr=svcCollect(); const prim=svcPrimary(svcsArr); const tot=svcTotals(svcsArr);
   var _hiddenCl=[];
   document.querySelectorAll('#pj-clvis .cl-vis-tog').forEach(function(b){ if(!b.classList.contains('on')) _hiddenCl.push(b.dataset.mk); });
-  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:(prim.service||p.svc||'—'), tariff:(prim.tariff||null), mrr:tot.mrr, cost:tot.cost, lead_id:(_v('pj-lead')||null), status, cl_hidden:_hiddenCl };
+  var _leadsArr=Array.isArray(window.NP_LEADS)?window.NP_LEADS.slice():[]; const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:(prim.service||p.svc||'—'), tariff:(prim.tariff||null), mrr:tot.mrr, cost:tot.cost, lead_id:(_leadsArr[0]||null), leads:_leadsArr, status, cl_hidden:_hiddenCl };
   if(status==='done'&&p.status!=='done')patch.closed_at=new Date().toISOString(); else if(status==='active')patch.closed_at=null;
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():null);
   const ctTerm={start:_v('np-cstart')||null, end:_v('np-cend')||null};
@@ -6187,7 +6197,7 @@ async function pjSaveSettings(i){
     return;
   }
   if(selTeam){ p._team=selTeam.map(id=>{ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:id}:null; }).filter(Boolean); }
-  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.mrr=patch.mrr; p.cost=patch.cost; p._svcs=svcsArr; p.lead_id=patch.lead_id; p._lead=null; p.status=status; p.cl_hidden=patch.cl_hidden||[];
+  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.mrr=patch.mrr; p.cost=patch.cost; p._svcs=svcsArr; p.lead_id=patch.lead_id; p._lead=null; p.status=status; p.cl_hidden=patch.cl_hidden||[]; p.leads=patch.leads||[];
   pd2Close(); renderProjects(); toast('Проект обновлён');
 }
 function pjDoReactivate(){
@@ -6464,6 +6474,66 @@ function npSelectedStages(){ return (window.NP_STAGES||[]).map(s=>(s.name||'').t
 window.npReseedLast=async()=>{ const p=window._npPendingSeed; if(!p){toast('Нет ожидающего засева');return;} const ok=await window.tStageSeed(p.id,p.names); if(ok){ window._npPendingSeed=null; } };
 
 /* ——— project team picker (Фаза 2.2 · вариант C: окно выбора) ——— */
+function pjRenderLeads(){
+  var box=document.getElementById('pj-leads'); if(!box) return;
+  var team=(typeof TEAM!=='undefined'?TEAM:[]);
+  var sel=window.NP_LEADS||[];
+  var chips=sel.map(function(id,i){
+    var m=team.find(function(x){return String(x._id)===String(id);}); if(!m) return '';
+    var c=m.color||'#37E6C8';
+    var main=i===0?'<span class="np-chip-main" title="Главный ответственный">★</span>':'';
+    return '<span class="np-chip"'+(i===0?' data-main="1"':'')+'>'
+      +main
+      +'<span class="np-chip-av" style="background:'+c+'22;color:'+c+'">'+(m.avatar?('<img src="'+String(m.avatar).replace(/"/g,'')+'" alt="">'):_ddH((m.name||'?').trim().charAt(0).toUpperCase()))+'</span>'
+      +_ddH(m.name||'—')
+      +(i>0?'<button type="button" class="np-chip-star" title="Сделать главным" onclick="pjLeadMakePrimary(\''+m._id+'\')">☆</button>':'')
+      +'<button type="button" class="np-chip-x" onclick="pjLeadRemove(\''+m._id+'\')">×</button></span>';
+  }).join('');
+  box.innerHTML='<button type="button" class="np-team-btn" onclick="pjLeadsPickerOpen()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 19a6 6 0 0112 0"/><path d="M16 6.5a3 3 0 010 5.5M21 19a6 6 0 00-4-5.6"/></svg>'+(sel.length?('Ответственные: '+sel.length+' — изменить'):'Выбрать ответственных')+'</button>'+(chips?('<div class="np-chips">'+chips+'</div>'):'');
+}
+function pjLeadRemove(id){ var arr=window.NP_LEADS||[]; window.NP_LEADS=arr.filter(function(x){return String(x)!==String(id);}); pjRenderLeads(); }
+function pjLeadMakePrimary(id){ var arr=(window.NP_LEADS||[]).slice(); var idx=arr.findIndex(function(x){return String(x)===String(id);}); if(idx<0)return; arr.splice(idx,1); arr.unshift(id); window.NP_LEADS=arr; pjRenderLeads(); }
+function pjLeadsPickerOpen(){
+  var ov=document.getElementById('ov-npteam'); if(!ov) return;
+  var team=(typeof TEAM!=='undefined'?TEAM:[]);
+  window._pjLeadsWork=new Set(window.NP_LEADS||[]);
+  var chipsHtml='<button type="button" class="np-pick-dept on" data-d="all" onclick="pjLeadsPickDept(this)">Все</button>'
+    +'<button type="button" class="np-pick-dept" data-d="pm" onclick="pjLeadsPickDept(this)">Только PM</button>';
+  window._pjLeadsDept='all';
+  ov.innerHTML='<div class="modal"><div class="modal-h"><h3>Ответственные проекта</h3><p>Можно выбрать несколько · первый = главный</p></div>'
+    +'<div class="modal-b"><input id="pj-leads-q" class="np-pick-q" placeholder="Поиск по имени или роли" oninput="pjLeadsPickerRender()">'
+    +'<div class="np-pick-depts">'+chipsHtml+'</div><div id="pj-leads-list" class="np-pick-list"></div></div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="pjLeadsPickerClose()">Отмена</button><button class="btn-add" onclick="pjLeadsPickerDone()">Готово<span id="pj-leads-cnt"></span></button></div></div>';
+  ov.classList.add('on'); pjLeadsPickerRender();
+  setTimeout(function(){var q=document.getElementById('pj-leads-q'); if(q)q.focus();},30);
+}
+function pjLeadsPickDept(el){ window._pjLeadsDept=el.dataset.d; document.querySelectorAll('#ov-npteam .np-pick-dept').forEach(function(b){b.classList.toggle('on', b===el);}); pjLeadsPickerRender(); }
+function pjLeadsPickerRender(){
+  var list=document.getElementById('pj-leads-list'); if(!list) return;
+  var team=(typeof TEAM!=='undefined'?TEAM:[]); var work=window._pjLeadsWork||(window._pjLeadsWork=new Set());
+  var q=((document.getElementById('pj-leads-q')||{}).value||'').trim().toLowerCase();
+  var mode=window._pjLeadsDept||'all';
+  var ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  var rows=team.filter(function(m){
+    if(mode==='pm' && !m.is_pm) return false;
+    if(q && !((m.name||'').toLowerCase().indexOf(q)>=0||(m.role||'').toLowerCase().indexOf(q)>=0)) return false;
+    return true;
+  });
+  if(!rows.length){ list.innerHTML='<div class="np-team-empty">Никого не найдено</div>'; pjLeadsPickCount(); return; }
+  list.innerHTML=rows.map(function(m){var c=m.color||'#37E6C8'; var on=work.has(m._id); return '<button type="button" class="np-pick-row'+(on?' on':'')+'" onclick="pjLeadsTogglePick(\''+m._id+'\')"><span class="np-pick-av" style="background:'+c+'22;color:'+c+'">'+(m.avatar?('<img src="'+String(m.avatar).replace(/"/g,'')+'" alt="">'):_ddH((m.name||'?').trim().charAt(0).toUpperCase()))+'</span><span class="np-pick-nm"><b>'+_ddH(m.name||'—')+'</b><span>'+_ddH(m.role||'—')+(m.is_pm?' · PM':'')+'</span></span>'+(on?'<span class="np-pick-ck">'+ck+'</span>':'')+'</button>';}).join('');
+  pjLeadsPickCount();
+}
+function pjLeadsTogglePick(id){ var w=window._pjLeadsWork; if(w.has(id))w.delete(id); else w.add(id); pjLeadsPickerRender(); }
+function pjLeadsPickCount(){ var n=(window._pjLeadsWork&&window._pjLeadsWork.size)||0; var el=document.getElementById('pj-leads-cnt'); if(el)el.textContent=n?(' · '+n):''; }
+function pjLeadsPickerClose(){ var ov=document.getElementById('ov-npteam'); if(ov)ov.classList.remove('on'); ov.innerHTML=''; }
+function pjLeadsPickerDone(){
+  // Синхронизируем NP_LEADS с выбором, сохраняя старый порядок для оставшихся
+  var picked=Array.from(window._pjLeadsWork||[]);
+  var old=(window.NP_LEADS||[]).filter(function(id){return picked.indexOf(id)>=0;});
+  var added=picked.filter(function(id){return old.indexOf(id)<0;});
+  window.NP_LEADS=old.concat(added);
+  pjLeadsPickerClose(); pjRenderLeads();
+}
 function npTeamReset(){ window.NP_TEAM=new Set(); npRenderTeam(); }
 function npSelectedTeam(){ return [...(window.NP_TEAM||new Set())]; }
 function npChipRemove(id){ const s=window.NP_TEAM; if(s)s.delete(id); npRenderTeam(); }
@@ -16372,7 +16442,7 @@ const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.ver
 const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
   logoUrl:p.logo_url||'', cat:p.category||'—', svc:p.service||'SMM', pct:p.pct||0,
   stages:(p.stages_done||0)+' / '+(p.stages_total||6), health:p.health||'В норме',
-  dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]) });
+  dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]), leads:Array.isArray(p.leads)?p.leads:(typeof p.leads==='string'?(function(){try{return JSON.parse(p.leads)||[];}catch(_){return [];}})():[]) });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
   login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, perms:m.permissions||{}, _id:m.id });
