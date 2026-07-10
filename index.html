@@ -18209,6 +18209,15 @@ window._kpiShellHTML = () => {
       /* Таб-текст немного плотнее */
       .kpi-tab{padding:7px 12px;font-size:12.5px}
 
+/* KPI · переключатель категорий */
+.kpi-catbar{display:inline-flex;gap:3px;padding:3px;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;flex-wrap:wrap}
+.kpi-catchip{padding:7px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s var(--ease-out);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.kpi-catchip:hover{color:var(--txt-1)}
+.kpi-catchip.on{background:var(--panel-2);color:var(--txt-1);box-shadow:0 0 0 1px rgba(138,143,255,.15)}
+.kpi-catchip-n{font-family:var(--mono);font-size:10.5px;padding:1px 6px;background:rgba(255,255,255,.05);border-radius:5px;color:var(--txt-3);font-weight:600}
+.kpi-catchip.on .kpi-catchip-n{color:var(--accent);background:rgba(55,230,200,.1)}
+#kpi-catbar-wrap{margin-top:-6px}
+
 /* KPI · badge в сайдбаре */
 .kpi-nav-badge{margin-left:auto;background:var(--warn);color:#241900;padding:1px 7px;border-radius:8px;font-size:10.5px;font-weight:700;font-family:var(--mono);line-height:1.35;box-shadow:0 0 0 1.5px var(--bg)}
 .kpi-nav-badge.crit{background:var(--neg);color:#fff;animation:kpiPulse 2.4s ease-in-out infinite}
@@ -20557,6 +20566,89 @@ window._kpiMemberName = (id) => {
 };
 
 /* ═══════════ /KPI PHASE 8 ═══════════ */
+
+/* ═══════════ KPI · разделение метрик TPI / SMM ═══════════
+   Категорийный фильтр колонок над блоками. По умолчанию TPI.
+   Если применима одна категория (member, agency без SMM-данных) — фильтр скрыт.
+*/
+_kpiState.metricCat = _kpiState.metricCat || 'ops';
+
+/* Обёртка над _kpiScopeMetricKeys: применяем категорийный фильтр */
+const _kpiOrigScopeMetricKeys = window._kpiScopeMetricKeys;
+window._kpiScopeMetricKeys = (scope) => {
+  const all = _kpiOrigScopeMetricKeys(scope);
+  const cat = _kpiState.metricCat;
+  if (cat === 'all') return all;
+  return all.filter(k => (KPI_METRICS[k]||{}).category === cat);
+};
+
+/* Переключатель */
+window.kpiSetMetricCat = (c) => {
+  _kpiState.metricCat = c;
+  _kpiState._currentCacheKey = null;   // сбросить currents
+  const bar = document.getElementById('kpi-catbar-wrap');
+  if (bar) bar.innerHTML = _kpiCatChipBar();
+  _kpiRenderBody();
+};
+
+/* HTML чипов */
+window._kpiCatChipBar = () => {
+  const st = _kpiState;
+  const allKeys = _kpiOrigScopeMetricKeys(st.scope);
+  const hasOps = allKeys.some(k => (KPI_METRICS[k]||{}).category === 'ops');
+  const hasSmm = allKeys.some(k => (KPI_METRICS[k]||{}).category === 'smm');
+  if (!hasOps || !hasSmm) return '';   // одна категория — переключатель не нужен
+  const chips = [
+    { k:'ops', l:'TPI · операционные', n: allKeys.filter(k => KPI_METRICS[k].category==='ops').length },
+    { k:'smm', l:'SMM · соцсети',      n: allKeys.filter(k => KPI_METRICS[k].category==='smm').length },
+    { k:'all', l:'Всё вместе',          n: allKeys.length },
+  ];
+  return `<div class="kpi-catbar">
+    ${chips.map(c => `<div class="kpi-catchip${c.k===st.metricCat?' on':''}" onclick="kpiSetMetricCat('${c.k}')">${c.l} <span class="kpi-catchip-n">${c.n}</span></div>`).join('')}
+  </div>`;
+};
+
+/* Хук в _kpiRenderBody — вставляем chip-bar перед kpi-body */
+const _kpiOrigRB = window._kpiRenderBody;
+window._kpiRenderBody = async () => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body');
+  if (body){
+    let bar = document.getElementById('kpi-catbar-wrap');
+    const html = (st.scope === 'settings') ? '' : _kpiCatChipBar();
+    if (html){
+      if (!bar){
+        bar = document.createElement('div');
+        bar.id = 'kpi-catbar-wrap';
+        body.parentNode.insertBefore(bar, body);
+      }
+      bar.innerHTML = html;
+    } else if (bar){
+      bar.remove();
+    }
+  }
+  return _kpiOrigRB();
+};
+
+/* Смена scope сбрасывает категорию если она неприменима */
+const _kpiOrigSetScope2 = window.kpiSetScope;
+window.kpiSetScope = (k) => {
+  const r = _kpiOrigSetScope2(k);
+  // если новая scope не имеет текущей категории — переключаем на первую доступную
+  setTimeout(() => {
+    const allKeys = _kpiOrigScopeMetricKeys(_kpiState.scope);
+    const has = allKeys.some(kk => (KPI_METRICS[kk]||{}).category === _kpiState.metricCat);
+    if (!has && allKeys.length){
+      const firstCat = (KPI_METRICS[allKeys[0]]||{}).category;
+      if (firstCat) _kpiState.metricCat = firstCat;
+      _kpiRenderBody();
+    }
+  }, 0);
+  return r;
+};
+/* ═══════════ /KPI · разделение метрик ═══════════ */
+
+
 
 
 
