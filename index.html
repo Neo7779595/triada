@@ -18044,6 +18044,8 @@ window.renderKPI = async () => {
   const st = _kpiState;
   // Гарантируем TEAM/PROJECTS
   if (!window._teamRaw && window.tLoadTeam) await window.tLoadTeam().catch(()=>{});
+  // Автосохранение снапшотов (не чаще раз в час)
+  if (typeof _kpiAutoSnapshot === 'function') _kpiAutoSnapshot();
   // Каркас
   document.getElementById('content-ag').innerHTML = _kpiShellHTML();
   await _kpiPickCurrentPeriod();
@@ -18159,6 +18161,27 @@ window._kpiShellHTML = () => {
       .kpi-risk-mit b{color:var(--violet)}
       .kpi-risk-meta{display:flex;gap:14px;font-size:11.5px;color:var(--txt-3);margin-top:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid rgba(255,255,255,.04)}
       .kpi-risk-meta b{color:var(--txt-1)}
+/* Прогноз */
+      .kpi-fc-cell{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:90px}
+      .kpi-fc-val{font-family:var(--mono);font-weight:700;font-size:13px}
+      .kpi-fc-hint{font-size:10.5px;color:var(--txt-3);font-family:var(--mono)}
+      /* Мониторинг */
+      .kpi-alerts{display:flex;flex-direction:column;gap:8px}
+      .kpi-alert{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;transition:border-color .16s}
+      .kpi-alert:hover{border-color:rgba(255,255,255,.1)}
+      .kpi-alert-l{flex:none}
+      .kpi-alert-b{flex:1;min-width:0}
+      .kpi-alert-t{font-size:13px;font-weight:600;color:var(--txt-1);line-height:1.4;overflow:hidden;text-overflow:ellipsis}
+      .kpi-alert-m{font-size:11px;color:var(--txt-3);margin-top:3px;font-family:var(--mono)}
+      .kpi-alert-r{display:flex;gap:6px;flex:none}
+      .kpi-alert-btn{padding:6px 11px;font-size:11.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:7px;color:var(--txt-2);cursor:pointer;transition:all .14s;white-space:nowrap}
+      .kpi-alert-btn:hover{background:var(--bg);color:var(--txt-1);border-color:rgba(138,143,255,.25)}
+      /* Статистика */
+      .kpi-st-cell{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:90px}
+      .kpi-st-row{display:flex;align-items:baseline;gap:6px;font-family:var(--mono);font-size:12.5px}
+      .kpi-st-cur{font-weight:700}
+      .kpi-st-delta{font-weight:600}
+      .kpi-st-hint{font-size:10.5px;color:var(--txt-3);font-family:var(--mono)}
     </style>
     <div class="kpi-wrap">
       <div class="kpi-hero">
@@ -18236,6 +18259,9 @@ window._kpiRenderBody = async () => {
   if (st.block === 'goal')     return _kpiBlkTargetLike(period, 'target');
   if (st.block === 'min')      return _kpiBlkTargetLike(period, 'minimum');
   if (st.block === 'rpmrmp')   return _kpiBlkRPMRMP(period);
+  if (st.block === 'forecast') return _kpiBlkForecast(period);
+  if (st.block === 'monitor')  return _kpiBlkMonitor(period);
+  if (st.block === 'stats')    return _kpiBlkStats(period);
   body.innerHTML = `<div class="kpi-empty"><h4>Блок в разработке</h4><p>Здесь появится содержимое следующего блока — соберём после того как утвердим стилистику блока «Точка А».</p></div>`;
 };
 
@@ -18702,6 +18728,535 @@ window.kpiRiskMenu = async (riskId, e) => {
 };
 
 /* ═══════════ /KPI BLOCKS 2–4 ═══════════ */
+
+/* ═══════════ KPI PHASE 4 · Snapshots + Forecast + Monitor + Stats ═══════════ */
+
+/* ── SNAPSHOT WRITER ── */
+/* Идемпотентно: сохраняем снапшот раз в день на scope+metric.
+   Проверяем последний снапшот и не пишем если он уже сегодня. */
+window._kpiSnapshotCache = window._kpiSnapshotCache || { key:null, ts:0, map:null };
+
+window._kpiHasSnapshotToday = async (scopeKind, scopeId, metricKey) => {
+  if(!SB || !ME) return false;
+  const today = new Date().toISOString().slice(0,10);
+  let q = SB.from('kpi_snapshots').select('taken_at').eq('scope_kind', scopeKind).eq('metric_key', metricKey).gte('taken_at', today+'T00:00:00').lte('taken_at', today+'T23:59:59').limit(1);
+  if (scopeId != null) q = q.eq('scope_id', scopeId); else q = q.is('scope_id', null);
+  const { data } = await q;
+  return !!(data && data.length);
+};
+
+/* Массовое сохранение снапшотов для всех member scope + agency */
+window.kpiSaveSnapshotsAll = async () => {
+  if(!SB || !ME) return { saved:0, skipped:0 };
+  const now = new Date();
+  const toISO = now.toISOString();
+  const fromISO = new Date(now.getTime() - 7*86400000).toISOString();
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const opsKeys = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  let saved = 0, skipped = 0;
+  // Сотрудники
+  for (const m of TM){
+    const uid = m._id || m.id; if(!uid) continue;
+    const res = await kpiComputeOpsAll('member', uid, fromISO, toISO);
+    for (const k of opsKeys){
+      const v = res[k]; if(!v || v.value == null) continue;
+      const has = await _kpiHasSnapshotToday('member', uid, k);
+      if (has){ skipped++; continue; }
+      await kpiSaveSnapshot({ scope_kind:'member', scope_id:uid, metric_key:k, value:v.value, sample_size:v.sample_size, source:'auto', granularity:'day' });
+      saved++;
+    }
+  }
+  // Агентство — тоже (для портфельных)
+  const agRes = await kpiComputeOpsAll('agency', null, fromISO, toISO);
+  for (const k of opsKeys){
+    const v = agRes[k]; if(!v || v.value == null) continue;
+    const has = await _kpiHasSnapshotToday('agency', null, k);
+    if (has){ skipped++; continue; }
+    await kpiSaveSnapshot({ scope_kind:'agency', scope_id:null, metric_key:k, value:v.value, sample_size:v.sample_size, source:'auto', granularity:'day' });
+    saved++;
+  }
+  return { saved, skipped };
+};
+
+/* Автозапуск: не чаще раз в час на клиента */
+window._kpiAutoSnapshot = async () => {
+  const key = 'kpi:lastAutoSnap:'+((ME&&ME.id)||'anon');
+  const last = +localStorage.getItem(key) || 0;
+  if (Date.now() - last < 3600000) return;   // раз в час
+  localStorage.setItem(key, String(Date.now()));
+  try {
+    const r = await kpiSaveSnapshotsAll();
+    if (r.saved > 0) console.log('[KPI] snapshots saved:', r.saved, 'skipped:', r.skipped);
+  } catch(e){ console.warn('[KPI] auto-snapshot failed', e); }
+};
+
+/* ── SERIES: массив снапшотов по метрике в scope с шагом day ── */
+window._kpiSeriesCache = { key:null, ts:0, data:null };
+
+/* Считаем «текущее» = последний свежий снапшот; если его нет — свежий полнорасчёт */
+window._kpiCurrentValue = async (scopeKind, scopeId, metricKey, period) => {
+  if(!SB) return null;
+  // Ищем свежий снапшот (за последние 3 дня)
+  const from = new Date(Date.now() - 3*86400000).toISOString();
+  const snaps = await kpiFetchSnapshots(scopeKind, scopeId, metricKey, from);
+  if (snaps.length){ return snaps[snaps.length-1].value; }
+  // Fallback: считаем на лету за прошедшую часть периода
+  const now = new Date().toISOString();
+  const startPeriod = new Date(period.start_date+'T00:00:00').toISOString();
+  const fromISO = startPeriod < now ? startPeriod : new Date(Date.now()-7*86400000).toISOString();
+  const fnMap = { cycle_time:'kpiComputeCycleTime', ontime_rate:'kpiComputeOnTimeRate', rework_rate:'kpiComputeReworkRate', throughput_w:'kpiComputeThroughputWeighted', review_response:'kpiComputeReviewResponse' };
+  const fn = window[fnMap[metricKey]]; if(!fn) return null;
+  const r = await fn(scopeKind, scopeId, fromISO, now);
+  return r && r.value;
+};
+
+/* Забираем цепочку current-значений для всех member+metric — одним пакетом с кэшем */
+window._kpiLoadCurrents = async (period) => {
+  const st = _kpiState;
+  const key = `${period.id}|currents|${st.scope}`;
+  if (st._currentCacheKey === key && st.currents) return st.currents;
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const out = {};
+  await Promise.all(TM.map(async m => {
+    const uid = m._id || m.id; if(!uid) return;
+    out[uid] = {};
+    await Promise.all(metrics.map(async k => {
+      out[uid][k] = await _kpiCurrentValue('member', uid, k, period);
+    }));
+  }));
+  st.currents = out;
+  st._currentCacheKey = key;
+  return out;
+};
+
+/* Обновлённый RPM с реальным current из snapshots */
+window._kpiRenderRPM = async (period) => {
+  const cont = document.getElementById('kpi-rmp-content'); if(!cont) return;
+  const st = _kpiState;
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const baselines = st.baselines[period.id] || {};
+  const currents = await _kpiLoadCurrents(period);
+  const now = Date.now();
+  const startMs = new Date(period.start_date+'T00:00:00').getTime();
+  const endMs   = new Date(period.end_date  +'T23:59:59').getTime();
+  const totalDays = Math.max(1, Math.round((endMs-startMs)/86400000));
+  const elapsedDays = Math.max(0, Math.min(totalDays, Math.round((now-startMs)/86400000)));
+  const remainingDays = Math.max(0, totalDays-elapsedDays);
+  const pct = totalDays ? Math.round(100*elapsedDays/totalDays) : 0;
+  const initials = (nm) => (nm||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+
+  const rowHTML = (m) => {
+    const uid = m._id || m.id;
+    return `
+      <tr>
+        <td><div class="kpi-nameC">
+          <div class="kpi-av" style="${m.avatar_url?'background:transparent':''}">${m.avatar_url?`<img src="${m.avatar_url}">`:initials(m.name||m.full_name)}</div>
+          <div><div class="kpi-nm">${m.name||m.full_name||'—'}</div><div class="kpi-nsub">${m.dept||m.role_title||'—'}</div></div>
+        </div></td>
+        ${metrics.map(k => {
+          const base = ((baselines[uid]||{})[k]||{}).value;
+          const tgt = _kpiGetTgt(period.id, 'member', uid, k) || {};
+          const target = tgt.target;
+          const cur = (currents[uid] && currents[uid][k] != null) ? currents[uid][k] : base;
+          if (base == null || target == null){
+            return `<td class="num"><span class="kpi-cell" style="color:var(--txt-3)">${target==null?'нет цели':'нет базы'}</span></td>`;
+          }
+          const M = KPI_METRICS[k];
+          const totalDelta = target - base;
+          const currentDelta = cur - base;
+          const progress = totalDelta === 0 ? 100 : Math.max(0, Math.min(100, Math.round(100*currentDelta/totalDelta)));
+          const onTrack = progress >= pct;
+          const color = onTrack ? 'var(--pos)' : progress >= pct-15 ? 'var(--warn)' : 'var(--neg)';
+          const status = onTrack ? 'в темпе' : progress >= pct-15 ? 'отстаём' : 'риск срыва';
+          return `<td class="num">
+            <div class="kpi-rpm-cell">
+              <div class="kpi-rpm-val">${_kpiFmt(k, cur)} <span class="kpi-rpm-arrow">→</span> <span style="color:var(--txt-3)">${_kpiFmt(k, target)}</span></div>
+              <div class="kpi-rpm-bar"><div class="kpi-rpm-fill" style="width:${progress}%;background:${color}"></div><div class="kpi-rpm-mark" style="left:${pct}%"></div></div>
+              <div class="kpi-rpm-hint" style="color:${color}">${status} · ${progress}% при ${pct}%</div>
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  const noTargets = TM.every(m => { const uid = m._id||m.id; return metrics.every(k => !(_kpiGetTgt(period.id,'member',uid,k)||{}).target); });
+  if (noTargets){ cont.innerHTML = `<div class="kpi-empty" style="padding:36px 20px"><h4>Целей ещё нет</h4><p>Задайте цели на вкладке «Цель» — тогда RPM покажет темп движения к ним.</p></div>`; return; }
+
+  cont.innerHTML = `
+    <div class="kpi-rpm-head">
+      <div class="kpi-rpm-clock">
+        <div class="kpi-rpm-clock-l"><b>Прошло ${elapsedDays}</b> из ${totalDays} дней · осталось <b>${remainingDays}</b> · <span style="color:var(--accent)">${pct}%</span></div>
+        <div class="kpi-rpm-clock-bar"><div class="kpi-rpm-clock-fill" style="width:${pct}%"></div></div>
+      </div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table kpi-table-rpm">
+        <thead><tr><th>Сотрудник</th>${metrics.map(k => `<th class="num">${KPI_METRICS[k].label}</th>`).join('')}</tr></thead>
+        <tbody>${TM.map(rowHTML).join('')}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;color:var(--txt-3);padding:0 4px;line-height:1.5">
+      Заливка = % пути к цели, вертикальная риска = % времени. Если заливка левее риски — отстаём.
+    </div>
+  `;
+};
+
+/* ── СЕРИЯ (для Прогноза): скользящие окна по метрике ── */
+window.kpiComputeMetricSeries = async (scopeKind, scopeId, metricKey, weeks) => {
+  const fnMap = { cycle_time:'kpiComputeCycleTime', ontime_rate:'kpiComputeOnTimeRate', rework_rate:'kpiComputeReworkRate', throughput_w:'kpiComputeThroughputWeighted', review_response:'kpiComputeReviewResponse' };
+  const fn = window[fnMap[metricKey]]; if(!fn) return [];
+  const now = Date.now();
+  const points = [];
+  for (let i = weeks; i > 0; i--){
+    const to   = new Date(now - (i-1)*7*86400000);
+    const from = new Date(now - i*7*86400000);
+    const r = await fn(scopeKind, scopeId, from.toISOString(), to.toISOString());
+    points.push({ at: to.toISOString().slice(0,10), value: r && r.value, n: r && r.sample_size });
+  }
+  return points;
+};
+
+/* Линейная экстраполяция points → forecast к концу периода */
+window._kpiLinearForecast = (points, targetDate) => {
+  const valid = points.filter(p => p.value != null && !isNaN(p.value));
+  if (valid.length < 2) return null;
+  const t0 = new Date(valid[0].at).getTime();
+  const xs = valid.map(p => (new Date(p.at).getTime() - t0)/86400000);
+  const ys = valid.map(p => p.value);
+  const n = xs.length;
+  const sx = xs.reduce((s,x)=>s+x,0), sy = ys.reduce((s,y)=>s+y,0);
+  const sxx = xs.reduce((s,x)=>s+x*x,0), sxy = xs.reduce((s,x,i)=>s+x*ys[i],0);
+  const denom = n*sxx - sx*sx; if (denom === 0) return valid[valid.length-1].value;
+  const slope = (n*sxy - sx*sy)/denom;
+  const intercept = (sy - slope*sx)/n;
+  const dt = (new Date(targetDate).getTime() - t0)/86400000;
+  return intercept + slope*dt;
+};
+
+/* SVG-спарклайн */
+window._kpiSpark = (points, opts) => {
+  opts = opts || {};
+  const w = opts.w || 100, h = opts.h || 24;
+  const valid = points.filter(p => p.value != null);
+  if (!valid.length) return `<svg width="${w}" height="${h}"></svg>`;
+  const vals = valid.map(p => p.value);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = max - min || 1;
+  const step = w / Math.max(1, valid.length-1);
+  const pts = valid.map((p,i) => `${(i*step).toFixed(1)},${(h-2 - ((p.value-min)/range)*(h-4)).toFixed(1)}`).join(' ');
+  const color = opts.color || 'var(--accent)';
+  const last = valid[valid.length-1];
+  const lastY = h-2 - ((last.value-min)/range)*(h-4);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="overflow:visible">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="${((valid.length-1)*step).toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.2" fill="${color}"/>
+  </svg>`;
+};
+
+/* ── БЛОК 5: Прогноз ── */
+window._kpiBlkForecast = async (period) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  if (st.scope !== 'member'){
+    body.innerHTML = `<div class="kpi-body-head"><div class="kpi-body-h">Прогноз</div><div class="kpi-body-sub">Для этого уровня блок появится следом.</div></div><div class="kpi-empty">Скоро</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Прогноз · сотрудники</div>
+      <div class="kpi-body-sub">Тренд за 8 недель + линейная экстраполяция к концу периода (<b>${period.end_date}</b>). Сравнение с целью: попадём/не попадём и на сколько.</div>
+    </div>
+    <div class="kpi-empty" id="kpi-fc-loading">Считаем ряды за 8 недель…</div>
+  `;
+  await _kpiLoadTargets(period.id, 'member');
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const grid = {};
+  // Считаем последовательно чтобы не заваливать БД
+  for (const m of TM){
+    const uid = m._id || m.id; if(!uid) continue;
+    grid[uid] = {};
+    for (const k of metrics){
+      grid[uid][k] = await kpiComputeMetricSeries('member', uid, k, 8);
+    }
+  }
+  _kpiRenderForecast(period, grid);
+};
+
+window._kpiRenderForecast = (period, grid) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const st = _kpiState;
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const initials = (nm) => (nm||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+
+  const rowHTML = (m) => {
+    const uid = m._id || m.id;
+    return `
+      <tr>
+        <td><div class="kpi-nameC">
+          <div class="kpi-av" style="${m.avatar_url?'background:transparent':''}">${m.avatar_url?`<img src="${m.avatar_url}">`:initials(m.name||m.full_name)}</div>
+          <div><div class="kpi-nm">${m.name||m.full_name||'—'}</div><div class="kpi-nsub">${m.dept||m.role_title||'—'}</div></div>
+        </div></td>
+        ${metrics.map(k => {
+          const pts = (grid[uid]||{})[k] || [];
+          const tgt = _kpiGetTgt(period.id, 'member', uid, k) || {};
+          const forecast = _kpiLinearForecast(pts, period.end_date + 'T23:59:59');
+          const M = KPI_METRICS[k];
+          const good = tgt.target != null && forecast != null
+            ? (M.dir === 'up' ? forecast >= tgt.target : forecast <= tgt.target)
+            : null;
+          const color = good===true ? 'var(--pos)' : good===false ? 'var(--warn)' : 'var(--txt-3)';
+          const badge = tgt.target == null ? '' : good===true ? '✓ попадём' : good===false ? '✗ мимо' : '?';
+          const delta = (tgt.target != null && forecast != null) ? (forecast - tgt.target) : null;
+          return `<td class="num">
+            <div class="kpi-fc-cell">
+              ${_kpiSpark(pts, {w:88, h:22, color})}
+              <div class="kpi-fc-val" style="color:${color}">${forecast==null?'—':_kpiFmt(k, forecast)}</div>
+              <div class="kpi-fc-hint">${badge}${delta!=null?' · Δ '+ (delta>0?'+':'') + _kpiFmt(k, delta):''}</div>
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Прогноз · сотрудники</div>
+      <div class="kpi-body-sub">Тренд за 8 недель + линейная экстраполяция к <b>${period.end_date}</b>. Зелёная точка на графике — последнее реальное значение; крупная цифра — прогноз на конец периода.</div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table kpi-table-fc">
+        <thead><tr><th>Сотрудник</th>${metrics.map(k => `<th class="num">${KPI_METRICS[k].label}</th>`).join('')}</tr></thead>
+        <tbody>${TM.map(rowHTML).join('')}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;color:var(--txt-3);padding:0 4px;line-height:1.5">
+      Прогноз линейный по 8-недельному ряду. Δ — насколько прогноз выше/ниже цели. Ряды пересчитываются на лету, кэш 2 минуты.
+    </div>
+  `;
+};
+
+/* ── СКАНЕР АЛЕРТОВ ── */
+window.kpiScanAlerts = async (period) => {
+  if(!SB || !ME) return { raised:0 };
+  const st = _kpiState;
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const baselines = st.baselines[period.id] || {};
+  const currents = st.currents || await _kpiLoadCurrents(period);
+  let raised = 0;
+  for (const m of TM){
+    const uid = m._id || m.id; if(!uid) continue;
+    for (const k of metrics){
+      const M = KPI_METRICS[k];
+      const cur = (currents[uid]||{})[k];
+      const tgt = _kpiGetTgt(period.id, 'member', uid, k) || {};
+      // 1) Нет данных для критичной метрики
+      if (cur == null && M.sample_min > 0){
+        await kpiRaiseAlert({ kind:'no_data', scope_kind:'member', scope_id:uid, metric_key:k, severity:'info', message:`Нет данных для «${M.label}» — не можем измерить`, data:{ period_id: period.id }});
+        raised++;
+        continue;
+      }
+      // 2) Ниже минимума
+      if (cur != null && tgt.minimum != null){
+        const belowMin = M.dir === 'up' ? cur < tgt.minimum : cur > tgt.minimum;
+        if (belowMin){
+          await kpiRaiseAlert({ kind:'below_minimum', scope_kind:'member', scope_id:uid, metric_key:k, severity:'critical', message:`«${M.label}» ниже минимума: ${_kpiFmt(k, cur)} (мин. ${_kpiFmt(k, tgt.minimum)})`, data:{ period_id: period.id, current: cur, minimum: tgt.minimum }});
+          raised++;
+        }
+      }
+      // 3) Отстаём от темпа (progress < time_pct - 20)
+      if (cur != null && tgt.target != null && baselines[uid] && baselines[uid][k] && baselines[uid][k].value != null){
+        const base = baselines[uid][k].value;
+        const totalDelta = tgt.target - base;
+        const currentDelta = cur - base;
+        const progress = totalDelta === 0 ? 100 : 100*currentDelta/totalDelta;
+        const now = Date.now();
+        const startMs = new Date(period.start_date+'T00:00:00').getTime();
+        const endMs = new Date(period.end_date+'T23:59:59').getTime();
+        const pct = 100 * (now-startMs) / (endMs-startMs);
+        if (pct > 20 && progress < pct - 20){
+          await kpiRaiseAlert({ kind:'behind_pace', scope_kind:'member', scope_id:uid, metric_key:k, severity:'warning', message:`«${M.label}» отстаёт от темпа: ${Math.round(progress)}% при ${Math.round(pct)}%`, data:{ period_id: period.id, progress, pct }});
+          raised++;
+        }
+      }
+    }
+  }
+  return { raised };
+};
+
+/* ── БЛОК 6: Мониторинг (alerts) ── */
+window._kpiBlkMonitor = async (period) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Мониторинг · алерты</div>
+      <div class="kpi-body-sub">Автоматические сигналы отклонений: ниже минимума, отстаём от темпа, нет данных. Дедуп по scope + метрика — один алерт не размножается.</div>
+      <button class="kpi-cta" style="padding:7px 12px;font-size:12px" onclick="kpiScanNow()">Пересканировать</button>
+    </div>
+    <div id="kpi-mon-content" class="kpi-empty">Сканируем…</div>
+  `;
+  if (!st.baselines[period.id]) st.baselines[period.id] = await _kpiComputeBaselines(period);
+  await _kpiLoadTargets(period.id, 'member');
+  await _kpiLoadCurrents(period);
+  await kpiScanAlerts(period);
+  await _kpiRenderMonitor(period);
+};
+
+window.kpiScanNow = async () => {
+  const period = _kpiState.periods.find(p=>p.id===_kpiState.periodId); if(!period) return;
+  const r = await kpiScanAlerts(period);
+  if (typeof toast==='function') toast(`Найдено ${r.raised} сигналов`);
+  await _kpiRenderMonitor(period);
+};
+
+window._kpiRenderMonitor = async (period) => {
+  const cont = document.getElementById('kpi-mon-content'); if(!cont) return;
+  const alerts = await kpiFetchAlerts({});
+  const sev = { critical:['#F26666','крит'], warning:['#E3B567','предупр.'], info:['#5BC8F5','инфо'] };
+  const kindL = { below_minimum:'ниже минимума', behind_pace:'отстаём от темпа', no_data:'нет данных', trend_deviation:'отклонение тренда', stall:'застой' };
+  if (!alerts.length){
+    cont.innerHTML = `<div class="kpi-empty" style="padding:36px 20px"><h4 style="color:var(--pos)">Всё чисто</h4><p>Сигналов отклонений нет. Как только что-то уйдёт ниже минимума, отстанет от темпа или пропадут данные — увидите здесь.</p></div>`;
+    return;
+  }
+  cont.innerHTML = `
+    <div class="kpi-alerts">
+      ${alerts.map(a => {
+        const s = sev[a.severity] || sev.warning;
+        const sc = s[0], sl = s[1];
+        const M = KPI_METRICS[a.metric_key]; const ml = M ? M.label : (a.metric_key||'—');
+        const nm = a.scope_kind==='member' && a.scope_id ? _kpiMemberName(a.scope_id) : a.scope_kind;
+        return `
+          <div class="kpi-alert">
+            <div class="kpi-alert-l"><span class="kpi-risk-sev" style="background:${sc}22;color:${sc};border:1px solid ${sc}44">${sl}</span></div>
+            <div class="kpi-alert-b">
+              <div class="kpi-alert-t">${a.message}</div>
+              <div class="kpi-alert-m">${nm} · ${ml} · ${kindL[a.kind]||a.kind} · с ${new Date(a.first_seen_at).toLocaleDateString('ru')}</div>
+            </div>
+            <div class="kpi-alert-r">
+              <button class="kpi-alert-btn" onclick="kpiAckAlert('${a.id}')">✓ Понял</button>
+              ${a.metric_key ? `<button class="kpi-alert-btn" onclick="kpiAlertToRisk('${a.id}')" title="Создать риск из алерта">↳ В риски</button>` : ''}
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+  `;
+};
+
+window.kpiAckAlert = async (id) => {
+  if(!SB) return;
+  await SB.from('kpi_alerts').update({ resolved_at: new Date().toISOString(), acknowledged_by: ME.id, acknowledged_at: new Date().toISOString() }).eq('id', id);
+  const period = _kpiState.periods.find(p=>p.id===_kpiState.periodId); if(period) _kpiRenderMonitor(period);
+};
+
+window.kpiAlertToRisk = async (id) => {
+  if(!SB || !ME) return;
+  const { data: a } = await SB.from('kpi_alerts').select('*').eq('id', id).single();
+  if (!a) return;
+  const period = _kpiState.periods.find(p=>p.id===_kpiState.periodId);
+  const row = {
+    period_id: period ? period.id : null,
+    scope_kind: a.scope_kind, scope_id: a.scope_id,
+    source: 'alert',
+    severity: a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'high' : 'med',
+    title: `Отклонение: ${a.message}`,
+    description: `Автоматически создано из алерта. Метрика: ${a.metric_key || '—'}.`,
+    mitigation: '',
+    status: 'open',
+  };
+  const saved = await kpiUpsertRisk(row);
+  if (saved){
+    await SB.from('kpi_alerts').update({ resolved_at: new Date().toISOString() }).eq('id', id);
+    if (typeof toast==='function') toast('Риск создан из алерта');
+    _kpiRenderMonitor(period);
+  }
+};
+
+/* ── БЛОК 7: Статистика ── */
+window._kpiBlkStats = async (period) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  if (st.scope !== 'member'){
+    body.innerHTML = `<div class="kpi-body-head"><div class="kpi-body-h">Статистика</div><div class="kpi-body-sub">Для этого уровня блок появится следом.</div></div><div class="kpi-empty">Скоро</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Статистика · сотрудники</div>
+      <div class="kpi-body-sub">Исторические ряды за 8 недель. Тренд и разброс. Δ — изменение от начала окна к концу.</div>
+    </div>
+    <div class="kpi-empty" id="kpi-st-loading">Считаем ряды…</div>
+  `;
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const grid = {};
+  for (const m of TM){
+    const uid = m._id || m.id; if(!uid) continue;
+    grid[uid] = {};
+    for (const k of metrics){
+      grid[uid][k] = await kpiComputeMetricSeries('member', uid, k, 8);
+    }
+  }
+  _kpiRenderStats(period, grid);
+};
+
+window._kpiRenderStats = (period, grid) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const initials = (nm) => (nm||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+
+  const rowHTML = (m) => {
+    const uid = m._id || m.id;
+    return `
+      <tr>
+        <td><div class="kpi-nameC">
+          <div class="kpi-av" style="${m.avatar_url?'background:transparent':''}">${m.avatar_url?`<img src="${m.avatar_url}">`:initials(m.name||m.full_name)}</div>
+          <div><div class="kpi-nm">${m.name||m.full_name||'—'}</div><div class="kpi-nsub">${m.dept||m.role_title||'—'}</div></div>
+        </div></td>
+        ${metrics.map(k => {
+          const pts = (grid[uid]||{})[k] || [];
+          const valid = pts.filter(p => p.value != null);
+          if (valid.length < 2) return `<td class="num"><span class="kpi-cell" style="color:var(--txt-3)">мало данных</span></td>`;
+          const M = KPI_METRICS[k];
+          const first = valid[0].value, last = valid[valid.length-1].value;
+          const delta = last - first;
+          const dir = M.dir === 'up' ? (delta > 0 ? '↑' : delta < 0 ? '↓' : '→') : (delta < 0 ? '↑' : delta > 0 ? '↓' : '→');
+          const good = M.dir === 'up' ? delta > 0 : delta < 0;
+          const color = delta === 0 ? 'var(--txt-3)' : good ? 'var(--pos)' : 'var(--warn)';
+          const med = _kpiMedian(valid.map(p=>p.value));
+          return `<td class="num">
+            <div class="kpi-st-cell">
+              ${_kpiSpark(pts, {w:88, h:22, color})}
+              <div class="kpi-st-row"><span class="kpi-st-cur">${_kpiFmt(k, last)}</span> <span class="kpi-st-delta" style="color:${color}">${dir} ${_kpiFmt(k, Math.abs(delta))}</span></div>
+              <div class="kpi-st-hint">медиана ${_kpiFmt(k, med)}</div>
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Статистика · сотрудники</div>
+      <div class="kpi-body-sub">Спарки за 8 недель. Первое число — последнее значение, стрелка со знаком — Δ от начала окна к концу. Медиана — центральная тенденция.</div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table kpi-table-st">
+        <thead><tr><th>Сотрудник</th>${metrics.map(k => `<th class="num">${KPI_METRICS[k].label}</th>`).join('')}</tr></thead>
+        <tbody>${TM.map(rowHTML).join('')}</tbody>
+      </table>
+    </div>
+  `;
+};
+
+/* ═══════════ /KPI PHASE 4 ═══════════ */
+
+
 
 
 
