@@ -6641,19 +6641,29 @@ function ddToggle(k){
       requestAnimationFrame(function(){
         const r=btn.getBoundingClientRect();
         menu.style.minWidth=Math.max(190,btn.offsetWidth)+'px';
-        const mw=Math.max(menu.offsetWidth,btn.offsetWidth,190);
+        // сначала сбрасываем ограничения, чтобы измерить контент
+        menu.style.maxHeight='';
+        var natH=menu.offsetHeight||60;
+        var mw=Math.max(menu.offsetWidth,btn.offsetWidth,190);
         var isRight=el.classList.contains('right');
         var left=isRight?(r.right-mw):r.left;
         var spaceBelow=window.innerHeight-r.bottom-16, spaceAbove=r.top-16;
         var openUp=false;
-        var mh=menu.offsetHeight||60;
-        if(mh>spaceBelow && spaceAbove>spaceBelow){ openUp=true; }
-        var maxH=Math.max(140, openUp?spaceAbove:spaceBelow);
+        if(natH>spaceBelow && spaceAbove>spaceBelow) openUp=true;
+        // максимум 360px, но не больше доступного пространства
+        var avail=openUp?spaceAbove:spaceBelow;
+        var maxH=Math.max(140,Math.min(360,avail));
         menu.style.maxHeight=maxH+'px';
-        mh=Math.min(menu.offsetHeight||mh,maxH);
+        // если контент меньше max — используем реальную высоту, иначе max
+        var mh=Math.min(natH,maxH);
         var top=openUp?(r.top-mh-6):(r.bottom+6);
         if(left+mw>window.innerWidth-8) left=window.innerWidth-8-mw;
         if(top<8) top=8;
+        if(top+mh>window.innerHeight-8){ // финальная страховка — не выходить за окно
+          var cap=window.innerHeight-8-top;
+          if(cap>140){ menu.style.maxHeight=cap+'px'; }
+          else { top=window.innerHeight-8-mh; if(top<8) top=8; }
+        }
         menu.style.left=Math.max(8,left)+'px';
         menu.style.top=top+'px';
       });
