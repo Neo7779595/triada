@@ -587,7 +587,8 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .dd-btn .dd-v{color:var(--accent)}
 .dd-btn>svg{width:11px;height:11px;color:var(--txt-3);transition:.18s;margin-left:2px}
 .dd.open .dd-btn>svg{transform:rotate(180deg);color:var(--accent)}
-.dd-menu{position:fixed;top:0;left:0;z-index:2000;min-width:190px;max-height:min(400px,80vh);overflow:auto;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;box-shadow:0 24px 60px rgba(0,0,0,.6);display:none;animation:ddIn .14s ease}
+.dd-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:190px;max-height:300px;overflow:auto;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;box-shadow:0 16px 44px rgba(0,0,0,.55);display:none;animation:ddIn .14s ease}
+.dd-menu.dd-portal{position:fixed;top:0;left:0;z-index:2000;box-shadow:0 24px 60px rgba(0,0,0,.6);display:block}
 .dd.right .dd-menu{left:auto;right:0}
 .dd.open .dd-menu{display:block}
 .toolbar:has(.dd.open),.toolbar:has(.dp-pop),.ti-bar:has(.dd.open),.ti-bar:has(.dr-pop),.ti-bar:has(.dp-pop){z-index:80}
@@ -6565,6 +6566,7 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
     +`</div></div>`;
 }
 function _closePops(){ document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
+function _ddPortalRelease(){ document.querySelectorAll('.dd-menu.dd-portal').forEach(function(m){ var home=m.__ddHome; if(home && home.parentNode){ home.parentNode.insertBefore(m,home); home.parentNode.removeChild(home); m.__ddHome=null; } m.classList.remove('dd-portal'); m.style.left=''; m.style.top=''; m.style.minWidth=''; }); }
 function ddToggle(k){
   const el=document.getElementById('dd-'+k);if(!el)return;
   const o=el.classList.contains('open');_closePops();
@@ -6572,23 +6574,32 @@ function ddToggle(k){
     el.classList.add('open');
     const btn=el.querySelector('.dd-btn'), menu=el.querySelector('.dd-menu');
     if(btn && menu){
+      // Portal: помещаем меню в body с фикс-координатами, чтобы не резалось overflow:hidden предков
+      var placeholder=document.createElement('span'); placeholder.style.display='none';
+      menu.__ddHome=placeholder;
+      menu.parentNode.insertBefore(placeholder, menu);
+      document.body.appendChild(menu);
+      menu.classList.add('dd-portal');
       requestAnimationFrame(function(){
         const r=btn.getBoundingClientRect();
-        menu.style.left='-9999px'; menu.style.top='-9999px';
-        const mw=menu.offsetWidth||Math.max(btn.offsetWidth,190), mh=menu.offsetHeight||60;
+        menu.style.minWidth=Math.max(190,btn.offsetWidth)+'px';
+        const mw=Math.max(menu.offsetWidth,btn.offsetWidth,190), mh=menu.offsetHeight||60;
         var isRight=el.classList.contains('right');
         var left=isRight?(r.right-mw):r.left, top=r.bottom+6;
         if(left+mw>window.innerWidth-8) left=window.innerWidth-8-mw;
         if(top+mh>window.innerHeight-8) top=r.top-mh-6;
+        if(top<8) top=8;
         menu.style.left=Math.max(8,left)+'px';
-        menu.style.top=Math.max(8,top)+'px';
-        menu.style.minWidth=Math.max(190,btn.offsetWidth)+'px';
+        menu.style.top=top+'px';
       });
     }
   }
 }
-window.addEventListener('scroll',function(){ document.querySelectorAll('.dd.open').forEach(function(el){ el.classList.remove('open'); }); },true);
-window.addEventListener('resize',function(){ document.querySelectorAll('.dd.open').forEach(function(el){ el.classList.remove('open'); }); });
+// Хук: когда _closePops убирает .open с .dd — вернуть меню в родителя
+var _prev_closePops=_closePops;
+_closePops=function(){ _ddPortalRelease(); return _prev_closePops.apply(this,arguments); };
+window.addEventListener('scroll',function(){ if(document.querySelector('.dd.open')) _closePops(); },true);
+window.addEventListener('resize',function(){ if(document.querySelector('.dd.open')) _closePops(); });
 const _attr=v=>_ddH(v).replace(/"/g,'&quot;');
 /* Кастомный дропдаун в фирменном стиле с произвольным колбэком.
    opts: [[value,label],…]; при выборе вызывает cb(value). Колбэк хранится в реестре по id. */
