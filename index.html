@@ -2071,6 +2071,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cl-vis-tog.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 .cl-vis-tog .cvt-ic{display:inline-flex;width:16px;height:16px;flex:none}
 .cl-vis-tog .cvt-ic svg{width:16px;height:16px}
+
+/* Полный экран клиентского кабинета */
+.cl-fs-btn.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+#app-cl.cl-fs{background:var(--bg);height:100vh;min-height:100vh;overflow:hidden}
+#app-cl.cl-fs .side{border-right:1px solid var(--line);position:relative;top:auto;height:100vh;overflow-y:auto;overflow-x:hidden}
+#app-cl.cl-fs .main{background:var(--bg);height:100vh;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+#app-cl.cl-fs .topbar2{flex:0 0 auto;position:relative;top:auto}
+#app-cl.cl-fs .content{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 /* Полный экран главного окна */
 .ag-fs-btn.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 #app-ag.ag-fs{background:var(--bg);height:100vh;min-height:100vh;overflow:hidden}
@@ -5193,6 +5201,7 @@ button:active{transform:translateY(.5px) scale(.99)}
     <header class="topbar2">
       <div class="pg">Добрый день<b>UZBEK DONER</b></div>
       <div class="flex1"></div>
+      <button class="tb-search cl-fs-btn" id="cl-fs-btn" onclick="clFullscreen()" title="Полный экран · Esc чтобы выйти"><svg id="cl-fs-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg><span id="cl-fs-lbl">Экран</span></button>
       <div class="u-chip" style="font-family:var(--mono)">12 июня 2026</div>
     </header>
     <div class="content" id="content-cl"></div>
@@ -7195,6 +7204,20 @@ function agFsSync(){
   var lb=document.getElementById('ag-fs-lbl'); if(lb) lb.textContent=on?'Свернуть':'Экран';
 }
 if(!window._agFsBound){ window._agFsBound=1; document.addEventListener('fullscreenchange',agFsSync); document.addEventListener('webkitfullscreenchange',agFsSync); }
+function clFullscreen(){
+  var el=document.documentElement;
+  var fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!fsEl){ var rq=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen; if(rq){ try{ var r=rq.call(el); if(r&&r.catch)r.catch(function(){}); }catch(_){} } else if(typeof toast==='function'){ toast('Полный экран не поддерживается браузером'); } }
+  else { var ex=document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen; if(ex){ try{ ex.call(document); }catch(_){} } }
+}
+function clFsSync(){
+  var on=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  var app=document.getElementById('app-cl'); if(app) app.classList.toggle('cl-fs',on);
+  var b=document.getElementById('cl-fs-btn'); if(b) b.classList.toggle('on',on);
+  var ic=document.getElementById('cl-fs-ic'); if(ic) ic.innerHTML=on?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+  var lb=document.getElementById('cl-fs-lbl'); if(lb) lb.textContent=on?'Свернуть':'Экран';
+}
+if(!window._clFsBound){ window._clFsBound=1; document.addEventListener('fullscreenchange',clFsSync); document.addEventListener('webkitfullscreenchange',clFsSync); }
 function pdTabbar(p){
   const _fsOn=!!(document.fullscreenElement||document.webkitFullscreenElement);
   const reps=(p&&p._reports)?p._reports.length:0;
