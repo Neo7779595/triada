@@ -18544,13 +18544,20 @@ window._kpiGetTgt = (periodId, scopeKind, scopeId, metricKey) => {
 window.kpiSuggestTarget = (metricKey, baseline) => {
   if (baseline == null) return null;
   const m = KPI_METRICS[metricKey]; if(!m) return null;
-  const raw = m.dir === 'up' ? baseline * 1.15 : baseline * 0.85;
+  let raw = m.dir === 'up' ? baseline * 1.15 : baseline * 0.85;
+  // Клэмп для % метрик — не может выйти за [0, 100]
+  if (m.unit === '%') raw = Math.max(0, Math.min(100, raw));
+  // Дополнительный soft-cap по scale.hard для up-метрик если он задан
+  else if (m.dir === 'up' && m.scale && m.scale.hard != null) raw = Math.min(raw, m.scale.hard);
+  else if (m.dir === 'down') raw = Math.max(raw, 0);
   return Math.round(raw * 10) / 10;
 };
 window.kpiSuggestMin = (metricKey, baseline) => {
   if (baseline == null) return null;
   const m = KPI_METRICS[metricKey]; if(!m) return null;
-  const raw = m.dir === 'up' ? baseline * 0.90 : baseline * 1.10;
+  let raw = m.dir === 'up' ? baseline * 0.90 : baseline * 1.10;
+  if (m.unit === '%') raw = Math.max(0, Math.min(100, raw));
+  else if (m.dir === 'down') raw = Math.max(raw, 0);
   return Math.round(raw * 10) / 10;
 };
 
@@ -18635,8 +18642,14 @@ window.kpiSaveTarget = async (memberId, metricKey, mode, rawValue, baseline) => 
   const st = _kpiState;
   const period = st.periods.find(p => p.id === st.periodId); if(!period) return;
   const raw = rawValue == null ? '' : String(rawValue).replace(',', '.').replace(/[^\d.\-]/g,'');
-  const val = raw === '' ? null : Number(raw);
+  let val = raw === '' ? null : Number(raw);
   if (val != null && isNaN(val)){ if(typeof toast==='function') toast('Не число'); return; }
+  // Клэмп для % метрик — вне [0, 100] невозможно
+  const _mm = KPI_METRICS[metricKey];
+  if (val != null && _mm && _mm.unit === '%'){
+    if (val > 100){ if(typeof toast==='function') toast('Максимум для % — 100'); val = 100; }
+    if (val < 0)  { if(typeof toast==='function') toast('Минимум для % — 0');   val = 0; }
+  }
   const existing = _kpiGetTgt(period.id, 'member', memberId, metricKey) || {};
   const row = {
     period_id: period.id, scope_kind: 'member', scope_id: memberId, metric_key: metricKey,
@@ -19712,8 +19725,14 @@ window.kpiSaveTarget = async (rowId, metricKey, mode, rawValue, baseline) => {
   const st = _kpiState;
   const period = st.periods.find(p => p.id === st.periodId); if(!period) return;
   const raw = rawValue == null ? '' : String(rawValue).replace(',', '.').replace(/[^\d.\-]/g,'');
-  const val = raw === '' ? null : Number(raw);
+  let val = raw === '' ? null : Number(raw);
   if (val != null && isNaN(val)){ if(typeof toast==='function') toast('Не число'); return; }
+  // Клэмп для % метрик — вне [0, 100] невозможно
+  const _mm = KPI_METRICS[metricKey];
+  if (val != null && _mm && _mm.unit === '%'){
+    if (val > 100){ if(typeof toast==='function') toast('Максимум для % — 100'); val = 100; }
+    if (val < 0)  { if(typeof toast==='function') toast('Минимум для % — 0');   val = 0; }
+  }
   const existing = _kpiGetTgt(period.id, st.scope, rowId, metricKey) || {};
   const row = {
     period_id: period.id, scope_kind: st.scope, scope_id: rowId, metric_key: metricKey,
