@@ -17117,8 +17117,8 @@ window.tLoadClient = async () => {
   // 1) проект(ы) клиента — оба направления связи запрашиваем сразу параллельно (раньше — последовательный fallback)
   const _safe=q=>Promise.resolve(q).catch(()=>null);
   const [q1,q2] = await Promise.all([
-    _safe(SB.from('projects').select('id,name,logo,logo_url,service,category,status,mrr,created_at').eq('client_id', ME.id).order('created_at',{ascending:true})),
-    ME.client_id ? _safe(SB.from('projects').select('id,name,logo,logo_url,service,category,status,mrr,created_at').eq('id', ME.client_id)) : Promise.resolve(null)
+    _safe(SB.from('projects').select('id,name,logo,logo_url,service,category,status,mrr,created_at,cl_hidden').eq('client_id', ME.id).order('created_at',{ascending:true})),
+    ME.client_id ? _safe(SB.from('projects').select('id,name,logo,logo_url,service,category,status,mrr,created_at,cl_hidden').eq('id', ME.client_id)) : Promise.resolve(null)
   ]);
   let rows = (q1 && !q1.error && q1.data && q1.data.length) ? q1.data
            : (q2 && !q2.error && q2.data && q2.data.length) ? q2.data : null;
@@ -17144,7 +17144,7 @@ window.tLoadClient = async () => {
     return { k, txt, tag:(h.stage_name||'—'), t:tAgo(h.created_at) }; });
   window.CLP = { id:pid, name:p.name||'', logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
     logoUrl:p.logo_url||'', svc:p.service||'', cat:p.category||'', status:p.status||'active',
-    mrr:p.mrr||0, createdAt:p.created_at||null, allProjects:rows, stages, reports, history, feed };
+    mrr:p.mrr||0, createdAt:p.created_at||null, cl_hidden:(Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[])), allProjects:rows, stages, reports, history, feed };
 };
 
 function _bgGentleRefresh(){ try{                                                     // фон догрузился: обновляем экран, не мешая пользователю
