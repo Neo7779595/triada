@@ -18116,7 +18116,31 @@ window._kpiShellHTML = () => {
       .kpi-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none}
       .kpi-tblwrap{overflow:auto;max-height:64vh;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
       .kpi-metric-h{display:flex;align-items:center;gap:6px;justify-content:flex-end;color:var(--txt-3);font-size:11px}
-      /* KPI · badge в сайдбаре */
+      /* Аватары — фолбэк с data-i */
+      .kpi-av{position:relative;isolation:isolate}
+      .kpi-av img{display:block;width:100%;height:100%;object-fit:cover}
+      .kpi-av-fb::before{content:attr(data-i);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;letter-spacing:.01em;color:inherit;background:linear-gradient(135deg, rgba(255,255,255,.03), rgba(255,255,255,.01));border-radius:inherit}
+      /* Скелетон */
+      .kpi-skel{display:inline-block;height:12px;border-radius:5px;background:linear-gradient(90deg, rgba(255,255,255,.04) 0%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 100%);background-size:200% 100%;animation:kpiShimmer 1.4s linear infinite;vertical-align:middle}
+      @keyframes kpiShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+      .kpi-skel-h{width:200px;height:18px}
+      .kpi-skel-sub{width:80%;max-width:520px;height:11px;margin-top:6px}
+      .kpi-skel-hd{width:70px;height:9px;display:inline-block}
+      .kpi-skel-av{width:32px;height:32px;border-radius:8px;flex:none}
+      .kpi-skel-nm{width:140px;height:12px}
+      .kpi-skel-sub2{width:80px;height:9px;margin-top:5px}
+      .kpi-skel-cell{width:60px;height:12px}
+      /* Sticky scope-табы и блок-табы (при длинной таблице не уплывают) */
+      .kpi-bar{position:sticky;top:0;z-index:22;background:linear-gradient(180deg, var(--bg) 60%, transparent);padding:8px 0;margin:0 -2px}
+      .kpi-blocks{position:sticky;top:56px;z-index:21;background:var(--bg);padding:2px 0}
+      /* Улучшение hero */
+      .kpi-hero{padding:20px 22px}
+      .kpi-hero-h{font-size:20px}
+      .kpi-hero-sub{font-size:13px}
+      /* Таб-текст немного плотнее */
+      .kpi-tab{padding:7px 12px;font-size:12.5px}
+
+/* KPI · badge в сайдбаре */
 .kpi-nav-badge{margin-left:auto;background:var(--warn);color:#241900;padding:1px 7px;border-radius:8px;font-size:10.5px;font-weight:700;font-family:var(--mono);line-height:1.35;box-shadow:0 0 0 1.5px var(--bg)}
 .kpi-nav-badge.crit{background:var(--neg);color:#fff;animation:kpiPulse 2.4s ease-in-out infinite}
 @keyframes kpiPulse{0%,100%{box-shadow:0 0 0 1.5px var(--bg), 0 0 0 0 rgba(242,102,102,0.55)}50%{box-shadow:0 0 0 1.5px var(--bg), 0 0 0 6px rgba(242,102,102,0)}}
@@ -20402,6 +20426,170 @@ if (typeof _origScan === 'function'){
 }
 
 /* ═══════════ /KPI PHASE 7 ═══════════ */
+
+/* ═══════════ KPI PHASE 8 · fixes: data / avatars / speed / nav ═══════════
+   1) Явная загрузка members из profiles — TEAM может быть не готов
+   2) Аватарки везде — валидация URL + fallback на инициалы
+   3) In-flight dedup для _kpiFetchOpsRaw — параллельные вызовы делят один Promise
+   4) Sticky scope-табы и блок-табы — не уплывают при скролле длинной таблицы
+   5) Skeleton loader вместо голого «Загрузка…»
+*/
+
+/* ── 1. Правильная загрузка members ── */
+window._kpiMembers = window._kpiMembers || null;
+
+window._kpiLoadMembers = async () => {
+  if (window._kpiMembers) return window._kpiMembers;
+  if (!SB || !ME) { window._kpiMembers = []; return []; }
+  const { data, error } = await SB.from('profiles')
+    .select('id, full_name, dept, role_title, avatar_url, is_pm, color')
+    .eq('agency_id', ME.agency_id).eq('role', 'member').order('full_name');
+  if (error){ console.warn('[KPI] loadMembers', error); window._kpiMembers = []; return []; }
+  window._kpiMembers = data || [];
+  return window._kpiMembers;
+};
+
+/* Валидация URL (реальный http/https vs. кличка/эмодзи) */
+window._kpiIsValidUrl = (s) => typeof s === 'string' && /^https?:\/\//i.test(s.trim());
+
+/* ── 2. Универсальный аватар с гарантированным fallback ── */
+window._kpiRowAvHTML = (r) => {
+  const url = _kpiIsValidUrl(r.avatarUrl) ? r.avatarUrl : null;
+  if (url) return `<div class="kpi-av"><img src="${url}" loading="lazy" onerror="this.style.display='none';this.parentNode.classList.add('kpi-av-fb');this.parentNode.dataset.i='${(r.initials||'?').replace(/'/g,'')}'"></div>`;
+  return `<div class="kpi-av kpi-av-fb" style="color:${r.color||'var(--accent)'}" data-i="${r.initials||'?'}"></div>`;
+};
+
+/* ── 3. Обновлённые scope-rows: members теперь из БД, projects — валидная логика логотипа ── */
+window._kpiScopeRows = (scope) => {
+  if (scope === 'member'){
+    const src = window._kpiMembers || [];
+    return src.map(m => ({
+      id: m.id,
+      name: m.full_name || '—',
+      subtitle: (m.dept || m.role_title || '—') + (m.is_pm ? ' · PM' : ''),
+      avatarUrl: m.avatar_url,
+      color: m.color || 'var(--accent)',
+      initials: (m.full_name || '?').split(' ').filter(Boolean).map(x => x[0]).slice(0,2).join('').toUpperCase(),
+    }));
+  }
+  if (scope === 'team'){
+    return (window._kpiTeams || []).map(t => ({
+      id: t.id,
+      name: t.name,
+      subtitle: (t.dept ? t.dept + ' · ' : '') + `${(t.team_members||[]).filter(x => !x.left_at).length} чел.`,
+      color: t.color || 'var(--accent)',
+      initials: (t.name||'?').split(' ').filter(Boolean).map(x => x[0]).slice(0,2).join('').toUpperCase(),
+    }));
+  }
+  if (scope === 'project'){
+    return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done').map(p => ({
+      id: p.id,
+      name: p.name || '—',
+      subtitle: (p.service || '—') + (p.category ? ' · ' + p.category : ''),
+      // logo_url — реальный URL; logo — обычно одна буква для fallback
+      avatarUrl: _kpiIsValidUrl(p.logo_url) ? p.logo_url : (_kpiIsValidUrl(p.logo) ? p.logo : null),
+      color: 'var(--accent)',
+      initials: (typeof p.logo === 'string' && p.logo.length <= 2 && !_kpiIsValidUrl(p.logo))
+        ? p.logo.toUpperCase()
+        : (p.name||'?').split(' ').filter(Boolean).map(x => x[0]).slice(0,2).join('').toUpperCase(),
+    }));
+  }
+  if (scope === 'agency'){
+    return [{ id: null, name: (ME && ME.agency_name) || 'Агентство', subtitle: 'портфельный уровень', color: 'var(--violet)', initials: 'AG' }];
+  }
+  return [];
+};
+
+/* ── 4. In-flight dedup для тяжёлого _kpiFetchOpsRaw ── */
+window._kpiOpsRawInflight = window._kpiOpsRawInflight || {};
+const _origFetchOpsRaw = window._kpiFetchOpsRaw;
+window._kpiFetchOpsRaw = async (fromISO, toISO) => {
+  if(!SB || !ME) return null;
+  const key = `${ME.agency_id}|${fromISO}|${toISO}`;
+  if (_kpiOpsRawCache.key === key && _kpiOpsRawCache.data) return _kpiOpsRawCache.data;
+  if (_kpiOpsRawInflight[key]) return _kpiOpsRawInflight[key];
+  _kpiOpsRawInflight[key] = _origFetchOpsRaw(fromISO, toISO).finally(() => { delete _kpiOpsRawInflight[key]; });
+  return _kpiOpsRawInflight[key];
+};
+
+/* Аналогично для SMM raw */
+window._kpiSmmRawInflight = window._kpiSmmRawInflight || {};
+const _origFetchSmmRaw = window._kpiFetchSmmRaw;
+window._kpiFetchSmmRaw = async (fromISO, toISO) => {
+  if(!SB || !ME) return null;
+  const key = `${ME.agency_id}|${fromISO}|${toISO}`;
+  if (_kpiSmmRawCache.key === key && _kpiSmmRawCache.data) return _kpiSmmRawCache.data;
+  if (_kpiSmmRawInflight[key]) return _kpiSmmRawInflight[key];
+  _kpiSmmRawInflight[key] = _origFetchSmmRaw(fromISO, toISO).finally(() => { delete _kpiSmmRawInflight[key]; });
+  return _kpiSmmRawInflight[key];
+};
+
+/* ── 5. renderKPI: тянем members ДО первого рендера ── */
+const _kpiPhase8_origRender = window.renderKPI;
+window.renderKPI = async () => {
+  // Параллельно всё что нужно на входе
+  await Promise.all([
+    (!window._kpiMembers ? _kpiLoadMembers() : Promise.resolve()),
+    (!window._kpiTeams   ? (async () => { try { window._kpiTeams = await kpiFetchTeams(); } catch(e){ window._kpiTeams = []; } })() : Promise.resolve()),
+  ]);
+  return _kpiPhase8_origRender();
+};
+
+/* ── 6. Skeleton loader вместо голого текста ── */
+window._kpiSkeleton = (rows, cols) => {
+  rows = rows || 4; cols = cols || 5;
+  return `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h"><span class="kpi-skel kpi-skel-h"></span></div>
+      <div class="kpi-body-sub"><span class="kpi-skel kpi-skel-sub"></span></div>
+    </div>
+    <div class="kpi-tblwrap"><table class="kpi-table">
+      <thead><tr><th><span class="kpi-skel kpi-skel-hd" style="width:100px"></span></th>${Array.from({length:cols},()=>`<th class="num"><span class="kpi-skel kpi-skel-hd"></span></th>`).join('')}</tr></thead>
+      <tbody>${Array.from({length:rows}, () => `
+        <tr>
+          <td><div class="kpi-nameC"><span class="kpi-skel kpi-skel-av"></span><div style="flex:1"><div><span class="kpi-skel kpi-skel-nm"></span></div><div><span class="kpi-skel kpi-skel-sub2"></span></div></div></div></td>
+          ${Array.from({length:cols},()=>`<td class="num"><span class="kpi-skel kpi-skel-cell"></span></td>`).join('')}
+        </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+};
+
+/* Заменяем «Загрузка данных…» / «Считаем…» на скелетон */
+const _kpiPhase8_origBody = window._kpiRenderBody;
+window._kpiRenderBody = async () => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body');
+  const period = st.periods.find(p => p.id === st.periodId);
+  if (period && body && st.scope !== 'settings'){
+    // Ожидаемое число колонок = число метрик scope
+    const cols = Math.max(3, _kpiScopeMetricKeys(st.scope).length);
+    const rows = Math.max(2, _kpiScopeRows(st.scope).length || 3);
+    body.innerHTML = _kpiSkeleton(rows, cols);
+  }
+  return _kpiPhase8_origBody();
+};
+
+/* ── 7. Убираем гвоздевую фразу «Считаем базу…» — теперь skeleton живёт до отрисовки ── */
+const _kpiPhase8_origPointA = window._kpiBlkPointA;
+window._kpiBlkPointA = async (period) => {
+  // Skeleton уже висит из _kpiRenderBody — просто считаем и рендерим
+  const st = _kpiState;
+  if (st.scope === 'team') await _kpiLoadTeamsCache();
+  const baselines = await _kpiComputeBaselines(period);
+  st.baselines[period.id] = baselines;
+  _kpiRenderPointATable(period, baselines);
+};
+
+/* ── 8. Обновлённые labels в _kpiMemberName (теперь ищет в profiles) ── */
+window._kpiMemberName = (id) => {
+  const src = window._kpiMembers || [];
+  const m = src.find(x => x.id === id);
+  return m ? (m.full_name || '—') : '—';
+};
+
+/* ═══════════ /KPI PHASE 8 ═══════════ */
+
+
 
 
 
