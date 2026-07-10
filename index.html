@@ -21330,7 +21330,7 @@ window.renderKPI = async () => {
   _kpi2FillStatus();
   _kpi2FillIssues();
   _kpi2FillGoals();
-  _kpi2FillRanking(_kpi2.section4Tab);
+  _kpi2FillRanking(_kpi2.section4Tab); setTimeout(_kpi2WarmRanking, 500);
 };
 
 window._kpi2ShellHTML = () => `
@@ -21764,51 +21764,116 @@ window._kpi2Stars = (score) => {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 };
 
+/* Кэш посчитанных строк по scope на сессию + флаг «идёт расчёт» для соседних вкладок */
+_kpi2.rankCache = _kpi2.rankCache || { member:null, team:null, project:null };
+_kpi2.rankLoading = _kpi2.rankLoading || {};
+
+window._kpi2RankAvatarHTML = (r) => r.avatarUrl && /^https?:\/\//i.test(r.avatarUrl)
+  ? `<div class="kpi2-rank-av"><img src="${r.avatarUrl}" onerror="this.remove()"></div>`
+  : `<div class="kpi2-rank-av" style="color:${r.color||'var(--accent)'}">${r.initials || '?'}</div>`;
+
+window._kpi2RankRowHTML = (r, i, computed) => `
+  <div class="kpi2-rank-row" data-rid="${r.id||''}">
+    <div class="kpi2-rank-n">${i+1}</div>
+    ${_kpi2RankAvatarHTML(r)}
+    <div class="kpi2-rank-nm">
+      <b>${r.name}</b>
+      <span>${r.subtitle||''}</span>
+    </div>
+    <div class="kpi2-rank-score">
+      ${computed ? `
+        <div class="kpi2-rank-stars">${_kpi2Stars(computed.score)}</div>
+        <div class="kpi2-rank-num">${computed.score==null?'—':computed.score}</div>
+        <div class="kpi2-rank-trend ${computed.trend.sign}">${computed.trend.sign==='pos'?'↗':computed.trend.sign==='neg'?'↘':'→'} ${computed.trend.txt}</div>
+      ` : `
+        <div class="kpi2-rank-stars" style="opacity:.35">☆☆☆☆☆</div>
+        <div class="kpi2-rank-num" style="color:var(--txt-3)">…</div>
+        <div class="kpi2-rank-trend flat" style="opacity:.5">…</div>
+      `}
+    </div>
+  </div>`;
+
 window._kpi2FillRanking = async (scope) => {
   const box = document.getElementById('kpi2-ranking'); if(!box) return;
   _kpi2.section4Tab = scope;
   const rows = _kpiScopeRows(scope).slice(0, 20);
-  // Skeleton
-  box.innerHTML = `
+
+  // Шапка + табы всегда одинаковы
+  const headHTML = `
     <div class="kpi2-card-h">
       <div class="kpi2-card-t">Кто как работает</div>
       <div class="kpi2-card-c">оценка 0–100 по операционным метрикам за 30 дней</div>
     </div>
     <div class="kpi2-rank-tabs">
       ${['member','team','project'].map(k => `<div class="kpi2-rank-tab${k===scope?' on':''}" onclick="_kpi2FillRanking('${k}')">${{member:'Сотрудники',team:'Команды',project:'Проекты'}[k]}</div>`).join('')}
-    </div>
-    <div class="kpi2-rank-list">
-      ${rows.length ? rows.map(() => `<div class="kpi2-rank-row"><div class="kpi2-rank-n">…</div><div class="kpi2-rank-av"></div><div class="kpi2-rank-nm"><b>…</b><span>…</span></div></div>`).join('') : `<div class="kpi2-empty">Нет данных для этого уровня</div>`}
-    </div>
-  `;
-  if (!rows.length) return;
+    </div>`;
 
-  const enriched = await Promise.all(rows.map(async r => {
-    const [score, trend] = await Promise.all([_kpi2Score(scope, r.id), _kpi2Trend(scope, r.id)]);
-    return { r, score, trend };
-  }));
-  enriched.sort((a,b) => (b.score ?? -1) - (a.score ?? -1));
+  if (!rows.length){
+    box.innerHTML = headHTML + `<div class="kpi2-empty">Нет данных для этого уровня</div>`;
+    return;
+  }
 
-  const listEl = box.querySelector('.kpi2-rank-list');
-  const avatarHTML = r => r.avatarUrl && /^https?:\/\//i.test(r.avatarUrl)
-    ? `<div class="kpi2-rank-av"><img src="${r.avatarUrl}" onerror="this.remove()"></div>`
-    : `<div class="kpi2-rank-av" style="color:${r.color||'var(--accent)'}">${r.initials || '?'}</div>`;
+  // ── Если есть кэш — рендерим МГНОВЕННО, без ожидания расчёта
+  const cached = _kpi2.rankCache[scope];
+  if (cached && cached.length){
+    box.innerHTML = headHTML + `<div class="kpi2-rank-list">${cached.map((e, i) => _kpi2RankRowHTML(e.r, i, e)).join('')}</div>`;
+  } else {
+    // Прогрессивный skeleton — рендерим строки с именем+аватаром сразу, оценка "..." потом
+    box.innerHTML = headHTML + `<div class="kpi2-rank-list">${rows.map((r, i) => _kpi2RankRowHTML(r, i, null)).join('')}</div>`;
+  }
 
-  listEl.innerHTML = enriched.map((e, i) => `
-    <div class="kpi2-rank-row">
-      <div class="kpi2-rank-n">${i+1}</div>
-      ${avatarHTML(e.r)}
-      <div class="kpi2-rank-nm">
-        <b>${e.r.name}</b>
-        <span>${e.r.subtitle||''}</span>
-      </div>
-      <div class="kpi2-rank-score">
-        <div class="kpi2-rank-stars">${_kpi2Stars(e.score)}</div>
-        <div class="kpi2-rank-num">${e.score==null?'—':e.score}</div>
-        <div class="kpi2-rank-trend ${e.trend.sign}">${e.trend.sign==='pos'?'↗':e.trend.sign==='neg'?'↘':'→'} ${e.trend.txt}</div>
-      </div>
-    </div>
-  `).join('');
+  // Если уже идёт расчёт для этого scope — просто ждём, не запускаем второй раз
+  if (_kpi2.rankLoading[scope]) return;
+  _kpi2.rankLoading[scope] = true;
+
+  try {
+    // Считаем ПРОГРЕССИВНО — каждая строка обновляется как только её оценка готова
+    const enriched = [];
+    await Promise.all(rows.map(async (r, idx) => {
+      const [score, trend] = await Promise.all([_kpi2Score(scope, r.id), _kpi2Trend(scope, r.id)]);
+      const item = { r, score, trend };
+      enriched[idx] = item;
+      // Обновляем строку inline (без пересортировки — сортируем в конце)
+      const listEl = document.querySelector('#kpi2-ranking .kpi2-rank-list');
+      const rowEl = listEl && listEl.querySelector(`[data-rid="${r.id||''}"]`);
+      if (rowEl && _kpi2.section4Tab === scope){
+        rowEl.querySelector('.kpi2-rank-score').innerHTML = `
+          <div class="kpi2-rank-stars">${_kpi2Stars(score)}</div>
+          <div class="kpi2-rank-num">${score==null?'—':score}</div>
+          <div class="kpi2-rank-trend ${trend.sign}">${trend.sign==='pos'?'↗':trend.sign==='neg'?'↘':'→'} ${trend.txt}</div>
+        `;
+      }
+    }));
+    // Все посчитаны — теперь пересортируем и перерендерим итог
+    enriched.sort((a,b) => (b.score ?? -1) - (a.score ?? -1));
+    _kpi2.rankCache[scope] = enriched;
+    if (_kpi2.section4Tab === scope){
+      const listEl = document.querySelector('#kpi2-ranking .kpi2-rank-list');
+      if (listEl) listEl.innerHTML = enriched.map((e, i) => _kpi2RankRowHTML(e.r, i, e)).join('');
+    }
+  } finally {
+    _kpi2.rankLoading[scope] = false;
+  }
+};
+
+/* Прогрев соседних вкладок в фоне */
+window._kpi2WarmRanking = async () => {
+  const others = ['member','team','project'].filter(s => s !== _kpi2.section4Tab);
+  for (const scope of others){
+    if (_kpi2.rankCache[scope] || _kpi2.rankLoading[scope]) continue;
+    const rows = _kpiScopeRows(scope).slice(0, 20);
+    if (!rows.length) continue;
+    _kpi2.rankLoading[scope] = true;
+    try {
+      const enriched = await Promise.all(rows.map(async r => {
+        const [score, trend] = await Promise.all([_kpi2Score(scope, r.id), _kpi2Trend(scope, r.id)]);
+        return { r, score, trend };
+      }));
+      enriched.sort((a,b) => (b.score ?? -1) - (a.score ?? -1));
+      _kpi2.rankCache[scope] = enriched;
+    } catch(e){}
+    _kpi2.rankLoading[scope] = false;
+  }
 };
 
 /* ═══════════ /KPI v2 ═══════════ */
