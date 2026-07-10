@@ -17530,6 +17530,461 @@ window.kpiLoadMyPerms = async () => {
 };
 /* ═══════════ /KPI FOUNDATION ═══════════ */
 
+/* ═══════════ KPI COMPUTE · OPERATIONAL ═══════════
+   Все функции: (scopeKind, scopeId, fromISO, toISO) → { value, sample_size, confidence, meta? }
+   confidence: 'ok' если sample_size >= sample_min, 'low' если > 0, null если 0.
+
+   Общий сборщик _kpiFetchOpsRaw() один раз тянет task_history + tasks + stage_history за период,
+   кэширует по (agency|fromISO|toISO) — переиспользуется всеми метриками.
+*/
+
+/* median из массива чисел */
+window._kpiMedian = (arr) => {
+  const a = arr.filter(x => x != null && !isNaN(x)).slice().sort((x,y) => x - y);
+  const n = a.length; if (!n) return null;
+  return n % 2 ? a[(n-1)/2] : (a[n/2-1] + a[n/2]) / 2;
+};
+
+/* стандартное отклонение (population) */
+window._kpiStddev = (arr) => {
+  const a = arr.filter(x => x != null && !isNaN(x));
+  const n = a.length; if (n < 2) return null;
+  const mean = a.reduce((s,v)=>s+v,0) / n;
+  const v = a.reduce((s,x)=>s+(x-mean)*(x-mean),0) / n;
+  return Math.sqrt(v);
+};
+
+/* уверенность результата по правилу sample_size vs sample_min */
+window._kpiConfidence = (metricKey, sampleSize) => {
+  const m = KPI_METRICS[metricKey]; if(!m) return null;
+  if (!sampleSize) return null;
+  return sampleSize >= (m.sample_min || 0) ? 'ok' : 'low';
+};
+
+/* Кэш raw-выборки на 2 минуты */
+window._kpiOpsRawCache = { key:null, ts:0, data:null };
+window._kpiFetchOpsRaw = async (fromISO, toISO) => {
+  if(!SB || !ME) return null;
+  const key = `${ME.agency_id}|${fromISO}|${toISO}`;
+  const now = Date.now();
+  if (_kpiOpsRawCache.key === key && (now - _kpiOpsRawCache.ts) < 120000) return _kpiOpsRawCache.data;
+  const [tr, thr, hr] = await Promise.all([
+    SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,created_at,time_spent,difficulty,priority'),
+    SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at').gte('created_at', fromISO).lte('created_at', toISO),
+    SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at').gte('created_at', fromISO).lte('created_at', toISO),
+  ]);
+  const tasks = (tr && !tr.error && tr.data) ? tr.data : [];
+  const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];
+  const stageHist = (hr && !hr.error && hr.data) ? hr.data : [];
+  // Индексы
+  const byTask = {}; tasks.forEach(t => { byTask[t.id] = t; });
+  const data = { tasks, taskHist, stageHist, byTask, fromISO, toISO };
+  _kpiOpsRawCache = { key, ts: now, data };
+  return data;
+};
+window._kpiInvalidateOpsRaw = () => { _kpiOpsRawCache = { key:null, ts:0, data:null }; };
+
+/* Резолвер team_members на дату (для scope='team') */
+window._kpiTeamMembers = async (teamId, atISO) => {
+  if(!SB || !teamId) return [];
+  const { data, error } = await SB.from('team_members').select('member_id,joined_at,left_at').eq('team_id', teamId);
+  if (error || !data) return [];
+  const at = atISO ? new Date(atISO).getTime() : Date.now();
+  return data.filter(r => new Date(r.joined_at).getTime() <= at && (!r.left_at || new Date(r.left_at).getTime() >= at)).map(r => r.member_id);
+};
+
+/* Внутренний фильтр задач/истории по scope */
+window._kpiFilterByScope = async (raw, scopeKind, scopeId) => {
+  if (scopeKind === 'agency' || !scopeKind) return { tasks: raw.tasks, taskHist: raw.taskHist, stageHist: raw.stageHist };
+  if (scopeKind === 'project'){
+    return {
+      tasks: raw.tasks.filter(t => t.project_id === scopeId),
+      taskHist: raw.taskHist.filter(h => (raw.byTask[h.task_id]||{}).project_id === scopeId),
+      stageHist: raw.stageHist.filter(h => h.project_id === scopeId),
+    };
+  }
+  if (scopeKind === 'member'){
+    const uid = scopeId;
+    return {
+      tasks: raw.tasks.filter(t => t.assignee_id === uid),
+      taskHist: raw.taskHist.filter(h => h.changed_by === uid || (raw.byTask[h.task_id]||{}).assignee_id === uid),
+      stageHist: raw.stageHist.filter(h => h.changed_by === uid),
+    };
+  }
+  if (scopeKind === 'team'){
+    const midSet = new Set(await _kpiTeamMembers(scopeId, raw.toISO));
+    return {
+      tasks: raw.tasks.filter(t => midSet.has(t.assignee_id)),
+      taskHist: raw.taskHist.filter(h => midSet.has(h.changed_by) || midSet.has((raw.byTask[h.task_id]||{}).assignee_id)),
+      stageHist: raw.stageHist.filter(h => midSet.has(h.changed_by)),
+    };
+  }
+  return { tasks:[], taskHist:[], stageHist:[] };
+};
+
+/* ── 1. cycle_time (медиана «активна → done» задачи, часы) ── */
+window.kpiComputeCycleTime = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
+  // Для каждой задачи, у которой в периоде был переход в done — найти последний прошлый переход в active
+  const byTask = {};
+  f.taskHist.forEach(h => { (byTask[h.task_id] || (byTask[h.task_id]=[])).push(h); });
+  const durs = [];
+  Object.entries(byTask).forEach(([tid, hs]) => {
+    hs.sort((a,b) => a.created_at < b.created_at ? -1 : 1);
+    let lastActiveAt = null;
+    for (const h of hs){
+      if (h.new_status === 'active' && h.old_status !== 'done') lastActiveAt = new Date(h.created_at).getTime();
+      else if (h.new_status === 'done' && lastActiveAt){
+        durs.push((new Date(h.created_at).getTime() - lastActiveAt) / 3600000);
+        lastActiveAt = null;
+      }
+    }
+  });
+  const med = _kpiMedian(durs);
+  return { value: med==null ? null : Math.round(med*10)/10, sample_size: durs.length, confidence: _kpiConfidence('cycle_time', durs.length) };
+};
+
+/* ── 2. ontime_rate ── */
+window.kpiComputeOnTimeRate = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
+  // задачи, закрытые в периоде (last new_status='done')
+  const doneEvents = f.taskHist.filter(h => h.new_status === 'done');
+  const lastDoneByTask = {};
+  doneEvents.forEach(h => { const p = lastDoneByTask[h.task_id]; if (!p || p.created_at < h.created_at) lastDoneByTask[h.task_id] = h; });
+  let ok = 0, total = 0;
+  Object.entries(lastDoneByTask).forEach(([tid, h]) => {
+    const t = raw.byTask[tid]; if(!t) return;
+    if (!t.due_date) return; // нет дедлайна — исключаем из выборки
+    total++;
+    const closedAt = new Date(h.created_at).getTime();
+    const dueAt = new Date(t.due_date + 'T23:59:59').getTime();
+    if (closedAt <= dueAt) ok++;
+  });
+  const val = total ? Math.round(1000 * ok / total) / 10 : null;
+  return { value: val, sample_size: total, confidence: _kpiConfidence('ontime_rate', total) };
+};
+
+/* ── 3. rework_rate ── */
+window.kpiComputeReworkRate = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
+  // возвраты: old_status IN ('done','review'), new_status = 'active'
+  const rework = f.taskHist.filter(h => (h.old_status === 'done' || h.old_status === 'review') && h.new_status === 'active').length;
+  // уникальные закрытые задачи (у которых был done в периоде)
+  const uniqDone = new Set(f.taskHist.filter(h => h.new_status === 'done').map(h => h.task_id)).size;
+  const val = uniqDone ? Math.round(1000 * rework / uniqDone) / 10 : null;
+  return { value: val, sample_size: uniqDone, confidence: _kpiConfidence('rework_rate', uniqDone), meta:{rework_events:rework} };
+};
+
+/* ── 4. throughput_w ── */
+window.kpiComputeThroughputWeighted = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
+  const wOf = (d) => ({easy:1, medium:2, hard:3.5})[d] || 1.5;
+  // считаем последнее done-событие каждой задачи в периоде
+  const lastDoneByTask = {};
+  f.taskHist.forEach(h => { if (h.new_status !== 'done') return; const p = lastDoneByTask[h.task_id]; if (!p || p.created_at < h.created_at) lastDoneByTask[h.task_id] = h; });
+  let sum = 0, n = 0;
+  Object.keys(lastDoneByTask).forEach(tid => { const t = raw.byTask[tid]; if(!t) return; sum += wOf(t.difficulty); n++; });
+  return { value: Math.round(sum*10)/10, sample_size: n, confidence: _kpiConfidence('throughput_w', n) };
+};
+
+/* ── 5. review_response (часы) ── */
+window.kpiComputeReviewResponse = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
+  // для каждой задачи: находим переход X→review, потом следующий review→Y — считаем разницу
+  const byTask = {}; f.taskHist.forEach(h => { (byTask[h.task_id] || (byTask[h.task_id]=[])).push(h); });
+  const durs = [];
+  Object.values(byTask).forEach(hs => {
+    hs.sort((a,b) => a.created_at < b.created_at ? -1 : 1);
+    let reviewAt = null;
+    for (const h of hs){
+      if (h.new_status === 'review') reviewAt = new Date(h.created_at).getTime();
+      else if (h.old_status === 'review' && reviewAt){
+        durs.push((new Date(h.created_at).getTime() - reviewAt) / 3600000);
+        reviewAt = null;
+      }
+    }
+  });
+  const mean = durs.length ? durs.reduce((s,x)=>s+x,0)/durs.length : null;
+  return { value: mean==null ? null : Math.round(mean*10)/10, sample_size: durs.length, confidence: _kpiConfidence('review_response', durs.length) };
+};
+
+/* ── Сборный вызов ops для scope: возвращает {metric_key:{value,sample_size,confidence}} ── */
+window.kpiComputeOpsAll = async (scopeKind, scopeId, fromISO, toISO) => {
+  const [ct, ot, rw, tp, rr] = await Promise.all([
+    kpiComputeCycleTime(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeOnTimeRate(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeReworkRate(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeThroughputWeighted(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeReviewResponse(scopeKind, scopeId, fromISO, toISO),
+  ]);
+  return { cycle_time:ct, ontime_rate:ot, rework_rate:rw, throughput_w:tp, review_response:rr };
+};
+/* ═══════════ /KPI COMPUTE · OPERATIONAL ═══════════ */
+
+/* ═══════════ KPI COMPUTE · SMM ═══════════
+   Читает reports (kind='SMM'), агрегирует по scope. Тип scope: project|team|agency.
+   Для team: агрегируем по проектам, где хотя бы один задействованный member команды — lead/PM.
+   Для agency: все проекты агентства.
+*/
+
+/* Кэш SMM-отчётов на 2 минуты */
+window._kpiSmmRawCache = { key:null, ts:0, data:null };
+window._kpiFetchSmmRaw = async (fromISO, toISO) => {
+  if(!SB || !ME) return null;
+  const key = `${ME.agency_id}|${fromISO}|${toISO}`;
+  const now = Date.now();
+  if (_kpiSmmRawCache.key === key && (now - _kpiSmmRawCache.ts) < 120000) return _kpiSmmRawCache.data;
+  // Все SMM-отчёты периода. Проектов агентства без RLS фильтровать не надо (RLS отсечёт).
+  const { data, error } = await SB.from('reports').select('id,project_id,published_at,payload')
+    .eq('kind','SMM').gte('published_at', fromISO).lte('published_at', toISO)
+    .order('published_at', {ascending:true});
+  if (error){ console.warn('kpiFetchSmmRaw', error); return null; }
+  const rows = (data||[]).map(r => ({
+    id: r.id, project_id: r.project_id, at: r.published_at,
+    m: (r.payload && r.payload.metrics) || {},
+    prev: (r.payload && r.payload.prev) || {},
+  }));
+  const cache = { rows, byProj: {} };
+  rows.forEach(r => { (cache.byProj[r.project_id] || (cache.byProj[r.project_id]=[])).push(r); });
+  _kpiSmmRawCache = { key, ts: now, data: cache };
+  return cache;
+};
+window._kpiInvalidateSmmRaw = () => { _kpiSmmRawCache = { key:null, ts:0, data:null }; };
+
+/* Резолвим набор project_id для scope */
+window._kpiSmmScopeProjects = async (scopeKind, scopeId) => {
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  if (scopeKind === 'project') return [scopeId];
+  if (scopeKind === 'agency' || !scopeKind) return P.map(x => x.id);
+  if (scopeKind === 'team'){
+    // Проекты, где lead или один из leads входит в команду
+    const mids = new Set(await _kpiTeamMembers(scopeId));
+    return P.filter(p => mids.has(p.lead_id) || (Array.isArray(p.leads) && p.leads.some(id => mids.has(id)))).map(p => p.id);
+  }
+  return [];
+};
+
+/* Хелпер для reach-weighted mean */
+const _wmean = (rows, valKey, wKey) => {
+  let sw = 0, sv = 0;
+  rows.forEach(r => {
+    const v = +r.m[valKey], w = +r.m[wKey];
+    if (v!=null && !isNaN(v) && w>0){ sv += v*w; sw += w; }
+  });
+  return sw ? sv / sw : null;
+};
+
+/* ── 1. smm_er (reach-weighted mean ER) ── */
+window.kpiComputeSmmER = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const pids = new Set(await _kpiSmmScopeProjects(scopeKind, scopeId));
+  const rows = raw.rows.filter(r => pids.has(r.project_id));
+  const val = _wmean(rows, 'er', 'total_reach');
+  return { value: val==null ? null : Math.round(val*100)/100, sample_size: rows.length, confidence: _kpiConfidence('smm_er', rows.length) };
+};
+
+/* ── 2. smm_reach (Reels + Stories, сумма) ── */
+window.kpiComputeSmmReach = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const pids = new Set(await _kpiSmmScopeProjects(scopeKind, scopeId));
+  const rows = raw.rows.filter(r => pids.has(r.project_id));
+  let sum = 0; rows.forEach(r => { sum += (+r.m.reels_reach||0) + (+r.m.stories_reach||0); });
+  return { value: sum, sample_size: rows.length, confidence: _kpiConfidence('smm_reach', rows.length) };
+};
+
+/* ── 3. smm_growth: % прирост followers ── */
+window.kpiComputeSmmGrowth = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const pids = await _kpiSmmScopeProjects(scopeKind, scopeId);
+  let totalStart = 0, totalEnd = 0, n = 0;
+  pids.forEach(pid => {
+    const rs = (raw.byProj[pid] || []).slice().sort((a,b) => a.at < b.at ? -1 : 1);
+    if (!rs.length) return;
+    const first = rs[0], last = rs[rs.length-1];
+    const s = +first.m.followers ?? +first.prev.followers;
+    const e = +last.m.followers  ?? +last.m.subscribers_current;
+    if (s>0 && e>0){ totalStart += s; totalEnd += e; n++; }
+  });
+  const val = totalStart>0 ? Math.round(1000*(totalEnd-totalStart)/totalStart)/10 : null;
+  return { value: val, sample_size: n, confidence: _kpiConfidence('smm_growth', n) };
+};
+
+/* ── 4. smm_discipline (stddev частоты постов, ниже = ровнее) ── */
+window.kpiComputeSmmDiscipline = async (scopeKind, scopeId, fromISO, toISO) => {
+  const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
+  const pids = new Set(await _kpiSmmScopeProjects(scopeKind, scopeId));
+  const rows = raw.rows.filter(r => pids.has(r.project_id));
+  const freqs = rows.map(r => +r.m.frequency).filter(x => x!=null && !isNaN(x) && x>=0);
+  const fallbacks = freqs.length < 3 ? rows.map(r => +r.m.posts_count).filter(x => x!=null && !isNaN(x) && x>=0) : [];
+  const arr = freqs.length >= 3 ? freqs : fallbacks;
+  const sd = _kpiStddev(arr);
+  return { value: sd==null ? null : Math.round(sd*100)/100, sample_size: arr.length, confidence: _kpiConfidence('smm_discipline', arr.length) };
+};
+
+/* ── 5. smm_score (композит) ── */
+window.kpiComputeSmmScore = async (scopeKind, scopeId, fromISO, toISO) => {
+  const [er, rc, gr, ds] = await Promise.all([
+    kpiComputeSmmER(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmReach(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmGrowth(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmDiscipline(scopeKind, scopeId, fromISO, toISO),
+  ]);
+  // Веса, пере-нормализация по доступным
+  const W = {smm_er:0.35, smm_reach:0.25, smm_growth:0.25, smm_discipline:0.15};
+  const parts = [
+    {k:'smm_er', v:er.value},
+    {k:'smm_reach', v:rc.value},
+    {k:'smm_growth', v:gr.value},
+    {k:'smm_discipline', v:ds.value}
+  ].filter(p => p.v != null);
+  if (!parts.length) return {value:null, sample_size:0, confidence:null, meta:{er,rc,gr,ds}};
+  const sumW = parts.reduce((s,p) => s + W[p.k], 0);
+  let acc = 0;
+  parts.forEach(p => { acc += (W[p.k]/sumW) * kpiNormalize(p.k, p.v); });
+  const val = Math.round(acc);
+  const n = er.sample_size + rc.sample_size + gr.sample_size + ds.sample_size;
+  return { value: val, sample_size: n, confidence: _kpiConfidence('smm_score', Math.min(er.sample_size, 2)), meta:{er,rc,gr,ds,parts} };
+};
+
+/* Сборный вызов SMM для scope */
+window.kpiComputeSmmAll = async (scopeKind, scopeId, fromISO, toISO) => {
+  const [er, rc, gr, ds] = await Promise.all([
+    kpiComputeSmmER(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmReach(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmGrowth(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmDiscipline(scopeKind, scopeId, fromISO, toISO),
+  ]);
+  const score = await kpiComputeSmmScore(scopeKind, scopeId, fromISO, toISO);
+  return { smm_er:er, smm_reach:rc, smm_growth:gr, smm_discipline:ds, smm_score:score };
+};
+
+/* ═══════════ /KPI COMPUTE · SMM ═══════════ */
+
+
+/* ═══════════ KPI COMPUTE · FINANCE + PORTFOLIO ═══════════
+   Для agency: агрегация по проектам и fin_snapshots.
+   Для project: берём projects.mrr/cost + связанные time_logs.
+   Для member/team: финансовые метрики недоступны (возвращаем null).
+*/
+
+/* ── margin_pct: (revenue - cost) / revenue × 100 ── */
+window.kpiComputeMarginPct = async (scopeKind, scopeId, fromISO, toISO) => {
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  let rev = 0, cost = 0, n = 0;
+  if (scopeKind === 'project'){
+    const p = P.find(x => x.id === scopeId); if (!p) return {value:null,sample_size:0,confidence:null};
+    rev = +p.mrr||0; cost = +p.cost||0; n = 1;
+  } else if (scopeKind === 'agency' || !scopeKind){
+    P.filter(p => p.status !== 'done' && p.status !== 'blocked').forEach(p => {
+      rev += +p.mrr||0; cost += +p.cost||0; n++;
+    });
+  } else return {value:null,sample_size:0,confidence:null};
+  const val = rev>0 ? Math.round(1000*(rev-cost)/rev)/10 : null;
+  return { value: val, sample_size: n, confidence: _kpiConfidence('margin_pct', n) };
+};
+
+/* ── profit_hour: profit / hours ── */
+window.kpiComputeProfitHour = async (scopeKind, scopeId, fromISO, toISO) => {
+  if(!SB) return {value:null,sample_size:0,confidence:null};
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  let rev = 0, cost = 0;
+  let pids = [];
+  if (scopeKind === 'project'){ const p = P.find(x => x.id === scopeId); if(!p) return {value:null,sample_size:0,confidence:null}; rev=+p.mrr||0; cost=+p.cost||0; pids=[scopeId]; }
+  else if (scopeKind === 'agency' || !scopeKind){ P.filter(p => p.status !== 'done' && p.status !== 'blocked').forEach(p => { rev+=+p.mrr||0; cost+=+p.cost||0; pids.push(p.id); }); }
+  else return {value:null,sample_size:0,confidence:null};
+  // time_logs за период
+  const { data } = await SB.from('time_logs').select('seconds,project_id').gte('started_at', fromISO).lte('started_at', toISO).in('project_id', pids);
+  const hours = ((data||[]).reduce((s,r)=>s+(r.seconds||0),0))/3600;
+  const profit = rev - cost;
+  const val = hours>0 ? Math.round(10*profit/hours)/10 : null;
+  return { value: val, sample_size: Math.round(hours), confidence: _kpiConfidence('profit_hour', Math.round(hours)) };
+};
+
+/* ── mrr: сумма активных ── */
+window.kpiComputeMRR = async (scopeKind, scopeId, fromISO, toISO) => {
+  if (scopeKind !== 'agency' && scopeKind) return {value:null,sample_size:0,confidence:null};
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  let sum = 0, n = 0;
+  P.filter(p => p.status !== 'done' && p.status !== 'blocked').forEach(p => { sum += +p.mrr||0; n++; });
+  return { value: sum, sample_size: n, confidence: _kpiConfidence('mrr', n) };
+};
+
+/* ── nrr: (mrr_end / mrr_start same-cohort) × 100 ── */
+window.kpiComputeNRR = async (scopeKind, scopeId, fromISO, toISO) => {
+  if(!SB || !ME) return {value:null,sample_size:0,confidence:null};
+  if (scopeKind !== 'agency' && scopeKind) return {value:null,sample_size:0,confidence:null};
+  const { data } = await SB.from('fin_snapshots').select('period,mrr').eq('agency_id', ME.agency_id).order('period');
+  const rows = (data||[]).filter(r => r.period && r.mrr!=null);
+  if (rows.length < 2) return {value:null, sample_size: rows.length, confidence:null};
+  const start = rows[0].mrr, end = rows[rows.length-1].mrr;
+  const val = start>0 ? Math.round(1000*end/start)/10 : null;
+  return { value: val, sample_size: rows.length, confidence: _kpiConfidence('nrr', rows.length) };
+};
+
+/* ── concentration: mrr крупнейшего / total × 100 ── */
+window.kpiComputeConcentration = async (scopeKind, scopeId, fromISO, toISO) => {
+  if (scopeKind !== 'agency' && scopeKind) return {value:null,sample_size:0,confidence:null};
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const active = P.filter(p => p.status !== 'done' && p.status !== 'blocked');
+  const totals = {};
+  active.forEach(p => { const cid = p.client_id || p.id; totals[cid] = (totals[cid]||0) + (+p.mrr||0); });
+  const totalSum = Object.values(totals).reduce((s,v)=>s+v,0);
+  if (!totalSum) return {value:null, sample_size:0, confidence:null};
+  const largest = Math.max(...Object.values(totals));
+  const val = Math.round(1000*largest/totalSum)/10;
+  return { value: val, sample_size: active.length, confidence: _kpiConfidence('concentration', active.length) };
+};
+
+/* ── portfolio_health: % проектов не в blocked/done ── */
+window.kpiComputePortfolioHealth = async (scopeKind, scopeId, fromISO, toISO) => {
+  if (scopeKind !== 'agency' && scopeKind) return {value:null,sample_size:0,confidence:null};
+  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const active = P.filter(p => p.status !== 'done');
+  if (!active.length) return {value:null, sample_size:0, confidence:null};
+  const healthy = active.filter(p => p.status !== 'blocked' && p.status !== 'at_risk').length;
+  const val = Math.round(1000*healthy/active.length)/10;
+  return { value: val, sample_size: active.length, confidence: _kpiConfidence('portfolio_health', active.length) };
+};
+
+/* Сборный вызов fin для agency */
+window.kpiComputeFinAll = async (scopeKind, scopeId, fromISO, toISO) => {
+  const [mp, ph, mr, nr, co, pf] = await Promise.all([
+    kpiComputeMarginPct(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeProfitHour(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeMRR(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeNRR(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeConcentration(scopeKind, scopeId, fromISO, toISO),
+    kpiComputePortfolioHealth(scopeKind, scopeId, fromISO, toISO),
+  ]);
+  return { margin_pct:mp, profit_hour:ph, mrr:mr, nrr:nr, concentration:co, portfolio_health:pf };
+};
+
+/* Универсальный сбор всех применимых метрик для scope */
+window.kpiComputeAll = async (scopeKind, scopeId, fromISO, toISO) => {
+  const out = {};
+  const applicable = Object.entries(KPI_METRICS).filter(([k,m]) => m.scope.includes(scopeKind));
+  const cats = new Set(applicable.map(([k,m]) => m.category));
+  const jobs = [];
+  if (cats.has('ops')) jobs.push(kpiComputeOpsAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
+  if (cats.has('smm')) jobs.push(kpiComputeSmmAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
+  if (cats.has('fin')) jobs.push(kpiComputeFinAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
+  await Promise.all(jobs);
+  // Фильтруем: возвращаем только применимые к scope
+  const applicableKeys = new Set(applicable.map(([k]) => k));
+  const filtered = {};
+  Object.entries(out).forEach(([k,v]) => { if (applicableKeys.has(k)) filtered[k] = v; });
+  return filtered;
+};
+
+/* ═══════════ /KPI COMPUTE · FINANCE + PORTFOLIO ═══════════ */
+
+
+
 
 /* ===== FINANCE · live P&L from projects.mrr / projects.cost ===== */
 window.tLoadFinance = async () => {
