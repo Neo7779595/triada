@@ -277,6 +277,10 @@ button{font-family:inherit}
 .pf-amt-suf{padding:0 11px;font-size:11px;font-family:var(--mono);color:var(--txt-3);background:var(--bg-2);border-left:1px solid var(--line-2);text-transform:uppercase;letter-spacing:.06em;height:100%;display:flex;align-items:center;flex:none}
 .pf-mini{width:32px;height:32px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-3);border-radius:8px;cursor:pointer;font-size:14px;line-height:1;transition:background .14s,color .14s,border-color .14s;display:inline-flex;align-items:center;justify-content:center;flex:none}
 .pf-mini:hover{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+/* Справочники расходов — компакт-кнопка добавления снизу */
+.fce-add{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:8px;padding:10px;border:1px dashed var(--line-2);border-radius:10px;background:transparent;color:var(--txt-3);font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;transition:background .14s,border-color .14s,color .14s}
+.fce-add span{font-size:15px;font-weight:700;line-height:1}
+.fce-add:hover{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 /* Итог qty×rate — редактируемый инпут */
 .pf-sum-input{width:auto;min-width:100px;text-align:right;background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 8px;font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent);transition:border-color .14s,background .14s}
 .pf-sum-input:hover{border-color:var(--line-2)}
@@ -14097,9 +14101,9 @@ function openFinCatalog(){
   FINCAT_EDIT={ roles:JSON.parse(JSON.stringify(d.roles)), cats:JSON.parse(JSON.stringify(d.cats)) };
   finCatRender();
 }
-function finCatRoleAdd(){ FINCAT_EDIT.roles.push({name:'',rate:0,unit:'month'}); finCatRender(); }
+function finCatRoleAdd(){ FINCAT_EDIT.roles.push({name:'',rate:0,unit:'month'}); finCatRender({focus:'role',idx:FINCAT_EDIT.roles.length-1}); }
 function finCatRoleDel(i){ FINCAT_EDIT.roles.splice(i,1); finCatRender(); }
-function finCatCatAdd(){ FINCAT_EDIT.cats.push({name:'',unit:'month'}); finCatRender(); }
+function finCatCatAdd(){ FINCAT_EDIT.cats.push({name:'',unit:'month'}); finCatRender({focus:'cat',idx:FINCAT_EDIT.cats.length-1}); }
 function finCatCatDel(i){ FINCAT_EDIT.cats.splice(i,1); finCatRender(); }
 function finCatSetRole(i,f,v){ FINCAT_EDIT.roles[i][f]= f==='rate'?Math.max(0,parseInt(v,10)||0):v; }
 function finCatSetCat(i,f,v){ FINCAT_EDIT.cats[i][f]=v; }
@@ -14115,16 +14119,17 @@ function finCatResetDefaults(){
   FINCAT_EDIT={ roles:JSON.parse(JSON.stringify(FIN_ROLES_DEFAULT)), cats:JSON.parse(JSON.stringify(FIN_CATS_DEFAULT)) };
   finCatRender();
 }
-function finCatRender(){
+function finCatRender(_opts){
+  const _fcPrevScroll=(function(){var mb=document.querySelector('#ov-pd2 .modal-b');return mb?mb.scrollTop:null;})();
   const unitSel=(id,cur,cb)=>_ddSel(id, FIN_UNITS.map(u=>[u[0],u[1]]), cur, cb, 'единица');
   const roleRows=FINCAT_EDIT.roles.map((r,i)=>`<div class="fce-row">
-    <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Роль (напр. Монтажёр)" oninput="finCatSetRole(${i},'name',this.value)" class="fce-name">
+    <input value="${(r.name||'').replace(/"/g,'&quot;')}" placeholder="Роль (напр. Монтажёр)" oninput="finCatSetRole(${i},'name',this.value)" class="fce-name" data-fc="role-${i}">
     ${unitSel('fcru-'+i, r.unit, v=>finCatSetRole(i,'unit',v))}
     <input type="number" min="0" step="10000" value="${r.rate||0}" oninput="finCatSetRole(${i},'rate',this.value)" class="fce-rate" placeholder="ставка">
     <button class="pf-del" onclick="finCatRoleDel(${i})" title="Удалить">✕</button>
   </div>`).join('');
   const catRows=FINCAT_EDIT.cats.map((c,i)=>`<div class="fce-row fce-row-cat">
-    <input value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="Категория (напр. Такси)" oninput="finCatSetCat(${i},'name',this.value)" class="fce-name">
+    <input value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="Категория (напр. Такси)" oninput="finCatSetCat(${i},'name',this.value)" class="fce-name" data-fc="cat-${i}">
     ${unitSel('fccu-'+i, c.unit, v=>finCatSetCat(i,'unit',v))}
     <button class="pf-del" onclick="finCatCatDel(${i})" title="Удалить">✕</button>
   </div>`).join('');
@@ -14135,15 +14140,39 @@ function finCatRender(){
         <label style="display:flex;justify-content:space-between;align-items:center">Роли сотрудников и ставки<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatRoleAdd()">+ Роль</button></label>
         <div class="fce-head"><span>название</span><span>единица</span><span>ставка</span><span></span></div>
         ${roleRows||'<div class="pf-empty">Пока нет ролей</div>'}
+        <button class="fce-add" onclick="finCatRoleAdd()"><span>+</span> добавить роль</button>
       </div>
       <div class="fld" style="margin-top:14px">
         <label style="display:flex;justify-content:space-between;align-items:center">Категории прочих расходов<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatCatAdd()">+ Категория</button></label>
         ${catRows||'<div class="pf-empty">Пока нет категорий</div>'}
+        <button class="fce-add" onclick="finCatCatAdd()"><span>+</span> добавить категорию</button>
       </div>
       <button class="btn-ghost" style="margin-top:12px;font-size:12.5px;color:var(--txt-3)" onclick="finCatResetDefaults()">↺ Вернуть стандартный список</button>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="FINCAT_EDIT=null; ${'window.PFIN?pfRender():pd2Close()'}">Отмена</button><button class="btn-add" onclick="finCatSaveClose()">✓ Сохранить</button></div>
   </div>`);
+  requestAnimationFrame(function(){
+    var mb=document.querySelector('#ov-pd2 .modal-b'); if(!mb) return;
+    // focus на новую строку, если добавили
+    if(_opts&&_opts.focus!=null){
+      var el=mb.querySelector('input[data-fc="'+_opts.focus+'-'+_opts.idx+'"]');
+      if(el){ el.focus(); try{ el.select(); }catch(_){} el.scrollIntoView({block:'center',behavior:'smooth'}); return; }
+    }
+    // иначе восстанавливаем скролл
+    if(_fcPrevScroll!=null) mb.scrollTop=_fcPrevScroll;
+  });
+  // Enter — на следующий инпут
+  (function(){
+    var modal=document.querySelector('#ov-pd2 .modal'); if(!modal||modal.__fcEnterBound)return; modal.__fcEnterBound=1;
+    modal.addEventListener('keydown',function(e){
+      if(e.key!=='Enter'||e.shiftKey) return;
+      var t=e.target; if(!t||t.tagName==='TEXTAREA'||t.tagName==='BUTTON') return;
+      e.preventDefault();
+      var els=Array.from(modal.querySelectorAll('input:not([disabled]):not([type="hidden"]), select:not([disabled])')).filter(function(el){return el.offsetParent!==null;});
+      var idx=els.indexOf(t); if(idx<0) return;
+      var next=els[idx+1]; if(next){ next.focus(); try{next.select&&next.select();}catch(_){} } else { t.blur(); }
+    });
+  })();
 }
 
 /* ——— finance helpers: hours format, filters, profit split ——— */
