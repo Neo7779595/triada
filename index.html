@@ -6011,6 +6011,13 @@ function agCanEdit(m){
   const p=me.permissions||{};
   return !!(p[m]&&p[m].edit);
 }
+function agCanEditProject(p){
+  if(agIsOwner()) return true;
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me || me.role!=='member' || !me.is_pm) return false;
+  // PM может редактировать только проекты, где он назначен ответственным
+  return !!(p && p.lead_id && String(p.lead_id)===String(me.id));
+}
 function agIsOwner(){
   const me=(window.tMe&&window.tMe())||null;
   return !me || me.role!=='member';                   // управлять командой может только владелец/админ
@@ -6118,8 +6125,8 @@ function projNote(i){
 function pjSaveNote(i){ const p=PROJECTS[i]; if(window.LIVE&&window.tProjectUpdate) return window.tProjectUpdate(p.id,{note:_v('pj-note')}); p.note=_v('pj-note');pd2Close();toast('Заметка сохранена'); }
 function pjTogStatus(el){[...el.parentNode.children].forEach(b=>b.classList.remove('on'));el.classList.add('on');}
 function projSettings(i){
-  if(!agIsOwner()){ toast('Настройки проекта доступны только владельцу'); return; }
   const p=PROJECTS[i];
+  if(!agCanEditProject(p)){ toast('Редактировать могут владелец агентства и ответственный проект-менеджер'); return; }
   const cats=_tagList('category',[],(p.cat&&p.cat!=='—')?p.cat:'');
   const svcs=_tagList('service',['SMM','PROD','DESIGN'],p.svc);
   const tariffs=_tagList('tariff',['Platinum','Gold','Silver'],p.tariff||'');
@@ -7104,7 +7111,7 @@ const _projCard=(p)=>{
         <div class="pjh-meta">
           <div class="pjh-head">
             <button class="pjh-name" onclick="event.stopPropagation();openProject(${idx})"><span class="pjh-name-t">${p.name}</span><span class="pjh-dot" style="background:${risk.color};box-shadow:0 0 8px -1px ${risk.color}" title="${risk.label}"></span></button>
-            ${agIsOwner()?`<button class="pjh-set" title="Настройки проекта" onclick="event.stopPropagation();projSettings(${idx})">${_setSVG}</button>`:''}
+            ${agCanEditProject(p)?`<button class="pjh-set" title="Настройки проекта" onclick="event.stopPropagation();projSettings(${idx})">${_setSVG}</button>`:''}
           </div>
           <div class="pjh-mgrid">
             <div class="pjh-mblk"><div class="mk">Профиль проекта</div><div class="mcls"><div class="mr"><span class="ml">Услуга</span><span class="mv ac">${p.svc||'—'}</span></div><div class="mr"><span class="ml">Категория</span><span class="mv">${(p.cat&&p.cat!=='—')?p.cat:'—'}</span></div><div class="mr"><span class="ml">Тариф</span><span class="mv">${(tar.name&&tar.name!=='—')?tar.name:'—'}</span></div></div></div>
