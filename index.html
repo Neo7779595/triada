@@ -6026,7 +6026,7 @@ function applyAgencyPerms(){
   if(np)np.style.display=(perms.projects&&perms.projects.edit)?'':'none';
   return first;
 }
-function agNav(m){
+function agNav(m){if(typeof _closePops==='function')_closePops();
   if(!agCanView(m)){ toast('Нет доступа к этому разделу'); return; }
   document.querySelectorAll('#app-ag .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.m===m));
   document.getElementById('ag-tb').innerHTML='Агентство<b>'+AG_MODULES[m]+'</b>';
@@ -6566,7 +6566,7 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
     +`</div></div>`;
 }
 function _closePops(){ document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
-function _ddPortalRelease(){ document.querySelectorAll('.dd-menu.dd-portal').forEach(function(m){ var home=m.__ddHome; if(home && home.parentNode){ home.parentNode.insertBefore(m,home); home.parentNode.removeChild(home); m.__ddHome=null; } m.classList.remove('dd-portal'); m.style.left=''; m.style.top=''; m.style.minWidth=''; }); }
+function _ddPortalRelease(){ document.querySelectorAll('.dd-menu.dd-portal').forEach(function(m){ var home=m.__ddHome; if(home && home.parentNode && document.body.contains(home)){ home.parentNode.insertBefore(m,home); home.parentNode.removeChild(home); m.__ddHome=null; m.classList.remove('dd-portal'); m.style.left=''; m.style.top=''; m.style.minWidth=''; } else { if(m.parentNode) m.parentNode.removeChild(m); } }); document.querySelectorAll('.dd.open').forEach(function(el){ el.classList.remove('open'); }); }
 function ddToggle(k){
   const el=document.getElementById('dd-'+k);if(!el)return;
   const o=el.classList.contains('open');_closePops();
@@ -7372,8 +7372,8 @@ function openProject(i){
   requestAnimationFrame(()=>{const _mb=document.getElementById('pd-minibar'); if(_mb)_mb.style.width=p.pct+'%';});
   if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).then(()=>{ if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id) renderPd(); });
 }
-function closeProject(){ document.getElementById('ov-proj').classList.remove('on'); }
-function pdTab(t){pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));var _hr=document.getElementById('pd-hdr-rep');if(_hr)_hr.style.display=(t==='smm'||t==='reports')?'':'none';renderPd();if(t==='content'){const _p=PROJECTS[pdIdx];if(_p&&window.LIVE&&window.SB){ if(!_p._cpLoad){_p._cpLoad=1;cpLoadServer(_p);} else if(typeof cpRefreshAppr==='function')cpRefreshAppr(_p); }}}
+function closeProject(){ if(typeof _closePops==='function')_closePops(); document.getElementById('ov-proj').classList.remove('on'); }
+function pdTab(t){if(typeof _closePops==='function')_closePops();pdTabCur=t;document.querySelectorAll('#pd-tabbar .pd-tab').forEach((b,i)=>b.classList.toggle('on',PD_TABS[i][0]===t));var _hr=document.getElementById('pd-hdr-rep');if(_hr)_hr.style.display=(t==='smm'||t==='reports')?'':'none';renderPd();if(t==='content'){const _p=PROJECTS[pdIdx];if(_p&&window.LIVE&&window.SB){ if(!_p._cpLoad){_p._cpLoad=1;cpLoadServer(_p);} else if(typeof cpRefreshAppr==='function')cpRefreshAppr(_p); }}}
 const PD_STNEXT={wait:'active',active:'review',review:'done'};
 function pkAdvance(taskId,cur){ const nx=PD_STNEXT[cur]; if(!nx){toast('Уже готово');return;} if(window.tTaskMove) window.tTaskMove(taskId,nx); }
 const PK_DONE_LIMIT=10; let PK_DONE='recent';
@@ -15563,6 +15563,7 @@ function _clApplyVisibility(){
   return hidden;
 }
 function clNav(m){
+  if(typeof _closePops==='function')_closePops();
   renderClShell();
   var _hidden=_clApplyVisibility();
   if(_hidden.indexOf(m)>=0) m='overview';
