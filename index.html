@@ -17311,6 +17311,226 @@ window.tLoadTeam = async () => {
   TEAMAGG = { assigned:tA, open:tO, overdue:tOv, v30:tV };
 };
 
+/* ═══════════ KPI FOUNDATION ═══════════
+   Единый словарь метрик + функции чтения/записи БД. Используется всеми уровнями
+   (Сотрудник/Команда/Проект/Агентство). Каждая метрика:
+     key, label(RU), unit, dir('up'|'down'), scope[], category('ops'|'smm'|'fin'),
+     formula, sample_min (мин. выборка для доверия), scale{soft,hard} (для 0–100 норм.).
+*/
+window.KPI_METRICS = {
+  // ── Операционные (все scope) ──
+  cycle_time:      { label:'Cycle time (медиана)',   unit:'ч',  dir:'down', scale:{soft:2,    hard:24},     scope:['member','team','project','agency'], category:'ops', sample_min:5, formula:'median(closed_at − active_at) над задачами scope' },
+  ontime_rate:     { label:'On-Time %',              unit:'%',  dir:'up',   scale:{soft:60,   hard:100},    scope:['member','team','project','agency'], category:'ops', sample_min:5, formula:'closed_before_due / closed_total × 100' },
+  rework_rate:     { label:'Rework rate',            unit:'%',  dir:'down', scale:{soft:5,    hard:30},     scope:['member','team','project','agency'], category:'ops', sample_min:5, formula:'reopened / closed_unique × 100' },
+  throughput_w:    { label:'Throughput (взвешенно)', unit:'ед.',dir:'up',   scale:{soft:1,    hard:20},     scope:['member','team','project'],          category:'ops', sample_min:0, formula:'Σ вес(difficulty) закрытых: easy=1, medium=2, hard=3.5' },
+  review_response: { label:'Review response',        unit:'ч',  dir:'down', scale:{soft:2,    hard:48},     scope:['member','team','project'],          category:'ops', sample_min:3, formula:'avg(часы от статуса review до его смены)' },
+  portfolio_health:{ label:'Portfolio Health',       unit:'%',  dir:'up',   scale:{soft:60,   hard:100},    scope:['agency'],                            category:'ops', sample_min:1, formula:'взвеш. доля проектов on_track/at_risk (не done, не blocked)' },
+  // ── SMM ──
+  smm_er:         { label:'ER (Engagement Rate)',    unit:'%',  dir:'up',   scale:{soft:1,    hard:20},     scope:['project','team','agency'],           category:'smm', sample_min:2, formula:'(likes+comments+shares+saves)/reach × 100' },
+  smm_reach:      { label:'Reach (Reels+Stories)',   unit:'',   dir:'up',   scale:{soft:1000, hard:1000000},scope:['project','team','agency'],           category:'smm', sample_min:1, formula:'Σ reels_reach + Σ stories_reach за период' },
+  smm_growth:     { label:'Followers growth rate',   unit:'%',  dir:'up',   scale:{soft:0.5,  hard:15},     scope:['project','team','agency'],           category:'smm', sample_min:1, formula:'(followers_end − followers_start)/followers_start × 100' },
+  smm_discipline: { label:'Content discipline',      unit:'σ',  dir:'down', scale:{soft:0.5,  hard:3},      scope:['project','team','agency'],           category:'smm', sample_min:4, formula:'stddev(частоты постов) — ниже = ровнее ритм' },
+  smm_score:      { label:'SMM Composite Score',     unit:'',   dir:'up',   scale:{soft:40,   hard:100},    scope:['project','team','agency'],           category:'smm', sample_min:2, composite:true, formula:'0.35·n(ER)+0.25·n(Reach)+0.25·n(Growth)+0.15·n(Discipline)' },
+  // ── Финансовые ──
+  margin_pct:    { label:'Margin %',            unit:'%', dir:'up',   scale:{soft:15,   hard:70},        scope:['project','agency'], category:'fin', sample_min:1, formula:'(revenue−cost)/revenue × 100' },
+  profit_hour:   { label:'Profit / hour',       unit:'$', dir:'up',   scale:{soft:5,    hard:150},       scope:['project','agency'], category:'fin', sample_min:1, formula:'profit / hours_logged' },
+  mrr:           { label:'MRR',                 unit:'$', dir:'up',   scale:{soft:1000, hard:1000000},   scope:['agency'],            category:'fin', sample_min:1, formula:'Σ mrr активных проектов' },
+  nrr:           { label:'NRR',                 unit:'%', dir:'up',   scale:{soft:80,   hard:130},       scope:['agency'],            category:'fin', sample_min:1, formula:'(mrr_end / mrr_start_same_cohort) × 100' },
+  concentration: { label:'Concentration risk', unit:'%',  dir:'down', scale:{soft:20,   hard:60},        scope:['agency'],            category:'fin', sample_min:1, formula:'mrr_largest_client / total_mrr × 100' },
+};
+
+/* ── Хелперы над справочником ── */
+window.kpiMetricsFor = (scope) => {
+  const out = {};
+  Object.entries(KPI_METRICS).forEach(([k,v])=>{ if (v.scope.includes(scope)) out[k]=v; });
+  return out;
+};
+window.kpiMetric = (key) => KPI_METRICS[key] || null;
+
+/* Нормализация значения в 0-100 с учётом направления и baseline/target (или scale) */
+window.kpiNormalize = (metricKey, value, baseline, target) => {
+  const m = KPI_METRICS[metricKey]; if(!m || value==null) return null;
+  const lo = baseline!=null ? baseline : m.scale.soft;
+  const hi = target!=null   ? target   : m.scale.hard;
+  if (lo === hi) return value >= hi ? 100 : 0;
+  let pct = (m.dir === 'up') ? 100*(value - lo)/(hi - lo) : 100*(lo - value)/(lo - hi);
+  return Math.max(0, Math.min(100, Math.round(pct)));
+};
+
+/* Дедуп-отпечаток алерта */
+window.kpiFingerprint = (kind, scopeKind, scopeId, metricKey) =>
+  [kind, scopeKind, scopeId||'null', metricKey||'null'].join('|');
+
+/* ═══ БД: периоды ═══ */
+window.kpiFetchPeriods = async (opts={}) => {
+  if(!SB || !ME) return [];
+  let q = SB.from('kpi_periods').select('*').eq('agency_id', ME.agency_id).order('start_date',{ascending:false});
+  if (opts.status) q = q.eq('status', opts.status);
+  if (opts.limit)  q = q.limit(opts.limit);
+  const { data, error } = await q;
+  if (error){ console.warn('kpiFetchPeriods', error); return []; }
+  return data || [];
+};
+window.kpiCreatePeriod = async (row) => {
+  if(!SB || !ME) return null;
+  const ins = Object.assign({ agency_id: ME.agency_id, created_by: ME.id, status:'planning' }, row);
+  const { data, error } = await SB.from('kpi_periods').insert(ins).select().single();
+  if (error){ toast('Не удалось создать период'); console.warn(error); return null; }
+  return data;
+};
+window.kpiActivatePeriod = async (id) => {
+  if(!SB) return false;
+  const { error } = await SB.from('kpi_periods').update({status:'active'}).eq('id', id);
+  return !error;
+};
+window.kpiClosePeriod = async (id) => {
+  if(!SB || !ME) return false;
+  const { error } = await SB.from('kpi_periods').update({
+    status:'closed', closed_at:new Date().toISOString(), closed_by: ME.id
+  }).eq('id', id);
+  return !error;
+};
+
+/* ═══ БД: цели ═══ */
+window.kpiFetchTargets = async (periodId, opts={}) => {
+  if(!SB) return [];
+  let q = SB.from('kpi_targets').select('*').eq('period_id', periodId);
+  if (opts.scope_kind) q = q.eq('scope_kind', opts.scope_kind);
+  if (opts.scope_id)   q = q.eq('scope_id',   opts.scope_id);
+  const { data, error } = await q;
+  if (error){ console.warn('kpiFetchTargets', error); return []; }
+  return data || [];
+};
+window.kpiUpsertTarget = async (row) => {
+  if(!SB || !ME) return null;
+  const m = KPI_METRICS[row.metric_key];
+  if (!m){ toast('Неизвестная метрика'); return null; }
+  const ins = Object.assign({
+    agency_id: ME.agency_id, set_by: ME.id, direction: m.dir, updated_at: new Date().toISOString()
+  }, row);
+  const { data, error } = await SB.from('kpi_targets').upsert(ins, {
+    onConflict:'period_id,scope_kind,scope_id,metric_key'
+  }).select().single();
+  if (error){ toast('Не удалось сохранить цель'); console.warn(error); return null; }
+  return data;
+};
+
+/* ═══ БД: снапшоты ═══ */
+window.kpiSaveSnapshot = async (row) => {
+  if(!SB || !ME) return null;
+  const ins = Object.assign({
+    agency_id: ME.agency_id, taken_at:new Date().toISOString(), granularity:'day', source:'auto', sample_size:0
+  }, row);
+  const { data, error } = await SB.from('kpi_snapshots').insert(ins).select().single();
+  if (error){ console.warn('kpiSaveSnapshot', error); return null; }
+  return data;
+};
+window.kpiFetchSnapshots = async (scopeKind, scopeId, metricKey, fromISO) => {
+  if(!SB) return [];
+  let q = SB.from('kpi_snapshots').select('taken_at,value,sample_size,granularity')
+    .eq('scope_kind', scopeKind).eq('metric_key', metricKey);
+  if (scopeId != null) q = q.eq('scope_id', scopeId); else q = q.is('scope_id', null);
+  if (fromISO) q = q.gte('taken_at', fromISO);
+  q = q.order('taken_at', {ascending:true}).limit(2000);
+  const { data, error } = await q;
+  if (error){ console.warn('kpiFetchSnapshots', error); return []; }
+  return data || [];
+};
+
+/* ═══ БД: риски (RMP) ═══ */
+window.kpiFetchRisks = async (opts={}) => {
+  if(!SB || !ME) return [];
+  let q = SB.from('kpi_risks').select('*').eq('agency_id', ME.agency_id);
+  if (opts.scope_kind) q = q.eq('scope_kind', opts.scope_kind);
+  if (opts.scope_id)   q = q.eq('scope_id',   opts.scope_id);
+  if (opts.status)     q = q.eq('status',     opts.status);
+  if (opts.period_id)  q = q.eq('period_id',  opts.period_id);
+  q = q.order('severity',{ascending:false}).order('created_at',{ascending:false});
+  const { data, error } = await q;
+  if (error){ console.warn('kpiFetchRisks', error); return []; }
+  return data || [];
+};
+window.kpiUpsertRisk = async (row) => {
+  if(!SB || !ME) return null;
+  const ins = Object.assign({ agency_id: ME.agency_id }, row);
+  if (!ins.created_by) ins.created_by = ME.id;
+  const q = row.id
+    ? SB.from('kpi_risks').update(ins).eq('id', row.id).select().single()
+    : SB.from('kpi_risks').insert(ins).select().single();
+  const { data, error } = await q;
+  if (error){ toast('Не удалось сохранить риск'); console.warn(error); return null; }
+  return data;
+};
+
+/* ═══ БД: алерты ═══ */
+window.kpiRaiseAlert = async (row) => {
+  if(!SB || !ME) return null;
+  const fp = window.kpiFingerprint(row.kind, row.scope_kind, row.scope_id, row.metric_key);
+  const now = new Date().toISOString();
+  const ins = Object.assign({
+    agency_id: ME.agency_id, fingerprint: fp,
+    first_seen_at: now, last_seen_at: now, severity:'warning'
+  }, row);
+  const { data, error } = await SB.from('kpi_alerts').upsert(ins, {
+    onConflict:'agency_id,fingerprint'
+  }).select().single();
+  if (error){ console.warn('kpiRaiseAlert', error); return null; }
+  if (data && data.first_seen_at !== ins.first_seen_at){
+    await SB.from('kpi_alerts').update({last_seen_at: now}).eq('id', data.id);
+  }
+  return data;
+};
+window.kpiFetchAlerts = async (opts={}) => {
+  if(!SB || !ME) return [];
+  let q = SB.from('kpi_alerts').select('*').eq('agency_id', ME.agency_id).is('resolved_at', null);
+  if (opts.scope_kind) q = q.eq('scope_kind', opts.scope_kind);
+  if (opts.scope_id)   q = q.eq('scope_id',   opts.scope_id);
+  q = q.order('severity',{ascending:false}).order('last_seen_at',{ascending:false});
+  const { data, error } = await q;
+  if (error){ console.warn('kpiFetchAlerts', error); return []; }
+  return data || [];
+};
+window.kpiResolveAlert = async (id) => {
+  if(!SB) return false;
+  const { error } = await SB.from('kpi_alerts').update({resolved_at:new Date().toISOString()}).eq('id', id);
+  return !error;
+};
+
+/* ═══ БД: команды (формальная модель) ═══ */
+window.kpiFetchTeams = async () => {
+  if(!SB || !ME) return [];
+  const { data, error } = await SB.from('teams')
+    .select('*, team_members(member_id, role_in_team, joined_at, left_at)')
+    .eq('agency_id', ME.agency_id).is('archived_at', null).order('name');
+  if (error){ console.warn('kpiFetchTeams', error); return []; }
+  return data || [];
+};
+
+/* ═══ Права ═══ */
+window.kpiCan = (action, scopeKind, scopeId) => {
+  if(!ME) return false;
+  if (ME.role === 'owner') return true;
+  if (scopeKind === 'project' && scopeId){
+    const p = (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===scopeId);
+    if (p && p.lead_id === ME.id) return true;
+    if (p && Array.isArray(p.leads) && p.leads.includes(ME.id)) return true;
+  }
+  const perms = window.MY_KPI_PERMS || [];
+  return perms.some(r =>
+    (!r.scope_kind || r.scope_kind === scopeKind) &&
+    (!r.scope_id   || r.scope_id   === scopeId) &&
+    r.actions && r.actions[action] === true
+  );
+};
+window.kpiLoadMyPerms = async () => {
+  if(!SB || !ME) return;
+  const { data, error } = await SB.from('kpi_permissions').select('*')
+    .eq('agency_id', ME.agency_id).eq('member_id', ME.id);
+  window.MY_KPI_PERMS = (error || !data) ? [] : data;
+};
+/* ═══════════ /KPI FOUNDATION ═══════════ */
+
+
 /* ===== FINANCE · live P&L from projects.mrr / projects.cost ===== */
 window.tLoadFinance = async () => {
   if (!SB) return;
