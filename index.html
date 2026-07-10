@@ -18116,6 +18116,24 @@ window._kpiShellHTML = () => {
       .kpi-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none}
       .kpi-tblwrap{overflow:auto;max-height:64vh;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
       .kpi-metric-h{display:flex;align-items:center;gap:6px;justify-content:flex-end;color:var(--txt-3);font-size:11px}
+      /* KPI · badge в сайдбаре */
+.kpi-nav-badge{margin-left:auto;background:var(--warn);color:#241900;padding:1px 7px;border-radius:8px;font-size:10.5px;font-weight:700;font-family:var(--mono);line-height:1.35;box-shadow:0 0 0 1.5px var(--bg)}
+.kpi-nav-badge.crit{background:var(--neg);color:#fff;animation:kpiPulse 2.4s ease-in-out infinite}
+@keyframes kpiPulse{0%,100%{box-shadow:0 0 0 1.5px var(--bg), 0 0 0 0 rgba(242,102,102,0.55)}50%{box-shadow:0 0 0 1.5px var(--bg), 0 0 0 6px rgba(242,102,102,0)}}
+/* KPI · плитка в Сводке */
+.kpi-ovtile{display:flex;align-items:center;gap:20px;padding:16px 20px;background:linear-gradient(135deg, rgba(138,143,255,.08), rgba(55,230,200,.04));border:1px solid var(--line);border-radius:14px;cursor:pointer;margin-bottom:14px;transition:all .18s var(--ease-out);position:relative;overflow:hidden}
+.kpi-ovtile:hover{border-color:rgba(138,143,255,.28);transform:translateY(-1px);box-shadow:0 6px 18px -8px rgba(0,0,0,.4)}
+.kpi-ovtile::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 90% 0%, rgba(138,143,255,.1), transparent 55%);pointer-events:none}
+.kpi-ovtile-l{flex:1;min-width:0}
+.kpi-ovtile-eb{color:var(--txt-3);text-transform:uppercase;font-size:10.5px;letter-spacing:.14em;margin-bottom:4px;font-weight:600}
+.kpi-ovtile-title{font-size:15.5px;font-weight:700;letter-spacing:-.005em}
+.kpi-ovtile-sub{color:var(--txt-3);font-size:12px;margin-top:2px;font-family:var(--mono)}
+.kpi-ovtile-r{display:flex;align-items:center;gap:22px;flex:none}
+.kpi-ovtile-metric{text-align:right;min-width:70px}
+.kpi-ovtile-vk{font-family:var(--mono);font-size:18px;font-weight:700;letter-spacing:-.01em}
+.kpi-ovtile-vl{font-size:10.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.kpi-ovtile-arrow{color:var(--txt-3);font-size:16px;transition:transform .18s}
+.kpi-ovtile:hover .kpi-ovtile-arrow{color:var(--accent);transform:translateX(3px)}
       .kpi-help{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.05);color:var(--txt-3);font-size:10px;display:inline-flex;align-items:center;justify-content:center;cursor:help}
 /* Блоки Цель/Минимум */
       .kpi-tgt-cell{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
@@ -20224,6 +20242,168 @@ window._kpiSetRenderMetrics = () => {
   `;
 };
 /* ═══════════ /KPI PHASE 6 ═══════════ */
+
+/* ═══════════ KPI PHASE 7 · integrations ═══════════
+   Пробрасываем KPI в другие модули: badge алертов в сайдбаре,
+   плитка в Сводке, настроенные веса в SMM Score.
+*/
+
+/* ── 1. SMM Composite Score теперь читает настроенные веса из _kpiWeights ── */
+const _kpiOrigSmmScore = window.kpiComputeSmmScore;
+window.kpiComputeSmmScore = async (scopeKind, scopeId, fromISO, toISO) => {
+  const [er, rc, gr, ds] = await Promise.all([
+    kpiComputeSmmER(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmReach(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmGrowth(scopeKind, scopeId, fromISO, toISO),
+    kpiComputeSmmDiscipline(scopeKind, scopeId, fromISO, toISO),
+  ]);
+  const wCfg = (window._kpiWeights && window._kpiWeights.smm_score) || { smm_er:35, smm_reach:25, smm_growth:25, smm_discipline:15 };
+  const W = { smm_er: wCfg.smm_er/100, smm_reach: wCfg.smm_reach/100, smm_growth: wCfg.smm_growth/100, smm_discipline: wCfg.smm_discipline/100 };
+  const parts = [
+    { k:'smm_er', v:er.value }, { k:'smm_reach', v:rc.value },
+    { k:'smm_growth', v:gr.value }, { k:'smm_discipline', v:ds.value }
+  ].filter(p => p.v != null);
+  if (!parts.length) return { value:null, sample_size:0, confidence:null, meta:{ er, rc, gr, ds }};
+  const sumW = parts.reduce((s,p) => s + W[p.k], 0);
+  let acc = 0;
+  parts.forEach(p => { acc += (W[p.k]/sumW) * kpiNormalize(p.k, p.v); });
+  const val = Math.round(acc);
+  const n = er.sample_size + rc.sample_size + gr.sample_size + ds.sample_size;
+  return { value: val, sample_size: n, confidence: _kpiConfidence('smm_score', Math.min(er.sample_size, 2)), meta:{ er, rc, gr, ds, parts, weights:wCfg } };
+};
+
+/* ── 2. Badge алертов в сайдбаре — рядом с пунктом KPI ── */
+window._kpiAlertsCache = { ts:0, count:0, critical:0 };
+
+window._kpiRefreshNavBadge = async () => {
+  if (!SB || !ME) return;
+  const now = Date.now();
+  // Кэш 2 минуты
+  if (_kpiAlertsCache.ts && now - _kpiAlertsCache.ts < 120000) { _kpiApplyNavBadge(); return; }
+  const alerts = await kpiFetchAlerts({});
+  const critical = alerts.filter(a => a.severity === 'critical').length;
+  _kpiAlertsCache = { ts: now, count: alerts.length, critical };
+  _kpiApplyNavBadge();
+};
+
+window._kpiApplyNavBadge = () => {
+  const nav = document.querySelector('.nav-i[data-m="kpi"]');
+  if (!nav) return;
+  // Убираем старый badge если есть
+  const old = nav.querySelector('.kpi-nav-badge'); if (old) old.remove();
+  const { count, critical } = _kpiAlertsCache;
+  if (!count) return;
+  const b = document.createElement('span');
+  b.className = 'kpi-nav-badge';
+  b.textContent = count;
+  b.title = `${count} активных сигналов${critical?', из них '+critical+' критичных':''}`;
+  if (critical > 0) b.classList.add('crit');
+  nav.appendChild(b);
+};
+
+/* Запуск при готовности сессии */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(_kpiRefreshNavBadge, 3000));
+} else {
+  setTimeout(_kpiRefreshNavBadge, 3000);
+}
+// Обновление раз в 5 минут
+setInterval(_kpiRefreshNavBadge, 5*60*1000);
+
+/* ── 3. Плитка KPI в Сводке ── */
+window._kpiOvHTML = () => `
+  <div class="kpi-ovtile" onclick="agNav('kpi')" title="Открыть модуль KPI">
+    <div class="kpi-ovtile-l">
+      <div class="kpi-ovtile-eb">KPI · агентство</div>
+      <div class="kpi-ovtile-title" id="kpi-ovtile-title">…</div>
+      <div class="kpi-ovtile-sub" id="kpi-ovtile-sub">загружаем период</div>
+    </div>
+    <div class="kpi-ovtile-r">
+      <div class="kpi-ovtile-metric">
+        <div class="kpi-ovtile-vk" id="kpi-ovtile-health">—</div>
+        <div class="kpi-ovtile-vl">здоровье портфеля</div>
+      </div>
+      <div class="kpi-ovtile-metric" id="kpi-ovtile-alerts-wrap">
+        <div class="kpi-ovtile-vk" id="kpi-ovtile-alerts" style="color:var(--txt-3)">—</div>
+        <div class="kpi-ovtile-vl">сигналов</div>
+      </div>
+      <div class="kpi-ovtile-arrow">→</div>
+    </div>
+  </div>
+`;
+
+window._kpiFillOvTile = async () => {
+  const periods = await kpiFetchPeriods({ limit: 5 });
+  const p = periods.find(x => x.status === 'active') || periods.find(x => x.status === 'planning') || periods[0];
+  const T = document.getElementById('kpi-ovtile-title');
+  const S = document.getElementById('kpi-ovtile-sub');
+  const H = document.getElementById('kpi-ovtile-health');
+  const A = document.getElementById('kpi-ovtile-alerts');
+  if (!T) return;
+  if (!p){
+    T.textContent = 'Период не создан';
+    S.textContent = 'кликните чтобы создать';
+    H.textContent = '—';
+    return;
+  }
+  T.textContent = p.name;
+  S.textContent = `${p.start_date} → ${p.end_date} · ${{active:'активный',planning:'планирование',closed:'закрыт'}[p.status]||p.status}`;
+  // Здоровье портфеля из agency scope
+  try {
+    const from = new Date(Date.now()-7*86400000).toISOString();
+    const to = new Date().toISOString();
+    const r = await kpiComputePortfolioHealth('agency', null, from, to);
+    if (r && r.value != null){
+      H.textContent = Math.round(r.value) + '%';
+      H.style.color = r.value >= 80 ? 'var(--pos)' : r.value >= 60 ? 'var(--warn)' : 'var(--neg)';
+    } else { H.textContent = '—'; }
+  } catch(e){ H.textContent = '—'; }
+  // Алерты (из кэша если есть)
+  const c = (_kpiAlertsCache && _kpiAlertsCache.count) || 0;
+  const crit = (_kpiAlertsCache && _kpiAlertsCache.critical) || 0;
+  A.textContent = c;
+  A.style.color = crit > 0 ? 'var(--neg)' : c > 0 ? 'var(--warn)' : 'var(--pos)';
+};
+
+/* Хук: после рендера Сводки вставляем плитку KPI в начало */
+const _kpiOrigRenderOverview = window.renderOverview;
+if (typeof _kpiOrigRenderOverview === 'function'){
+  window.renderOverview = function(){
+    const r = _kpiOrigRenderOverview.apply(this, arguments);
+    setTimeout(() => {
+      const content = document.getElementById('content-ag'); if(!content) return;
+      // Не дублируем плитку
+      if (content.querySelector('.kpi-ovtile')) return;
+      // Вставляем в самое начало (после hero или первого блока)
+      const first = content.firstElementChild; if(!first) return;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = _kpiOvHTML();
+      first.parentNode.insertBefore(wrap.firstElementChild, first);
+      _kpiFillOvTile();
+    }, 0);
+    return r;
+  };
+}
+
+/* ── 4. Обновление badge и refresh кэша после действий с алертами ── */
+const _origAck = window.kpiAckAlert;
+if (typeof _origAck === 'function'){
+  window.kpiAckAlert = async (id) => {
+    await _origAck(id);
+    _kpiAlertsCache.ts = 0; _kpiRefreshNavBadge();
+  };
+}
+const _origScan = window.kpiScanNow;
+if (typeof _origScan === 'function'){
+  window.kpiScanNow = async () => {
+    await _origScan();
+    _kpiAlertsCache.ts = 0; _kpiRefreshNavBadge();
+  };
+}
+
+/* ═══════════ /KPI PHASE 7 ═══════════ */
+
+
 
 
 
