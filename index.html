@@ -19256,6 +19256,684 @@ window._kpiRenderStats = (period, grid) => {
 
 /* ═══════════ /KPI PHASE 4 ═══════════ */
 
+/* ═══════════ KPI PHASE 5 · scope generalization ═══════════
+   Универсализирует блоки на Team / Project / Agency. Перекрывает функции Фаз 2-4.
+   Одна строка = один "row" scope (сотрудник / команда / проект / агентство).
+   Метрики фильтруются через KPI_METRICS.scope[].
+*/
+
+/* Загрузка teams в кэш при первом обращении */
+window._kpiLoadTeamsCache = async () => {
+  if (window._kpiTeams) return window._kpiTeams;
+  window._kpiTeams = await kpiFetchTeams();
+  return window._kpiTeams;
+};
+
+/* Абстракция rows по scope */
+window._kpiScopeRows = (scope) => {
+  if (scope === 'member'){
+    return (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member').map(m => ({
+      id: m._id || m.id,
+      name: m.name || m.full_name || '—',
+      subtitle: m.dept || m.role_title || '—',
+      avatarUrl: m.avatar_url,
+      color: m.color || 'var(--accent)',
+      initials: (m.name||m.full_name||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase(),
+    }));
+  }
+  if (scope === 'team'){
+    return (window._kpiTeams || []).map(t => ({
+      id: t.id,
+      name: t.name,
+      subtitle: (t.dept ? t.dept + ' · ' : '') + `${(t.team_members||[]).filter(x=>!x.left_at).length} чел.`,
+      color: t.color || 'var(--accent)',
+      initials: (t.name||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase(),
+    }));
+  }
+  if (scope === 'project'){
+    return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done').map(p => ({
+      id: p.id,
+      name: p.name || '—',
+      subtitle: (p.service || '—') + (p.category ? ' · ' + p.category : ''),
+      avatarUrl: p.logo_url || p.logo,
+      color: 'var(--accent)',
+      initials: (p.name||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase(),
+    }));
+  }
+  if (scope === 'agency'){
+    return [{ id: null, name: (ME && ME.agency_name) || 'Агентство', subtitle: 'портфельный уровень', color: 'var(--violet)', initials: 'AG' }];
+  }
+  return [];
+};
+
+/* Метрики применимые к scope, отсортированные по категории (ops → smm → fin) */
+window._kpiScopeMetricKeys = (scope) => {
+  const order = { ops:1, smm:2, fin:3 };
+  return Object.entries(KPI_METRICS)
+    .filter(([,m]) => m.scope.includes(scope))
+    .sort((a,b) => (order[a[1].category]||9) - (order[b[1].category]||9))
+    .map(([k]) => k);
+};
+
+/* Универсальный ключ строки в кэшах */
+window._kpiRowKey = (r) => (r.id == null ? 'agency' : r.id);
+
+/* Отрисовка аватара строки */
+window._kpiRowAvHTML = (r) => {
+  if (r.avatarUrl) return `<div class="kpi-av" style="background:transparent"><img src="${r.avatarUrl}"></div>`;
+  return `<div class="kpi-av" style="color:${r.color||'var(--accent)'}">${r.initials || '?'}</div>`;
+};
+
+/* Именной блок в первой колонке */
+window._kpiRowNameHTML = (r) => `
+  <div class="kpi-nameC">
+    ${_kpiRowAvHTML(r)}
+    <div><div class="kpi-nm">${r.name}</div><div class="kpi-nsub">${r.subtitle}</div></div>
+  </div>`;
+
+/* ═══ ПЕРЕОПРЕДЕЛЁННЫЙ COMPUTE BASELINES: обходит rows scope, зовёт kpiComputeAll ═══ */
+window._kpiComputeBaselines = async (period) => {
+  if (!period) return {};
+  const st = _kpiState;
+  const scope = st.scope;
+  const days = period.baseline_window_days || 30;
+  const start = new Date(period.start_date + 'T00:00:00').getTime();
+  const fromISO = new Date(start - days*86400000).toISOString();
+  const toISO = new Date(start).toISOString();
+  const rows = _kpiScopeRows(scope);
+  const out = {};
+  await Promise.all(rows.map(async r => {
+    out[_kpiRowKey(r)] = await kpiComputeAll(scope, r.id, fromISO, toISO);
+  }));
+  return out;
+};
+
+/* ═══ ПЕРЕОПРЕДЕЛЁННЫЙ LOAD CURRENTS ═══ */
+window._kpiLoadCurrents = async (period) => {
+  const st = _kpiState;
+  const scope = st.scope;
+  const key = `${period.id}|currents|${scope}`;
+  if (st._currentCacheKey === key && st.currents) return st.currents;
+  const rows = _kpiScopeRows(scope);
+  const metrics = _kpiScopeMetricKeys(scope);
+  const fnMap = {
+    cycle_time:'kpiComputeCycleTime', ontime_rate:'kpiComputeOnTimeRate', rework_rate:'kpiComputeReworkRate',
+    throughput_w:'kpiComputeThroughputWeighted', review_response:'kpiComputeReviewResponse',
+    smm_er:'kpiComputeSmmER', smm_reach:'kpiComputeSmmReach', smm_growth:'kpiComputeSmmGrowth',
+    smm_discipline:'kpiComputeSmmDiscipline', smm_score:'kpiComputeSmmScore',
+    margin_pct:'kpiComputeMarginPct', profit_hour:'kpiComputeProfitHour', mrr:'kpiComputeMRR',
+    nrr:'kpiComputeNRR', concentration:'kpiComputeConcentration', portfolio_health:'kpiComputePortfolioHealth',
+  };
+  const out = {};
+  const to = new Date().toISOString();
+  const from = new Date(Date.now()-7*86400000).toISOString();
+  await Promise.all(rows.map(async r => {
+    const rk = _kpiRowKey(r);
+    out[rk] = {};
+    // Пытаемся из свежих снапшотов; если пусто — на лету
+    await Promise.all(metrics.map(async k => {
+      const snapFrom = new Date(Date.now()-3*86400000).toISOString();
+      const snaps = await kpiFetchSnapshots(scope, r.id, k, snapFrom);
+      if (snaps.length){ out[rk][k] = snaps[snaps.length-1].value; return; }
+      const fn = window[fnMap[k]]; if(!fn){ out[rk][k] = null; return; }
+      try { const rr = await fn(scope, r.id, from, to); out[rk][k] = rr && rr.value; } catch(e){ out[rk][k] = null; }
+    }));
+  }));
+  st.currents = out;
+  st._currentCacheKey = key;
+  return out;
+};
+
+/* ═══ ПЕРЕОПРЕДЕЛЁННЫЙ LOAD TARGETS: агрегируем по scope ═══ */
+window._kpiLoadTargets = async (periodId, scopeKind) => {
+  const st = _kpiState;
+  st.targets[periodId] = st.targets[periodId] || {};
+  const rows = await kpiFetchTargets(periodId, { scope_kind: scopeKind });
+  rows.forEach(r => {
+    const rk = r.scope_id == null ? 'agency' : r.scope_id;
+    const key = `${r.scope_kind}:${rk}`;
+    st.targets[periodId][key] = st.targets[periodId][key] || {};
+    st.targets[periodId][key][r.metric_key] = {
+      baseline: r.baseline, target: r.target, minimum: r.minimum,
+      direction: r.direction, weight: r.weight, id: r.id,
+    };
+  });
+  return st.targets[periodId];
+};
+window._kpiGetTgt = (periodId, scopeKind, scopeId, metricKey) => {
+  const st = _kpiState;
+  const rk = scopeId == null ? 'agency' : scopeId;
+  const key = `${scopeKind}:${rk}`;
+  return (st.targets[periodId] && st.targets[periodId][key] && st.targets[periodId][key][metricKey]) || null;
+};
+
+/* ═══════════ БЛОКИ · scope-generic ═══════════ */
+
+/* ── Точка А ── */
+window._kpiBlkPointA = async (period) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const st = _kpiState;
+  if (st.scope === 'team') await _kpiLoadTeamsCache();
+  body.innerHTML = `<div class="kpi-empty">Считаем базу…</div>`;
+  const baselines = await _kpiComputeBaselines(period);
+  st.baselines[period.id] = baselines;
+  _kpiRenderPointATable(period, baselines);
+};
+
+window._kpiRenderPointATable = (period, baselines) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const st = _kpiState;
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const scopeName = {member:'сотрудники', team:'команды', project:'проекты', agency:'агентство'}[st.scope] || '';
+
+  const rowHTML = (r) => {
+    const data = baselines[_kpiRowKey(r)] || {};
+    return `
+      <tr>
+        <td>${_kpiRowNameHTML(r)}</td>
+        ${metrics.map(k => {
+          const v = data[k] || { value:null, confidence:null, sample_size:0 };
+          return `<td class="num"><span class="kpi-cell">${_kpiFmt(k, v.value)}${_kpiConfDot(v.confidence)}</span></td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Точка А · ${scopeName}</div>
+      <div class="kpi-body-sub">Медиана за <b>${period.baseline_window_days}</b> дней до <b>${period.start_date}</b>. <span style="display:inline-flex;gap:11px;margin-left:8px;font-size:11.5px"><span><span class="kpi-dot" style="background:var(--pos)"></span> достоверно</span><span><span class="kpi-dot" style="background:var(--warn)"></span> мало данных</span><span><span class="kpi-dot" style="background:var(--txt-3)"></span> нет</span></span></div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table">
+        <thead><tr><th>${{member:'Сотрудник',team:'Команда',project:'Проект',agency:'Скоуп'}[st.scope]||'—'}</th>${metrics.map(k => `<th class="num"><div class="kpi-metric-h">${KPI_METRICS[k].label}<span class="kpi-help" title="${KPI_METRICS[k].formula}">?</span></div></th>`).join('')}</tr></thead>
+        <tbody>
+          ${rows.map(rowHTML).join('')}
+          ${rows.length===0?`<tr><td colspan="${metrics.length+1}" style="text-align:center;color:var(--txt-3);padding:30px">Нет строк для выбранного уровня.</td></tr>`:''}
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
+/* ── Цель / Минимум ── */
+window._kpiBlkTargetLike = async (period, mode) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  if (st.scope === 'team') await _kpiLoadTeamsCache();
+  body.innerHTML = `<div class="kpi-empty">Готовим…</div>`;
+  if (!st.baselines[period.id]) st.baselines[period.id] = await _kpiComputeBaselines(period);
+  await _kpiLoadTargets(period.id, st.scope);
+  _kpiRenderTargetLikeTable(period, mode);
+};
+
+window._kpiRenderTargetLikeTable = (period, mode) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const st = _kpiState;
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const baselines = st.baselines[period.id] || {};
+  const title = mode === 'target' ? 'Цель' : 'Минимум';
+  const scopeName = {member:'сотрудники', team:'команды', project:'проекты', agency:'агентство'}[st.scope] || '';
+  const desc = mode === 'target'
+    ? 'Куда стремимся к концу периода. Стрелка ↑ — метрика должна расти, ↓ — снижаться. Подсказка в поле — предложенное значение.'
+    : 'Порог, ниже которого — красная зона.';
+  const suggestFn = mode === 'target' ? kpiSuggestTarget : kpiSuggestMin;
+  const readOnly = !kpiCan('set_target', st.scope, null);
+
+  const rowHTML = (r) => {
+    const rk = _kpiRowKey(r);
+    return `
+      <tr>
+        <td>${_kpiRowNameHTML(r)}</td>
+        ${metrics.map(k => {
+          const base = ((baselines[rk]||{})[k]||{}).value;
+          const tgt = _kpiGetTgt(period.id, st.scope, r.id, k) || {};
+          const cur = mode === 'target' ? tgt.target : tgt.minimum;
+          const suggested = suggestFn(k, base);
+          const M = KPI_METRICS[k];
+          const arrow = M.dir === 'up' ? '↑' : '↓';
+          const inputId = `kpi-inp-${mode}-${rk}-${k}`;
+          const ph = suggested != null ? String(suggested) : '—';
+          const rowIdArg = r.id == null ? 'null' : `'${r.id}'`;
+          return `<td class="num">
+            <div class="kpi-tgt-cell">
+              <div class="kpi-tgt-base">от ${_kpiFmt(k, base)}</div>
+              <div class="kpi-tgt-row">
+                <span class="kpi-tgt-arrow" style="color:${M.dir==='up'?'var(--pos)':'var(--warn)'}">${arrow}</span>
+                <input id="${inputId}" class="kpi-tgt-input" type="text" inputmode="decimal" value="${cur!=null?cur:''}" ${readOnly?'disabled':''} placeholder="${ph}" onblur="kpiSaveTarget(${rowIdArg},'${k}','${mode}',this.value,${base==null?'null':base})" />
+              </div>
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">${title} · ${scopeName}</div>
+      <div class="kpi-body-sub">${desc}${readOnly?' <span style="color:var(--warn)">· нет прав менять</span>':''}</div>
+      ${readOnly?'':`<button class="kpi-cta" style="padding:7px 12px;font-size:12px;white-space:nowrap" onclick="kpiFillAllSuggested('${mode}')">Заполнить предложенным</button>`}
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table kpi-table-tgt">
+        <thead><tr><th>${{member:'Сотрудник',team:'Команда',project:'Проект',agency:'Скоуп'}[st.scope]||'—'}</th>${metrics.map(k => `<th class="num"><div class="kpi-metric-h">${KPI_METRICS[k].label}<span class="kpi-help" title="${KPI_METRICS[k].dir==='up'?'выше — лучше':'ниже — лучше'}. ${KPI_METRICS[k].formula}">?</span></div></th>`).join('')}</tr></thead>
+        <tbody>
+          ${rows.map(rowHTML).join('')}
+          ${rows.length===0?`<tr><td colspan="${metrics.length+1}" style="text-align:center;color:var(--txt-3);padding:30px">Нет строк.</td></tr>`:''}
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
+/* Сохранение цели/мин — универсально по scope */
+window.kpiSaveTarget = async (rowId, metricKey, mode, rawValue, baseline) => {
+  const st = _kpiState;
+  const period = st.periods.find(p => p.id === st.periodId); if(!period) return;
+  const raw = rawValue == null ? '' : String(rawValue).replace(',', '.').replace(/[^\d.\-]/g,'');
+  const val = raw === '' ? null : Number(raw);
+  if (val != null && isNaN(val)){ if(typeof toast==='function') toast('Не число'); return; }
+  const existing = _kpiGetTgt(period.id, st.scope, rowId, metricKey) || {};
+  const row = {
+    period_id: period.id, scope_kind: st.scope, scope_id: rowId, metric_key: metricKey,
+    baseline: existing.baseline != null ? existing.baseline : baseline,
+  };
+  if (mode === 'target')  row.target = val;
+  else                    row.minimum = val;
+  if (mode === 'target'  && existing.minimum != null) row.minimum = existing.minimum;
+  if (mode === 'minimum' && existing.target  != null) row.target  = existing.target;
+  const saved = await kpiUpsertTarget(row);
+  if (!saved) return;
+  const rk = rowId == null ? 'agency' : rowId;
+  const key = `${st.scope}:${rk}`;
+  st.targets[period.id] = st.targets[period.id] || {};
+  st.targets[period.id][key] = st.targets[period.id][key] || {};
+  st.targets[period.id][key][metricKey] = {
+    baseline: saved.baseline, target: saved.target, minimum: saved.minimum,
+    direction: saved.direction, weight: saved.weight, id: saved.id,
+  };
+  const inpId = `kpi-inp-${mode}-${rk}-${metricKey}`;
+  const inp = document.getElementById(inpId);
+  if (inp){ inp.style.borderColor = 'var(--pos)'; setTimeout(()=>{ inp.style.borderColor = ''; }, 700); }
+};
+
+/* Массовое заполнение — универсально */
+window.kpiFillAllSuggested = async (mode) => {
+  const st = _kpiState;
+  const period = st.periods.find(p => p.id === st.periodId); if(!period) return;
+  if (!kpiCan('set_target', st.scope, null)) return;
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const baselines = st.baselines[period.id] || {};
+  const suggestFn = mode === 'target' ? kpiSuggestTarget : kpiSuggestMin;
+  let saved = 0;
+  for (const r of rows){
+    const rk = _kpiRowKey(r);
+    for (const k of metrics){
+      const base = ((baselines[rk]||{})[k]||{}).value;
+      if (base == null) continue;
+      const cur = _kpiGetTgt(period.id, st.scope, r.id, k) || {};
+      const already = mode==='target' ? cur.target : cur.minimum;
+      if (already != null) continue;
+      const val = suggestFn(k, base);
+      if (val == null) continue;
+      await kpiSaveTarget(r.id, k, mode, String(val), base);
+      saved++;
+    }
+  }
+  if (typeof toast==='function') toast(saved ? `Заполнено ${saved} значений` : 'Все значения уже заданы');
+  _kpiRenderTargetLikeTable(period, mode);
+};
+
+/* ── RPM · RMP ── */
+window._kpiBlkRPMRMP = async (period) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  if (st.scope === 'team') await _kpiLoadTeamsCache();
+  body.innerHTML = `<div class="kpi-empty">Считаем темп…</div>`;
+  if (!st.baselines[period.id]) st.baselines[period.id] = await _kpiComputeBaselines(period);
+  await _kpiLoadTargets(period.id, st.scope);
+  st.risks[period.id] = await kpiFetchRisks({ period_id: period.id });
+  _kpiRenderRPMRMP(period);
+};
+
+window._kpiRenderRPM = async (period) => {
+  const cont = document.getElementById('kpi-rmp-content'); if(!cont) return;
+  const st = _kpiState;
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const baselines = st.baselines[period.id] || {};
+  const currents = await _kpiLoadCurrents(period);
+  const now = Date.now();
+  const startMs = new Date(period.start_date+'T00:00:00').getTime();
+  const endMs   = new Date(period.end_date  +'T23:59:59').getTime();
+  const totalDays = Math.max(1, Math.round((endMs-startMs)/86400000));
+  const elapsedDays = Math.max(0, Math.min(totalDays, Math.round((now-startMs)/86400000)));
+  const remainingDays = Math.max(0, totalDays-elapsedDays);
+  const pct = totalDays ? Math.round(100*elapsedDays/totalDays) : 0;
+
+  const rowHTML = (r) => {
+    const rk = _kpiRowKey(r);
+    return `
+      <tr>
+        <td>${_kpiRowNameHTML(r)}</td>
+        ${metrics.map(k => {
+          const base = ((baselines[rk]||{})[k]||{}).value;
+          const tgt = _kpiGetTgt(period.id, st.scope, r.id, k) || {};
+          const target = tgt.target;
+          const cur = (currents[rk] && currents[rk][k] != null) ? currents[rk][k] : base;
+          if (base == null || target == null){
+            return `<td class="num"><span class="kpi-cell" style="color:var(--txt-3)">${target==null?'нет цели':'нет базы'}</span></td>`;
+          }
+          const M = KPI_METRICS[k];
+          const totalDelta = target - base;
+          const currentDelta = cur - base;
+          const progress = totalDelta === 0 ? 100 : Math.max(0, Math.min(100, Math.round(100*currentDelta/totalDelta)));
+          const onTrack = progress >= pct;
+          const color = onTrack ? 'var(--pos)' : progress >= pct-15 ? 'var(--warn)' : 'var(--neg)';
+          const status = onTrack ? 'в темпе' : progress >= pct-15 ? 'отстаём' : 'риск срыва';
+          return `<td class="num">
+            <div class="kpi-rpm-cell">
+              <div class="kpi-rpm-val">${_kpiFmt(k, cur)} <span class="kpi-rpm-arrow">→</span> <span style="color:var(--txt-3)">${_kpiFmt(k, target)}</span></div>
+              <div class="kpi-rpm-bar"><div class="kpi-rpm-fill" style="width:${progress}%;background:${color}"></div><div class="kpi-rpm-mark" style="left:${pct}%"></div></div>
+              <div class="kpi-rpm-hint" style="color:${color}">${status} · ${progress}% при ${pct}%</div>
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  const noTargets = rows.every(r => { const rk=_kpiRowKey(r); return metrics.every(k => !(_kpiGetTgt(period.id, st.scope, r.id, k)||{}).target); });
+  if (noTargets){ cont.innerHTML = `<div class="kpi-empty" style="padding:36px 20px"><h4>Целей ещё нет</h4><p>Задайте цели на вкладке «Цель» — тогда RPM покажет темп движения к ним.</p></div>`; return; }
+
+  cont.innerHTML = `
+    <div class="kpi-rpm-head">
+      <div class="kpi-rpm-clock">
+        <div class="kpi-rpm-clock-l"><b>Прошло ${elapsedDays}</b> из ${totalDays} дней · осталось <b>${remainingDays}</b> · <span style="color:var(--accent)">${pct}%</span></div>
+        <div class="kpi-rpm-clock-bar"><div class="kpi-rpm-clock-fill" style="width:${pct}%"></div></div>
+      </div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table kpi-table-rpm">
+        <thead><tr><th>${{member:'Сотрудник',team:'Команда',project:'Проект',agency:'Скоуп'}[st.scope]||'—'}</th>${metrics.map(k => `<th class="num">${KPI_METRICS[k].label}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(rowHTML).join('')}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;font-size:11.5px;color:var(--txt-3);padding:0 4px;line-height:1.5">Заливка = % пути к цели, вертикальная риска = % времени.</div>
+  `;
+};
+
+/* RMP — универсально фильтруем риски по scope */
+window._kpiRenderRMP = (period) => {
+  const cont = document.getElementById('kpi-rmp-content'); if(!cont) return;
+  const st = _kpiState;
+  const allRisks = st.risks[period.id] || [];
+  // Показываем риски scope + агентские (общие) когда мы не на agency
+  const risks = allRisks.filter(r => r.scope_kind === st.scope || (st.scope !== 'agency' && r.scope_kind === 'agency'));
+  const canEdit = kpiCan('edit_risks', st.scope, null);
+  const sevBadge = { critical:['#F26666','крит'], high:['#F0785C','высок.'], med:['#E3B567','сред.'], low:['#5BC8F5','низк.'] };
+  const statBadge = { open:['var(--warn)','открыт'], in_progress:['var(--violet)','в работе'], mitigated:['var(--pos)','снят'], accepted:['var(--txt-3)','принят'] };
+  const active = risks.filter(r => r.status==='open' || r.status==='in_progress').length;
+  cont.innerHTML = `
+    <div class="kpi-rmp-head">
+      <div class="kpi-rmp-l"><b>${active}</b> активных · <span style="color:var(--txt-3)">${risks.length} всего</span></div>
+      ${canEdit?`<button class="kpi-cta" style="padding:7px 12px;font-size:12px" onclick="kpiOpenNewRisk()">+ Добавить риск</button>`:''}
+    </div>
+    <div class="kpi-risks">
+      ${risks.length===0 ? `<div class="kpi-empty" style="padding:36px 20px"><h4>Рисков не зафиксировано</h4><p>Событие, которое может помешать достижению цели.</p>${canEdit?'<button class="kpi-cta" onclick="kpiOpenNewRisk()">+ Добавить первый риск</button>':''}</div>`
+      : risks.map(r => {
+        const sv = sevBadge[r.severity] || sevBadge.med;
+        const sc = sv[0], sl = sv[1];
+        const stt = statBadge[r.status] || statBadge.open;
+        const tc = stt[0], tl = stt[1];
+        return `
+          <div class="kpi-risk">
+            <div class="kpi-risk-t">
+              <span class="kpi-risk-sev" style="background:${sc}22;color:${sc};border:1px solid ${sc}44">${sl}</span>
+              <div class="kpi-risk-title">${r.title||'Без названия'}</div>
+              <span class="kpi-risk-st" style="color:${tc}">● ${tl}</span>
+              ${canEdit?`<div class="kpi-risk-act"><span class="kpi-help" style="cursor:pointer" title="Меню" onclick="kpiRiskMenu('${r.id}',event)">⋯</span></div>`:''}
+            </div>
+            ${r.description?`<div class="kpi-risk-desc">${r.description}</div>`:''}
+            ${r.mitigation?`<div class="kpi-risk-mit"><b>План:</b> ${r.mitigation}</div>`:''}
+            <div class="kpi-risk-meta">
+              ${r.due_date?`<span>до <b>${r.due_date}</b></span>`:''}
+              ${r.owner_id?`<span>ответственный: <b>${_kpiMemberName(r.owner_id)}</b></span>`:''}
+              <span>источник: ${{alert:'алерт',manual:'вручную',trend:'тренд',forecast:'прогноз'}[r.source]||r.source}</span>
+              <span style="color:var(--txt-3)">${r.scope_kind}</span>
+            </div>
+          </div>`;
+      }).join('')}
+    </div>
+  `;
+};
+
+/* ── Прогноз ── */
+window._kpiBlkForecast = async (period) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  if (st.scope === 'team') await _kpiLoadTeamsCache();
+  const scopeName = {member:'сотрудники', team:'команды', project:'проекты', agency:'агентство'}[st.scope] || '';
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Прогноз · ${scopeName}</div>
+      <div class="kpi-body-sub">Тренд за 8 недель + линейная экстраполяция к <b>${period.end_date}</b>.</div>
+    </div>
+    <div class="kpi-empty" id="kpi-fc-loading">Считаем ряды за 8 недель…</div>
+  `;
+  await _kpiLoadTargets(period.id, st.scope);
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const grid = {};
+  for (const r of rows){
+    grid[_kpiRowKey(r)] = {};
+    for (const k of metrics){
+      grid[_kpiRowKey(r)][k] = await kpiComputeMetricSeries(st.scope, r.id, k, 8);
+    }
+  }
+  _kpiRenderForecast(period, grid);
+};
+
+window._kpiRenderForecast = (period, grid) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const st = _kpiState;
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const scopeName = {member:'сотрудники', team:'команды', project:'проекты', agency:'агентство'}[st.scope] || '';
+
+  const rowHTML = (r) => {
+    const rk = _kpiRowKey(r);
+    return `
+      <tr>
+        <td>${_kpiRowNameHTML(r)}</td>
+        ${metrics.map(k => {
+          const pts = (grid[rk]||{})[k] || [];
+          const tgt = _kpiGetTgt(period.id, st.scope, r.id, k) || {};
+          const forecast = _kpiLinearForecast(pts, period.end_date+'T23:59:59');
+          const M = KPI_METRICS[k];
+          const good = tgt.target != null && forecast != null
+            ? (M.dir === 'up' ? forecast >= tgt.target : forecast <= tgt.target)
+            : null;
+          const color = good===true ? 'var(--pos)' : good===false ? 'var(--warn)' : 'var(--txt-3)';
+          const badge = tgt.target == null ? '' : good===true ? '✓ попадём' : good===false ? '✗ мимо' : '?';
+          const delta = (tgt.target != null && forecast != null) ? (forecast - tgt.target) : null;
+          return `<td class="num">
+            <div class="kpi-fc-cell">
+              ${_kpiSpark(pts, {w:88, h:22, color})}
+              <div class="kpi-fc-val" style="color:${color}">${forecast==null?'—':_kpiFmt(k, forecast)}</div>
+              <div class="kpi-fc-hint">${badge}${delta!=null?' · Δ '+(delta>0?'+':'')+_kpiFmt(k, delta):''}</div>
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Прогноз · ${scopeName}</div>
+      <div class="kpi-body-sub">Тренд за 8 недель + линейная экстраполяция к <b>${period.end_date}</b>.</div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table kpi-table-fc">
+        <thead><tr><th>${{member:'Сотрудник',team:'Команда',project:'Проект',agency:'Скоуп'}[st.scope]||'—'}</th>${metrics.map(k => `<th class="num">${KPI_METRICS[k].label}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(rowHTML).join('')}</tbody>
+      </table>
+    </div>
+  `;
+};
+
+/* ── Статистика ── */
+window._kpiBlkStats = async (period) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  if (st.scope === 'team') await _kpiLoadTeamsCache();
+  const scopeName = {member:'сотрудники', team:'команды', project:'проекты', agency:'агентство'}[st.scope] || '';
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Статистика · ${scopeName}</div>
+      <div class="kpi-body-sub">Исторические ряды за 8 недель. Тренд, Δ, медиана.</div>
+    </div>
+    <div class="kpi-empty" id="kpi-st-loading">Считаем ряды…</div>
+  `;
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const grid = {};
+  for (const r of rows){
+    grid[_kpiRowKey(r)] = {};
+    for (const k of metrics){
+      grid[_kpiRowKey(r)][k] = await kpiComputeMetricSeries(st.scope, r.id, k, 8);
+    }
+  }
+  _kpiRenderStats(period, grid);
+};
+
+window._kpiRenderStats = (period, grid) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const st = _kpiState;
+  const rows = _kpiScopeRows(st.scope);
+  const metrics = _kpiScopeMetricKeys(st.scope);
+  const scopeName = {member:'сотрудники', team:'команды', project:'проекты', agency:'агентство'}[st.scope] || '';
+
+  const rowHTML = (r) => {
+    const rk = _kpiRowKey(r);
+    return `
+      <tr>
+        <td>${_kpiRowNameHTML(r)}</td>
+        ${metrics.map(k => {
+          const pts = (grid[rk]||{})[k] || [];
+          const valid = pts.filter(p => p.value != null);
+          if (valid.length < 2) return `<td class="num"><span class="kpi-cell" style="color:var(--txt-3)">мало данных</span></td>`;
+          const M = KPI_METRICS[k];
+          const first = valid[0].value, last = valid[valid.length-1].value;
+          const delta = last - first;
+          const dir = M.dir === 'up' ? (delta > 0 ? '↑' : delta < 0 ? '↓' : '→') : (delta < 0 ? '↑' : delta > 0 ? '↓' : '→');
+          const good = M.dir === 'up' ? delta > 0 : delta < 0;
+          const color = delta === 0 ? 'var(--txt-3)' : good ? 'var(--pos)' : 'var(--warn)';
+          const med = _kpiMedian(valid.map(p=>p.value));
+          return `<td class="num">
+            <div class="kpi-st-cell">
+              ${_kpiSpark(pts, {w:88, h:22, color})}
+              <div class="kpi-st-row"><span class="kpi-st-cur">${_kpiFmt(k, last)}</span> <span class="kpi-st-delta" style="color:${color}">${dir} ${_kpiFmt(k, Math.abs(delta))}</span></div>
+              <div class="kpi-st-hint">медиана ${_kpiFmt(k, med)}</div>
+            </div>
+          </td>`;
+        }).join('')}
+      </tr>`;
+  };
+
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Статистика · ${scopeName}</div>
+      <div class="kpi-body-sub">Спарки за 8 недель. Первое число — последнее значение, стрелка — Δ.</div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table kpi-table-st">
+        <thead><tr><th>${{member:'Сотрудник',team:'Команда',project:'Проект',agency:'Скоуп'}[st.scope]||'—'}</th>${metrics.map(k => `<th class="num">${KPI_METRICS[k].label}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(rowHTML).join('')}</tbody>
+      </table>
+    </div>
+  `;
+};
+
+/* ── Мониторинг · сканер обновлён для всех scope ── */
+window.kpiScanAlerts = async (period) => {
+  if(!SB || !ME) return { raised:0 };
+  const st = _kpiState;
+  const scopes = ['member','team','project','agency'];
+  let raised = 0;
+  const now = Date.now();
+  const startMs = new Date(period.start_date+'T00:00:00').getTime();
+  const endMs = new Date(period.end_date+'T23:59:59').getTime();
+  const pct = 100 * (now-startMs) / (endMs-startMs);
+  for (const scope of scopes){
+    if (scope === 'team') await _kpiLoadTeamsCache();
+    const rows = _kpiScopeRows(scope);
+    const metrics = _kpiScopeMetricKeys(scope);
+    // Загружаем таргеты и baselines для этого scope (маленькие)
+    await _kpiLoadTargets(period.id, scope);
+    const oldScope = st.scope;
+    st.scope = scope;
+    const baselines = st.baselines[`_scan|${period.id}|${scope}`] || await _kpiComputeBaselines(period);
+    st.baselines[`_scan|${period.id}|${scope}`] = baselines;
+    st._currentCacheKey = null; st.currents = null;
+    const currents = await _kpiLoadCurrents(period);
+    st.scope = oldScope;
+    for (const r of rows){
+      const rk = _kpiRowKey(r);
+      for (const k of metrics){
+        const M = KPI_METRICS[k];
+        const cur = (currents[rk]||{})[k];
+        const tgt = _kpiGetTgt(period.id, scope, r.id, k) || {};
+        if (cur == null && M.sample_min > 0){
+          await kpiRaiseAlert({ kind:'no_data', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'info', message:`Нет данных для «${M.label}» (${r.name})`, data:{ period_id: period.id }});
+          raised++; continue;
+        }
+        if (cur != null && tgt.minimum != null){
+          const belowMin = M.dir === 'up' ? cur < tgt.minimum : cur > tgt.minimum;
+          if (belowMin){
+            await kpiRaiseAlert({ kind:'below_minimum', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'critical', message:`«${M.label}» ниже минимума у ${r.name}: ${_kpiFmt(k, cur)} (мин. ${_kpiFmt(k, tgt.minimum)})`, data:{ period_id: period.id }});
+            raised++;
+          }
+        }
+        if (cur != null && tgt.target != null){
+          const base = ((baselines[rk]||{})[k]||{}).value;
+          if (base != null){
+            const totalDelta = tgt.target - base;
+            const currentDelta = cur - base;
+            const progress = totalDelta === 0 ? 100 : 100*currentDelta/totalDelta;
+            if (pct > 20 && progress < pct - 20){
+              await kpiRaiseAlert({ kind:'behind_pace', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'warning', message:`«${M.label}» отстаёт у ${r.name}: ${Math.round(progress)}% при ${Math.round(pct)}%`, data:{ period_id: period.id }});
+              raised++;
+            }
+          }
+        }
+      }
+    }
+  }
+  return { raised };
+};
+
+/* Обновлённый renderKPI — предзагрузка teams */
+const _kpiOrigRender = window.renderKPI;
+window.renderKPI = async () => {
+  // Гарантируем teams cache для scope=team
+  if (!window._kpiTeams){ try { window._kpiTeams = await kpiFetchTeams(); } catch(e){ window._kpiTeams = []; } }
+  return _kpiOrigRender();
+};
+
+/* Смена scope сбрасывает кэши currents/baselines ссылочно (не удаляем, но помечаем ключ) */
+const _kpiOrigSetScope = window.kpiSetScope;
+window.kpiSetScope = (k) => {
+  _kpiState.currents = null;
+  _kpiState._currentCacheKey = null;
+  return _kpiOrigSetScope(k);
+};
+
+/* ═══════════ /KPI PHASE 5 ═══════════ */
+
+
+
 
 
 
