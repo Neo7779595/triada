@@ -17510,7 +17510,7 @@ window.kpiFetchTeams = async () => {
 /* ═══ Права ═══ */
 window.kpiCan = (action, scopeKind, scopeId) => {
   if(!ME) return false;
-  if (ME.role === 'owner') return true;
+  if (ME.role === 'agency_owner') return true;
   if (scopeKind === 'project' && scopeId){
     const p = (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===scopeId);
     if (p && p.lead_id === ME.id) return true;
@@ -18108,8 +18108,8 @@ window._kpiShellHTML = () => {
       .kpi-table tbody tr:hover td{background:rgba(255,255,255,.015)}
       .kpi-table tbody td.num{text-align:right;font-family:var(--mono);color:var(--txt-1);white-space:nowrap;font-variant-numeric:tabular-nums}
       .kpi-nameC{display:flex;align-items:center;gap:11px}
-      .kpi-av{width:32px;height:32px;border-radius:8px;background:var(--panel-3);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;overflow:hidden;flex:none}
-      .kpi-av img{width:100%;height:100%;object-fit:cover}
+      .kpi-av{width:32px;height:32px;border-radius:8px;background:var(--panel-3);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;overflow:hidden;flex:none;position:relative;isolation:isolate}
+      .kpi-av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
       .kpi-nm{font-weight:600;font-size:13.5px}
       .kpi-nsub{font-size:11.5px;color:var(--txt-3)}
       .kpi-cell{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;width:100%}
@@ -18255,11 +18255,6 @@ window._kpiShellHTML = () => {
       .kpi-mset-min{color:var(--txt-3);margin-top:3px}
     </style>
     <div class="kpi-wrap">
-      <div class="kpi-hero">
-        <div class="kpi-hero-eb">Модуль KPI · показатели эффективности</div>
-        <div class="kpi-hero-h">Планируем цели, измеряем факт, управляем рисками</div>
-        <div class="kpi-hero-sub">Четыре уровня — сотрудники, команды, проекты, агентство. Каждый уровень — семь блоков: база (точка А), цель, минимум, темп и риски, прогноз, мониторинг, статистика. Данные обновляются автоматически.</div>
-      </div>
       <div class="kpi-bar">
         <div class="kpi-tabs" id="kpi-scope-tabs">
           ${scopes.map(x => `<div class="kpi-tab${x.k===st.scope?' on':''}" onclick="kpiSetScope('${x.k}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${x.ic}</svg>${x.l}</div>`).join('')}
@@ -20062,7 +20057,7 @@ window._kpiSetRenderPeriods = async () => {
   const cont = document.getElementById('kpi-set-content'); if(!cont) return;
   const st = _kpiState;
   const periods = st.periods.slice().sort((a,b) => a.start_date < b.start_date ? 1 : -1);
-  const canManage = kpiCan('close_period', 'agency', null) || (ME && ME.role === 'owner');
+  const canManage = kpiCan('close_period', 'agency', null) || (ME && ME.role === 'agency_owner');
   const statLabel = { active:['активный','var(--pos)'], planning:['планирование','var(--violet)'], closed:['закрыт','var(--txt-3)'] };
   cont.innerHTML = `
     <div class="kpi-set-head">
@@ -20140,7 +20135,7 @@ _kpiLoadWeightsFromStorage();
 
 window._kpiSetRenderWeights = () => {
   const cont = document.getElementById('kpi-set-content'); if(!cont) return;
-  const canEdit = kpiCan('set_target', 'agency', null) || (ME && ME.role === 'owner');
+  const canEdit = kpiCan('set_target', 'agency', null) || (ME && ME.role === 'agency_owner');
   const w = _kpiWeights.smm_score;
   const total = Object.values(w).reduce((s,v) => s+v, 0);
   cont.innerHTML = `
@@ -20179,7 +20174,7 @@ window.kpiResetWeights = () => {
 /* ── ПРАВА ── */
 window._kpiSetRenderPermissions = async () => {
   const cont = document.getElementById('kpi-set-content'); if(!cont) return;
-  if (!ME || ME.role !== 'owner'){
+  if (!ME || ME.role !== 'agency_owner'){
     cont.innerHTML = `<div class="kpi-empty"><h4>Только владелец агентства</h4><p>Раздача KPI-прав доступна только пользователю с ролью owner.</p></div>`;
     return;
   }
