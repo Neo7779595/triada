@@ -2062,6 +2062,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-tab .cnt{font-family:var(--mono);font-size:11.5px;background:var(--accent-dim);color:var(--accent);padding:1px 7px;border-radius:20px}
 .pd-tabact{margin-left:auto;display:flex;align-items:center;gap:9px;padding-left:18px}
 #ov-proj:fullscreen{width:100vw;height:100vh;background:var(--bg)}
+
+/* Тумблеры видимости модулей клиенту */
+.cl-vis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:2px}
+.cl-vis-tog{display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-3);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:background .14s,border-color .14s,color .14s}
+.cl-vis-tog:hover{background:var(--bg-3);color:var(--txt-2)}
+.cl-vis-tog.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+.cl-vis-tog .cvt-ic{display:inline-flex;width:16px;height:16px;flex:none}
+.cl-vis-tog .cvt-ic svg{width:16px;height:16px}
 /* Полный экран главного окна */
 .ag-fs-btn.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 #app-ag.ag-fs{background:var(--bg);height:100vh;min-height:100vh;overflow:hidden}
@@ -6069,6 +6077,11 @@ function projSettings(i){
         <div class="np-ct-row"><div class="np-ct-d"><span>Начало</span>${dateField('np-cstart','')}</div><div class="np-ct-d"><span>Окончание</span>${dateField('np-cend','')}</div></div>
         <div class="np-ct-presets"><button type="button" class="np-ct-p" onclick="npContractPreset(1)">1 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(3)">3 мес</button><button type="button" class="np-ct-p" onclick="npContractPreset(6)">6 мес</button></div>
       </div></div>
+      <div class="fld"><label>Видимость для клиента <small style="color:var(--txt-3);font-weight:400;margin-left:6px">выключите модули, которые не нужно показывать</small></label>
+        <div class="cl-vis" id="pj-clvis">
+          ${[['stages','Этапы'],['reports','Отчёты'],['content','Контент-план'],['passport','Паспорт'],['updates','Обновления']].map(function(m){var k=m[0],l=m[1];var _h=(p&&p.cl_hidden)||[];var on=_h.indexOf(k)<0;return '<button type="button" class="cl-vis-tog '+(on?'on':'')+'" data-mk="'+k+'" onclick="pjToggleClVis(this)"><span class="cvt-ic"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">'+(on?'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>':'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M2 2l20 20\"/>')+'</svg></span><span class="cvt-l">'+l+'</span></button>';}).join('')}
+        </div>
+      </div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
         <button data-st="active" class="${p.status!=='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--accent)"></span>В работе</button>
         <button data-st="done" class="${p.status==='done'?'on':''}" onclick="pjTogStatus(this)"><span class="d" style="background:var(--pos)"></span>Завершён</button>
@@ -6087,7 +6100,9 @@ async function pjSaveSettings(i){
   const p=PROJECTS[i];
   const b=document.querySelector('#pj-stseg button.on'); const status=b?b.dataset.st:p.status;
   const svcsArr=svcCollect(); const prim=svcPrimary(svcsArr); const tot=svcTotals(svcsArr);
-  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:(prim.service||p.svc||'—'), tariff:(prim.tariff||null), mrr:tot.mrr, cost:tot.cost, lead_id:(_v('pj-lead')||null), status };
+  var _hiddenCl=[];
+  document.querySelectorAll('#pj-clvis .cl-vis-tog').forEach(function(b){ if(!b.classList.contains('on')) _hiddenCl.push(b.dataset.mk); });
+  const patch={ name:_v('pj-name')||p.name, logo_url:_v('pj-logo'), category:_v('pj-cat')||'—', service:(prim.service||p.svc||'—'), tariff:(prim.tariff||null), mrr:tot.mrr, cost:tot.cost, lead_id:(_v('pj-lead')||null), status, cl_hidden:_hiddenCl };
   if(status==='done'&&p.status!=='done')patch.closed_at=new Date().toISOString(); else if(status==='active')patch.closed_at=null;
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():null);
   const ctTerm={start:_v('np-cstart')||null, end:_v('np-cend')||null};
@@ -6106,7 +6121,7 @@ async function pjSaveSettings(i){
     return;
   }
   if(selTeam){ p._team=selTeam.map(id=>{ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:id}:null; }).filter(Boolean); }
-  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.mrr=patch.mrr; p.cost=patch.cost; p._svcs=svcsArr; p.lead_id=patch.lead_id; p._lead=null; p.status=status;
+  p.name=patch.name; p.cat=patch.category; p.svc=patch.service; p.logoUrl=patch.logo_url; p.tariff=patch.tariff; p.mrr=patch.mrr; p.cost=patch.cost; p._svcs=svcsArr; p.lead_id=patch.lead_id; p._lead=null; p.status=status; p.cl_hidden=patch.cl_hidden||[];
   pd2Close(); renderProjects(); toast('Проект обновлён');
 }
 function pjDoReactivate(){
@@ -15503,8 +15518,20 @@ function enterClient(){
   clNav('overview');
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-cl .side')));
 }
+function pjToggleClVis(el){ var on=el.classList.toggle('on'); var ic=el.querySelector('.cvt-ic svg'); if(ic){ ic.innerHTML=on?'<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>':'<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/><path d="M2 2l20 20"/>'; } }
+function _clApplyVisibility(){
+  var P=window.CLP; var hidden=(P&&P.cl_hidden)||(P&&P.settings&&P.settings.cl_hidden)||[];
+  if(!Array.isArray(hidden)) hidden=[];
+  document.querySelectorAll('#app-cl .nav-i').forEach(function(n){
+    var k=n.dataset.cm; if(!k||k==='overview') return;
+    n.style.display=(hidden.indexOf(k)>=0)?'none':'';
+  });
+  return hidden;
+}
 function clNav(m){
   renderClShell();
+  var _hidden=_clApplyVisibility();
+  if(_hidden.indexOf(m)>=0) m='overview';
   document.querySelectorAll('#app-cl .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.cm===m));
   if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else if(m==='passport') renderClPassport(); else renderClUpdates();
 }
