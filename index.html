@@ -6728,7 +6728,47 @@ function selField(id, options, cur){
     +`<button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${co?'':'color:var(--txt-3);font-weight:500'}">${_ddH(lbl)}</span>${caret}</button>`
     +`<div class="dd-menu">`+opts.map(o=>`<button type="button" class="dd-opt ${String(o[0])===String(cur)?'on':''}" data-v="${_attr(o[0])}" data-l="${_attr(o[1])}" onclick="selPick('${id}',this.dataset.v,this.dataset.l)">${_ddH(o[1])}${ck}</button>`).join('')+`</div></div>`;
 }
-function selToggle(id){ const el=document.getElementById('seldd-'+id); if(!el)return; const o=el.classList.contains('open'); _closePops(); if(!o)el.classList.add('open'); }
+function selToggle(id){
+  const el=document.getElementById('seldd-'+id); if(!el)return;
+  const o=el.classList.contains('open'); _closePops();
+  if(!o){
+    el.classList.add('open');
+    const btn=el.querySelector('.dd-btn'), menu=el.querySelector('.dd-menu');
+    if(btn && menu){
+      var placeholder=document.createElement('span'); placeholder.style.display='none';
+      menu.__ddHome=placeholder;
+      menu.parentNode.insertBefore(placeholder, menu);
+      document.body.appendChild(menu);
+      menu.classList.add('dd-portal');
+      requestAnimationFrame(function(){
+        const r=btn.getBoundingClientRect();
+        menu.style.minWidth=Math.max(190,btn.offsetWidth)+'px';
+        menu.style.maxHeight='';
+        var natH=menu.offsetHeight||60;
+        var mw=Math.max(menu.offsetWidth,btn.offsetWidth,190);
+        var isRight=el.classList.contains('right');
+        var left=isRight?(r.right-mw):r.left;
+        var spaceBelow=window.innerHeight-r.bottom-16, spaceAbove=r.top-16;
+        var openUp=false;
+        if(natH>spaceBelow && spaceAbove>spaceBelow) openUp=true;
+        var avail=openUp?spaceAbove:spaceBelow;
+        var maxH=Math.max(140,Math.min(360,avail));
+        menu.style.maxHeight=maxH+'px';
+        var mh=Math.min(natH,maxH);
+        var top=openUp?(r.top-mh-6):(r.bottom+6);
+        if(left+mw>window.innerWidth-8) left=window.innerWidth-8-mw;
+        if(top<8) top=8;
+        if(top+mh>window.innerHeight-8){
+          var cap=window.innerHeight-8-top;
+          if(cap>140){ menu.style.maxHeight=cap+'px'; }
+          else { top=window.innerHeight-8-mh; if(top<8) top=8; }
+        }
+        menu.style.left=Math.max(8,left)+'px';
+        menu.style.top=top+'px';
+      });
+    }
+  }
+}
 function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } const el=document.getElementById('seldd-'+id); if(el)el.classList.remove('open'); if(id==='qt-proj'&&typeof _qtOnProject==='function')_qtOnProject(v); }
 function selSync(id){ const h=document.getElementById(id); if(!h)return; const lblEl=document.getElementById(id+'-lbl'); if(!lblEl)return; const v=h.value; let lbl=v; const menu=document.getElementById('seldd-'+id); if(menu){ menu.querySelectorAll('.dd-opt').forEach(function(o){ var on=String(o.dataset.v)===String(v); o.classList.toggle('on',on); if(on)lbl=o.dataset.l; }); } lblEl.textContent=lbl; lblEl.style.color=''; lblEl.style.fontWeight=''; }
 function _tagList(kind, fallback, cur){
