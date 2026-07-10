@@ -18182,6 +18182,35 @@ window._kpiShellHTML = () => {
       .kpi-st-cur{font-weight:700}
       .kpi-st-delta{font-weight:600}
       .kpi-st-hint{font-size:10.5px;color:var(--txt-3);font-family:var(--mono)}
+/* Настройка KPI */
+      .kpi-set-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:13px;color:var(--txt-2)}
+      .kpi-set-desc{font-size:13px;color:var(--txt-2);line-height:1.55;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;margin-bottom:14px}
+      .kpi-set-desc b{color:var(--txt-1)}
+      .kpi-tag{padding:2px 8px;font-size:11px;font-weight:600;background:var(--panel-3);border:1px solid var(--line);border-radius:5px;color:var(--txt-2)}
+      .kpi-tab-set{color:var(--txt-3)}
+      .kpi-tab-set.on{color:var(--violet)}
+      /* Веса */
+      .kpi-weights{display:flex;flex-direction:column;gap:12px}
+      .kpi-weight-row{display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px}
+      .kpi-weight-l{flex:1;min-width:0}
+      .kpi-weight-lbl{font-weight:600;font-size:13.5px;letter-spacing:-.005em}
+      .kpi-weight-fx{font-size:11px;color:var(--txt-3);margin-top:2px;font-family:var(--mono)}
+      .kpi-weight-bar{width:140px;height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;flex:none}
+      .kpi-weight-fill{height:100%;background:linear-gradient(90deg, var(--violet), var(--accent));transition:width .25s var(--ease-out);border-radius:3px}
+      .kpi-weight-total{margin-top:14px;padding:10px 14px;font-size:13px;text-align:center;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;font-family:var(--mono)}
+      /* Справочник метрик */
+      .kpi-mset-group{margin-bottom:22px}
+      .kpi-mset-title{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);margin-bottom:10px;padding-left:2px}
+      .kpi-mset-list{display:flex;flex-direction:column;gap:8px}
+      .kpi-mset-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px}
+      .kpi-mset-l{flex:1;min-width:0}
+      .kpi-mset-name{font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .kpi-mset-arrow{font-size:11px;font-weight:500;color:var(--txt-3)}
+      .kpi-mset-fx{font-size:11.5px;color:var(--txt-2);margin-top:4px;line-height:1.5;font-family:var(--mono)}
+      .kpi-mset-scope{font-size:11px;color:var(--txt-3);margin-top:6px}
+      .kpi-mset-r{text-align:right;flex:none;font-family:var(--mono);font-size:11px}
+      .kpi-mset-scale{color:var(--txt-2)}
+      .kpi-mset-min{color:var(--txt-3);margin-top:3px}
     </style>
     <div class="kpi-wrap">
       <div class="kpi-hero">
@@ -19931,6 +19960,272 @@ window.kpiSetScope = (k) => {
 };
 
 /* ═══════════ /KPI PHASE 5 ═══════════ */
+
+/* ═══════════ KPI PHASE 6 · Settings tab (Периоды / Веса / Права / Метрики) ═══════════ */
+
+/* Локальное состояние настроек */
+window._kpiSetTab = 'periods';
+
+/* Патч Shell: добавляем 5-й scope-таб «⚙ Настройка» */
+const _kpiOrigShell = window._kpiShellHTML;
+window._kpiShellHTML = () => {
+  let html = _kpiOrigShell();
+  // Вставляем settings-tab перед закрывающим </div class="kpi-tabs">
+  const inject = `<div class="kpi-tab kpi-tab-set${_kpiState.scope==='settings'?' on':''}" onclick="kpiSetScope('settings')" title="Настройка KPI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Настройка</div>`;
+  html = html.replace('</div>\n        <div style="flex:1">', inject + '</div>\n        <div style="flex:1">');
+  return html;
+};
+
+/* Диспетчер body: если scope='settings' → показываем настройки, скрываем блок-табы */
+const _kpiOrigBody = window._kpiRenderBody;
+window._kpiRenderBody = async () => {
+  const st = _kpiState;
+  const blkBar = document.querySelector('.kpi-blocks');
+  if (st.scope === 'settings'){
+    if (blkBar) blkBar.style.display = 'none';
+    return _kpiRenderSettings();
+  }
+  if (blkBar) blkBar.style.display = '';
+  return _kpiOrigBody();
+};
+
+/* Главный рендер Настройки — 4 суб-таба */
+window._kpiRenderSettings = async () => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const tabs = [
+    { k:'periods',   l:'Периоды',   ic:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>' },
+    { k:'weights',   l:'Веса',      ic:'<path d="M12 3v6m0 0l-4 4M12 9l4 4M4 21h16M8 15h8"/>' },
+    { k:'permissions', l:'Права',   ic:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+    { k:'metrics',   l:'Метрики',   ic:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>' },
+  ];
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Настройка KPI</div>
+      <div class="kpi-body-sub">Управление периодами, весами композитных метрик, правами доступа и справочник метрик агентства.</div>
+    </div>
+    <div class="kpi-subtabs">
+      ${tabs.map(t => `<div class="kpi-subtab${t.k===_kpiSetTab?' on':''}" onclick="kpiSetSetTab('${t.k}')"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">${t.ic}</svg>${t.l}</div>`).join('')}
+    </div>
+    <div id="kpi-set-content" class="kpi-empty">Загрузка…</div>
+  `;
+  if (_kpiSetTab === 'periods')       _kpiSetRenderPeriods();
+  else if (_kpiSetTab === 'weights')  _kpiSetRenderWeights();
+  else if (_kpiSetTab === 'permissions') _kpiSetRenderPermissions();
+  else                                _kpiSetRenderMetrics();
+};
+window.kpiSetSetTab = (k) => { _kpiSetTab = k; _kpiRenderSettings(); };
+
+/* ── ПЕРИОДЫ ── */
+window._kpiSetRenderPeriods = async () => {
+  const cont = document.getElementById('kpi-set-content'); if(!cont) return;
+  const st = _kpiState;
+  const periods = st.periods.slice().sort((a,b) => a.start_date < b.start_date ? 1 : -1);
+  const canManage = kpiCan('close_period', 'agency', null) || (ME && ME.role === 'owner');
+  const statLabel = { active:['активный','var(--pos)'], planning:['планирование','var(--violet)'], closed:['закрыт','var(--txt-3)'] };
+  cont.innerHTML = `
+    <div class="kpi-set-head">
+      <div class="kpi-set-l">Всего периодов: <b>${periods.length}</b></div>
+      ${canManage?`<button class="kpi-cta" style="padding:7px 12px;font-size:12px" onclick="kpiOpenNewPeriodForm()">+ Новый период</button>`:''}
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table">
+        <thead><tr>
+          <th>Название</th><th>Тип</th><th>Начало</th><th>Конец</th><th>Окно базы</th><th>Статус</th><th style="width:120px">Действие</th>
+        </tr></thead>
+        <tbody>
+          ${periods.length===0 ? `<tr><td colspan="7" style="text-align:center;color:var(--txt-3);padding:30px">Периодов нет. Создайте первый.</td></tr>`
+          : periods.map(p => {
+            const [sl, sc] = statLabel[p.status] || ['—','var(--txt-3)'];
+            return `
+              <tr>
+                <td style="font-weight:600">${p.name}</td>
+                <td><span class="kpi-tag">${{week:'нед.',month:'мес.',quarter:'квартал',custom:'своё'}[p.kind]||p.kind}</span></td>
+                <td class="num">${p.start_date}</td>
+                <td class="num">${p.end_date}</td>
+                <td class="num">${p.baseline_window_days} дн</td>
+                <td><span style="color:${sc};font-weight:600">● ${sl}</span></td>
+                <td>
+                  ${canManage ? `
+                    ${p.status==='planning'?`<button class="kpi-alert-btn" onclick="kpiPeriodAction('${p.id}','activate')">Активировать</button>`:''}
+                    ${p.status==='active'  ?`<button class="kpi-alert-btn" onclick="kpiPeriodAction('${p.id}','close')">Закрыть</button>`:''}
+                  ` : ''}
+                </td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
+window.kpiPeriodAction = async (id, action) => {
+  if (action === 'activate'){
+    if (!confirm('Активировать период? После этого baseline будет заморожен.')) return;
+    await kpiActivatePeriod(id);
+  } else if (action === 'close'){
+    if (!confirm('Закрыть период? Итоги сохранятся, но новые данные учитываться не будут.')) return;
+    await kpiClosePeriod(id);
+  }
+  _kpiState.periods = await kpiFetchPeriods({ limit: 30 });
+  _kpiSetRenderPeriods();
+  _kpiRenderPeriodBar();
+};
+
+window.kpiOpenNewPeriodForm = async () => {
+  const name = prompt('Название периода:');
+  if (!name) return;
+  const kind = (prompt('Тип (week/month/quarter/custom):', 'month') || 'month').toLowerCase();
+  const start = prompt('Дата начала (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+  if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return;
+  const end = prompt('Дата конца (YYYY-MM-DD):');
+  if (!end || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return;
+  const bwd = parseInt(prompt('Окно базы, дней:', '30'), 10) || 30;
+  const row = await kpiCreatePeriod({ name, kind: ['week','month','quarter','custom'].includes(kind)?kind:'month', start_date:start, end_date:end, baseline_window_days: bwd });
+  if (row){
+    _kpiState.periods = await kpiFetchPeriods({ limit: 30 });
+    if (typeof toast==='function') toast('Период создан');
+    _kpiSetRenderPeriods();
+    _kpiRenderPeriodBar();
+  }
+};
+
+/* ── ВЕСА ── */
+window._kpiWeights = window._kpiWeights || { smm_score: { smm_er:35, smm_reach:25, smm_growth:25, smm_discipline:15 } };
+window._kpiLoadWeightsFromStorage = () => {
+  try{ const raw = localStorage.getItem('kpi:weights'); if(raw){ Object.assign(_kpiWeights, JSON.parse(raw)); } }catch(e){}
+};
+_kpiLoadWeightsFromStorage();
+
+window._kpiSetRenderWeights = () => {
+  const cont = document.getElementById('kpi-set-content'); if(!cont) return;
+  const canEdit = kpiCan('set_target', 'agency', null) || (ME && ME.role === 'owner');
+  const w = _kpiWeights.smm_score;
+  const total = Object.values(w).reduce((s,v) => s+v, 0);
+  cont.innerHTML = `
+    <div class="kpi-set-desc">Веса управляют композитной метрикой <b>SMM Composite Score</b>. Итог должен равняться 100 (пере-нормализация происходит автоматически если сумма другая, но лучше держать ровно 100).</div>
+    <div class="kpi-weights">
+      ${Object.keys(w).map(k => `
+        <div class="kpi-weight-row">
+          <div class="kpi-weight-l">
+            <div class="kpi-weight-lbl">${KPI_METRICS[k].label}</div>
+            <div class="kpi-weight-fx">${KPI_METRICS[k].dir==='up'?'↑':'↓'} ${KPI_METRICS[k].formula}</div>
+          </div>
+          <input class="kpi-tgt-input" style="width:76px" type="number" min="0" max="100" step="5" value="${w[k]}" ${canEdit?'':'disabled'} oninput="kpiSetWeight('${k}',this.value)" />
+          <div class="kpi-weight-bar"><div class="kpi-weight-fill" style="width:${w[k]}%"></div></div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="kpi-weight-total" style="color:${total===100?'var(--pos)':'var(--warn)'}">
+      Сумма: <b>${total}</b>${total===100?' — идеально':' (норма 100)'}
+    </div>
+    ${canEdit?`<div style="margin-top:14px;display:flex;gap:8px"><button class="kpi-alert-btn" onclick="kpiResetWeights()">Вернуть по умолчанию</button></div>`:''}
+  `;
+};
+
+window.kpiSetWeight = (k, val) => {
+  const n = Math.max(0, Math.min(100, parseInt(val, 10) || 0));
+  _kpiWeights.smm_score[k] = n;
+  localStorage.setItem('kpi:weights', JSON.stringify(_kpiWeights));
+  _kpiSetRenderWeights();
+};
+window.kpiResetWeights = () => {
+  _kpiWeights.smm_score = { smm_er:35, smm_reach:25, smm_growth:25, smm_discipline:15 };
+  localStorage.setItem('kpi:weights', JSON.stringify(_kpiWeights));
+  _kpiSetRenderWeights();
+};
+
+/* ── ПРАВА ── */
+window._kpiSetRenderPermissions = async () => {
+  const cont = document.getElementById('kpi-set-content'); if(!cont) return;
+  if (!ME || ME.role !== 'owner'){
+    cont.innerHTML = `<div class="kpi-empty"><h4>Только владелец агентства</h4><p>Раздача KPI-прав доступна только пользователю с ролью owner.</p></div>`;
+    return;
+  }
+  cont.innerHTML = `<div class="kpi-empty">Загружаем права…</div>`;
+  const { data: perms } = await SB.from('kpi_permissions').select('*').eq('agency_id', ME.agency_id);
+  const permMap = {};
+  (perms||[]).forEach(r => { permMap[r.member_id] = r; });
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member');
+  cont.innerHTML = `
+    <div class="kpi-set-desc">Отметьте, кому доверяете отдельные права по KPI. Владелец и PM проекта имеют полный доступ по умолчанию — здесь только дополнительные роли.</div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table">
+        <thead><tr>
+          <th>Сотрудник</th>
+          <th style="text-align:center">Ставить цели</th>
+          <th style="text-align:center">Управлять рисками</th>
+          <th style="text-align:center">Закрывать периоды</th>
+        </tr></thead>
+        <tbody>
+          ${TM.length===0 ? `<tr><td colspan="4" style="text-align:center;color:var(--txt-3);padding:30px">Нет сотрудников.</td></tr>`
+          : TM.map(m => {
+            const uid = m._id || m.id;
+            const p = permMap[uid] || { actions: { set_target:false, edit_risks:false, close_period:false } };
+            const a = p.actions || {};
+            return `
+              <tr>
+                <td>${_kpiRowNameHTML(_kpiScopeRows('member').find(x=>x.id===uid) || {id:uid,name:m.name||m.full_name,subtitle:m.dept||'',initials:'?'})}</td>
+                <td style="text-align:center"><input type="checkbox" ${a.set_target?'checked':''} onchange="kpiTogglePerm('${uid}','set_target',this.checked)" /></td>
+                <td style="text-align:center"><input type="checkbox" ${a.edit_risks?'checked':''} onchange="kpiTogglePerm('${uid}','edit_risks',this.checked)" /></td>
+                <td style="text-align:center"><input type="checkbox" ${a.close_period?'checked':''} onchange="kpiTogglePerm('${uid}','close_period',this.checked)" /></td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
+window.kpiTogglePerm = async (memberId, action, checked) => {
+  if(!SB || !ME) return;
+  const { data: existing } = await SB.from('kpi_permissions').select('*').eq('agency_id', ME.agency_id).eq('member_id', memberId).is('scope_kind', null).limit(1);
+  const row = existing && existing[0];
+  const actions = row ? (row.actions || {}) : { set_target:false, edit_risks:false, close_period:false };
+  actions[action] = !!checked;
+  if (row){
+    await SB.from('kpi_permissions').update({ actions }).eq('id', row.id);
+  } else {
+    await SB.from('kpi_permissions').insert({
+      agency_id: ME.agency_id, member_id: memberId, scope_kind: null, scope_id: null,
+      actions, granted_by: ME.id,
+    });
+  }
+  if (typeof toast==='function') toast('Права обновлены');
+};
+
+/* ── МЕТРИКИ (справочник) ── */
+window._kpiSetRenderMetrics = () => {
+  const cont = document.getElementById('kpi-set-content'); if(!cont) return;
+  const cats = { ops:'Операционные', smm:'SMM', fin:'Финансовые' };
+  const grouped = { ops:[], smm:[], fin:[] };
+  Object.entries(KPI_METRICS).forEach(([k, m]) => { (grouped[m.category] || (grouped[m.category] = [])).push([k, m]); });
+  cont.innerHTML = `
+    <div class="kpi-set-desc">Справочник метрик — что мы считаем, как и зачем. На каких уровнях применимо. Пороги шкалы (soft — типовое значение, hard — вершина 100 из 100).</div>
+    ${Object.entries(cats).map(([cat, catName]) => `
+      <div class="kpi-mset-group">
+        <div class="kpi-mset-title">${catName}</div>
+        <div class="kpi-mset-list">
+          ${grouped[cat].map(([k, m]) => `
+            <div class="kpi-mset-row">
+              <div class="kpi-mset-l">
+                <div class="kpi-mset-name">${m.label} <span class="kpi-mset-arrow" style="color:${m.dir==='up'?'var(--pos)':'var(--warn)'}">${m.dir==='up'?'↑ рост лучше':'↓ снижение лучше'}</span></div>
+                <div class="kpi-mset-fx">${m.formula}</div>
+                <div class="kpi-mset-scope">Уровни: ${m.scope.map(s => ({member:'сотрудник',team:'команда',project:'проект',agency:'агентство'}[s])).join(', ')}</div>
+              </div>
+              <div class="kpi-mset-r">
+                <div class="kpi-mset-scale">soft ${m.scale.soft} · hard ${m.scale.hard}</div>
+                <div class="kpi-mset-min">мин. выборка ${m.sample_min}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+  `;
+};
+/* ═══════════ /KPI PHASE 6 ═══════════ */
+
+
 
 
 
