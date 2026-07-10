@@ -14051,6 +14051,27 @@ function pfRender(_opts){
   </div>`);
   svcReset( (PFIN._svcsInit ? (window.NP_SVCS||[]) : ((PFIN._svcs&&PFIN._svcs.length)?PFIN._svcs:[{service:'',tariff:'',mrr:PFIN.mrr,cost:0}])) ); PFIN._svcsInit=true;
   requestAnimationFrame(function(){ var mb=document.querySelector('#ov-pd2 .modal-b'); if(!mb)return; if(_opts&&_opts.scrollBottom) mb.scrollTop=mb.scrollHeight; else if(_pfPrevScroll!=null) mb.scrollTop=_pfPrevScroll; });
+  // Enter / Return → перевод на следующее поле (сохранение уже происходит по input)
+  (function(){
+    var modal=document.querySelector('#ov-pd2 .modal'); if(!modal||modal.__pfEnterBound)return; modal.__pfEnterBound=1;
+    modal.addEventListener('keydown',function(e){
+      if(e.key!=='Enter'||e.shiftKey) return;
+      var t=e.target; if(!t) return;
+      // Пропускаем textarea и кнопки
+      if(t.tagName==='TEXTAREA') return;
+      if(t.tagName==='BUTTON') return;
+      e.preventDefault();
+      // Собираем все табируемые инпуты внутри модалки в порядке DOM
+      var els=Array.from(modal.querySelectorAll('input:not([disabled]):not([type="hidden"]), select:not([disabled])')).filter(function(el){
+        return el.offsetParent!==null; // видимые
+      });
+      var idx=els.indexOf(t);
+      if(idx<0) return;
+      var next=els[idx+1];
+      if(next){ next.focus(); try{ next.select&&next.select(); }catch(_){} }
+      else { t.blur(); }
+    });
+  })();
 }
 async function saveProjFinance(){
   if(!PFIN) return;
