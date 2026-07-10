@@ -17334,6 +17334,13 @@ window.KPI_METRICS = {
   smm_cr:         { label:'CR',                  unit:'%',  dir:'up', scale:{soft:0.1,  hard:5},       scope:['project','team','agency'], category:'smm', sample_min:2, formula:'Comment Rate: комментарии / охват × 100' },
   smm_shr:        { label:'SHR',                 unit:'%',  dir:'up', scale:{soft:0.1,  hard:3},       scope:['project','team','agency'], category:'smm', sample_min:2, formula:'Share Rate: репосты / охват × 100' },
   smm_sr:         { label:'SR',                  unit:'%',  dir:'up', scale:{soft:0.1,  hard:5},       scope:['project','team','agency'], category:'smm', sample_min:2, formula:'Save Rate: сохранения / охват × 100' },
+  // ── Портфель · 6 метрик агентского уровня ──
+  portfolio_health: { label:'Здоровье портфеля', unit:'%',   dir:'up',   scale:{soft:60, hard:100},   scope:['agency'], category:'portfolio', sample_min:1, formula:'Доля активных проектов не в статусе blocked/at_risk' },
+  ontime_delivery:  { label:'On-time delivery',  unit:'%',   dir:'up',   scale:{soft:60, hard:100},   scope:['agency'], category:'portfolio', sample_min:5, formula:'Доля задач сданных в срок по всему агентству' },
+  velocity_30d:     { label:'Velocity 30 дней',  unit:'ед.', dir:'up',   scale:{soft:20, hard:200},   scope:['agency'], category:'portfolio', sample_min:0, formula:'Взвешенная выработка за последние 30 дней (rolling)' },
+  otkaty:           { label:'Откаты · rework',   unit:'%',   dir:'down', scale:{soft:5,  hard:30},    scope:['agency'], category:'portfolio', sample_min:5, formula:'Доля задач возвращённых на доработку' },
+  mrr:              { label:'MRR',               unit:'$',   dir:'up',   scale:{soft:1000, hard:1000000}, scope:['agency'], category:'portfolio', sample_min:1, formula:'Сумма MRR активных проектов' },
+  margin:           { label:'Маржа',             unit:'%',   dir:'up',   scale:{soft:15, hard:70},    scope:['agency'], category:'portfolio', sample_min:1, formula:'(выручка − себестоимость) / выручка × 100' },
 };
 
 /* ── Хелперы над справочником ── */
@@ -18031,8 +18038,33 @@ window.kpiComputePortfolioHealth = async (scopeKind, scopeId, fromISO, toISO) =>
   return { value: val, sample_size: active.length, confidence: _kpiConfidence('portfolio_health', active.length) };
 };
 
-/* Финансовые метрики убраны из KPI — живут в модуле Финансы */
+/* Финансовые метрики убраны из KPI как отдельный блок — живут в модуле Финансы.
+   Отдельные фин-функции (kpiComputeMRR, kpiComputeMarginPct и др.) остаются
+   доступны и используются в портфельной категории. */
 window.kpiComputeFinAll = async () => ({});
+
+/* ── ПОРТФЕЛЬ · агентские метрики ── */
+window.kpiComputeOntimeDelivery = (sc, id, from, to) => kpiComputeOnTimeRate(sc, id, from, to);
+window.kpiComputeOtkaty         = (sc, id, from, to) => kpiComputeReworkRate(sc, id, from, to);
+window.kpiComputeMargin         = (sc, id, from, to) => kpiComputeMarginPct(sc, id, from, to);
+window.kpiComputeVelocity30d = async (sc, id, fromISO, toISO) => {
+  // Всегда rolling 30 дней от указанной даты 'to' (или от сейчас)
+  const to = toISO || new Date().toISOString();
+  const from = new Date(new Date(to).getTime() - 30*86400000).toISOString();
+  return kpiComputeThroughputWeighted(sc, id, from, to);
+};
+window.kpiComputePortfolioAll = async (sc, id, from, to) => {
+  if (sc !== 'agency') return {};
+  const [ph, od, vel, ot, mrrR, margR] = await Promise.all([
+    kpiComputePortfolioHealth(sc, id, from, to),
+    kpiComputeOntimeDelivery(sc, id, from, to),
+    kpiComputeVelocity30d(sc, id, from, to),
+    kpiComputeOtkaty(sc, id, from, to),
+    kpiComputeMRR(sc, id, from, to),
+    kpiComputeMargin(sc, id, from, to),
+  ]);
+  return { portfolio_health:ph, ontime_delivery:od, velocity_30d:vel, otkaty:ot, mrr:mrrR, margin:margR };
+};
 
 /* Универсальный сбор всех применимых метрик для scope */
 window.kpiComputeAll = async (scopeKind, scopeId, fromISO, toISO) => {
@@ -18040,9 +18072,10 @@ window.kpiComputeAll = async (scopeKind, scopeId, fromISO, toISO) => {
   const applicable = Object.entries(KPI_METRICS).filter(([k,m]) => m.scope.includes(scopeKind));
   const cats = new Set(applicable.map(([k,m]) => m.category));
   const jobs = [];
-  if (cats.has('ops')) jobs.push(kpiComputeOpsAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
-  if (cats.has('smm')) jobs.push(kpiComputeSmmAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
-  if (cats.has('fin')) jobs.push(kpiComputeFinAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
+  if (cats.has('ops'))       jobs.push(kpiComputeOpsAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
+  if (cats.has('smm'))       jobs.push(kpiComputeSmmAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
+  if (cats.has('fin'))       jobs.push(kpiComputeFinAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
+  if (cats.has('portfolio')) jobs.push(kpiComputePortfolioAll(scopeKind, scopeId, fromISO, toISO).then(r => Object.assign(out, r)));
   await Promise.all(jobs);
   // Фильтруем: возвращаем только применимые к scope
   const applicableKeys = new Set(applicable.map(([k]) => k));
@@ -18948,7 +18981,7 @@ window._kpiCurrentValue = async (scopeKind, scopeId, metricKey, period) => {
   const now = new Date().toISOString();
   const startPeriod = new Date(period.start_date+'T00:00:00').toISOString();
   const fromISO = startPeriod < now ? startPeriod : new Date(Date.now()-7*86400000).toISOString();
-  const fnMap = { vyrabotka:'kpiComputeVyrabotka', skorost:'kpiComputeSkorost', nadezhnost:'kpiComputeNadezhnost', kachestvo:'kpiComputeKachestvo', smm_reach:'kpiComputeSmmReach', smm_views:'kpiComputeSmmViews', smm_growth_abs:'kpiComputeSmmGrowthAbs', smm_followers:'kpiComputeSmmFollowers', smm_er:'kpiComputeSmmER', smm_lr:'kpiComputeSmmLR', smm_cr:'kpiComputeSmmCR', smm_shr:'kpiComputeSmmSHR', smm_sr:'kpiComputeSmmSR' };
+  const fnMap = { vyrabotka:'kpiComputeVyrabotka', skorost:'kpiComputeSkorost', nadezhnost:'kpiComputeNadezhnost', kachestvo:'kpiComputeKachestvo', smm_reach:'kpiComputeSmmReach', smm_views:'kpiComputeSmmViews', smm_growth_abs:'kpiComputeSmmGrowthAbs', smm_followers:'kpiComputeSmmFollowers', smm_er:'kpiComputeSmmER', smm_lr:'kpiComputeSmmLR', smm_cr:'kpiComputeSmmCR', smm_shr:'kpiComputeSmmSHR', smm_sr:'kpiComputeSmmSR', portfolio_health:'kpiComputePortfolioHealth', ontime_delivery:'kpiComputeOntimeDelivery', velocity_30d:'kpiComputeVelocity30d', otkaty:'kpiComputeOtkaty', mrr:'kpiComputeMRR', margin:'kpiComputeMargin' };
   const fn = window[fnMap[metricKey]]; if(!fn) return null;
   const r = await fn(scopeKind, scopeId, fromISO, now);
   return r && r.value;
@@ -19049,7 +19082,7 @@ window._kpiRenderRPM = async (period) => {
 
 /* ── СЕРИЯ (для Прогноза): скользящие окна по метрике ── */
 window.kpiComputeMetricSeries = async (scopeKind, scopeId, metricKey, weeks) => {
-  const fnMap = { vyrabotka:'kpiComputeVyrabotka', skorost:'kpiComputeSkorost', nadezhnost:'kpiComputeNadezhnost', kachestvo:'kpiComputeKachestvo', smm_reach:'kpiComputeSmmReach', smm_views:'kpiComputeSmmViews', smm_growth_abs:'kpiComputeSmmGrowthAbs', smm_followers:'kpiComputeSmmFollowers', smm_er:'kpiComputeSmmER', smm_lr:'kpiComputeSmmLR', smm_cr:'kpiComputeSmmCR', smm_shr:'kpiComputeSmmSHR', smm_sr:'kpiComputeSmmSR' };
+  const fnMap = { vyrabotka:'kpiComputeVyrabotka', skorost:'kpiComputeSkorost', nadezhnost:'kpiComputeNadezhnost', kachestvo:'kpiComputeKachestvo', smm_reach:'kpiComputeSmmReach', smm_views:'kpiComputeSmmViews', smm_growth_abs:'kpiComputeSmmGrowthAbs', smm_followers:'kpiComputeSmmFollowers', smm_er:'kpiComputeSmmER', smm_lr:'kpiComputeSmmLR', smm_cr:'kpiComputeSmmCR', smm_shr:'kpiComputeSmmSHR', smm_sr:'kpiComputeSmmSR', portfolio_health:'kpiComputePortfolioHealth', ontime_delivery:'kpiComputeOntimeDelivery', velocity_30d:'kpiComputeVelocity30d', otkaty:'kpiComputeOtkaty', mrr:'kpiComputeMRR', margin:'kpiComputeMargin' };
   const fn = window[fnMap[metricKey]]; if(!fn) return [];
   const now = Date.now();
   const points = [];
@@ -19507,6 +19540,9 @@ window._kpiLoadCurrents = async (period) => {
     smm_growth_abs:'kpiComputeSmmGrowthAbs', smm_followers:'kpiComputeSmmFollowers',
     smm_er:'kpiComputeSmmER', smm_lr:'kpiComputeSmmLR',
     smm_cr:'kpiComputeSmmCR', smm_shr:'kpiComputeSmmSHR', smm_sr:'kpiComputeSmmSR',
+    portfolio_health:'kpiComputePortfolioHealth', ontime_delivery:'kpiComputeOntimeDelivery',
+    velocity_30d:'kpiComputeVelocity30d', otkaty:'kpiComputeOtkaty',
+    mrr:'kpiComputeMRR', margin:'kpiComputeMargin',
   };
   const out = {};
   const to = new Date().toISOString();
@@ -20290,7 +20326,7 @@ window.kpiTogglePerm = async (memberId, action, checked) => {
 /* ── МЕТРИКИ (справочник) ── */
 window._kpiSetRenderMetrics = () => {
   const cont = document.getElementById('kpi-set-content'); if(!cont) return;
-  const cats = { ops:'TPI · операционные', smm:'SMM · соцсети' };
+  const cats = { ops:'TPI · операционные', smm:'SMM · соцсети', portfolio:'Портфель · агентство' };
   const grouped = { ops:[], smm:[], fin:[] };
   Object.entries(KPI_METRICS).forEach(([k, m]) => { (grouped[m.category] || (grouped[m.category] = [])).push([k, m]); });
   cont.innerHTML = `
@@ -20595,14 +20631,15 @@ window.kpiSetMetricCat = (c) => {
 window._kpiCatChipBar = () => {
   const st = _kpiState;
   const allKeys = _kpiOrigScopeMetricKeys(st.scope);
-  const hasOps = allKeys.some(k => (KPI_METRICS[k]||{}).category === 'ops');
-  const hasSmm = allKeys.some(k => (KPI_METRICS[k]||{}).category === 'smm');
-  if (!hasOps || !hasSmm) return '';   // одна категория — переключатель не нужен
-  const chips = [
-    { k:'ops', l:'TPI · операционные', n: allKeys.filter(k => KPI_METRICS[k].category==='ops').length },
-    { k:'smm', l:'SMM · соцсети',      n: allKeys.filter(k => KPI_METRICS[k].category==='smm').length },
-    { k:'all', l:'Всё вместе',          n: allKeys.length },
-  ];
+  const cats = {};
+  allKeys.forEach(k => { const c = (KPI_METRICS[k]||{}).category; if(c) cats[c] = (cats[c]||0) + 1; });
+  const catKeys = Object.keys(cats);
+  if (catKeys.length < 2) return '';   // одна категория — переключатель не нужен
+  const catOrder = ['portfolio','ops','smm','fin'];
+  const catNames = { ops:'TPI · операционные', smm:'SMM · соцсети', portfolio:'Портфель', fin:'Финансы' };
+  const orderedCats = catKeys.slice().sort((a,b) => (catOrder.indexOf(a)+99) - (catOrder.indexOf(b)+99));
+  const chips = orderedCats.map(c => ({ k:c, l:catNames[c]||c, n:cats[c] }));
+  chips.push({ k:'all', l:'Всё вместе', n:allKeys.length });
   return `<div class="kpi-catbar">
     ${chips.map(c => `<div class="kpi-catchip${c.k===st.metricCat?' on':''}" onclick="kpiSetMetricCat('${c.k}')">${c.l} <span class="kpi-catchip-n">${c.n}</span></div>`).join('')}
   </div>`;
@@ -20630,17 +20667,24 @@ window._kpiRenderBody = async () => {
   return _kpiOrigRB();
 };
 
-/* Смена scope сбрасывает категорию если она неприменима */
+/* Смена scope: дефолт-категорию подставляем умно.
+   Для agency — 'portfolio' (управленческий дашборд).
+   Иначе — первая доступная категория. */
 const _kpiOrigSetScope2 = window.kpiSetScope;
 window.kpiSetScope = (k) => {
   const r = _kpiOrigSetScope2(k);
-  // если новая scope не имеет текущей категории — переключаем на первую доступную
   setTimeout(() => {
     const allKeys = _kpiOrigScopeMetricKeys(_kpiState.scope);
     const has = allKeys.some(kk => (KPI_METRICS[kk]||{}).category === _kpiState.metricCat);
-    if (!has && allKeys.length){
+    if (_kpiState.scope === 'agency' && _kpiState.metricCat !== 'portfolio'){
+      // всегда переключаем на portfolio при заходе на agency
+      _kpiState.metricCat = 'portfolio';
+      _kpiState._currentCacheKey = null;
+      _kpiRenderBody();
+    } else if (!has && allKeys.length){
       const firstCat = (KPI_METRICS[allKeys[0]]||{}).category;
       if (firstCat) _kpiState.metricCat = firstCat;
+      _kpiState._currentCacheKey = null;
       _kpiRenderBody();
     }
   }, 0);
