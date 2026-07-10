@@ -18066,6 +18066,89 @@ window.kpiComputePortfolioAll = async (sc, id, from, to) => {
   return { portfolio_health:ph, ontime_delivery:od, velocity_30d:vel, otkaty:ot, mrr:mrrR, margin:margR };
 };
 
+/* ═══ Синхронизация с OVERVIEW/FINANCE — цифры должны совпадать со Сводкой ═══ */
+
+/* Здоровье портфеля — как в Сводке: не просроченные И не застойные (14+ дней без активности) */
+window.kpiComputePortfolioHealth = async (sc, id) => {
+  if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
+  const P = (typeof PROJECTS!=='undefined' ? PROJECTS : []);
+  const active = P.filter(p => p.status !== 'done');
+  if (!active.length) return { value:null, sample_size:0, confidence:null };
+  const STALE_DAYS = 14;
+  const isStale = p => p._lastActDays != null && p._lastActDays >= STALE_DAYS;
+  const onTrack = active.filter(p => !p._overdue && !isStale(p)).length;
+  const val = Math.round(100 * onTrack / active.length);
+  return { value: val, sample_size: active.length, confidence: _kpiConfidence('portfolio_health', active.length) };
+};
+
+/* On-time delivery — этапы+задачи в срок (как объединённые токены в hero Сводки) */
+window.kpiComputeOntimeDelivery = async (sc, id) => {
+  if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
+  const O = (typeof OVERVIEW!=='undefined' ? OVERVIEW : {}) || {};
+  const done = (O.deadlineDone || 0) + (O.tDeadlineDone || 0);
+  const onTime = (O.onTime || 0) + (O.tOnTime || 0);
+  if (!done) return { value:null, sample_size:0, confidence:null };
+  const val = Math.round(100 * onTime / done);
+  return { value: val, sample_size: done, confidence: _kpiConfidence('ontime_delivery', done) };
+};
+
+/* Velocity 30 дней — этапы+задачи за 30 дней (v30 + tV30 из OVERVIEW) */
+window.kpiComputeVelocity30d = async (sc, id) => {
+  if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
+  const O = (typeof OVERVIEW!=='undefined' ? OVERVIEW : {}) || {};
+  const val = (O.v30 || 0) + (O.tV30 || 0);
+  return { value: val, sample_size: val, confidence: _kpiConfidence('velocity_30d', val) };
+};
+
+/* Откаты · rework — % переходов назад (rework/trans × 100) как в Сводке */
+window.kpiComputeOtkaty = async (sc, id) => {
+  if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
+  const O = (typeof OVERVIEW!=='undefined' ? OVERVIEW : {}) || {};
+  const trans = (O.trans || 0) + (O.tTrans || 0);
+  const rework = (O.rework || 0) + (O.tRework || 0);
+  if (!trans) return { value:null, sample_size:0, confidence:null };
+  const val = Math.round(1000 * rework / trans) / 10;
+  return { value: val, sample_size: trans, confidence: _kpiConfidence('otkaty', trans) };
+};
+
+/* MRR — сумма из модуля Финансы (FINANCE.totalMrr) */
+window.kpiComputeMRR = async (sc, id) => {
+  if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
+  const F = (typeof FINANCE!=='undefined' ? FINANCE : {}) || {};
+  if (F.totalMrr == null){
+    // Fallback: сумма mrr из PROJECTS
+    const P = (typeof PROJECTS!=='undefined' ? PROJECTS : []);
+    const active = P.filter(p => p.status !== 'done' && p.status !== 'blocked');
+    const sum = active.reduce((s,p) => s + (+p.mrr || 0), 0);
+    return { value: sum, sample_size: active.length, confidence: _kpiConfidence('mrr', active.length) };
+  }
+  return { value: F.totalMrr, sample_size: F.paying || 0, confidence: _kpiConfidence('mrr', F.paying || 0) };
+};
+
+/* Маржа — из модуля Финансы (FINANCE.marginPct), сходится с P&L */
+window.kpiComputeMargin = async (sc, id) => {
+  if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
+  const F = (typeof FINANCE!=='undefined' ? FINANCE : {}) || {};
+  if (F.marginPct == null){
+    return { value:null, sample_size:0, confidence:null };
+  }
+  return { value: Math.round(F.marginPct * 10) / 10, sample_size: F.paying || 1, confidence: _kpiConfidence('margin', F.paying || 1) };
+};
+
+/* Убедимся что OVERVIEW и FINANCE подгружены при заходе в KPI-модуль */
+const _kpiOrigRenderKPI2 = window.renderKPI;
+window.renderKPI = async () => {
+  const needsOverview = !window.OVERVIEW || typeof window.OVERVIEW.deadlineDone === 'undefined';
+  const needsFinance  = !window.FINANCE  || typeof window.FINANCE.totalMrr === 'undefined';
+  const jobs = [];
+  if (needsOverview && window.tLoadOverview) jobs.push(window.tLoadOverview().catch(()=>{}));
+  if (needsFinance  && window.tLoadFinance)  jobs.push(window.tLoadFinance().catch(()=>{}));
+  if (jobs.length) await Promise.all(jobs);
+  return _kpiOrigRenderKPI2();
+};
+/* ═══ /Синхронизация ═══ */
+
+
 /* Универсальный сбор всех применимых метрик для scope */
 window.kpiComputeAll = async (scopeKind, scopeId, fromISO, toISO) => {
   const out = {};
