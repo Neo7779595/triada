@@ -7800,7 +7800,27 @@ function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи з
   const row={title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx,subtasks};
   if(_diff)row.difficulty=_diff; if(_prio)row.priority=_prio;
   if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,row); }
-function pdTaskDel(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ toast('Проект завершён — редактирование запрещено'); return; } if(window.tTaskDel) window.tTaskDel(id); }
+function pdTaskDel(id){
+  if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ toast('Проект завершён — редактирование запрещено'); return; }
+  var p=PROJECTS[pdIdx]; var t=(p&&p._tasks||[]).find(function(x){return String(x.id)===String(id);});
+  var title=(t&&t.title)||'задача';
+  var stg=(t&&p&&p._stages||[]).find(function(s){return String(s.id)===String(t&&t.stage_id);});
+  var stageName=stg?stg.name:'—';
+  var status=(t&&t.status)||'';
+  var stMap={wait:'ожидание',active:'в работе',review:'на утверждении',done:'готово'};
+  if(typeof pd2Open!=='function'){ if(window.tTaskDel) window.tTaskDel(id); return; }
+  pd2Open('<div class="modal" style="max-width:440px">'
+    +'<div class="modal-h"><h3>Удалить задачу?</h3><p>Действие нельзя отменить.</p></div>'
+    +'<div class="modal-b" style="padding-top:4px"><div style="background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px">'
+    +'<div style="width:36px;height:36px;border-radius:9px;background:rgba(240,120,92,.13);color:var(--neg);display:flex;align-items:center;justify-content:center;flex:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+_ddH(title)+'</div>'
+    +'<div style="font-family:var(--mono);font-size:12px;color:var(--txt-3);margin-top:3px">'+_ddH(stageName)+(status?(' · '+(stMap[status]||status)):'')+'</div></div></div>'
+    +'<p style="color:var(--txt-3);font-size:12.5px;line-height:1.5;margin:12px 2px 0">Удалится вся история задачи, подзадачи, отметки времени и комментарии.</p></div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button>'
+    +'<button class="btn-add" style="background:var(--neg);color:#04140f" onclick="_pdTaskDelConfirm(\''+String(id).replace(/\'/g,'')+'\')">Удалить</button></div></div>');
+}
+function _pdTaskDelConfirm(id){ if(typeof pd2Close==='function') pd2Close(); if(window.tTaskDel) window.tTaskDel(id); }
+
 async function pdTaskEdit(id){
   const p=PROJECTS[pdIdx];
   if(p&&p.status==='done'){ toast('Проект завершён — редактирование запрещено'); return; }
