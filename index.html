@@ -2058,6 +2058,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-tab .cnt{font-family:var(--mono);font-size:11.5px;background:var(--accent-dim);color:var(--accent);padding:1px 7px;border-radius:20px}
 .pd-tabact{margin-left:auto;display:flex;align-items:center;gap:9px;padding-left:18px}
 #ov-proj:fullscreen{width:100vw;height:100vh;background:var(--bg)}
+/* Полный экран главного окна */
+.ag-fs-btn.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+#app-ag.ag-fs{background:var(--bg)}
+#app-ag.ag-fs .side{border-right:1px solid var(--line)}
+#app-ag.ag-fs .main{background:var(--bg)}
+:fullscreen #app-ag{width:100vw;height:100vh}
+:-webkit-full-screen #app-ag{width:100vw;height:100vh}
 #ov-proj:-webkit-full-screen{width:100vw;height:100vh;background:var(--bg)}
 :fullscreen{background:var(--bg)}
 :-webkit-full-screen{background:var(--bg)}
@@ -5130,6 +5137,7 @@ button:active{transform:translateY(.5px) scale(.99)}
       <div class="flex1"></div>
       <button class="tb-search" onclick="cmdkOpen()" title="Глобальный поиск (⌘K)"><span>Глобальный поиск</span><kbd>⌘K</kbd></button>
       <button class="tb-search" onclick="quickTaskOpen()" title="Добавить задачу"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 5v14M5 12h14"/></svg><span>Задача</span></button>
+      <button class="tb-search ag-fs-btn" id="ag-fs-btn" onclick="agFullscreen()" title="Полный экран · Esc чтобы выйти"><svg id="ag-fs-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg><span id="ag-fs-lbl">Экран</span></button>
       <button class="tb-search" id="ag-stpl-btn" onclick="openTemplatesSettings()" title="Настройки шаблонов" style="display:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Настройки шаблонов</span></button>
       <button class="tb-search" id="ag-tg-btn" onclick="tgTeamModal()" title="Telegram-группа команды" style="display:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg><span>Telegram</span></button>
       <button class="u-chip" id="ag-uchip" onclick="myProfileOpen()" title="Мой профиль · сменить фото" style="background:none;font-family:inherit"><span class="d"></span><span id="ag-uchip-av" style="width:22px;height:22px;border-radius:6px;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;overflow:hidden;flex:none"></span><span id="ag-uchip-nm">Менеджер агентства</span></button>
@@ -7102,6 +7110,20 @@ function pdFsSync(){
   var ic=document.getElementById('pd-fs-ic'); if(ic) ic.innerHTML=on?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>';
 }
 if(!window._pdFsBound){ window._pdFsBound=1; document.addEventListener('fullscreenchange',pdFsSync); document.addEventListener('webkitfullscreenchange',pdFsSync); }
+function agFullscreen(){
+  var el=document.documentElement;
+  var fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!fsEl){ var rq=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen; if(rq){ try{ var r=rq.call(el); if(r&&r.catch)r.catch(function(){}); }catch(_){} } else if(typeof toast==='function'){ toast('Полный экран не поддерживается браузером'); } }
+  else { var ex=document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen; if(ex){ try{ ex.call(document); }catch(_){} } }
+}
+function agFsSync(){
+  var on=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  var app=document.getElementById('app-ag'); if(app) app.classList.toggle('ag-fs',on);
+  var b=document.getElementById('ag-fs-btn'); if(b) b.classList.toggle('on',on);
+  var ic=document.getElementById('ag-fs-ic'); if(ic) ic.innerHTML=on?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+  var lb=document.getElementById('ag-fs-lbl'); if(lb) lb.textContent=on?'Свернуть':'Экран';
+}
+if(!window._agFsBound){ window._agFsBound=1; document.addEventListener('fullscreenchange',agFsSync); document.addEventListener('webkitfullscreenchange',agFsSync); }
 function pdTabbar(p){
   const _fsOn=!!(document.fullscreenElement||document.webkitFullscreenElement);
   const reps=(p&&p._reports)?p._reports.length:0;
