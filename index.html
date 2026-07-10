@@ -5191,6 +5191,7 @@ button:active{transform:translateY(.5px) scale(.99)}
       <div class="nav-i" data-m="cycles" onclick="agNav('cycles')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Циклы</div>
       <div class="nav-i" data-m="finance" onclick="agNav('finance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Финансы</div>
       <div class="nav-i" data-m="team" onclick="agNav('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/></svg>Команда</div>
+      <div class="nav-i" data-m="kpi" onclick="agNav('kpi')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/><circle cx="7" cy="15" r="1.4"/><circle cx="11" cy="11" r="1.4"/><circle cx="14" cy="14" r="1.4"/><circle cx="19" cy="8" r="1.4"/></svg>KPI</div>
       <div class="nav-i" data-m="leaderboard" onclick="agNav('leaderboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM5 4H4a2 2 0 0 0 0 4h1M19 4h1a2 2 0 0 1 0 4h-1"/></svg>Лидерборд</div>
       <div class="nav-i" data-m="kb" onclick="agNav('kb')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>База знаний</div>
       <div class="nav-i" data-m="tools" onclick="agNav('tools')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Инструменты</div>
@@ -5995,7 +5996,7 @@ let PROJECTS = [
 ];
 let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all',agCplx='all';
 let PROJECT_TAGS={category:[],service:[],tariff:[],dept:[],rubric:[]};
-const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты',leaderboard:'Лидерборд'};
+const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты',kpi:'KPI',leaderboard:'Лидерборд'};
 
 function enterAgency(){
   document.getElementById('page-login').classList.add('hidden');
@@ -6105,7 +6106,7 @@ function agNav(m){if(typeof _closePops==='function')_closePops();
   document.getElementById('ag-tb').innerHTML='Агентство<b>'+AG_MODULES[m]+'</b>';
   { const _tgb=document.getElementById('ag-tg-btn'); if(_tgb) _tgb.style.display=(m==='team'&&agIsOwner())?'':'none'; }
   _agSetTopBtn(m);
-  if(m==='projects') renderProjects(); else if(m==='deadlines') renderDeadlines(); else if(m==='overview') renderOverview(); else if(m==='cycles') renderCycles(); else if(m==='finance') renderFinance(); else if(m==='team') renderTeam(); else if(m==='leaderboard') renderLeaderboard(); else if(m==='kb') renderKB(); else if(m==='tools') renderTools(); else renderModule(m);
+  if(m==='projects') renderProjects(); else if(m==='deadlines') renderDeadlines(); else if(m==='overview') renderOverview(); else if(m==='cycles') renderCycles(); else if(m==='finance') renderFinance(); else if(m==='team') renderTeam(); else if(m==='kpi') renderKPI(); else if(m==='leaderboard') renderLeaderboard(); else if(m==='kb') renderKB(); else if(m==='tools') renderTools(); else renderModule(m);
 }
 /* ——— project quick actions / general settings actions ——— */
 function _agSetTopBtn(m){
@@ -17982,6 +17983,284 @@ window.kpiComputeAll = async (scopeKind, scopeId, fromISO, toISO) => {
 };
 
 /* ═══════════ /KPI COMPUTE · FINANCE + PORTFOLIO ═══════════ */
+
+/* ═══════════ KPI MODULE · UI ═══════════
+   Модуль KPI: 4 scope-таба × 7 блоков. Пока подключён блок «Точка А база» на «Сотрудники» как эталон.
+*/
+
+/* ── Локальное состояние ── */
+window._kpiState = { scope:'member', block:'pointA', periodId:null, periods:[], baselines:{}, computing:false };
+
+/* Утилита: короткий формат значения по типу метрики */
+window._kpiFmt = (metricKey, v) => {
+  if (v == null) return '—';
+  const m = KPI_METRICS[metricKey]; if(!m) return String(v);
+  if (m.unit === '%') return (Math.round(v*10)/10) + '%';
+  if (m.unit === 'ч') return v < 24 ? v + ' ч' : Math.round(v/24*10)/10 + ' дн';
+  if (m.unit === '$') return v >= 1000 ? Math.round(v/100)/10 + 'k' : '$' + Math.round(v);
+  if (m.unit === 'σ') return Math.round(v*100)/100;
+  if (m.unit === '' || m.unit === 'ед.'){
+    return v >= 1000000 ? (Math.round(v/100000)/10) + 'M' : v >= 1000 ? (Math.round(v/100)/10) + 'k' : String(Math.round(v));
+  }
+  return String(v);
+};
+
+/* Утилита: цвет уверенности */
+window._kpiConfDot = (conf) => {
+  const c = conf==='ok' ? 'var(--pos)' : conf==='low' ? 'var(--warn)' : 'var(--txt-3)';
+  const title = conf==='ok' ? 'Достаточно данных' : conf==='low' ? 'Мало данных — оценка приблизительна' : 'Нет данных';
+  return `<span class="kpi-dot" style="background:${c}" title="${title}"></span>`;
+};
+
+/* Загрузка/выбор активного периода */
+window._kpiPickCurrentPeriod = async () => {
+  const st = _kpiState;
+  if (!st.periods || !st.periods.length) st.periods = await kpiFetchPeriods({ limit: 20 });
+  if (!st.periods.length) { st.periodId = null; return null; }
+  const active = st.periods.find(p => p.status === 'active');
+  const planning = st.periods.find(p => p.status === 'planning');
+  st.periodId = (st.periodId) ? st.periodId : (active ? active.id : planning ? planning.id : st.periods[0].id);
+  return st.periods.find(p => p.id === st.periodId);
+};
+
+/* Расчёт baseline для всех сотрудников агентства по ops-метрикам */
+window._kpiComputeBaselines = async (period) => {
+  if (!period) return {};
+  const days = period.baseline_window_days || 30;
+  const start = new Date(period.start_date + 'T00:00:00').getTime();
+  const fromISO = new Date(start - days*86400000).toISOString();
+  const toISO = new Date(start).toISOString();
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]);
+  const out = {};
+  await Promise.all(TM.map(async m => {
+    const uid = m._id || m.id; if(!uid) return;
+    out[uid] = await kpiComputeOpsAll('member', uid, fromISO, toISO);
+  }));
+  return out;
+};
+
+/* Точка входа */
+window.renderKPI = async () => {
+  const st = _kpiState;
+  // Гарантируем TEAM/PROJECTS
+  if (!window._teamRaw && window.tLoadTeam) await window.tLoadTeam().catch(()=>{});
+  // Каркас
+  document.getElementById('content-ag').innerHTML = _kpiShellHTML();
+  await _kpiPickCurrentPeriod();
+  _kpiRenderPeriodBar();
+  await _kpiRenderBody();
+};
+
+/* Шелл с scope-табами и заголовком */
+window._kpiShellHTML = () => {
+  const st = _kpiState;
+  const scopes = [
+    {k:'member', l:'Сотрудники', ic:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/>'},
+    {k:'team',   l:'Команды',    ic:'<path d="M4 20a4 4 0 118 0M12 20a4 4 0 118 0"/><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/>'},
+    {k:'project',l:'Проекты',    ic:'<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/>'},
+    {k:'agency', l:'Агентство',  ic:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'},
+  ];
+  const blocks = [
+    {k:'pointA',   l:'Точка А · база'},
+    {k:'goal',     l:'Цель'},
+    {k:'min',      l:'Минимум'},
+    {k:'rpmrmp',   l:'RPM · RMP'},
+    {k:'forecast', l:'Прогноз'},
+    {k:'monitor',  l:'Мониторинг'},
+    {k:'stats',    l:'Статистика'},
+  ];
+  return `
+    <style>
+      .kpi-wrap{display:flex;flex-direction:column;gap:16px;padding:0}
+      .kpi-hero{background:linear-gradient(135deg, rgba(138,143,255,.08), rgba(55,230,200,.05));border:1px solid var(--line);border-radius:16px;padding:22px 24px;position:relative;overflow:hidden}
+      .kpi-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 85% 0%, rgba(138,143,255,.1), transparent 55%);pointer-events:none}
+      .kpi-hero-eb{color:var(--txt-3);text-transform:uppercase;font-size:11px;letter-spacing:.14em;margin-bottom:6px;font-weight:600}
+      .kpi-hero-h{font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
+      .kpi-hero-sub{color:var(--txt-2);font-size:13.5px;max-width:680px;line-height:1.55}
+      .kpi-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .kpi-tabs{display:inline-flex;gap:4px;padding:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px}
+      .kpi-tab{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;color:var(--txt-2);font-weight:600;font-size:13px;cursor:pointer;transition:all .16s var(--ease-out);white-space:nowrap}
+      .kpi-tab svg{width:14px;height:14px;flex:none}
+      .kpi-tab:hover{color:var(--txt-1);background:rgba(255,255,255,.03)}
+      .kpi-tab.on{background:var(--panel-3);color:var(--txt-1);box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 0 0 1px rgba(138,143,255,.15)}
+      .kpi-period{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;font-weight:600;font-size:13px;cursor:pointer}
+      .kpi-period svg{width:13px;height:13px;flex:none;opacity:.7}
+      .kpi-period-info{font-family:var(--mono);font-size:12px;color:var(--txt-3);padding-left:10px;border-left:1px solid var(--line);margin-left:2px}
+      .kpi-blocks{display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:3px;overflow-x:auto}
+      .kpi-blk{padding:9px 13px;border-radius:9px;font-weight:600;font-size:12.5px;color:var(--txt-3);cursor:pointer;white-space:nowrap;transition:all .14s}
+      .kpi-blk:hover{color:var(--txt-1)}
+      .kpi-blk.on{background:var(--panel-3);color:var(--txt-1);box-shadow:0 0 0 1px var(--line)}
+      .kpi-body{background:var(--panel-2);border:1px solid var(--line);border-radius:16px;padding:20px;min-height:280px}
+      .kpi-body-head{display:flex;align-items:baseline;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+      .kpi-body-h{font-size:16px;font-weight:700;letter-spacing:-.005em}
+      .kpi-body-sub{color:var(--txt-3);font-size:12.5px;line-height:1.5;flex:1;min-width:200px}
+      .kpi-empty{padding:34px 24px;text-align:center;color:var(--txt-3)}
+      .kpi-empty h4{font-size:15px;color:var(--txt-1);margin:0 0 6px}
+      .kpi-empty p{font-size:13px;margin:0 auto 16px;max-width:420px;line-height:1.55}
+      .kpi-cta{display:inline-flex;gap:8px;align-items:center;padding:9px 16px;background:linear-gradient(180deg, rgba(138,143,255,.14), rgba(138,143,255,.08));border:1px solid rgba(138,143,255,.3);border-radius:10px;color:var(--txt-1);font-weight:600;font-size:13px;cursor:pointer;transition:all .16s}
+      .kpi-cta:hover{background:linear-gradient(180deg, rgba(138,143,255,.22), rgba(138,143,255,.12));transform:translateY(-1px)}
+      .kpi-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+      .kpi-table thead th{text-align:left;padding:10px 12px;color:var(--txt-3);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--line);white-space:nowrap;background:transparent;position:sticky;top:0;background:var(--panel-2)}
+      .kpi-table thead th.num{text-align:right}
+      .kpi-table tbody td{padding:12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+      .kpi-table tbody tr:hover td{background:rgba(255,255,255,.015)}
+      .kpi-table tbody td.num{text-align:right;font-family:var(--mono);color:var(--txt-1);white-space:nowrap;font-variant-numeric:tabular-nums}
+      .kpi-nameC{display:flex;align-items:center;gap:11px}
+      .kpi-av{width:32px;height:32px;border-radius:8px;background:var(--panel-3);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;overflow:hidden;flex:none}
+      .kpi-av img{width:100%;height:100%;object-fit:cover}
+      .kpi-nm{font-weight:600;font-size:13.5px}
+      .kpi-nsub{font-size:11.5px;color:var(--txt-3)}
+      .kpi-cell{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;width:100%}
+      .kpi-dot{width:6px;height:6px;border-radius:50%;display:inline-block;flex:none}
+      .kpi-tblwrap{overflow:auto;max-height:64vh;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
+      .kpi-metric-h{display:flex;align-items:center;gap:6px;justify-content:flex-end;color:var(--txt-3);font-size:11px}
+      .kpi-help{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.05);color:var(--txt-3);font-size:10px;display:inline-flex;align-items:center;justify-content:center;cursor:help}
+    </style>
+    <div class="kpi-wrap">
+      <div class="kpi-hero">
+        <div class="kpi-hero-eb">Модуль KPI · показатели эффективности</div>
+        <div class="kpi-hero-h">Планируем цели, измеряем факт, управляем рисками</div>
+        <div class="kpi-hero-sub">Четыре уровня — сотрудники, команды, проекты, агентство. Каждый уровень — семь блоков: база (точка А), цель, минимум, темп и риски, прогноз, мониторинг, статистика. Данные обновляются автоматически.</div>
+      </div>
+      <div class="kpi-bar">
+        <div class="kpi-tabs" id="kpi-scope-tabs">
+          ${scopes.map(x => `<div class="kpi-tab${x.k===st.scope?' on':''}" onclick="kpiSetScope('${x.k}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${x.ic}</svg>${x.l}</div>`).join('')}
+        </div>
+        <div style="flex:1"></div>
+        <div id="kpi-period-bar"></div>
+      </div>
+      <div class="kpi-blocks">
+        ${blocks.map(b => `<div class="kpi-blk${b.k===st.block?' on':''}" onclick="kpiSetBlock('${b.k}')">${b.l}</div>`).join('')}
+      </div>
+      <div class="kpi-body" id="kpi-body"><div class="kpi-empty">Загрузка данных…</div></div>
+    </div>
+  `;
+};
+
+window.kpiSetScope = (k) => { _kpiState.scope = k; document.querySelectorAll('#kpi-scope-tabs .kpi-tab').forEach(el => el.classList.toggle('on', el.textContent.trim() === {member:'Сотрудники',team:'Команды',project:'Проекты',agency:'Агентство'}[k])); _kpiRenderBody(); };
+window.kpiSetBlock = (k) => { _kpiState.block = k; document.querySelectorAll('.kpi-blk').forEach((el,i) => { const labels=['pointA','goal','min','rpmrmp','forecast','monitor','stats']; el.classList.toggle('on', labels[i]===k); }); _kpiRenderBody(); };
+
+/* Панель периода — с dropdown-меню */
+window._kpiRenderPeriodBar = () => {
+  const st = _kpiState;
+  const bar = document.getElementById('kpi-period-bar'); if(!bar) return;
+  const cur = st.periods.find(p => p.id === st.periodId);
+  if (!cur){
+    bar.innerHTML = `<button class="kpi-cta" onclick="kpiCreateDefaultPeriod()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Создать первый KPI-период</button>`;
+    return;
+  }
+  const statusL = { active:'активный', planning:'планирование', closed:'закрыт' }[cur.status] || cur.status;
+  const dc = { active:'var(--pos)', planning:'var(--violet)', closed:'var(--txt-3)' }[cur.status] || 'var(--txt-3)';
+  const opts = st.periods.map(p => [p.id, `${p.name} · ${{active:'активный',planning:'план.',closed:'закрыт'}[p.status]||p.status}`]);
+  opts.push(['__new', '+ Новый период (текущий месяц)']);
+  const ddHTML = _ddSel('kpi-period-sel', opts, cur.id, (v) => {
+    if (v === '__new') return kpiCreateDefaultPeriod();
+    st.periodId = v; _kpiRenderPeriodBar(); _kpiRenderBody();
+  });
+  bar.innerHTML = `
+    <div style="display:inline-flex;align-items:center;gap:10px">
+      <span class="kpi-dot" style="background:${dc};box-shadow:0 0 6px -1px ${dc};width:8px;height:8px"></span>
+      <span class="kpi-period-info" style="border:none;margin:0;padding:0;font-size:12px">${cur.start_date} → ${cur.end_date} · ${statusL}</span>
+      <div style="min-width:240px">${ddHTML}</div>
+    </div>`;
+};
+
+/* Быстрое создание периода — текущий месяц с baseline 30 дней */
+window.kpiCreateDefaultPeriod = async () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  const end = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().slice(0,10);
+  const name = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][now.getMonth()] + ' ' + now.getFullYear();
+  const row = await kpiCreatePeriod({ name, kind:'month', start_date:start, end_date:end, baseline_window_days:30 });
+  if (row){
+    _kpiState.periods.unshift(row); _kpiState.periodId = row.id;
+    if (typeof toast === 'function') toast('Период создан');
+    _kpiRenderPeriodBar(); _kpiRenderBody();
+  }
+};
+
+/* ── Диспетчер блоков ── */
+window._kpiRenderBody = async () => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const period = st.periods.find(p => p.id === st.periodId);
+  if (!period){
+    body.innerHTML = `<div class="kpi-empty"><h4>KPI-период не создан</h4><p>Чтобы измерять и планировать — заведите первый период. По умолчанию: текущий месяц с окном базы 30 дней. Всё можно поменять позже.</p><button class="kpi-cta" onclick="kpiCreateDefaultPeriod()">Создать первый период</button></div>`;
+    return;
+  }
+  if (st.block === 'pointA') return _kpiBlkPointA(period);
+  body.innerHTML = `<div class="kpi-empty"><h4>Блок в разработке</h4><p>Здесь появится содержимое следующего блока — соберём после того как утвердим стилистику блока «Точка А».</p></div>`;
+};
+
+/* ── Блок «Точка А база» ── */
+window._kpiBlkPointA = async (period) => {
+  const st = _kpiState;
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  if (st.scope !== 'member'){
+    body.innerHTML = `<div class="kpi-body-head"><div class="kpi-body-h">Точка А · база</div><div class="kpi-body-sub">Для этого уровня блок появится следом — сейчас собираем эталон на «Сотрудниках».</div></div><div class="kpi-empty">Скоро</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Точка А · база</div>
+      <div class="kpi-body-sub">Базовый уровень сотрудников — медиана за <b>${period.baseline_window_days}</b> дней до старта периода <b>${period.start_date}</b>. Точка отсчёта для целей и минимумов.</div>
+    </div>
+    <div class="kpi-empty" id="kpi-baseline-loading">Считаем базу по данным задач…</div>
+  `;
+  st.computing = true;
+  try {
+    const baselines = await _kpiComputeBaselines(period);
+    st.baselines[period.id] = baselines;
+    st.computing = false;
+    _kpiRenderPointATable(period, baselines);
+  } catch(e){ console.warn(e); body.querySelector('#kpi-baseline-loading').textContent = 'Ошибка расчёта. Проверьте консоль.'; }
+};
+
+window._kpiRenderPointATable = (period, baselines) => {
+  const body = document.getElementById('kpi-body'); if(!body) return;
+  const TM = (typeof TEAM!=='undefined'?TEAM:[]).filter(m => (m.role||'member')==='member').slice();
+  const metrics = ['cycle_time','ontime_rate','rework_rate','throughput_w','review_response'];
+  const rows = TM.map(m => {
+    const uid = m._id || m.id;
+    const data = baselines[uid] || {};
+    return { m, uid, data };
+  });
+  const initials = (nm) => (nm||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+  const html = `
+    <div class="kpi-body-head">
+      <div class="kpi-body-h">Точка А · база сотрудников</div>
+      <div class="kpi-body-sub">Медиана за <b>${period.baseline_window_days}</b> дней до <b>${period.start_date}</b>. <span style="display:inline-flex;gap:11px;margin-left:8px;font-size:11.5px"><span><span class="kpi-dot" style="background:var(--pos)"></span> достоверно</span><span><span class="kpi-dot" style="background:var(--warn)"></span> мало данных</span><span><span class="kpi-dot" style="background:var(--txt-3)"></span> нет</span></span></div>
+    </div>
+    <div class="kpi-tblwrap">
+      <table class="kpi-table">
+        <thead>
+          <tr>
+            <th>Сотрудник</th>
+            ${metrics.map(k => `<th class="num"><div class="kpi-metric-h">${KPI_METRICS[k].label}<span class="kpi-help" title="${KPI_METRICS[k].formula}">?</span></div></th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td><div class="kpi-nameC">
+                <div class="kpi-av" style="${r.m.avatar_url?'background:transparent':''}">${r.m.avatar_url?`<img src="${r.m.avatar_url}">`:initials(r.m.name||r.m.full_name)}</div>
+                <div><div class="kpi-nm">${r.m.name||r.m.full_name||'—'}</div><div class="kpi-nsub">${r.m.dept||r.m.role_title||'—'}</div></div>
+              </div></td>
+              ${metrics.map(k => {
+                const v = r.data[k] || {value:null,confidence:null,sample_size:0};
+                return `<td class="num"><span class="kpi-cell">${_kpiFmt(k, v.value)}${_kpiConfDot(v.confidence)}</span></td>`;
+              }).join('')}
+            </tr>
+          `).join('')}
+          ${rows.length===0 ? `<tr><td colspan="${metrics.length+1}" style="text-align:center;color:var(--txt-3);padding:30px">В агентстве нет сотрудников для расчёта.</td></tr>` : ''}
+        </tbody>
+      </table>
+    </div>
+  `;
+  body.innerHTML = html;
+};
+/* ═══════════ /KPI MODULE · UI ═══════════ */
+
 
 
 
