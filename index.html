@@ -267,6 +267,17 @@ button{font-family:inherit}
 .pf-del{flex:0 0 auto;width:30px;height:30px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-3);border-radius:8px;cursor:pointer;font-size:13px;transition:.14s}
 .pf-del:hover{color:var(--neg);border-color:var(--neg)}
 .pf-staff{margin-top:8px}
+/* Финансы проекта — упрощённый режим строк */
+.pf-row-simple{padding:8px 10px}
+.pf-simple-line{display:grid;grid-template-columns:minmax(0,1.6fr) 190px auto auto;gap:8px;align-items:center}
+.pf-amt-wrap{display:flex;align-items:center;background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;overflow:hidden;height:36px}
+.pf-amt-wrap .pf-amt{flex:1;text-align:right;background:transparent;border:0;border-radius:0;padding:0 10px;font-family:var(--mono);font-size:13.5px;color:var(--txt);width:100%}
+.pf-amt-wrap .pf-amt:focus{outline:none;box-shadow:none}
+.pf-amt-wrap:focus-within{border-color:var(--accent-line);box-shadow:0 0 0 2px var(--accent-dim)}
+.pf-amt-suf{padding:0 11px;font-size:11px;font-family:var(--mono);color:var(--txt-3);background:var(--bg-2);border-left:1px solid var(--line-2);text-transform:uppercase;letter-spacing:.06em;height:100%;display:flex;align-items:center;flex:none}
+.pf-mini{width:32px;height:32px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-3);border-radius:8px;cursor:pointer;font-size:14px;line-height:1;transition:background .14s,color .14s,border-color .14s;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.pf-mini:hover{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+@media (max-width:640px){.pf-simple-line{grid-template-columns:1fr 1fr;grid-auto-flow:row}.pf-simple-line .ddsel,.pf-simple-line .pf-amt-wrap{grid-column:span 2}}
 .pf-empty{border:1px dashed var(--line-2);border-radius:10px;padding:12px;text-align:center;color:var(--txt-3);font-size:13px;cursor:pointer;transition:.14s}
 .pf-empty:hover{border-color:var(--accent-line);color:var(--accent)}
 .pf-empty span{color:var(--accent);font-weight:600;margin-left:4px}
@@ -13966,41 +13977,48 @@ function pfSection(list,title,sub,ph){
   const pool = list==='salaries' ? cat.roles : cat.cats;
   const isSalary = list==='salaries';
   const catLabel = isSalary?'роль':'категория';
-  // для гонораров — полный набор единиц; для категорий расходов — только осмысленные (месяц / штука / час)
   const unitOpts = isSalary ? FIN_UNITS.map(u=>[u[0],u[1]]) : FIN_UNITS.filter(u=>['month','piece','hour'].includes(u[0])).map(u=>[u[0],u[1]]);
   const rowHtml=(r,i)=>{
     const amt=pfRowAmount(r);
-    const fixed = r.unit==='month';
+    const isMonth = r.unit==='month' || !r.unit;
+    const advanced = !isMonth || !!r._adv;
     const staff = isSalary && r.role ? finStaffByRole(r.role) : [];
-    // селект роли/категории
     const catOpts=[['','— '+catLabel+' —']].concat(pool.map(x=>[x.name,x.name]));
-    const curCatLbl = r.name || ('— '+catLabel+' —');
-    return `<div class="pf-row">
-      <div class="pf-row-main">
-        ${_pfSel('pfc-'+list+'-'+i, catOpts, r.name, v=>pfPickCat(list,i,v), catLabel)}
-        ${_pfSel('pfu-'+list+'-'+i, unitOpts, r.unit, v=>pfSetUnit(list,i,v), 'единица')}
-      </div>
-      <div class="pf-row-calc">
-        ${fixed?`
-          <div class="pf-fixed"><span class="pf-fx-l">сумма / мес</span>
-            <input type="number" min="0" step="50000" value="${amt}" oninput="pfSetAmt('${list}',${i},this.value)" class="pf-amt"></div>
-        `:`
-          <input type="number" min="0" step="1" value="${r.qty||0}" oninput="pfSetQty('${list}',${i},this.value)" class="pf-qty" title="количество">
-          <span class="pf-x">×</span>
-          <input type="number" min="0" step="10000" value="${r.rate||0}" oninput="pfSetRate('${list}',${i},this.value)" class="pf-rate" title="ставка ${FIN_UNIT_LABEL[r.unit]||''}">
-          <span class="pf-eq">=</span>
-          <span class="pf-sum">${money(amt)}</span>
-        `}
-        <button class="pf-del" onclick="pfDel('${list}',${i})" title="Удалить">✕</button>
-      </div>
-      ${staff.length?`<div class="pf-staff">${_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',v=>pfSetStaff(list,i,v),'сотрудник')}</div>`:''}
-    </div>`;
+    if(!advanced){
+      // ПРОСТОЙ РЕЖИМ — одна строка: категория + сумма/мес + кнопка "..." + удалить
+      return '<div class="pf-row pf-row-simple">'
+        +'<div class="pf-simple-line">'
+        +  _pfSel('pfc-'+list+'-'+i, catOpts, r.name, function(v){return pfPickCat(list,i,v);}, catLabel)
+        +  '<div class="pf-amt-wrap"><input type="number" min="0" step="50000" value="'+amt+'" oninput="pfSetAmt(\''+list+'\','+i+',this.value)" class="pf-amt" placeholder="0"><span class="pf-amt-suf">/мес</span></div>'
+        +  '<button class="pf-mini" onclick="pfToggleAdv(\''+list+'\','+i+')" title="Расширенно · qty × rate">···</button>'
+        +  '<button class="pf-del" onclick="pfDel(\''+list+'\','+i+')" title="Удалить">✕</button>'
+        +'</div>'
+        +(staff.length?'<div class="pf-staff">'+_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',function(v){return pfSetStaff(list,i,v);},'сотрудник')+'</div>':'')
+        +'</div>';
+    }
+    // ПРОДВИНУТЫЙ РЕЖИМ — как раньше, но с кнопкой свернуть
+    return '<div class="pf-row pf-row-adv">'
+      +'<div class="pf-row-main">'
+      +  _pfSel('pfc-'+list+'-'+i, catOpts, r.name, function(v){return pfPickCat(list,i,v);}, catLabel)
+      +  _pfSel('pfu-'+list+'-'+i, unitOpts, r.unit||'month', function(v){return pfSetUnit(list,i,v);}, 'единица')
+      +'</div>'
+      +'<div class="pf-row-calc">'
+      +(isMonth
+        ? '<div class="pf-fixed"><span class="pf-fx-l">сумма / мес</span><input type="number" min="0" step="50000" value="'+amt+'" oninput="pfSetAmt(\''+list+'\','+i+',this.value)" class="pf-amt"></div>'
+        : '<input type="number" min="0" step="1" value="'+(r.qty||0)+'" oninput="pfSetQty(\''+list+'\','+i+',this.value)" class="pf-qty" title="количество"><span class="pf-x">×</span><input type="number" min="0" step="10000" value="'+(r.rate||0)+'" oninput="pfSetRate(\''+list+'\','+i+',this.value)" class="pf-rate" title="ставка"><span class="pf-eq">=</span><span class="pf-sum">'+money(amt)+'</span>')
+      +'<button class="pf-mini" onclick="pfToggleAdv(\''+list+'\','+i+')" title="Свернуть">↑</button>'
+      +'<button class="pf-del" onclick="pfDel(\''+list+'\','+i+')" title="Удалить">✕</button>'
+      +'</div>'
+      +(staff.length?'<div class="pf-staff">'+_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',function(v){return pfSetStaff(list,i,v);},'сотрудник')+'</div>':'')
+      +'</div>';
   };
-  return `<div class="fld pf-sec" style="margin-top:6px">
-    <label style="display:flex;justify-content:space-between;align-items:center">${title}<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="pfAdd('${list}')">+ Добавить</button></label>
-    ${rows.length?rows.map(rowHtml).join(''):`<div class="pf-empty" onclick="pfAdd('${list}')">${ph} <span>+ добавить</span></div>`}
-  </div>`;
+  return '<div class="fld pf-sec" style="margin-top:6px">'
+    +'<label style="display:flex;justify-content:space-between;align-items:center">'+title+'<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="pfAdd(\''+list+'\')">+ Добавить</button></label>'
+    +(rows.length?rows.map(rowHtml).join(''):'<div class="pf-empty" onclick="pfAdd(\''+list+'\')">'+ph+' <span>+ добавить</span></div>')
+    +'</div>';
 }
+function pfToggleAdv(list,i){ var r=PFIN[list][i]; if(!r)return; r._adv=!r._adv; if(!r._adv && r.unit!=='month'){ r.unit='month'; }
+  pfRender(); }
 // компактный нативный селект в стиле платформы (без кастомного дропдауна — надёжнее в скролле модалки)
 function _pfSel(id,opts,cur,cb,ph){
   return _ddSel(id, opts, cur, cb, ph);
