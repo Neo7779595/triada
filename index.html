@@ -5592,21 +5592,26 @@ function renderAnalytics(){
   const leaders=[...A].sort((x,y)=>y.mrr-x.mrr);
   const verts={}; A.forEach(a=>{verts[a.vertical]=(verts[a.vertical]||0)+a.mrr;});
   const vMax=Math.max(...Object.values(verts),1);
-  const trendV=[62,71,78,86,94,103,Math.round(totMrr/1e5)/10], trendL=['Янв','Фев','Мар','Апр','Май','Июн','Июл'];
+  const _S=(window.PLATFORM_SETTINGS)||{};
+  const _MON3=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const _snaps=(window.PLATFORM_SNAPSHOTS)||[];
+  let trendV, trendL, trendReal=false;
+  if(_snaps.length>=2){ trendReal=true; trendV=_snaps.map(s=>Math.round((s.mrr||0)/1e5)/10); trendL=_snaps.map(s=>{ const d=new Date(s.period); return _MON3[d.getMonth()]||''; }); }
+  else { trendV=[Math.round(totMrr/1e5)/10]; trendL=['сейчас']; }
   document.getElementById('content').innerHTML=`
   <div class="ph"><div><div class="eyebrow">Платформа · аналитика</div><h1>Аналитика платформы</h1></div>
     <button class="btn-add" onclick="exportAgencies()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Экспорт</button></div>
   <div style="margin:-2px 0 14px;font-size:13.5px;color:var(--txt-3);line-height:1.5;max-width:980px">Операционные суммы — <b style="color:var(--txt-2)">MRR, ARPA, медиана, доли тарифов</b> — считаются из ваших агентств (замороженные исключены). «MRR платформы» здесь — регулярный доход <b style="color:var(--txt-2)">под управлением</b> агентств, а не выручка DETROYD по подпискам. Метрики динамики (рост, конверсия, NRR, прогноз, воронка) помечены <b style="color:var(--txt-2)">«план»</b> — это ориентиры, для них нужна история.</div>
   <div class="kpis" style="grid-template-columns:repeat(6,1fr)">
-    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">+12% м/м · план</div><div class="kfoot pos">прогноз Q3: 128 М</div></div>
+    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">${(function(){ if(_snaps.length>=2){ const a=_snaps[_snaps.length-2].mrr||0,b=totMrr; if(a>0){ const d=Math.round((b/a-1)*100); return (d>=0?'+':'')+d+'% м/м'; } } return 'под управлением'; })()}</div><div class="kfoot">${paying} платящих · ${trial} триал</div></div>
     <div class="kpi"><div class="l">ARPA</div><div class="v num">${M(arpa)}<span class="u">сум</span></div><div class="sub">на платящее агентство</div><div class="kfoot">медиана: ${M(medMrr)}</div></div>
     <div class="kpi"><div class="l">Платящих</div><div class="v num">${paying}<span class="u">/${A.length}</span></div><div class="sub">${A.length?Math.round(paying/A.length*100):0}% базы</div><div class="kfoot">${trial} триал · ${susp} заморож.</div></div>
     <div class="kpi"><div class="l">Клиентов всего</div><div class="v num">${clients}</div><div class="sub">по агентствам</div><div class="kfoot">${projects} проектов</div></div>
-    <div class="kpi"><div class="l">Конверсия триала</div><div class="v num" style="color:var(--pos)">50<span class="u">%</span></div><div class="sub">ориентир · план</div><div class="kfoot">цель: 65%</div></div>
-    <div class="kpi"><div class="l">NRR</div><div class="v num" style="color:var(--pos)">108<span class="u">%</span></div><div class="sub">удержание дохода · план</div><div class="kfoot pos">расширение > отток</div></div>
+    <div class="kpi"><div class="l">Конверсия триала</div><div class="v num" style="color:var(--pos)">${(_S.trial_conv_target!=null?_S.trial_conv_target:50)}<span class="u">%</span></div><div class="sub">цель · задаётся в настройках</div><div class="kfoot">факт: ${trial} на триале</div></div>
+    <div class="kpi"><div class="l">NRR</div><div class="v num" style="color:var(--pos)">${(_S.nrr_target!=null?_S.nrr_target:108)}<span class="u">%</span></div><div class="sub">цель · задаётся в настройках</div><div class="kfoot pos">расширение > отток</div></div>
   </div>
   <div class="row2" style="margin-top:16px">
-    <div class="card"><div class="card-h"><div class="t">Рост MRR платформы</div><div class="c">млн сум · 7 мес</div></div><div class="card-body">${svgLine(trendV,trendL)}<div style="text-align:center;font-size:13px;color:var(--pos);margin-top:6px">↑ +${Math.round((trendV[trendV.length-1]/trendV[0]-1)*100)}% с начала года · план</div></div></div>
+    <div class="card"><div class="card-h"><div class="t">Рост MRR платформы</div><div class="c">млн сум${trendReal?' · '+trendV.length+' мес':' · история копится'}</div></div><div class="card-body">${trendReal?svgLine(trendV,trendL)+`<div style="text-align:center;font-size:13px;color:var(--pos);margin-top:6px">↑ +${Math.round((trendV[trendV.length-1]/trendV[0]-1)*100)}% за период</div>`:`<div style="text-align:center;padding:26px 0"><div class="num" style="font-size:30px;color:var(--accent)">${M(totMrr)} <span style="font-size:15px;color:var(--txt-3)">сум</span></div><div style="font-size:12.5px;color:var(--txt-3);margin-top:8px">Тренд появится со второго месячного снимка</div></div>`}</div></div>
     <div class="card"><div class="card-h"><div class="t">MRR по тарифам</div></div><div class="card-body">
       ${['enterprise','pro','basic'].map(k=>`<div style="margin-top:14px">
         <div style="display:flex;justify-content:space-between;font-size:14px"><span style="display:flex;align-items:center;gap:8px;text-transform:capitalize"><span style="width:8px;height:8px;border-radius:2px;background:${planColor[k]}"></span>${k}</span><span class="num">${M(planRev[k])} сум</span></div>
@@ -5635,11 +5640,11 @@ function renderAnalytics(){
       </div>`).join('')}
     </div></div>
     <div class="card"><div class="card-h"><div class="t">Воронка платформы <span class="c" style="color:var(--txt-3)">иллюстрация</span></div></div><div class="card-body">
-      ${[{l:'Демо-запросы',v:48,c:'var(--txt-2)'},{l:'Активировано',v:12,c:'#8A8FFF'},{l:'На триале',v:6,c:'var(--warn)'},{l:'Платящих',v:paying,c:'var(--accent)'},{l:'Расширение (апсейл)',v:2,c:'var(--pos)'}].map((s,i,arr)=>`<div style="margin-top:12px">
+      ${[{l:'Демо-запросы · цель',v:(_S.demo_month!=null?_S.demo_month:48),c:'var(--txt-2)'},{l:'Активировано · цель',v:(_S.activated_month!=null?_S.activated_month:12),c:'#8A8FFF'},{l:'На триале · факт',v:trial,c:'var(--warn)'},{l:'Платящих · факт',v:paying,c:'var(--accent)'},{l:'Расширение (апсейл)',v:0,c:'var(--pos)'}].map((s,i,arr)=>`<div style="margin-top:12px">
         <div style="display:flex;justify-content:space-between;font-size:14px"><span>${s.l}</span><span class="num">${s.v}</span></div>
         <div style="height:8px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:6px"><div class="bf" style="width:${s.v/arr[0].v*100}%;height:100%;background:${s.c};border-radius:4px"></div></div>
       </div>`).join('')}
-      <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--line);font-size:13px;color:var(--txt-3)">Демо → платящий: <b style="color:var(--accent)">${Math.round(paying/48*100)}%</b> сквозная конверсия</div>
+      <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--line);font-size:13px;color:var(--txt-3)">Демо → платящий: <b style="color:var(--accent)">${(_S.demo_month?Math.round(paying/_S.demo_month*100):Math.round(paying/48*100))}%</b> · демо — цель из настроек</div>
     </div></div>
   </div>`;
 }
@@ -5702,27 +5707,58 @@ let TARIFFS=[
 ];
 function tariffEdit(i){
   const isNew=(i==null);
-  const p=isNew?{name:'',price:'',per:'сум / мес',feats:[[1,'До 10 клиентов'],[1,'Все 8 модулей'],[1,'Командные роли'],[0,'White-label бренд'],[0,'API и вебхуки'],[0,'Приоритетная поддержка']]}:TARIFFS[i];
+  const p=isNew?{name:'',price:'',per:'мес',pop:false,feats:[[1,'До 10 клиентов'],[1,'Все 8 модулей'],[1,'Командные роли'],[0,'White-label бренд'],[0,'API и вебхуки'],[0,'Приоритетная поддержка']]}:TARIFFS[i];
   const feats=p.feats.map((f,fi)=>`<label class="tf-row"><input type="checkbox" ${f[0]?'checked':''}><input class="tf-lbl" value="${(f[1]||'').replace(/"/g,'&quot;')}"></label>`).join('');
   pd2Open(`<div class="modal" style="max-width:560px">
     <div class="modal-h"><h3>${isNew?'Новый тариф':'Тариф · '+p.name}</h3><p>Название, цена и состав возможностей</p></div>
     <div class="modal-b">
-      <div class="fld2"><div class="fld"><label>Название</label><input id="tf-name" value="${p.name||''}" placeholder="Pro"></div><div class="fld"><label>Цена</label><input id="tf-price" value="${p.price||''}" placeholder="3 900 000"></div></div>
-      <div class="fld"><label>Период</label><input id="tf-per" value="${p.per||''}" placeholder="сум / мес"></div>
+      <div class="fld2"><div class="fld"><label>Название</label><input id="tf-name" value="${(p.name||'').replace(/"/g,'&quot;')}" placeholder="Pro"></div><div class="fld"><label>Цена, сум</label><input id="tf-price" value="${tariffPriceInput(p.price)}" placeholder="3 900 000" inputmode="numeric"></div></div>
+      <div class="fld" style="margin-top:-6px"><div style="font-size:12px;color:var(--txt-3)">пусто = «по договору» · 0 = «Бесплатно»</div></div>
+      <div class="fld2"><div class="fld"><label>Период</label><input id="tf-per" value="${(p.per||'').replace(/"/g,'&quot;')}" placeholder="мес"></div>
+      <div class="fld"><label>Популярный</label><div style="display:flex;align-items:center;gap:10px;height:38px"><span class="tgl ${p.pop?'on':''}" id="tf-pop" onclick="this.classList.toggle('on')"><i></i></span><span style="font-size:13px;color:var(--txt-3)">бейдж «Популярный»</span></div></div></div>
       <div class="fld"><label>Возможности — галочка включает, текст редактируется</label><div id="tf-feats">${feats}</div></div>
     </div>
     <div class="modal-f">${isNew?'':`<button class="btn-ghost" style="color:var(--neg);margin-right:auto" onclick="tariffDel(${i})">Удалить</button>`}<button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="tariffSave(${isNew?'null':i})">${isNew?'Создать тариф':'Сохранить'}</button></div>
   </div>`);
 }
-function tariffSave(i){
+function tariffPriceFmt(p){
+  if(p===null||p===undefined||p==='') return 'Индивид.';
+  if(typeof p==='string'){ const s=p.trim(); return s||'Индивид.'; }
+  if(typeof p==='number'){ return p===0?'Бесплатно':fmt(p); }
+  return String(p);
+}
+function tariffPriceInput(p){
+  if(p===null||p===undefined) return '';
+  if(typeof p==='number') return p===0?'0':fmt(p);
+  const s=String(p).trim();
+  if(s==='Индивид.'||s==='') return '';
+  if(s==='Бесплатно') return '0';
+  return s;
+}
+async function tariffSave(i){
   const name=_v('tf-name'); if(!name){toast('Введи название тарифа');return;}
-  const price=_v('tf-price')||'—', per=_v('tf-per')||'';
+  const per=_v('tf-per')||'';
   const feats=[...document.querySelectorAll('#tf-feats .tf-row')].map(l=>[l.querySelector('input[type=checkbox]').checked?1:0, l.querySelector('.tf-lbl').value.trim()||'—']);
-  if(i==null){TARIFFS.push({key:name.toLowerCase().replace(/\s+/g,'_'),name,price,per,feats});}
-  else{Object.assign(TARIFFS[i],{name,price,per,feats});}
+  const pop=!!(document.getElementById('tf-pop')&&document.getElementById('tf-pop').classList.contains('on'));
+  const raw=_v('tf-price'); const digits=(raw||'').replace(/[^\d]/g,'');
+  const price=(raw||'').trim()===''?null:(digits===''?null:Number(digits));
+  if(window.LIVE && window.tPlatTariffSave){
+    const cur=(i==null)?null:TARIFFS[i];
+    await window.tPlatTariffSave({ id:cur&&cur.id, name, price, per, popular:pop, feats });
+    pd2Close(); return;
+  }
+  const priceMem=price===null?'Индивид.':(price===0?'Бесплатно':fmt(price));
+  if(i==null){TARIFFS.push({key:name.toLowerCase().replace(/\s+/g,'_'),name,price:priceMem,per,pop,feats});}
+  else{Object.assign(TARIFFS[i],{name,price:priceMem,per,pop,feats});}
   pd2Close(); renderTariffs(); toast(i==null?`Тариф «${name}» создан`:`Тариф «${name}» обновлён`);
 }
-function tariffDel(i){const n=TARIFFS[i].name;TARIFFS.splice(i,1);pd2Close();renderTariffs();toast(`Тариф «${n}» удалён`);}
+async function tariffDel(i){
+  const t=TARIFFS[i]; if(!t) return; const n=t.name;
+  const cnt=(typeof AGENCIES!=='undefined')?AGENCIES.filter(a=>a.plan===t.key).length:0;
+  if(cnt>0 && !confirm(`На тарифе «${n}» ${cnt} агентств(а). Тариф удалится из списка, но поле plan у агентств останется прежним. Продолжить?`)) return;
+  if(window.LIVE && window.tPlatTariffDel){ await window.tPlatTariffDel(t.id, t.key); pd2Close(); return; }
+  TARIFFS.splice(i,1); pd2Close(); renderTariffs(); toast(`Тариф «${n}» удалён`);
+}
 function renderTariffs(){
   const A=AGENCIES, M=v=>(v/1e6).toFixed(1).replace(/\.0$/,'')+' М';
   const cnt={trial:A.filter(a=>a.status==='trial').length,basic:A.filter(a=>a.plan==='basic').length,pro:A.filter(a=>a.plan==='pro').length,enterprise:A.filter(a=>a.plan==='enterprise').length};
@@ -5735,7 +5771,7 @@ function renderTariffs(){
   <div class="ph"><div><div class="eyebrow">Платформа · тарифы</div><h1>Тарифы</h1></div>
     <button class="btn-add" onclick="tariffEdit(null)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый тариф</button></div>
   <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">MRR под управлением</div><div class="kfoot pos">+12% м/м · план</div></div>
+    <div class="kpi"><div class="l">MRR платформы</div><div class="v num" style="color:var(--accent)">${M(totMrr)}<span class="u">сум</span></div><div class="sub">MRR под управлением</div><div class="kfoot">${paying} платящих</div></div>
     <div class="kpi"><div class="l">Платящих агентств</div><div class="v num">${paying}</div><div class="sub">на оплате</div><div class="kfoot">${cnt.trial} на триале</div></div>
     <div class="kpi"><div class="l">Средний чек</div><div class="v num">${M(paying?totMrr/paying:0)}<span class="u">сум</span></div><div class="sub">ARPA платящих</div><div class="kfoot">медиана: ${M(medMrr)}</div></div>
     <div class="kpi"><div class="l">Популярный тариф</div><div class="v num">Pro</div><div class="sub">${cnt.pro} агентства</div><div class="kfoot pos">${totMrr?Math.round(planRev.pro/totMrr*100):0}% MRR</div></div>
@@ -5743,7 +5779,7 @@ function renderTariffs(){
   <div class="price-grid">${PLANS.map((p,i)=>`<div class="price-card ${p.pop?'pop':''}">
     ${p.pop?'<span class="pop-rib">Популярный</span>':''}
     <div class="pl-name">${p.name}</div>
-    <div class="pl-price">${p.price}</div>
+    <div class="pl-price">${tariffPriceFmt(p.price)}</div>
     <div class="pl-per">${p.per}</div>
     <div class="pl-meta"><span class="d"></span>${cnt[p.key]||0} ${cnt[p.key]===1?'агентство':'агентств'} на тарифе</div>
     <div class="feat-list">${p.feats.map(f=>`<div class="feat ${f[0]?'':'off'}">${f[0]?ck:xk}<span>${f[1]}</span></div>`).join('')}</div>
@@ -5763,42 +5799,78 @@ function renderTariffs(){
   </div>`;
 }
 function renderSettings(){
-  const sw=on=>`<span class="tgl ${on?'on':''}" onclick="this.classList.toggle('on')"><i></i></span>`;
+  const S=Object.assign({
+    name:'DETROYD SMART SYSTEM', domain:'triada.app', admin_email:'admin@triada.app',
+    accent:'#37E6C8', dark:true, powered_by:true, tz_tashkent:true,
+    twofa:true, session_min:30, agency_limit:50,
+    alert_churn:true, digest_mrr:true, alert_trials:false,
+    nrr_target:108, trial_conv_target:50, demo_month:48, activated_month:12
+  }, window.PLATFORM_SETTINGS||{});
+  const sw=(id,on)=>`<span class="tgl ${on?'on':''}" id="${id}" onclick="this.classList.toggle('on')"><i></i></span>`;
+  const ACC=['#37E6C8','#8A8FFF','#43D88C','#6AA9FF','#E3B567','#F0785C'];
   document.getElementById('content').innerHTML=`
   <div class="ph"><div><div class="eyebrow">Платформа · настройки</div><h1>Настройки</h1></div>
-    <button class="btn-add" onclick="toast('Настройки сохранены')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Сохранить</button></div>
+    <button class="btn-add" onclick="saveSettings()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Сохранить</button></div>
   <div class="row2" style="grid-template-columns:1fr 1fr;margin-top:4px">
     <div class="card"><div class="card-h"><div class="t">Профиль платформы</div></div><div class="card-body">
-      <div class="set-row"><div class="si"><div class="t">Название</div><div class="d">Отображается в кабинетах и письмах</div></div><input class="set-inp" value="DETROYD SMART SYSTEM"></div>
-      <div class="set-row"><div class="si"><div class="t">Корневой домен</div><div class="d">Поддомены агентств: *.triada.app</div></div><input class="set-inp" style="width:160px" value="triada.app"></div>
-      <div class="set-row"><div class="si"><div class="t">Email администратора</div><div class="d">Системные уведомления платформы</div></div><input class="set-inp" value="admin@triada.app"></div>
-      <div class="set-row"><div class="si"><div class="t">Часовой пояс</div><div class="d">Asia/Tashkent · UTC+5</div></div>${sw(1)}</div>
+      <div class="set-row"><div class="si"><div class="t">Название</div><div class="d">Отображается в кабинетах и письмах</div></div><input class="set-inp" id="set-name" value="${_ddA(S.name)}"></div>
+      <div class="set-row"><div class="si"><div class="t">Корневой домен</div><div class="d">Поддомены агентств: *.${_ddH(S.domain)}</div></div><input class="set-inp" id="set-domain" style="width:160px" value="${_ddA(S.domain)}"></div>
+      <div class="set-row"><div class="si"><div class="t">Email администратора</div><div class="d">Системные уведомления платформы</div></div><input class="set-inp" id="set-email" value="${_ddA(S.admin_email)}"></div>
+      <div class="set-row"><div class="si"><div class="t">Часовой пояс</div><div class="d">Asia/Tashkent · UTC+5</div></div>${sw('set-tz',S.tz_tashkent)}</div>
     </div></div>
     <div class="card"><div class="card-h"><div class="t">Брендинг</div></div><div class="card-body">
       <div class="set-row"><div class="si"><div class="t">Акцентный цвет</div><div class="d">Основной цвет интерфейса платформы</div></div></div>
-      <div class="sw-row" style="margin:-4px 0 4px">${['#37E6C8','#8A8FFF','#43D88C','#6AA9FF','#E3B567','#F0785C'].map((c,i)=>`<span class="swatch ${i===0?'on':''}" style="background:${c}" onclick="document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('on'));this.classList.add('on')"></span>`).join('')}</div>
-      <div class="set-row"><div class="si"><div class="t">Тёмная тема Obsidian</div><div class="d">Фирменный фон по умолчанию</div></div>${sw(1)}</div>
-      <div class="set-row"><div class="si"><div class="t">«Powered by DETROYD»</div><div class="d">Подпись в кабинетах агентств</div></div>${sw(1)}</div>
+      <div class="sw-row" id="set-accents" style="margin:-4px 0 4px">${ACC.map(c=>`<span class="swatch ${c.toLowerCase()===String(S.accent).toLowerCase()?'on':''}" data-c="${c}" style="background:${c}" onclick="document.querySelectorAll('#set-accents .swatch').forEach(s=>s.classList.remove('on'));this.classList.add('on')"></span>`).join('')}</div>
+      <div class="set-row"><div class="si"><div class="t">Тёмная тема Obsidian</div><div class="d">Фирменный фон по умолчанию</div></div>${sw('set-dark',S.dark)}</div>
+      <div class="set-row"><div class="si"><div class="t">«Powered by DETROYD»</div><div class="d">Подпись в кабинетах агентств</div></div>${sw('set-pb',S.powered_by)}</div>
     </div></div>
   </div>
   <div class="row2" style="grid-template-columns:1fr 1fr;margin-top:16px">
     <div class="card"><div class="card-h"><div class="t">Безопасность</div></div><div class="card-body">
-      <div class="set-row"><div class="si"><div class="t">2FA для администраторов</div><div class="d">Обязательная двухфакторная аутентификация</div></div>${sw(1)}</div>
+      <div class="set-row"><div class="si"><div class="t">2FA для администраторов</div><div class="d">Обязательная двухфакторная аутентификация</div></div>${sw('set-2fa',S.twofa)}</div>
       <div class="set-row"><div class="si"><div class="t">RLS-изоляция арендаторов</div><div class="d">Row Level Security · agency_id на всех таблицах</div></div><span class="badge b-active"><span class="bd"></span>Активно</span></div>
-      <div class="set-row"><div class="si"><div class="t">Тайм-аут сессии</div><div class="d">Автовыход при бездействии</div></div><input class="set-inp" style="width:120px" value="30 мин"></div>
-      <div class="set-row"><div class="si"><div class="t">API-ключи платформы</div><div class="d">2 активных ключа · ротация 90 дней</div></div><button class="btn-ghost" style="padding:7px 13px;font-size:13.5px" onclick="keysModal()">Управление</button></div>
+      <div class="set-row"><div class="si"><div class="t">Тайм-аут сессии</div><div class="d">Автовыход при бездействии</div></div><input class="set-inp" id="set-session" style="width:120px" value="${S.session_min} мин"></div>
+      <div class="set-row"><div class="si"><div class="t">API-ключи платформы</div><div class="d">Метаданные · шлюз подключается отдельно</div></div><button class="btn-ghost" style="padding:7px 13px;font-size:13.5px" onclick="keysModal()">Управление</button></div>
     </div></div>
     <div class="card"><div class="card-h"><div class="t">Уведомления и лимиты</div></div><div class="card-body">
-      <div class="set-row"><div class="si"><div class="t">Лимит агентств</div><div class="d">Максимум кабинетов на платформе</div></div><input class="set-inp" style="width:120px" value="50"></div>
-      <div class="set-row"><div class="si"><div class="t">Алерт о churn-риске</div><div class="d">Письмо при 7+ днях без активности</div></div>${sw(1)}</div>
-      <div class="set-row"><div class="si"><div class="t">Дайджест по MRR</div><div class="d">Еженедельная сводка по выручке</div></div>${sw(1)}</div>
-      <div class="set-row"><div class="si"><div class="t">Новые триалы</div><div class="d">Мгновенно при активации демо</div></div>${sw(0)}</div>
+      <div class="set-row"><div class="si"><div class="t">Лимит агентств</div><div class="d">Максимум кабинетов на платформе</div></div><input class="set-inp" id="set-limit" style="width:120px" value="${S.agency_limit}"></div>
+      <div class="set-row"><div class="si"><div class="t">Алерт о churn-риске</div><div class="d">Письмо при 7+ днях без активности</div></div>${sw('set-churn',S.alert_churn)}</div>
+      <div class="set-row"><div class="si"><div class="t">Дайджест по MRR</div><div class="d">Еженедельная сводка по выручке</div></div>${sw('set-digest',S.digest_mrr)}</div>
+      <div class="set-row"><div class="si"><div class="t">Новые триалы</div><div class="d">Мгновенно при активации демо</div></div>${sw('set-trials',S.alert_trials)}</div>
     </div></div>
   </div>
+  <div class="card" style="margin-top:16px"><div class="card-h"><div class="t">Аналитика · цели</div><div class="c">ориентиры для раздела «Аналитика»</div></div><div class="card-body">
+    <div class="row2" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:14px">
+      <div class="fld"><label>Цель NRR, %</label><input class="set-inp" id="set-nrr" value="${S.nrr_target}"></div>
+      <div class="fld"><label>Цель конверсии триала, %</label><input class="set-inp" id="set-conv" value="${S.trial_conv_target}"></div>
+      <div class="fld"><label>Демо-запросы / мес</label><input class="set-inp" id="set-demo" value="${S.demo_month}"></div>
+      <div class="fld"><label>Активаций / мес</label><input class="set-inp" id="set-activated" value="${S.activated_month}"></div>
+    </div>
+  </div></div>
   <div class="card" style="margin-top:16px;border-color:rgba(224,86,106,.35)"><div class="card-h"><div class="t" style="color:var(--neg)">Опасная зона</div></div><div class="card-body">
     <div class="set-row"><div class="si"><div class="t">Заморозить все триалы</div><div class="d">Приостановит доступ агентствам на триале</div></div><button class="btn-ghost" style="padding:8px 14px;font-size:13.5px;color:var(--neg);border-color:rgba(224,86,106,.4)" onclick="freezeTrials()">Заморозить</button></div>
     <div class="set-row"><div class="si"><div class="t">Экспорт всех данных платформы</div><div class="d">Полный дамп · JSON + CSV</div></div><button class="btn-ghost" style="padding:8px 14px;font-size:13.5px" onclick="exportPlatform()">Экспорт</button></div>
   </div></div>`;
+}
+function saveSettings(){
+  const g=id=>document.getElementById(id);
+  const tg=id=>!!(g(id)&&g(id).classList.contains('on'));
+  const numv=(id,def)=>{ const v=Number((_v(id)||'').replace(/[^\d]/g,'')); return v||def; };
+  const accEl=document.querySelector('#set-accents .swatch.on');
+  const patch={
+    name:_v('set-name')||'DETROYD SMART SYSTEM',
+    domain:_v('set-domain')||'triada.app',
+    admin_email:_v('set-email')||'',
+    accent:(accEl&&accEl.dataset.c)||'#37E6C8',
+    dark:tg('set-dark'), powered_by:tg('set-pb'), tz_tashkent:tg('set-tz'),
+    twofa:tg('set-2fa'), session_min:numv('set-session',30), agency_limit:numv('set-limit',50),
+    alert_churn:tg('set-churn'), digest_mrr:tg('set-digest'), alert_trials:tg('set-trials'),
+    nrr_target:numv('set-nrr',108), trial_conv_target:numv('set-conv',50),
+    demo_month:numv('set-demo',48), activated_month:numv('set-activated',12)
+  };
+  if(window.LIVE && window.tSavePlatformSettings){
+    window.tSavePlatformSettings(patch).then(ok=>{ if(ok) toast('Настройки сохранены'); });
+  } else { window.PLATFORM_SETTINGS=Object.assign({}, window.PLATFORM_SETTINGS||{}, patch); toast('Настройки сохранены'); }
 }
 function logoFill(url,letter){if(!url)return letter;const u=String(url).replace(/["'<>]/g,'');return `${letter}<img src="${u}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.remove()">`;}
 function renderGeneral(){
@@ -5808,6 +5880,8 @@ function renderGeneral(){
   const proj=AGENCIES.reduce((s,a)=>s+a.projects,0);
   const cli=AGENCIES.reduce((s,a)=>s+a.clients,0);
   const mrr=platMrr(AGENCIES);
+  const onlineAg=AGENCIES.filter(a=>a.online>0).length;
+  const onlineUsers=AGENCIES.reduce((s,a)=>s+(a.online||0),0);
 
   document.getElementById('content').innerHTML = `
     <div class="ph">
@@ -5822,7 +5896,7 @@ function renderGeneral(){
       <div class="kpi"><div class="l">Сотрудников</div><div class="v num">${emp}</div><div class="sub">по всем агентствам</div></div>
       <div class="kpi"><div class="l">Проектов</div><div class="v num">${proj}</div><div class="sub">в работе</div></div>
       <div class="kpi"><div class="l">MRR платформы</div><div class="v num">${fmt(Math.round(mrr/1e6))}<span class="u">M сум</span></div><div class="sub">MRR под управлением</div></div>
-      <div class="kpi"><div class="l">Активность</div><div class="v num">${active}<span class="u">/${total}</span></div><div class="sub">онлайн сегодня</div></div>
+      <div class="kpi"><div class="l">Онлайн сейчас</div><div class="v num">${onlineAg}<span class="u">/${total}</span></div><div class="sub">${onlineUsers?onlineUsers+' польз. активны':'нет активных'}</div></div>
     </div>
 
     <div class="row2">
@@ -5945,8 +6019,6 @@ function confirmDel(){if(window.LIVE){window.tDeleteAgency(_delId);closeDel();re
 /* ——— drawer (read-only monitoring) ——— */
 function openDrawer(id){
   const a=AGENCIES.find(x=>String(x.id)===String(id));
-  const emps=['Оператор','Дизайнер','Менеджер','Таргетолог','Контент'].slice(0,Math.min(a.employees,5));
-  const projs=Array.from({length:Math.min(a.projects,5)},(_,i)=>'Проект '+(i+1));
   document.getElementById('drawer').innerHTML=`
     <div class="dr-h">
       <div class="dr-av" style="background:${a.accent}">${logoFill(a.logoUrl,a.name[0])}</div>
@@ -5967,17 +6039,59 @@ function openDrawer(id){
     </div>
     <div class="dr-sec">
       <div class="sh">Сотрудники · ${a.employees}</div>
-      <div class="dr-list">${emps.length?emps.map(e=>`<div class="dr-li"><span class="ic">${e[0]}</span>${e}<span class="meta">сотрудник</span></div>`).join(''):'<div style="color:var(--txt-3);font-size:14px">Пока нет сотрудников</div>'}</div>
+      <div class="dr-list" id="dr-emps">${_agDrawerSkel()}</div>
     </div>
     <div class="dr-sec">
       <div class="sh">Проекты · ${a.projects}</div>
-      <div class="dr-list">${projs.length?projs.map(p=>`<div class="dr-li"><span class="ic">#</span>${p}<span class="meta">активен</span></div>`).join(''):'<div style="color:var(--txt-3);font-size:14px">Пока нет проектов</div>'}</div>
+      <div class="dr-list" id="dr-projs">${_agDrawerSkel()}</div>
     </div>
     <div class="dr-sec" style="border:0">
       <button class="btn-ghost" style="width:100%" onclick="openAgency('${a.id}');closeDrawer()">Редактировать кабинет</button>
     </div>`;
   document.getElementById('drawer').classList.add('on');
   document.getElementById('ov-bg').classList.add('on');
+  _agDrawerLoad(a);
+}
+function _agDrawerSkel(){ return '<div style="color:var(--txt-3);font-size:13px;padding:4px 0">Загрузка…</div>'; }
+async function _agDrawerLoad(a){
+  const esc=s=>String(s==null?'':s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const eEl=document.getElementById('dr-emps'), pEl=document.getElementById('dr-projs');
+  if(!window.LIVE || !window.SB){
+    const emps=['Оператор','Дизайнер','Менеджер','Таргетолог','Контент'].slice(0,Math.min(a.employees,5));
+    const projs=Array.from({length:Math.min(a.projects,5)},(_,i)=>'Проект '+(i+1));
+    if(eEl) eEl.innerHTML = emps.length?emps.map(e=>`<div class="dr-li"><span class="ic">${e[0]}</span>${e}<span class="meta">сотрудник</span></div>`).join(''):'<div style="color:var(--txt-3);font-size:14px">Пока нет сотрудников</div>';
+    if(pEl) pEl.innerHTML = projs.length?projs.map(p=>`<div class="dr-li"><span class="ic">#</span>${p}<span class="meta">активен</span></div>`).join(''):'<div style="color:var(--txt-3);font-size:14px">Пока нет проектов</div>';
+    return;
+  }
+  try{
+    const cache=(window._agDrawerCache||(window._agDrawerCache={}));
+    let d=cache[a.id];
+    if(!d){
+      const [em, pr] = await Promise.all([
+        SB.from('profiles').select('full_name,role_title,color,avatar_url').eq('agency_id',a.id).eq('role','member').order('full_name'),
+        SB.from('projects').select('name,status,logo,logo_url').eq('agency_id',a.id).order('created_at')
+      ]);
+      d={ emps:(em&&em.data)||[], projs:(pr&&pr.data)||[] };
+      cache[a.id]=d;
+    }
+    if(eEl){
+      eEl.innerHTML = d.emps.length ? d.emps.map(m=>{
+        const ini=((m.full_name||'?').trim()[0]||'?').toUpperCase();
+        return `<div class="dr-li"><span class="ic" style="background:${m.color||'var(--accent)'}">${logoFill(m.avatar_url,ini)}</span>${esc(m.full_name||'—')}<span class="meta">${esc(m.role_title||'сотрудник')}</span></div>`;
+      }).join('') : '<div style="color:var(--txt-3);font-size:14px">Пока нет сотрудников</div>';
+    }
+    if(pEl){
+      const stL=s=>s==='done'?'завершён':s==='paused'?'пауза':'активен';
+      pEl.innerHTML = d.projs.length ? d.projs.map(p=>{
+        const ini=((p.logo||((p.name||'?')[0]||'#'))+'').toUpperCase();
+        return `<div class="dr-li"><span class="ic">${logoFill(p.logo_url,ini)}</span>${esc(p.name||'—')}<span class="meta">${stL(p.status)}</span></div>`;
+      }).join('') : '<div style="color:var(--txt-3);font-size:14px">Пока нет проектов</div>';
+    }
+  }catch(e){
+    if(eEl) eEl.innerHTML='<div style="color:var(--neg);font-size:13px">Не удалось загрузить сотрудников</div>';
+    if(pEl) pEl.innerHTML='<div style="color:var(--neg);font-size:13px">Не удалось загрузить проекты</div>';
+    console.warn('drawer load', e);
+  }
 }
 function closeDrawer(){document.getElementById('drawer').classList.remove('on');document.getElementById('ov-bg').classList.remove('on');}
 
@@ -6228,18 +6342,23 @@ let KEYS=[
   {name:'Production',key:'trd_live_••••8f2a',created:'12 апр 2026'},
   {name:'Webhook signing',key:'trd_whk_••••a91c',created:'03 мая 2026'},
 ];
+function _platKeys(){ const s=window.PLATFORM_SETTINGS; return (s&&Array.isArray(s.api_keys))?s.api_keys:KEYS; }
+function _platKeysSave(arr){
+  if(window.LIVE && window.tSavePlatformSettings){ return window.tSavePlatformSettings({api_keys:arr}); }
+  KEYS=arr; return Promise.resolve(true);
+}
 function keysModal(){
   pd2Open(`<div class="modal" style="max-width:560px">
-    <div class="modal-h"><h3>API-ключи платформы</h3><p>Ротация каждые 90 дней · храните в секрете</p></div>
+    <div class="modal-h"><h3>API-ключи платформы</h3><p>Метаданные ключей · API-шлюз подключается отдельно</p></div>
     <div class="modal-b"><div style="display:flex;flex-direction:column;gap:9px">
-      ${KEYS.length?KEYS.map((k,i)=>`<div style="display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
-        <div style="flex:1"><div style="font-weight:600;font-size:14px">${k.name}</div><div style="font-family:var(--mono);font-size:13px;color:var(--txt-3);margin-top:3px">${k.key} · создан ${k.created}</div></div>
+      ${_platKeys().length?_platKeys().map((k,i)=>`<div style="display:flex;align-items:center;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+        <div style="flex:1"><div style="font-weight:600;font-size:14px">${_ddH(k.name||'ключ')}</div><div style="font-family:var(--mono);font-size:13px;color:var(--txt-3);margin-top:3px">${_ddH(k.key||'')} · создан ${_ddH(k.created||'')}</div></div>
         <button class="btn-ghost" style="padding:6px 11px;font-size:12.5px;color:var(--neg)" onclick="revokeKey(${i})">Отозвать</button></div>`).join(''):'<div class="pk-empty" style="padding:26px 0">Ключей нет</div>'}
     </div></div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button><button class="btn-add" onclick="createKey()">+ Создать ключ</button></div></div>`);
 }
-function revokeKey(i){const n=KEYS[i].name;KEYS.splice(i,1);keysModal();toast(`Ключ «${n}» отозван`);}
-function createKey(){const r=Math.random().toString(16).slice(2,6);KEYS.push({name:'Новый ключ',key:'trd_live_••••'+r,created:'сегодня'});keysModal();toast('Ключ создан — скопируйте сейчас');}
+function revokeKey(i){ const arr=_platKeys().slice(); const n=(arr[i]&&arr[i].name)||'ключ'; arr.splice(i,1); _platKeysSave(arr).then(()=>{ keysModal(); toast(`Ключ «${n}» отозван`); }); }
+function createKey(){ const arr=_platKeys().slice(); const r=Math.random().toString(16).slice(2,6); const today=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'}); arr.push({name:'Новый ключ',key:'trd_live_••••'+r,created:today}); _platKeysSave(arr).then(()=>{ keysModal(); toast('Ключ создан — метаданные сохранены'); }); }
 function downloadJSON(fn,obj){
   try{const b=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);toast(`${fn} — выгружен`);}catch(e){toast('Экспорт недоступен в этом окружении');}
 }
@@ -6249,7 +6368,7 @@ function freezeTrials(){
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Заморозить все триалы?</h3><p>Приостановит доступ агентствам на триале</p></div>
     <div class="modal-b"><div style="font-size:14px;color:var(--txt-2);line-height:1.55">Действие затронет все агентства со статусом «триал». Их пользователи временно потеряют доступ до разморозки. Это можно откатить.</div></div>
-    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" style="background:var(--neg);color:#fff;box-shadow:0 0 0 1px rgba(224,86,106,.5)" onclick="pd2Close();toast('Триалы заморожены')">Заморозить</button></div></div>`);
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" style="background:var(--neg);color:#fff;box-shadow:0 0 0 1px rgba(224,86,106,.5)" onclick="pd2Close();if(window.LIVE&&window.tFreezeTrials){window.tFreezeTrials();}else{toast('Триалы заморожены');}">Заморозить</button></div></div>`);
 }
 
 function teamStripHTML(p){
@@ -16486,10 +16605,15 @@ async function tgBannerRemove(){
 window.tgBannerRemove=tgBannerRemove;
 let ME = null; window.tMe = () => ME;
 
+const _seenLabel = ts => { if(!ts) return '—'; const s=Math.max(0,(Date.now()-ts)/1000);
+  if(s<300) return 'онлайн'; if(s<3600) return Math.floor(s/60)+' мин назад';
+  if(s<86400) return Math.floor(s/3600)+' ч назад'; return Math.floor(s/86400)+' дн назад'; };
 const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.vertical||'—',
   plan:a.plan, status:a.status, accent:a.accent||'#37E6C8', logoUrl:a.logo_url||'',
   owner:a.owner_name||'owner', mrr:a.mrr||0,
-  employees:c.emp[a.id]||0, clients:c.cl[a.id]||0, projects:c.pr[a.id]||0, active:'—' });
+  employees:c.emp[a.id]||0, clients:c.cl[a.id]||0, projects:c.pr[a.id]||0,
+  lastSeenTs:(c.seen&&c.seen[a.id])||0, online:(c.online&&c.online[a.id])||0,
+  active:_seenLabel((c.seen&&c.seen[a.id])||0) });
 const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
   logoUrl:p.logo_url||'', cat:p.category||'—', svc:p.service||'SMM', pct:p.pct||0,
   stages:(p.stages_done||0)+' / '+(p.stages_total||6), health:p.health||'В норме',
@@ -16501,9 +16625,84 @@ const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудни
 async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
   if (data && typeof TARIFFS !== 'undefined'){ TARIFFS.length = 0;
-    data.forEach(t => TARIFFS.push({ key:t.key, name:t.name, price:t.price, per:t.per,
+    data.forEach(t => TARIFFS.push({ id:t.id, key:t.key, name:t.name, price:t.price, per:t.per, sort:t.sort,
       pop:t.popular, feats:(t.features||[]).map(x => [x[0], x[1]]) })); }
 }
+
+/* ===== DETROYD · генеральный кабинет: живые тарифы / настройки / история ===== */
+window.tPlatTariffSave = async (t) => {
+  try{
+    const feats = Array.isArray(t.feats) ? t.feats.map(f=>[f[0]?1:0, String((f[1]!=null?f[1]:'')).trim()||'—']) : [];
+    const row = { name:t.name, price:(t.price===''||t.price===undefined)?null:t.price,
+                  per:(t.per&&String(t.per).trim())||'мес', popular:!!t.popular, features:feats };
+    if (t.id){
+      const { error } = await SB.from('tariffs').update(row).eq('id', t.id); if (error) throw error;
+    } else {
+      let base=(t.name||'tariff').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tariff';
+      const used=new Set((typeof TARIFFS!=='undefined'?TARIFFS:[]).map(x=>x.key));
+      let key=base, n=2; while(used.has(key)){ key=base+'_'+n; n++; }
+      const maxSort=(typeof TARIFFS!=='undefined'?TARIFFS:[]).reduce((m,x)=>Math.max(m,x.sort||0),0);
+      const { error } = await SB.from('tariffs').insert(Object.assign({ key, sort:maxSort+1 }, row)); if (error) throw error;
+    }
+    await loadTariffs(); if(typeof renderTariffs==='function') renderTariffs();
+    toast('Тариф сохранён');
+  }catch(e){ toast('Ошибка тарифа: '+(e.message||e)); }
+};
+window.tPlatTariffDel = async (id, key) => {
+  try{
+    const { error } = id ? await SB.from('tariffs').delete().eq('id', id)
+                         : await SB.from('tariffs').delete().eq('key', key);
+    if (error) throw error;
+    await loadTariffs(); if(typeof renderTariffs==='function') renderTariffs();
+    toast('Тариф удалён');
+  }catch(e){ toast('Ошибка: '+(e.message||e)); }
+};
+window.PLATFORM_SETTINGS = null;
+window.tLoadPlatformSettings = async () => {
+  try{ const { data, error } = await SB.from('platform_settings').select('data').eq('id',1).maybeSingle();
+    if(error) throw error; window.PLATFORM_SETTINGS = (data&&data.data)||{}; }
+  catch(e){ window.PLATFORM_SETTINGS = window.PLATFORM_SETTINGS||{}; }
+};
+window.tSavePlatformSettings = async (patch) => {
+  try{
+    const cur=Object.assign({}, window.PLATFORM_SETTINGS||{}, patch||{});
+    const { error } = await SB.from('platform_settings').upsert({ id:1, data:cur, updated_at:new Date().toISOString() }, { onConflict:'id' });
+    if(error) throw error; window.PLATFORM_SETTINGS=cur; return true;
+  }catch(e){ toast('Не удалось сохранить настройки: '+(e.message||e)); return false; }
+};
+window.PLATFORM_SNAPSHOTS = [];
+window.tLoadPlatformSnapshots = async () => {
+  try{ const { data, error } = await SB.from('platform_snapshots')
+        .select('period,mrr,paying,trial,suspended,clients,projects,agencies_total,agencies_active').order('period');
+    if(error) throw error; window.PLATFORM_SNAPSHOTS = data||[]; }
+  catch(e){ window.PLATFORM_SNAPSHOTS = []; }
+};
+window.tSnapshotPlatform = async () => {
+  try{
+    if(!(typeof AGENCIES!=='undefined' && AGENCIES.length)) return;
+    const d=new Date(); const period=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+    const A=AGENCIES;
+    const row={ period,
+      mrr:A.reduce((s,a)=>s+(a.status!=='suspended'?(a.mrr||0):0),0),
+      agencies_total:A.length,
+      agencies_active:A.filter(a=>a.status==='active').length,
+      paying:A.filter(a=>a.status!=='suspended'&&(a.mrr||0)>0).length,
+      trial:A.filter(a=>a.status==='trial').length,
+      suspended:A.filter(a=>a.status==='suspended').length,
+      clients:A.reduce((s,a)=>s+(a.clients||0),0),
+      projects:A.reduce((s,a)=>s+(a.projects||0),0),
+      taken_at:new Date().toISOString() };
+    await SB.from('platform_snapshots').upsert(row, { onConflict:'period' });
+  }catch(e){ /* таблицы может не быть — тихо */ }
+};
+window.tFreezeTrials = async () => {
+  try{
+    const { error } = await SB.from('agencies').update({status:'suspended'}).eq('status','trial');
+    if(error) throw error;
+    toast('Триалы заморожены'); await window.tLoadAll('superadmin');
+    if(typeof refreshActive==='function') refreshActive();
+  }catch(e){ toast('Ошибка: '+(e.message||e)); }
+};
 
 window.tLoadKB = async () => {
   if (!SB) return;
@@ -21036,18 +21235,31 @@ window.tLoadAll = async (role, opts) => {
   if (!SB) return;
   const _fast=!!(opts&&opts.fast);                                                    // fast: показать кабинет после ядра, остальное — в фоне
   if (role === 'superadmin'){
-    const [ag, pr, pf] = await Promise.all([
+    const [ag, pr, pf0] = await Promise.all([
       SB.from('agencies').select('*').order('created_at'),
       SB.from('projects').select('id,agency_id'),
-      SB.from('profiles').select('id,agency_id,role') ]);
-    const c = { emp:{}, cl:{}, pr:{} };
+      SB.from('profiles').select('id,agency_id,role,last_seen_at') ]);
+    let pf = pf0;
+    if (pf && pf.error) pf = await SB.from('profiles').select('id,agency_id,role');   // колонки last_seen_at ещё нет — мягкий откат
+    const c = { emp:{}, cl:{}, pr:{}, seen:{}, online:{} };
+    const _now=Date.now(), _onlineMs=5*60*1000;
     (pr.data||[]).forEach(p => c.pr[p.agency_id] = (c.pr[p.agency_id]||0)+1);
     (pf.data||[]).forEach(p => { if (p.role==='member') c.emp[p.agency_id]=(c.emp[p.agency_id]||0)+1;
-      if (p.role==='client') c.cl[p.agency_id]=(c.cl[p.agency_id]||0)+1; });
+      if (p.role==='client') c.cl[p.agency_id]=(c.cl[p.agency_id]||0)+1;
+      const ls=p.last_seen_at?new Date(p.last_seen_at).getTime():0;
+      if(ls){ if(!c.seen[p.agency_id]||ls>c.seen[p.agency_id]) c.seen[p.agency_id]=ls;
+              if(_now-ls<_onlineMs) c.online[p.agency_id]=(c.online[p.agency_id]||0)+1; } });
     AGENCIES.length = 0; (ag.data||[]).forEach(a => AGENCIES.push(mapAgency(a, c)));
+    window._agDrawerCache = {};
     const nb = document.getElementById('nav-ag-ct'); if (nb) nb.textContent = AGENCIES.length;
-    if(_fast){ loadTariffs().catch(e=>console.warn('tariffs',e)); return; }           // тарифы — в фон
-  } else if (role === 'agency_owner' || role === 'member'){
+    const _genBg = () => Promise.all([
+      loadTariffs().catch(e=>console.warn('tariffs',e)),
+      (window.tLoadPlatformSettings?window.tLoadPlatformSettings():Promise.resolve()).catch(()=>{}),
+      (window.tSnapshotPlatform?window.tSnapshotPlatform().then(()=>window.tLoadPlatformSnapshots&&window.tLoadPlatformSnapshots()):Promise.resolve()).catch(()=>{})
+    ]);
+    if(_fast){ _genBg().then(()=>{ if(typeof refreshActive==='function') refreshActive(); }); return; }
+    await _genBg();
+    } else if (role === 'agency_owner' || role === 'member'){
     const [pr, tm, tpl] = await Promise.all([
       SB.from('projects').select('*').order('created_at'),
       SB.from('profiles').select('*').eq('role','member').order('created_at'),
@@ -21162,6 +21374,8 @@ async function routeByProfile(userArg){
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
   ME = data || { role:'member' };
+  try{ if(ME&&ME.id) SB.from('profiles').update({last_seen_at:new Date().toISOString()}).eq('id',ME.id).then(()=>{},()=>{}); }catch(_){}
+  if(!window._hbOn){ window._hbOn=true; setInterval(()=>{ try{ if(ME&&ME.id&&SB) SB.from('profiles').update({last_seen_at:new Date().toISOString()}).eq('id',ME.id).then(()=>{},()=>{}); }catch(_){} }, 120000); }
   const _jobs=[ window.tLoadAll(ME.role, {fast:true}) ];                              // ядро данных — параллельно с инфо агентства
   if (ME.agency_id){ _jobs.push(
     SB.from('agencies').select('slug,accent,name,logo_url,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
