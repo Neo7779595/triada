@@ -21304,1284 +21304,859 @@ if (window.LIVE){
   (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(ses.user); })();
 }
 
-/* ═══════════ KPI v2 · дружелюбный одноэкранный дашборд ═══════════
-   Отказываемся от 7-блочной структуры Точка А/Цель/Минимум/RPM/RMP/Прогноз/Мониторинг/Статистика.
-   Одна страница, 4 секции сверху вниз, без жаргона, с встроенной подсказкой.
+/* ═══════════ KPI v3 · 3 категории · Точка А + Цели+RPM + Статистика ═══════════
+   Мировые практики: RPM (Tony Robbins), OKR-hybrid, Point A→B visualisation.
+   3 категории: Сотрудники (только TPI) · Команды · Проекты.
+   3 секции: [1] Точка А, [2] Цели (с инлайн-RPM), [3] Статистика.
 */
 
-window._kpi2 = { period: null, section4Tab: 'member' };
-
-/* Map metric_key → compute function name (используется в v2 модалках и целях) */
-window._kpiFnMap = window._kpiFnMap || {
-  // TPI aliases
-  vyrabotka:'kpiComputeVyrabotka', skorost:'kpiComputeSkorost',
-  nadezhnost:'kpiComputeNadezhnost', kachestvo:'kpiComputeKachestvo',
-  // Портфель (agency-only)
-  portfolio_health:'kpiComputePortfolioHealth', ontime_delivery:'kpiComputeOntimeDelivery',
-  velocity_30d:'kpiComputeVelocity30d', otkaty:'kpiComputeOtkaty',
-  mrr:'kpiComputeMRR', margin:'kpiComputeMargin',
-  // SMM
-  smm_reach:'kpiComputeSmmReach', smm_views:'kpiComputeSmmViews',
-  smm_growth_abs:'kpiComputeSmmGrowthAbs', smm_followers:'kpiComputeSmmFollowers',
-  smm_er:'kpiComputeSmmER', smm_lr:'kpiComputeSmmLR',
-  smm_cr:'kpiComputeSmmCR', smm_shr:'kpiComputeSmmSHR', smm_sr:'kpiComputeSmmSR',
-  // Обратная совместимость со старыми ключами snapshot-историй
-  cycle_time:'kpiComputeCycleTime', ontime_rate:'kpiComputeOnTimeRate',
-  rework_rate:'kpiComputeReworkRate', throughput_w:'kpiComputeThroughputWeighted',
+window._kpi3 = {
+  period: null,
+  periods: [],
+  category: 'member',
+  expandedGoalId: null,
+  goals: [],
+  rowVals: {},
 };
 
-/* Единый рендер точки входа — переопределяет всё что было */
+window._kpi3TpiKeys = ['vyrabotka','skorost','nadezhnost','kachestvo'];
+window._kpi3SmmKeys = ['smm_reach','smm_views','smm_growth_abs','smm_followers','smm_er','smm_lr','smm_cr','smm_shr','smm_sr'];
+window._kpi3MetricsFor = (cat) => cat === 'member' ? [..._kpi3TpiKeys] : [..._kpi3TpiKeys, ..._kpi3SmmKeys];
+window._kpi3CatLabel = (cat) => ({member:'сотрудникам', team:'командам', project:'проектам'})[cat] || cat;
+window._kpi3CatLabelOne = (cat) => ({member:'Сотрудник', team:'Команда', project:'Проект'})[cat] || cat;
+
+window._kpi3Fmt = (v, unit) => {
+  if (v == null || Number.isNaN(v)) return '—';
+  const n = Number(v);
+  if (unit === '%') return `${n.toFixed(n < 10 ? 1 : 0)}%`;
+  if (unit === 'ч') return `${n.toFixed(1)}ч`;
+  if (unit === '$') return `$${_kpi3ShortNum(n)}`;
+  if (unit === 'чел') return `${_kpi3ShortNum(n)}`;
+  if (unit === 'ед.') return `${n.toFixed(n < 10 ? 1 : 0)}`;
+  return _kpi3ShortNum(n);
+};
+window._kpi3ShortNum = (n) => {
+  n = Number(n);
+  if (Math.abs(n) >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1000)    return (n/1000).toFixed(1) + 'K';
+  if (Math.abs(n) >= 100)     return Math.round(n).toString();
+  return n.toFixed(n % 1 === 0 ? 0 : 1);
+};
+window._kpi3FmtDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const mo = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  return `${d.getDate()} ${mo[d.getMonth()]}`;
+};
+window._kpi3Esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+window._kpi3TryParseJson = (s, fb) => { try { return JSON.parse(s); } catch(e) { return fb; } };
+window._kpi3ExtractVal = (v) => {
+  if (v == null) return null;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'object') return v.value != null ? Number(v.value) : (v.v != null ? Number(v.v) : null);
+  return Number(v);
+};
+
 window.renderKPI = async () => {
   const el = document.getElementById('content-ag'); if(!el) return;
-  el.innerHTML = _kpi2ShellHTML();
-  // Параллельная подгрузка всех необходимых источников
+  el.innerHTML = _kpi3ShellHTML();
   const jobs = [];
-  if (!window.OVERVIEW || typeof window.OVERVIEW.deadlineDone === 'undefined') if (window.tLoadOverview) jobs.push(window.tLoadOverview().catch(()=>{}));
-  if (!window.FINANCE  || typeof window.FINANCE.totalMrr === 'undefined')      if (window.tLoadFinance)  jobs.push(window.tLoadFinance().catch(()=>{}));
-  if (!window._kpiMembers) if (window._kpiLoadMembers) jobs.push(_kpiLoadMembers().catch(()=>{}));
-  if (!window._kpiTeams)   jobs.push(kpiFetchTeams().then(x => window._kpiTeams = x).catch(()=>window._kpiTeams=[]));
-  jobs.push(kpiFetchPeriods({ limit: 10 }).then(x => _kpi2.periods = x || []));
+  if (!window._kpiMembers && window._kpiLoadMembers) jobs.push(_kpiLoadMembers().catch(()=>{}));
+  if (!window._kpiTeams) jobs.push(kpiFetchTeams().then(x => window._kpiTeams = x).catch(()=>window._kpiTeams=[]));
+  jobs.push(kpiFetchPeriods({ limit: 10 }).then(x => _kpi3.periods = x || []));
   await Promise.all(jobs);
-  _kpi2.period = _kpi2.periods.find(p => p.status==='active') || _kpi2.periods.find(p => p.status==='planning') || _kpi2.periods[0] || null;
-
-  // Заполняем секции
-  _kpi2FillTopbar();
-  _kpi2FillStatus();
-  _kpi2FillIssues();
-  _kpi2FillGoals();
-  _kpi2FillRanking(_kpi2.section4Tab); setTimeout(_kpi2WarmRanking, 500);
+  _kpi3.period = _kpi3.periods.find(p => p.status==='active') || _kpi3.periods.find(p => p.status==='planning') || _kpi3.periods[0] || null;
+  _kpi3FillTopbar();
+  _kpi3SwitchCategory(_kpi3.category, true);
 };
 
-window._kpi2ShellHTML = () => `
+window._kpi3ShellHTML = () => `
   <style>
-    .kpi2-wrap{display:flex;flex-direction:column;gap:16px;padding:0 4px}
-    .kpi2-topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-    .kpi2-title{font-size:22px;font-weight:800;letter-spacing:-.015em}
-    .kpi2-title b{background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
-    .kpi2-topbar-r{display:flex;gap:8px;align-items:center}
-    .kpi2-help-btn{padding:8px 12px;font-size:12.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--txt-2);cursor:pointer;transition:all .16s;display:inline-flex;align-items:center;gap:6px}
-    .kpi2-help-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
-    .kpi2-help{padding:18px 22px;background:linear-gradient(135deg, rgba(138,143,255,.08), rgba(55,230,200,.04));border:1px solid var(--line);border-radius:14px;font-size:13.5px;line-height:1.7;color:var(--txt-2)}
-    .kpi2-help h4{font-size:14px;margin:0 0 10px;color:var(--txt-1);letter-spacing:-.005em}
-    .kpi2-help p{margin:0 0 6px}
-    .kpi2-help b{color:var(--txt-1)}
-
-    /* ── Секция 1: Как дела ── */
-    .kpi2-status{padding:22px 26px;background:linear-gradient(135deg,var(--panel-2),var(--panel-3));border:1px solid var(--line);border-radius:16px;position:relative;overflow:hidden}
-    .kpi2-status::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 90% 0%, var(--_glow, rgba(138,143,255,.14)), transparent 55%);pointer-events:none}
-    .kpi2-status-head{display:flex;align-items:center;gap:14px;margin-bottom:16px;position:relative}
-    .kpi2-status-eb{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--txt-3);font-weight:700}
-    .kpi2-status-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:24px;font-weight:700;font-size:13px}
-    .kpi2-status-badge .d{width:8px;height:8px;border-radius:50%;box-shadow:0 0 6px 0 currentColor}
-    .kpi2-status-h{font-size:20px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px}
-    .kpi2-status-sub{color:var(--txt-3);font-size:12.5px}
-    .kpi2-tiles{display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-top:16px;position:relative}
-    .kpi2-tile{padding:14px 16px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:all .16s var(--ease-out)}
-    .kpi2-tile:hover{border-color:rgba(138,143,255,.24);transform:translateY(-1px)}
-    .kpi2-tile-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:600;margin-bottom:6px}
-    .kpi2-tile-v{font-family:var(--mono);font-size:26px;font-weight:800;letter-spacing:-.02em;color:var(--txt-1)}
-    .kpi2-tile-v .u{font-size:14px;font-weight:600;color:var(--txt-3);margin-left:2px}
-    .kpi2-tile-sub{margin-top:4px;font-size:11px;color:var(--txt-3);font-family:var(--mono)}
-    .kpi2-tile-arrow{margin-left:5px;font-size:11px;font-weight:700}
-    .kpi2-tile.pos{--_glow: rgba(55,230,200,.12)}
-    .kpi2-tile.warn .kpi2-tile-v{color:var(--warn)}
-    .kpi2-tile.neg .kpi2-tile-v{color:var(--neg)}
-
-    /* ── Секция 2: Что делать сейчас ── */
-    .kpi2-card{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
-    .kpi2-card-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;gap:10px}
-    .kpi2-card-t{font-size:15px;font-weight:700;letter-spacing:-.005em}
-    .kpi2-card-c{color:var(--txt-3);font-size:12.5px}
-    .kpi2-issues-list{display:flex;flex-direction:column;gap:8px}
-    .kpi2-issue{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;transition:all .14s}
-    .kpi2-issue:hover{border-color:rgba(255,255,255,.1)}
-    .kpi2-issue-ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;font-size:16px}
-    .kpi2-issue.neg .kpi2-issue-ic{background:rgba(242,102,102,.13);color:var(--neg)}
-    .kpi2-issue.warn .kpi2-issue-ic{background:rgba(227,181,103,.13);color:var(--warn)}
-    .kpi2-issue.info .kpi2-issue-ic{background:rgba(91,200,245,.13);color:#5BC8F5}
-    .kpi2-issue-b{flex:1;min-width:0}
-    .kpi2-issue-t{font-size:13.5px;font-weight:600;color:var(--txt-1);line-height:1.4}
-    .kpi2-issue-s{font-size:11.5px;color:var(--txt-3);margin-top:2px}
-    .kpi2-issue-btn{padding:6px 12px;font-size:11.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--txt-2);cursor:pointer;flex:none;transition:all .14s}
-    .kpi2-issue-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
-    .kpi2-issues-none{padding:24px;text-align:center;color:var(--txt-3);font-size:13px}
-    .kpi2-issues-none b{color:var(--pos)}
-
-    /* ── Секция 3: Мои цели ── */
-    .kpi2-goals-list{display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:10px}
-    .kpi2-goal{padding:14px 16px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;gap:8px}
-    .kpi2-goal-t{font-size:13.5px;font-weight:700;color:var(--txt-1);letter-spacing:-.005em}
-    .kpi2-goal-v{display:flex;align-items:baseline;gap:10px;font-family:var(--mono)}
-    .kpi2-goal-cur{font-size:20px;font-weight:800;color:var(--txt-1)}
-    .kpi2-goal-arrow{color:var(--txt-3);font-size:14px}
-    .kpi2-goal-tgt{font-size:15px;color:var(--accent);font-weight:700}
-    .kpi2-goal-bar{height:6px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;margin-top:4px}
-    .kpi2-goal-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .35s var(--ease-out);border-radius:4px}
-    .kpi2-goal.warn .kpi2-goal-fill{background:linear-gradient(90deg,var(--warn),#E3B567)}
-    .kpi2-goal.neg .kpi2-goal-fill{background:linear-gradient(90deg,var(--neg),#F26666)}
-    .kpi2-goal-hint{font-size:11.5px;color:var(--txt-3);display:flex;align-items:center;gap:6px}
-    .kpi2-goal-hint .kpi2-goal-status{font-weight:700}
-    .kpi2-goal.pos .kpi2-goal-status{color:var(--pos)}
-    .kpi2-goal.warn .kpi2-goal-status{color:var(--warn)}
-    .kpi2-goal.neg .kpi2-goal-status{color:var(--neg)}
-    .kpi2-add-goal{margin-top:10px;padding:12px;background:transparent;border:1.5px dashed rgba(138,143,255,.28);border-radius:11px;color:var(--txt-2);font-size:13px;font-weight:600;cursor:pointer;transition:all .14s;width:100%}
-    .kpi2-add-goal:hover{border-color:rgba(138,143,255,.5);color:var(--txt-1);background:rgba(138,143,255,.04)}
-
-    /* ── Секция 4: Кто как работает ── */
-    .kpi2-rank-tabs{display:inline-flex;gap:3px;padding:3px;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;margin-bottom:14px}
-    .kpi2-rank-tab{padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s}
-    .kpi2-rank-tab:hover{color:var(--txt-1)}
-    .kpi2-rank-tab.on{background:var(--panel-2);color:var(--txt-1);box-shadow:0 0 0 1px rgba(138,143,255,.18)}
-    .kpi2-rank-list{display:flex;flex-direction:column;gap:6px}
-    .kpi2-rank-row{display:flex;align-items:center;gap:14px;padding:12px 14px;background:var(--panel-3);border:1px solid transparent;border-radius:11px;transition:all .14s;cursor:pointer}
-    .kpi2-rank-row:hover{border-color:var(--line);background:rgba(255,255,255,.015)}
-    .kpi2-rank-n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--txt-3);width:22px;text-align:right;flex:none}
-    .kpi2-rank-av{width:34px;height:34px;border-radius:9px;flex:none;overflow:hidden;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--accent);position:relative;isolation:isolate}
-    .kpi2-rank-av img{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}
-    .kpi2-rank-nm{flex:1;min-width:0}
-    .kpi2-rank-nm b{font-size:13.5px;font-weight:600;color:var(--txt-1);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .kpi2-rank-nm span{font-size:11.5px;color:var(--txt-3)}
-    .kpi2-rank-score{display:flex;align-items:center;gap:10px;flex:none}
-    .kpi2-rank-stars{color:var(--warn);font-size:14px;letter-spacing:2px}
-    .kpi2-rank-num{font-family:var(--mono);font-size:16px;font-weight:800;color:var(--txt-1);min-width:36px;text-align:right}
-    .kpi2-rank-trend{font-family:var(--mono);font-size:12px;font-weight:600;min-width:44px;text-align:right}
-    .kpi2-rank-trend.pos{color:var(--pos)}
-    .kpi2-rank-trend.neg{color:var(--neg)}
-    .kpi2-rank-trend.flat{color:var(--txt-3)}
-    .kpi2-empty{padding:24px;text-align:center;color:var(--txt-3);font-size:13px}
-  /* KPI v2 · модалки */
-.kpi2-modal-scrim{position:fixed;inset:0;background:rgba(6,20,15,.72);backdrop-filter:blur(8px);z-index:9990;display:flex;align-items:center;justify-content:center;padding:24px;animation:kpi2FadeIn .18s var(--ease-out)}
-@keyframes kpi2FadeIn{from{opacity:0}to{opacity:1}}
-.kpi2-modal{background:var(--panel-2);border:1px solid var(--line);border-radius:16px;max-width:640px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px -12px rgba(0,0,0,.6);overflow:hidden;animation:kpi2SlideUp .22s var(--ease-out)}
-.kpi2-modal-wide{max-width:820px}
-@keyframes kpi2SlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-.kpi2-modal-h{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line)}
-.kpi2-modal-t{font-size:16px;font-weight:800;letter-spacing:-.01em}
-.kpi2-modal-x{background:transparent;border:none;color:var(--txt-3);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .14s}
-.kpi2-modal-x:hover{color:var(--txt-1);background:rgba(255,255,255,.05)}
-.kpi2-modal-b{padding:20px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:22px}
-.kpi2-modal-f{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
-.kpi2-modal-btn{padding:9px 18px;font-size:13px;font-weight:600;border-radius:9px;cursor:pointer;transition:all .16s var(--ease-out);border:1px solid var(--line)}
-.kpi2-modal-btn.ghost{background:transparent;color:var(--txt-2)}
-.kpi2-modal-btn.ghost:hover{color:var(--txt-1);border-color:rgba(255,255,255,.14)}
-.kpi2-modal-btn.primary{background:linear-gradient(180deg, rgba(55,230,200,.16), rgba(55,230,200,.08));border-color:rgba(55,230,200,.3);color:var(--txt-1)}
-.kpi2-modal-btn.primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 14px -6px rgba(55,230,200,.5)}
-.kpi2-modal-btn.primary:disabled{opacity:.4;cursor:not-allowed}
-.kpi2-step{display:flex;flex-direction:column;gap:10px}
-.kpi2-step-l{font-size:13.5px;font-weight:600;color:var(--txt-1);letter-spacing:-.005em}
-.kpi2-step-l b{color:var(--accent);margin-right:6px;font-weight:800}
-.kpi2-mc-group{margin-top:4px}
-.kpi2-mc-gt{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:700;margin-bottom:8px}
-.kpi2-mc-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:8px}
-.kpi2-mc{padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;cursor:pointer;transition:all .16s}
-.kpi2-mc:hover{border-color:rgba(138,143,255,.28);transform:translateY(-1px)}
-.kpi2-mc.on{background:linear-gradient(135deg, rgba(55,230,200,.14), rgba(138,143,255,.08));border-color:rgba(55,230,200,.35)}
-.kpi2-mc-t{font-weight:700;font-size:13px;color:var(--txt-1)}
-.kpi2-mc-dir{font-weight:800;margin-left:2px}
-.kpi2-mc-c{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:3px}
-.kpi2-scope-chips{display:flex;gap:6px;flex-wrap:wrap}
-.kpi2-scope-chip{padding:8px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;font-size:13px;font-weight:600;color:var(--txt-2);cursor:pointer;transition:all .14s}
-.kpi2-scope-chip:hover{color:var(--txt-1)}
-.kpi2-scope-chip.on{background:var(--panel-2);color:var(--txt-1);border-color:rgba(55,230,200,.35)}
-.kpi2-scope-picker{margin-top:2px}
-.kpi2-scope-sel{width:100%;padding:10px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;color:var(--txt-1);font-size:13px;font-family:inherit;cursor:pointer}
-.kpi2-scope-sel:focus{outline:none;border-color:var(--accent)}
-.kpi2-vals{display:flex;align-items:center;gap:14px;padding:14px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px}
-.kpi2-val{display:flex;flex-direction:column;gap:4px;flex:1}
-.kpi2-val-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:700}
-.kpi2-val-l .kpi2-val-hint{text-transform:none;letter-spacing:0;color:var(--txt-3);font-weight:500;margin-left:6px}
-.kpi2-val-v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--txt-1)}
-.kpi2-val-inp{padding:9px 12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt-1);font-family:var(--mono);font-size:14px;font-weight:700;transition:border-color .14s}
-.kpi2-val-inp:focus{outline:none;border-color:var(--accent)}
-.kpi2-val-arrow{flex:none;color:var(--txt-3);font-size:20px;font-weight:700;padding:0 4px}
-.kpi2-preview{margin-top:12px;padding:12px 14px;background:rgba(55,230,200,.05);border:1px solid rgba(55,230,200,.18);border-radius:10px}
-.kpi2-preview-t{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--pos);font-weight:700;margin-bottom:6px}
-.kpi2-preview-b{font-size:13px;line-height:1.55;color:var(--txt-1)}
-.kpi2-preview-b b{color:var(--accent)}
-/* Список периодов */
-.kpi2-newp{display:flex;flex-direction:column;gap:10px;padding:14px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px}
-.kpi2-newp-dates{display:flex;gap:12px;flex-wrap:wrap}
-.kpi2-newp-dates > div{display:flex;flex-direction:column;gap:4px}
-.kpi2-plist{display:flex;flex-direction:column;gap:6px}
-.kpi2-prow{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px}
-.kpi2-prow-b{flex:1;min-width:0}
-.kpi2-prow-b b{font-size:13.5px;font-weight:700;color:var(--txt-1);display:block}
-.kpi2-prow-b span{font-size:11.5px;color:var(--txt-3);font-family:var(--mono)}
-.kpi2-prow-s{font-size:12.5px;font-weight:700;white-space:nowrap;flex:none}
-.kpi2-prow-a{display:flex;gap:6px;flex:none}
-.kpi2-prow-btn{padding:6px 12px;font-size:11.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:7px;color:var(--txt-2);cursor:pointer;transition:all .14s;white-space:nowrap}
-.kpi2-prow-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
-/* Улучшенные цели */
-.kpi2-goal{position:relative}
-.kpi2-goal-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.kpi2-goal-scope{font-size:11px;color:var(--txt-3);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
-.kpi2-goal-bar{position:relative}
-.kpi2-goal-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.4);border-radius:1px}
-.kpi2-goal-del{position:absolute;top:8px;right:8px;width:22px;height:22px;background:transparent;border:none;color:var(--txt-3);font-size:11px;cursor:pointer;border-radius:5px;opacity:0;transition:all .14s}
-.kpi2-goal:hover .kpi2-goal-del{opacity:1}
-.kpi2-goal-del:hover{color:var(--neg);background:rgba(242,102,102,.1)}
-.kpi2-just-added{animation:kpi2Flash 1.6s ease-out}
-@keyframes kpi2Flash{0%{box-shadow:0 0 0 0 rgba(55,230,200,.55)}50%{box-shadow:0 0 0 6px rgba(55,230,200,0)}100%{box-shadow:0 0 0 0 rgba(55,230,200,0)}}
-
-
-/* KPI v2 · тёмный date input */
-input.kpi2-val-inp[type="date"]{color-scheme:dark;font-family:var(--mono);letter-spacing:.02em;padding-right:6px;position:relative}
-input.kpi2-val-inp[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.7);cursor:pointer;opacity:.65;padding:2px;border-radius:4px;transition:opacity .14s}
-input.kpi2-val-inp[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
-input.kpi2-val-inp[type="date"]::-webkit-datetime-edit{color:var(--txt-1);font-family:var(--mono);font-weight:600}
-input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-fields-wrapper{color:var(--txt-1)}
-input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-text{color:var(--txt-3);padding:0 2px}
-input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-month-field:focus,
-input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-day-field:focus,
-input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-year-field:focus{background:rgba(55,230,200,.14);color:var(--txt-1);outline:none;border-radius:3px}
-input.kpi2-val-inp[type="number"]{color-scheme:dark}
-/* Fallback для инпутов вне формы модалки */
-input[type="date"], input[type="datetime-local"], input[type="time"], input[type="number"]{color-scheme:dark}
-/* KPI v2 · кастомный date picker */
-.kpi2-dp-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;color:var(--txt-1);font-family:var(--mono);font-size:14px;font-weight:700;cursor:pointer;transition:all .16s var(--ease-out);width:100%;text-align:left}
-.kpi2-dp-btn:hover{border-color:rgba(138,143,255,.3)}
-.kpi2-dp-btn:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(55,230,200,.12)}
-.kpi2-dp-txt{flex:1;letter-spacing:.005em}
-.kpi2-dp-ic{color:var(--txt-3);flex:none;transition:color .16s}
-.kpi2-dp-btn:hover .kpi2-dp-ic{color:var(--accent)}
-
-.kpi2-dp-pop{position:fixed;z-index:10001;width:288px;padding:14px;background:linear-gradient(180deg, var(--panel-2), var(--panel-3));border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 50px -12px rgba(0,0,0,.65);opacity:0;transform:translateY(-4px) scale(.98);transition:opacity .16s var(--ease-out), transform .16s var(--ease-out);pointer-events:none}
-.kpi2-dp-pop.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
-
-.kpi2-dp-h{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px}
-.kpi2-dp-nav{width:30px;height:30px;border-radius:8px;background:var(--panel-3);border:1px solid var(--line);color:var(--txt-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .14s}
-.kpi2-dp-nav:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28);background:rgba(138,143,255,.06)}
-.kpi2-dp-title{display:flex;gap:5px;flex:1;justify-content:center}
-.kpi2-dp-sel{background:transparent;border:1px solid var(--line);border-radius:7px;color:var(--txt-1);padding:5px 8px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;color-scheme:dark}
-.kpi2-dp-sel:hover{border-color:rgba(138,143,255,.28)}
-.kpi2-dp-sel:focus{outline:none;border-color:var(--accent)}
-
-.kpi2-dp-wd{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
-.kpi2-dp-w{padding:6px 0;text-align:center;font-size:10.5px;font-weight:700;color:var(--txt-3);text-transform:uppercase;letter-spacing:.05em}
-
-.kpi2-dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
-.kpi2-dp-c{aspect-ratio:1/1;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--txt-1);font-size:13px;font-weight:600;font-family:var(--mono);cursor:pointer;transition:all .12s var(--ease-out);display:flex;align-items:center;justify-content:center;padding:0}
-.kpi2-dp-c:hover:not(.sel){background:rgba(138,143,255,.08);border-color:rgba(138,143,255,.2)}
-.kpi2-dp-c.muted{color:var(--txt-3);opacity:.4}
-.kpi2-dp-c.today{border-color:rgba(55,230,200,.35);color:var(--accent)}
-.kpi2-dp-c.sel{background:linear-gradient(135deg, var(--accent), var(--violet));color:#06140f;border-color:transparent;font-weight:800;box-shadow:0 4px 10px -4px rgba(55,230,200,.5)}
-
-.kpi2-dp-f{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
-.kpi2-dp-tf{flex:1;padding:8px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:8px;color:var(--txt-2);font-size:12px;font-weight:600;cursor:pointer;transition:all .14s}
-.kpi2-dp-tf:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
-
-</style>
-  <div class="kpi2-wrap">
-    <div class="kpi2-topbar">
-      <div class="kpi2-title">Панель <b>KPI</b> · <span id="kpi2-period">…</span></div>
-      <div class="kpi2-topbar-r">
-        <div id="kpi2-period-picker"></div>
-        <button class="kpi2-help-btn" onclick="kpi2ToggleHelp()">? Как работать</button>
+    .kpi3-wrap{display:flex;flex-direction:column;gap:16px;padding:0 4px}
+    .kpi3-topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+    .kpi3-title{font-size:22px;font-weight:800;letter-spacing:-.015em;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+    .kpi3-title b{background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .kpi3-title .kpi3-period-lbl{font-size:14px;font-weight:600;color:var(--txt-3);letter-spacing:0}
+    .kpi3-top-actions{display:flex;gap:8px;align-items:center}
+    .kpi3-btn{padding:8px 14px;font-size:12.5px;font-weight:600;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--txt-2);cursor:pointer;transition:all .16s var(--ease-out);display:inline-flex;align-items:center;gap:6px}
+    .kpi3-btn:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
+    .kpi3-btn-primary{background:linear-gradient(135deg,var(--accent),#2ac9b1);color:#031a15;border-color:transparent;font-weight:700}
+    .kpi3-btn-primary:hover{box-shadow:0 4px 12px rgba(55,230,200,.28);transform:translateY(-1px);color:#031a15}
+    .kpi3-btn-ghost{background:transparent}
+    .kpi3-btn-danger{background:transparent;color:var(--neg);border-color:rgba(242,102,102,.25)}
+    .kpi3-btn-danger:hover{background:rgba(242,102,102,.08);color:var(--neg)}
+    .kpi3-btn-sm{padding:5px 10px;font-size:11.5px;border-radius:7px}
+    .kpi3-cats{display:inline-flex;gap:3px;padding:4px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px}
+    .kpi3-cat{padding:10px 18px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .16s var(--ease-out);display:inline-flex;align-items:center;gap:8px;border:none;background:transparent}
+    .kpi3-cat:hover{color:var(--txt-1)}
+    .kpi3-cat.on{background:var(--panel-2);color:var(--txt-1);box-shadow:0 0 0 1px rgba(138,143,255,.25),0 6px 14px -4px rgba(0,0,0,.35)}
+    .kpi3-cat-ic{font-size:16px}
+    .kpi3-cat-cnt{font-family:var(--mono);font-size:11px;color:var(--txt-3);background:rgba(255,255,255,.04);padding:2px 7px;border-radius:20px}
+    .kpi3-cat.on .kpi3-cat-cnt{color:var(--accent);background:rgba(55,230,200,.1)}
+    .kpi3-section{padding:22px 24px;background:var(--panel-2);border:1px solid var(--line);border-radius:16px}
+    .kpi3-block-t{font-size:15px;font-weight:800;letter-spacing:-.005em;color:var(--txt-1)}
+    .kpi3-block-sub{font-size:12px;color:var(--txt-3);margin-top:2px}
+    .kpi3-section-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+    .kpi3-pa-groups{display:flex;flex-direction:column;gap:18px}
+    .kpi3-pa-group-t{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--txt-3);font-weight:700;margin-bottom:10px}
+    .kpi3-tiles{display:grid;gap:10px}
+    .kpi3-tile{padding:14px 16px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;transition:all .16s var(--ease-out);position:relative;overflow:hidden}
+    .kpi3-tile:hover{border-color:rgba(138,143,255,.22);transform:translateY(-1px)}
+    .kpi3-tile-l{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:700;margin-bottom:8px}
+    .kpi3-tile-v{font-family:var(--mono);font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--txt-1);line-height:1.05}
+    .kpi3-tile-sub{margin-top:6px;font-size:11px;color:var(--txt-3);font-family:var(--mono);display:flex;align-items:center;justify-content:space-between;gap:6px}
+    .kpi3-tile-bar{height:3px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;margin-top:8px}
+    .kpi3-tile-bar-f{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));border-radius:3px;transition:width .4s var(--ease-out)}
+    .kpi3-tile.pos .kpi3-tile-bar-f{background:var(--pos)}
+    .kpi3-tile.warn .kpi3-tile-bar-f{background:var(--warn)}
+    .kpi3-tile.warn .kpi3-tile-v{color:var(--warn)}
+    .kpi3-tile.neg .kpi3-tile-bar-f{background:var(--neg)}
+    .kpi3-tile.neg .kpi3-tile-v{color:var(--neg)}
+    .kpi3-tile.empty .kpi3-tile-v{color:var(--txt-3);font-size:16px;font-weight:600}
+    .kpi3-goals-list{display:flex;flex-direction:column;gap:10px}
+    .kpi3-goal{background:var(--panel-3);border:1px solid var(--line);border-radius:13px;overflow:hidden;transition:all .18s var(--ease-out)}
+    .kpi3-goal.expanded{border-color:rgba(138,143,255,.28);box-shadow:0 8px 24px -8px rgba(0,0,0,.4)}
+    .kpi3-goal-head{padding:14px 18px;display:grid;grid-template-columns:1fr auto auto;gap:20px;align-items:center;cursor:pointer;transition:background .14s}
+    .kpi3-goal-head:hover{background:rgba(255,255,255,.02)}
+    .kpi3-goal-info{min-width:0}
+    .kpi3-goal-title{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:14px}
+    .kpi3-goal-metric{font-weight:700;color:var(--txt-1);letter-spacing:-.005em}
+    .kpi3-goal-row{color:var(--txt-3);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi3-goal-values{display:flex;align-items:baseline;gap:9px;font-family:var(--mono)}
+    .kpi3-goal-cur{font-size:20px;font-weight:800;color:var(--txt-1)}
+    .kpi3-goal-arrow{color:var(--txt-3);font-size:11px}
+    .kpi3-goal-tgt{font-size:16px;color:var(--accent);font-weight:700}
+    .kpi3-goal-progress{min-width:200px;display:flex;flex-direction:column;gap:6px}
+    .kpi3-goal-bar{height:6px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
+    .kpi3-goal-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .4s var(--ease-out)}
+    .kpi3-goal.warn .kpi3-goal-fill{background:linear-gradient(90deg,var(--warn),#E3B567)}
+    .kpi3-goal.neg .kpi3-goal-fill{background:linear-gradient(90deg,var(--neg),#F26666)}
+    .kpi3-goal-meta{display:flex;align-items:center;gap:10px;font-size:11px;font-family:var(--mono)}
+    .kpi3-goal-pct{color:var(--txt-2);font-weight:700}
+    .kpi3-goal-status{font-weight:700}
+    .kpi3-goal.pos .kpi3-goal-status{color:var(--pos)}
+    .kpi3-goal.warn .kpi3-goal-status{color:var(--warn)}
+    .kpi3-goal.neg .kpi3-goal-status{color:var(--neg)}
+    .kpi3-goal-days{color:var(--txt-3)}
+    .kpi3-goal-toggle{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.03);color:var(--txt-2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;transition:all .14s;line-height:1}
+    .kpi3-goal.expanded .kpi3-goal-toggle{background:var(--accent);color:#031a15}
+    .kpi3-rpm{padding:0 18px 18px;border-top:1px solid var(--line);background:rgba(138,143,255,.025);animation:kpi3Slide .22s var(--ease-out)}
+    @keyframes kpi3Slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+    .kpi3-rpm-row{display:grid;grid-template-columns:36px 1fr;gap:14px;padding:16px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
+    .kpi3-rpm-row:last-of-type{border-bottom:none}
+    .kpi3-rpm-icon{width:36px;height:36px;border-radius:10px;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-size:18px}
+    .kpi3-rpm-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-3);font-weight:700;margin-bottom:6px}
+    .kpi3-rpm-val{font-size:14px;color:var(--txt-1);font-weight:600;line-height:1.5}
+    .kpi3-rpm-textarea{width:100%;min-height:60px;padding:10px 12px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;color:var(--txt-1);font-size:13.5px;font-family:inherit;resize:vertical;line-height:1.5}
+    .kpi3-rpm-textarea:focus{outline:none;border-color:rgba(138,143,255,.5)}
+    .kpi3-rpm-map{display:flex;flex-direction:column;gap:6px}
+    .kpi3-rpm-step{display:grid;grid-template-columns:22px 1fr 26px;gap:9px;align-items:center;padding:7px 10px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;transition:all .12s}
+    .kpi3-rpm-step:hover{border-color:rgba(138,143,255,.2)}
+    .kpi3-rpm-step.done .kpi3-rpm-step-text{color:var(--txt-3);text-decoration:line-through}
+    .kpi3-rpm-cb{position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .kpi3-rpm-cb input{position:absolute;opacity:0;width:0;height:0}
+    .kpi3-rpm-cbi{width:16px;height:16px;border:1.5px solid var(--txt-3);border-radius:5px;transition:all .14s;display:block;position:relative}
+    .kpi3-rpm-cb input:checked ~ .kpi3-rpm-cbi{background:var(--accent);border-color:var(--accent)}
+    .kpi3-rpm-cb input:checked ~ .kpi3-rpm-cbi::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #031a15;border-width:0 2px 2px 0;transform:rotate(45deg)}
+    .kpi3-rpm-step-text{background:transparent;border:none;color:var(--txt-1);font-size:13px;padding:4px 0;outline:none;font-family:inherit;width:100%}
+    .kpi3-rpm-step-text::placeholder{color:var(--txt-3)}
+    .kpi3-rpm-del{width:26px;height:26px;background:transparent;border:none;color:var(--txt-3);font-size:18px;cursor:pointer;border-radius:6px;line-height:1;transition:all .12s}
+    .kpi3-rpm-del:hover{background:rgba(242,102,102,.1);color:var(--neg)}
+    .kpi3-rpm-add{padding:9px 12px;background:transparent;border:1.5px dashed rgba(138,143,255,.28);border-radius:9px;color:var(--txt-2);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .14s;width:100%;margin-top:2px}
+    .kpi3-rpm-add:hover{border-color:rgba(138,143,255,.5);color:var(--txt-1);background:rgba(138,143,255,.04)}
+    .kpi3-rpm-footer{display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--line);margin-top:14px}
+    .kpi3-stats-list{display:flex;flex-direction:column;gap:6px}
+    .kpi3-stats-row{display:grid;grid-template-columns:32px 40px 1fr 90px 90px 60px;gap:14px;align-items:center;padding:12px 14px;background:var(--panel-3);border:1px solid transparent;border-radius:11px;transition:all .14s}
+    .kpi3-stats-row:hover{border-color:var(--line);background:rgba(255,255,255,.015)}
+    .kpi3-stats-n{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--txt-3);text-align:right}
+    .kpi3-stats-av{width:36px;height:36px;border-radius:10px;overflow:hidden;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;color:var(--accent)}
+    .kpi3-stats-av img{width:100%;height:100%;object-fit:cover;display:block}
+    .kpi3-stats-nm{min-width:0}
+    .kpi3-stats-nm b{font-size:13.5px;font-weight:600;color:var(--txt-1);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi3-stats-nm span{font-size:11.5px;color:var(--txt-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+    .kpi3-stats-stars{color:var(--warn);font-size:14px;letter-spacing:2px;text-align:center}
+    .kpi3-stats-score{font-family:var(--mono);font-size:18px;font-weight:800;color:var(--txt-1);text-align:right}
+    .kpi3-stats-score .u{font-size:11px;color:var(--txt-3);font-weight:600;margin-left:2px}
+    .kpi3-stats-row.pos .kpi3-stats-score{color:var(--pos)}
+    .kpi3-stats-row.warn .kpi3-stats-score{color:var(--warn)}
+    .kpi3-stats-row.neg .kpi3-stats-score{color:var(--neg)}
+    .kpi3-stats-tr{font-family:var(--mono);font-size:12.5px;font-weight:700;text-align:right}
+    .kpi3-stats-tr.pos{color:var(--pos)}
+    .kpi3-stats-tr.neg{color:var(--neg)}
+    .kpi3-stats-tr.flat{color:var(--txt-3)}
+    .kpi3-empty{padding:28px;text-align:center;color:var(--txt-3);font-size:13.5px;line-height:1.6;display:flex;flex-direction:column;align-items:center;gap:12px}
+    .kpi3-empty b{color:var(--txt-1);font-weight:700}
+    .kpi3-loading{padding:20px;text-align:center;color:var(--txt-3);font-size:12.5px}
+    .kpi3-skel{display:inline-block;background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.08),rgba(255,255,255,.04));background-size:300% 100%;animation:kpi3Skel 1.4s ease infinite;border-radius:4px}
+    @keyframes kpi3Skel{0%{background-position:100% 50%}100%{background-position:-100% 50%}}
+    .kpi3-scrim{position:fixed;inset:0;background:rgba(6,20,15,.72);backdrop-filter:blur(8px);z-index:9990;display:flex;align-items:center;justify-content:center;padding:24px;animation:kpi3FadeIn .18s var(--ease-out)}
+    @keyframes kpi3FadeIn{from{opacity:0}to{opacity:1}}
+    .kpi3-modal{background:var(--panel-2);border:1px solid var(--line);border-radius:16px;max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px -12px rgba(0,0,0,.6);overflow:hidden;animation:kpi3SlideUp .24s var(--ease-out)}
+    @keyframes kpi3SlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .kpi3-modal-h{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line)}
+    .kpi3-modal-t{font-size:16px;font-weight:800;letter-spacing:-.01em}
+    .kpi3-modal-x{background:transparent;border:none;color:var(--txt-3);font-size:22px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .14s;line-height:1}
+    .kpi3-modal-x:hover{background:rgba(255,255,255,.05);color:var(--txt-1)}
+    .kpi3-modal-b{padding:20px 22px;overflow-y:auto;flex:1}
+    .kpi3-modal-f{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+    .kpi3-field{margin-bottom:16px}
+    .kpi3-field-l{font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:700;margin-bottom:7px}
+    .kpi3-field-h{font-size:11px;color:var(--txt-3);margin-top:5px}
+    .kpi3-input,.kpi3-select{width:100%;padding:10px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;color:var(--txt-1);font-size:13.5px;font-family:inherit}
+    .kpi3-input:focus,.kpi3-select:focus{outline:none;border-color:rgba(138,143,255,.5)}
+    .kpi3-mchoice{display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;margin-top:2px}
+    .kpi3-mopt{padding:9px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;font-size:12.5px;font-weight:600;color:var(--txt-2);cursor:pointer;transition:all .14s;text-align:left}
+    .kpi3-mopt:hover{border-color:rgba(138,143,255,.28);color:var(--txt-1)}
+    .kpi3-mopt.on{background:linear-gradient(135deg,rgba(55,230,200,.12),rgba(138,143,255,.08));border-color:var(--accent);color:var(--txt-1)}
+    .kpi3-mopt-cat{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);margin-top:2px}
+    @media (max-width: 780px){
+      .kpi3-goal-head{grid-template-columns:1fr auto;gap:12px}
+      .kpi3-goal-progress{grid-column:1/-1;min-width:0}
+      .kpi3-stats-row{grid-template-columns:24px 34px 1fr 70px}
+      .kpi3-stats-stars,.kpi3-stats-tr{display:none}
+      .kpi3-tiles{grid-template-columns:repeat(2,1fr) !important}
+    }
+  </style>
+  <div class="kpi3-wrap">
+    <div class="kpi3-topbar">
+      <div class="kpi3-title">
+        <b>Панель KPI</b>
+        <span class="kpi3-period-lbl" id="kpi3-period-label">—</span>
+      </div>
+      <div class="kpi3-top-actions" id="kpi3-top-actions"></div>
+    </div>
+    <div style="display:flex;justify-content:center">
+      <div class="kpi3-cats" id="kpi3-cats-nav">
+        <button class="kpi3-cat on" data-cat="member" onclick="_kpi3SwitchCategory('member')">
+          <span class="kpi3-cat-ic">👤</span>Сотрудники<span class="kpi3-cat-cnt" id="kpi3-cnt-member">—</span>
+        </button>
+        <button class="kpi3-cat" data-cat="team" onclick="_kpi3SwitchCategory('team')">
+          <span class="kpi3-cat-ic">👥</span>Команды<span class="kpi3-cat-cnt" id="kpi3-cnt-team">—</span>
+        </button>
+        <button class="kpi3-cat" data-cat="project" onclick="_kpi3SwitchCategory('project')">
+          <span class="kpi3-cat-ic">📦</span>Проекты<span class="kpi3-cat-cnt" id="kpi3-cnt-project">—</span>
+        </button>
       </div>
     </div>
-    <div class="kpi2-help" id="kpi2-help" style="display:none">
-      <h4>Как читать эту панель</h4>
-      <p><b>Наверху</b> — общее состояние агентства одним взглядом. Зелёная точка = всё хорошо, жёлтая = требует внимания, красная = проблема.</p>
-      <p><b>«Что делать сейчас»</b> — конкретные точки риска: просрочки, проекты под угрозой, сотрудники с падением. Нажми «Открыть» чтобы перейти к делу.</p>
-      <p><b>«Мои цели»</b> — куда стремимся к концу периода и как идём. Хочешь новую цель — жми «+ Добавить цель», выбери метрику и целевое значение.</p>
-      <p><b>«Кто как работает»</b> — рейтинг сотрудников/команд/проектов. Оценка 0–100, звёзды визуально, стрелка = тренд относительно прошлой недели.</p>
+    <div class="kpi3-section">
+      <div class="kpi3-section-h">
+        <div>
+          <div class="kpi3-block-t">Точка А · где мы сейчас</div>
+          <div class="kpi3-block-sub" id="kpi3-pa-sub">Агрегированные метрики за последние 30 дней</div>
+        </div>
+      </div>
+      <div id="kpi3-pointa"><div class="kpi3-loading">Считаем реальность…</div></div>
     </div>
-    <div id="kpi2-status" class="kpi2-status"></div>
-    <div id="kpi2-issues" class="kpi2-card"></div>
-    <div id="kpi2-goals"  class="kpi2-card"></div>
-    <div id="kpi2-ranking" class="kpi2-card"></div>
+    <div class="kpi3-section">
+      <div class="kpi3-section-h">
+        <div>
+          <div class="kpi3-block-t">Цели · куда идём</div>
+          <div class="kpi3-block-sub">Клик на цель раскрывает RPM: результат · зачем · план</div>
+        </div>
+        <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Цель</button>
+      </div>
+      <div id="kpi3-goals"><div class="kpi3-loading">Загружаем цели…</div></div>
+    </div>
+    <div class="kpi3-section">
+      <div class="kpi3-section-h">
+        <div>
+          <div class="kpi3-block-t">Статистика · кто как выполняет</div>
+          <div class="kpi3-block-sub">Ранжирование по общему проценту KPI и тренду за неделю</div>
+        </div>
+      </div>
+      <div id="kpi3-stats"><div class="kpi3-loading">Считаем рейтинг…</div></div>
+    </div>
   </div>
 `;
 
-window.kpi2ToggleHelp = () => {
-  const el = document.getElementById('kpi2-help'); if(!el) return;
-  el.style.display = el.style.display === 'none' ? '' : 'none';
-};
-
-/* Верхняя панель — период */
-window._kpi2FillTopbar = () => {
-  const p = _kpi2.period;
-  const t = document.getElementById('kpi2-period');
-  if (t) t.textContent = p ? p.name : 'Период не создан';
-  const picker = document.getElementById('kpi2-period-picker');
-  if (picker){
-    if (!p){
-      picker.innerHTML = `<button class="kpi2-help-btn" onclick="kpiCreateDefaultPeriod().then(()=>renderKPI())" style="color:var(--txt-1);border-color:rgba(138,143,255,.28)">+ Создать период</button>`;
-    } else {
-      const opts = _kpi2.periods.map(x => [x.id, `${x.name} · ${{active:'активный',planning:'планирование',closed:'закрыт'}[x.status]||x.status}`]);
-      picker.innerHTML = _ddSel('kpi2-period-sel', opts, p.id, (v) => { _kpi2.period = _kpi2.periods.find(x => x.id === v); renderKPI(); });
-    }
-  }
-};
-
-/* Секция 1: статус агентства */
-window._kpi2FillStatus = async () => {
-  const box = document.getElementById('kpi2-status'); if(!box) return;
-  const [ph, od, vel, ot] = await Promise.all([
-    kpiComputePortfolioHealth('agency'),
-    kpiComputeOntimeDelivery('agency'),
-    kpiComputeVelocity30d('agency'),
-    kpiComputeOtkaty('agency'),
-  ]);
-  const health = ph.value;
-  let statusLabel, statusColor, statusGlow, subLabel;
-  if (health == null){
-    statusLabel = 'Пока нет данных'; statusColor = 'var(--txt-3)'; statusGlow = 'rgba(255,255,255,.06)';
-    subLabel = 'Как появятся активные проекты — покажем состояние';
-  } else if (health >= 80){
-    statusLabel = 'Всё хорошо'; statusColor = 'var(--pos)'; statusGlow = 'rgba(55,230,200,.18)';
-    subLabel = 'Портфель в норме, продолжайте в том же духе';
-  } else if (health >= 50){
-    statusLabel = 'Требует внимания'; statusColor = 'var(--warn)'; statusGlow = 'rgba(227,181,103,.16)';
-    subLabel = 'Есть проекты под риском — посмотрите ниже что делать';
-  } else {
-    statusLabel = 'Красная зона'; statusColor = 'var(--neg)'; statusGlow = 'rgba(242,102,102,.16)';
-    subLabel = 'Половина или больше проектов в риске — срочно разберитесь';
-  }
-  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done');
-  const isStale = p => p._lastActDays != null && p._lastActDays >= 14;
-  const risk = P.filter(p => p._overdue || isStale(p)).length;
-  const okN = P.length - risk;
-
-  box.style.setProperty('--_glow', statusGlow);
-  const fmt = (v, unit) => v==null?'—':(unit==='%'?Math.round(v)+'%':unit==='ч'?Math.round(v*10)/10+'ч':Math.round(v));
-  box.innerHTML = `
-    <div class="kpi2-status-head">
-      <div>
-        <div class="kpi2-status-eb">общее состояние агентства</div>
-        <div class="kpi2-status-h">${statusLabel}</div>
-        <div class="kpi2-status-sub">${subLabel} · ${okN} в норме, ${risk} под риском из ${P.length}</div>
-      </div>
-      <div class="kpi2-status-badge" style="background:${statusColor}22;color:${statusColor}"><span class="d" style="background:${statusColor}"></span>${health==null?'—':health+'%'}</div>
-    </div>
-    <div class="kpi2-tiles">
-      <div class="kpi2-tile ${_kpi2ClassFor('portfolio_health', health, 'up')}" onclick="agNav('overview')">
-        <div class="kpi2-tile-l">здоровье</div>
-        <div class="kpi2-tile-v">${fmt(health,'%')}</div>
-        <div class="kpi2-tile-sub">открыть Сводку →</div>
-      </div>
-      <div class="kpi2-tile ${_kpi2ClassFor('ontime_delivery', od.value, 'up')}" onclick="agNav('deadlines')">
-        <div class="kpi2-tile-l">в срок</div>
-        <div class="kpi2-tile-v">${fmt(od.value,'%')}</div>
-        <div class="kpi2-tile-sub">открыть Дедлайны →</div>
-      </div>
-      <div class="kpi2-tile" onclick="agNav('cycles')">
-        <div class="kpi2-tile-l">выработка 30д</div>
-        <div class="kpi2-tile-v">${fmt(vel.value)}</div>
-        <div class="kpi2-tile-sub">этапы и задачи</div>
-      </div>
-      <div class="kpi2-tile ${_kpi2ClassFor('otkaty', ot.value, 'down')}" onclick="agNav('cycles')">
-        <div class="kpi2-tile-l">откаты</div>
-        <div class="kpi2-tile-v">${fmt(ot.value,'%')}</div>
-        <div class="kpi2-tile-sub">возвраты на доработку</div>
-      </div>
-    </div>
-  `;
-};
-
-window._kpi2ClassFor = (key, val, dir) => {
-  if (val == null) return '';
-  const m = KPI_METRICS[key]; if(!m) return '';
-  const n = kpiNormalize(key, val);
-  if (n == null) return '';
-  return n >= 70 ? 'pos' : n >= 40 ? 'warn' : 'neg';
-};
-
-/* Секция 2: конкретные проблемы */
-window._kpi2FillIssues = () => {
-  const box = document.getElementById('kpi2-issues'); if(!box) return;
-  const issues = [];
-  const O = window.OVERVIEW || {};
-  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
-
-  // Просрочки
-  const overdueTasks = (O.overdueTasks || 0);
-  const overdueStages = (O.overdueStages || 0);
-  const overdueTotal = overdueTasks + overdueStages;
-  if (overdueTotal > 0){
-    issues.push({
-      sev: overdueTotal > 15 ? 'neg' : 'warn',
-      ic: '⏰',
-      t: `Просрочено ${overdueTotal} ${overdueTotal===1?'элемент':'элементов'}: ${overdueStages} этапов и ${overdueTasks} задач`,
-      s: 'Сдвиньте сроки или ускорьте выполнение',
-      action: 'Смотреть',
-      onclick: `agNav('deadlines')`,
-    });
-  }
-
-  // Проекты под риском
-  const isStale = p => p._lastActDays != null && p._lastActDays >= 14;
-  const riskyProjects = P.filter(p => p.status !== 'done' && (p._overdue || isStale(p))).slice(0, 5);
-  if (riskyProjects.length){
-    const names = riskyProjects.slice(0, 3).map(p => p.name).join(', ');
-    const more = riskyProjects.length > 3 ? ` и ещё ${riskyProjects.length - 3}` : '';
-    issues.push({
-      sev: riskyProjects.length >= 3 ? 'neg' : 'warn',
-      ic: '⚠️',
-      t: `${riskyProjects.length} ${riskyProjects.length===1?'проект под риском':'проекта под риском'}: ${names}${more}`,
-      s: 'Есть просрочки или застой более 2 недель',
-      action: 'Открыть',
-      onclick: `agNav('projects')`,
-    });
-  }
-
-  // Rework — если много переходов назад
-  const trans = (O.trans || 0) + (O.tTrans || 0);
-  const rework = (O.rework || 0) + (O.tRework || 0);
-  if (trans && rework/trans > 0.15){
-    const pct = Math.round(100*rework/trans);
-    issues.push({
-      sev: pct >= 25 ? 'neg' : 'warn',
-      ic: '↺',
-      t: `Высокий процент откатов: ${pct}% работ возвращаются на доработку`,
-      s: 'Смотрите Циклы чтобы понять на каких этапах откаты',
-      action: 'Циклы',
-      onclick: `agNav('cycles')`,
-    });
-  }
-
-  // Финансы: концентрация выручки
-  const active = P.filter(p => p.status !== 'done' && p.status !== 'blocked');
-  const mrrTotal = active.reduce((s,p) => s + (+p.mrr || 0), 0);
-  if (mrrTotal > 0){
-    const top = active.slice().sort((a,b) => (+b.mrr||0) - (+a.mrr||0))[0];
-    const topShare = Math.round(100*(+top.mrr||0)/mrrTotal);
-    if (topShare >= 40){
-      issues.push({
-        sev: topShare >= 60 ? 'neg' : 'warn',
-        ic: '💰',
-        t: `${topShare}% выручки — с одного клиента (${top.name})`,
-        s: 'Диверсифицируйте портфель — риск потерять крупного клиента',
-        action: 'Финансы',
-        onclick: `agNav('finance')`,
-      });
-    }
-  }
-
-  if (!issues.length){
-    box.innerHTML = `
-      <div class="kpi2-card-h">
-        <div class="kpi2-card-t">Что делать сейчас</div>
-      </div>
-      <div class="kpi2-issues-none"><b>Всё чисто</b> · нет активных проблем требующих внимания. Продолжайте в том же духе.</div>
-    `;
+window._kpi3FillTopbar = () => {
+  const lbl = document.getElementById('kpi3-period-label');
+  const act = document.getElementById('kpi3-top-actions');
+  if (!lbl || !act) return;
+  const p = _kpi3.period;
+  if (!p) {
+    lbl.textContent = 'нет активного периода';
+    act.innerHTML = `<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewPeriod()">+ Период</button>`;
     return;
   }
-
-  box.innerHTML = `
-    <div class="kpi2-card-h">
-      <div class="kpi2-card-t">Что делать сейчас</div>
-      <div class="kpi2-card-c">${issues.length} ${issues.length===1?'точка внимания':'точек внимания'}</div>
-    </div>
-    <div class="kpi2-issues-list">
-      ${issues.map(i => `
-        <div class="kpi2-issue ${i.sev}">
-          <div class="kpi2-issue-ic">${i.ic}</div>
-          <div class="kpi2-issue-b"><div class="kpi2-issue-t">${i.t}</div><div class="kpi2-issue-s">${i.s}</div></div>
-          <button class="kpi2-issue-btn" onclick="${i.onclick}">${i.action} →</button>
-        </div>
-      `).join('')}
-    </div>
-  `;
+  const dot = ({active:'var(--pos)', planning:'var(--warn)', closed:'var(--txt-3)'})[p.status] || 'var(--txt-3)';
+  lbl.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dot};margin-right:6px;box-shadow:0 0 6px 0 ${dot}"></span>${_kpi3Esc(p.name || 'Период')} · ${_kpi3FmtDate(p.start_date)} — ${_kpi3FmtDate(p.end_date)}`;
+  act.innerHTML = `<button class="kpi3-btn" onclick="_kpi3ShowPeriods()">Период ▾</button>`;
 };
 
-/* Секция 3: цели агентства (простая версия) */
-window._kpi2FillGoals = async () => {
-  const box = document.getElementById('kpi2-goals'); if(!box) return;
-  const p = _kpi2.period;
-  if (!p){
-    box.innerHTML = `<div class="kpi2-card-h"><div class="kpi2-card-t">Мои цели</div></div><div class="kpi2-issues-none">Сначала создайте период — тогда сможете задать цели.</div>`;
-    return;
-  }
-  // Тянем все agency-цели по периоду
-  const targets = await kpiFetchTargets(p.id, { scope_kind: 'agency' });
-  const now = Date.now();
-  const startMs = new Date(p.start_date+'T00:00:00').getTime();
-  const endMs   = new Date(p.end_date  +'T23:59:59').getTime();
-  const pctTime = 100 * (now - startMs) / Math.max(1, endMs - startMs);
-
-  const goalHTML = async (t) => {
-    const M = KPI_METRICS[t.metric_key]; if(!M) return '';
-    // Текущее значение
-    const fnName = _kpiFnMap[t.metric_key] || '';
-    let cur = t.baseline;
-    try { const fn = window[fnName]; if(fn){ const r = await fn('agency', null); if(r && r.value != null) cur = r.value; } } catch(e){}
-    const total = (t.target || 0) - (t.baseline || 0);
-    const done  = (cur || 0) - (t.baseline || 0);
-    const progress = total === 0 ? (cur >= t.target ? 100 : 0) : Math.max(0, Math.min(100, Math.round(100*done/total)));
-    const onTrack = progress >= pctTime - 10;
-    const behind = progress < pctTime - 25;
-    const cls = onTrack ? 'pos' : behind ? 'neg' : 'warn';
-    const status = onTrack ? '✓ в темпе' : behind ? '⚠ отстаём' : '~ идём медленно';
-    const fmt = v => v==null?'—':(M.unit==='%'?Math.round(v*10)/10+'%':M.unit==='ч'?Math.round(v*10)/10+'ч':M.unit==='$'?'$'+Math.round(v):Math.round(v));
-    return `
-      <div class="kpi2-goal ${cls}">
-        <div class="kpi2-goal-t">${M.label}</div>
-        <div class="kpi2-goal-v">
-          <span class="kpi2-goal-cur">${fmt(cur)}</span>
-          <span class="kpi2-goal-arrow">→</span>
-          <span class="kpi2-goal-tgt">${fmt(t.target)}</span>
-        </div>
-        <div class="kpi2-goal-bar"><div class="kpi2-goal-fill" style="width:${progress}%"></div></div>
-        <div class="kpi2-goal-hint">
-          <span>прошло ${Math.round(pctTime)}% времени</span>
-          <span>·</span>
-          <span class="kpi2-goal-status">${status}</span>
-        </div>
-      </div>`;
-  };
-
-  const cards = await Promise.all(targets.filter(t => t.target != null).map(goalHTML));
-  const canEdit = kpiCan('set_target', 'agency', null);
-  box.innerHTML = `
-    <div class="kpi2-card-h">
-      <div class="kpi2-card-t">Мои цели · ${p.name}</div>
-      <div class="kpi2-card-c">до ${p.end_date}</div>
-    </div>
-    ${cards.length ? `<div class="kpi2-goals-list">${cards.join('')}</div>` : `<div class="kpi2-issues-none">Пока не задано ни одной цели. Задайте первую — увидим прогресс.</div>`}
-    ${canEdit ? `<button class="kpi2-add-goal" onclick="kpi2NewGoal()">+ Добавить цель</button>` : ''}
-  `;
-};
-
-/* Простая модалка добавления цели через prompt */
-window.kpi2NewGoal = async () => {
-  const p = _kpi2.period; if(!p) return;
-  const agencyKeys = Object.entries(KPI_METRICS).filter(([k,m]) => m.scope.includes('agency')).map(([k,m]) => ({k, m}));
-  const choices = agencyKeys.map((x, i) => `${i+1}. ${x.m.label}${x.m.dir==='down'?' (снижать)':' (повышать)'} — сейчас ${x.m.unit || 'ед.'}`).join('\n');
-  const idxStr = prompt('Что улучшаем?\n\n' + choices + '\n\nВведите номер:');
-  const idx = parseInt(idxStr, 10);
-  if (isNaN(idx) || idx < 1 || idx > agencyKeys.length) return;
-  const {k, m} = agencyKeys[idx-1];
-  const fnName = _kpiFnMap[k];
-  let baseline = null;
-  try { const fn = window[fnName]; if(fn){ const r = await fn('agency', null); if(r && r.value != null) baseline = r.value; } } catch(e){}
-  const baseStr = baseline==null?'':' (сейчас ' + baseline + (m.unit||'') + ')';
-  const tgtStr = prompt(`Какое значение хотим достичь к ${p.end_date}?${baseStr}\n\nВведите число:`);
-  if (!tgtStr) return;
-  const tgt = Number(String(tgtStr).replace(',', '.'));
-  if (isNaN(tgt)) { toast('Не число'); return; }
-  await kpiUpsertTarget({ period_id: p.id, scope_kind: 'agency', scope_id: null, metric_key: k, baseline: baseline, target: tgt });
-  if (typeof toast==='function') toast('Цель сохранена');
-  _kpi2FillGoals();
-};
-
-/* Секция 4: рейтинг сотрудников/команд/проектов */
-window._kpi2Score = async (scope, id) => {
-  const from = new Date(Date.now() - 30*86400000).toISOString();
-  const to   = new Date().toISOString();
-  const res = await kpiComputeOpsAll(scope, id, from, to);
-  const scores = [];
-  Object.entries(res).forEach(([k, r]) => {
-    if (r && r.value != null){
-      const s = kpiNormalize(k, r.value);
-      if (s != null) scores.push(s);
-    }
+window._kpi3SwitchCategory = async (cat) => {
+  _kpi3.category = cat;
+  _kpi3.expandedGoalId = null;
+  document.querySelectorAll('.kpi3-cat').forEach(t => t.classList.toggle('on', t.dataset.cat === cat));
+  ['member','team','project'].forEach(c => {
+    const el = document.getElementById('kpi3-cnt-' + c);
+    if (el) el.textContent = _kpiScopeRows(c).length;
   });
-  if (!scores.length) return null;
-  return Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
-};
-
-window._kpi2Trend = async (scope, id) => {
-  const now = Date.now();
-  const [thisWeek, prevWeek] = await Promise.all([
-    kpiComputeOpsAll(scope, id, new Date(now - 7*86400000).toISOString(), new Date(now).toISOString()),
-    kpiComputeOpsAll(scope, id, new Date(now - 14*86400000).toISOString(), new Date(now - 7*86400000).toISOString()),
+  const paSub = document.getElementById('kpi3-pa-sub');
+  if (paSub) paSub.textContent = `Агрегированные метрики за 30 дней · ${_kpiScopeRows(cat).length} ${_kpi3CatLabel(cat)}`;
+  await Promise.all([
+    _kpi3FillPointA(),
+    _kpi3FillGoals(),
+    _kpi3FillStats(),
   ]);
-  const avgOf = res => {
-    const arr = [];
-    Object.entries(res).forEach(([k,r]) => { if (r && r.value != null){ const s = kpiNormalize(k, r.value); if (s!=null) arr.push(s); } });
-    return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
-  };
-  const tw = avgOf(thisWeek), pw = avgOf(prevWeek);
-  if (tw == null || pw == null) return { d:0, sign:'flat', txt:'—' };
-  const d = tw - pw;
-  return { d, sign: d > 2 ? 'pos' : d < -2 ? 'neg' : 'flat', txt: (d>0?'+':'')+Math.round(d) };
 };
 
-window._kpi2Stars = (score) => {
-  if (score == null) return '☆☆☆☆☆';
-  const n = score >= 90 ? 5 : score >= 75 ? 4 : score >= 55 ? 3 : score >= 35 ? 2 : 1;
-  return '★'.repeat(n) + '☆'.repeat(5 - n);
-};
-
-/* Кэш посчитанных строк по scope на сессию + флаг «идёт расчёт» для соседних вкладок */
-_kpi2.rankCache = _kpi2.rankCache || { member:null, team:null, project:null };
-_kpi2.rankLoading = _kpi2.rankLoading || {};
-
-window._kpi2RankAvatarHTML = (r) => r.avatarUrl && /^https?:\/\//i.test(r.avatarUrl)
-  ? `<div class="kpi2-rank-av"><img src="${r.avatarUrl}" onerror="this.remove()"></div>`
-  : `<div class="kpi2-rank-av" style="color:${r.color||'var(--accent)'}">${r.initials || '?'}</div>`;
-
-window._kpi2RankRowHTML = (r, i, computed) => `
-  <div class="kpi2-rank-row" data-rid="${r.id||''}">
-    <div class="kpi2-rank-n">${i+1}</div>
-    ${_kpi2RankAvatarHTML(r)}
-    <div class="kpi2-rank-nm">
-      <b>${r.name}</b>
-      <span>${r.subtitle||''}</span>
-    </div>
-    <div class="kpi2-rank-score">
-      ${computed ? `
-        <div class="kpi2-rank-stars">${_kpi2Stars(computed.score)}</div>
-        <div class="kpi2-rank-num">${computed.score==null?'—':computed.score}</div>
-        <div class="kpi2-rank-trend ${computed.trend.sign}">${computed.trend.sign==='pos'?'↗':computed.trend.sign==='neg'?'↘':'→'} ${computed.trend.txt}</div>
-      ` : `
-        <div class="kpi2-rank-stars" style="opacity:.35">☆☆☆☆☆</div>
-        <div class="kpi2-rank-num" style="color:var(--txt-3)">…</div>
-        <div class="kpi2-rank-trend flat" style="opacity:.5">…</div>
-      `}
-    </div>
-  </div>`;
-
-window._kpi2FillRanking = async (scope) => {
-  const box = document.getElementById('kpi2-ranking'); if(!box) return;
-  _kpi2.section4Tab = scope;
-  const rows = _kpiScopeRows(scope).slice(0, 20);
-
-  // Шапка + табы всегда одинаковы
-  const headHTML = `
-    <div class="kpi2-card-h">
-      <div class="kpi2-card-t">Кто как работает</div>
-      <div class="kpi2-card-c">оценка 0–100 по операционным метрикам за 30 дней</div>
-    </div>
-    <div class="kpi2-rank-tabs">
-      ${['member','team','project'].map(k => `<div class="kpi2-rank-tab${k===scope?' on':''}" onclick="_kpi2FillRanking('${k}')">${{member:'Сотрудники',team:'Команды',project:'Проекты'}[k]}</div>`).join('')}
-    </div>`;
-
-  if (!rows.length){
-    box.innerHTML = headHTML + `<div class="kpi2-empty">Нет данных для этого уровня</div>`;
+window._kpi3FillPointA = async () => {
+  const target = document.getElementById('kpi3-pointa'); if(!target) return;
+  const cat = _kpi3.category;
+  const rows = _kpiScopeRows(cat);
+  if (!rows.length) {
+    target.innerHTML = `<div class="kpi3-empty">В категории <b>${_kpi3CatLabelOne(cat).toLowerCase()}</b> нет данных.<br/>${cat==='team' ? 'Добавьте команды в модуле «Команды»' : cat==='project' ? 'Добавьте проекты в модуле «Проекты»' : 'Добавьте сотрудников в модуле «Команда»'}.</div>`;
     return;
   }
+  target.innerHTML = _kpi3TilesSkeleton(cat);
+  const to = new Date().toISOString();
+  const from = new Date(Date.now() - 30*86400000).toISOString();
+  const rowVals = await Promise.all(rows.map(r => kpiComputeAll(cat, r.id, from, to).catch(() => ({}))));
+  rows.forEach((r, i) => { _kpi3.rowVals[`${cat}|${r.id}`] = rowVals[i]; });
 
-  // ── Если есть кэш — рендерим МГНОВЕННО, без ожидания расчёта
-  const cached = _kpi2.rankCache[scope];
-  if (cached && cached.length){
-    box.innerHTML = headHTML + `<div class="kpi2-rank-list">${cached.map((e, i) => _kpi2RankRowHTML(e.r, i, e)).join('')}</div>`;
-  } else {
-    // Прогрессивный skeleton — рендерим строки с именем+аватаром сразу, оценка "..." потом
-    box.innerHTML = headHTML + `<div class="kpi2-rank-list">${rows.map((r, i) => _kpi2RankRowHTML(r, i, null)).join('')}</div>`;
-  }
-
-  // Если уже идёт расчёт для этого scope — просто ждём, не запускаем второй раз
-  if (_kpi2.rankLoading[scope]) return;
-  _kpi2.rankLoading[scope] = true;
-
-  try {
-    // Считаем ПРОГРЕССИВНО — каждая строка обновляется как только её оценка готова
-    const enriched = [];
-    await Promise.all(rows.map(async (r, idx) => {
-      const [score, trend] = await Promise.all([_kpi2Score(scope, r.id), _kpi2Trend(scope, r.id)]);
-      const item = { r, score, trend };
-      enriched[idx] = item;
-      // Обновляем строку inline (без пересортировки — сортируем в конце)
-      const listEl = document.querySelector('#kpi2-ranking .kpi2-rank-list');
-      const rowEl = listEl && listEl.querySelector(`[data-rid="${r.id||''}"]`);
-      if (rowEl && _kpi2.section4Tab === scope){
-        rowEl.querySelector('.kpi2-rank-score').innerHTML = `
-          <div class="kpi2-rank-stars">${_kpi2Stars(score)}</div>
-          <div class="kpi2-rank-num">${score==null?'—':score}</div>
-          <div class="kpi2-rank-trend ${trend.sign}">${trend.sign==='pos'?'↗':trend.sign==='neg'?'↘':'→'} ${trend.txt}</div>
-        `;
-      }
-    }));
-    // Все посчитаны — теперь пересортируем и перерендерим итог
-    enriched.sort((a,b) => (b.score ?? -1) - (a.score ?? -1));
-    _kpi2.rankCache[scope] = enriched;
-    if (_kpi2.section4Tab === scope){
-      const listEl = document.querySelector('#kpi2-ranking .kpi2-rank-list');
-      if (listEl) listEl.innerHTML = enriched.map((e, i) => _kpi2RankRowHTML(e.r, i, e)).join('');
-    }
-  } finally {
-    _kpi2.rankLoading[scope] = false;
-  }
+  const agg = {};
+  _kpi3MetricsFor(cat).forEach(k => {
+    const m = KPI_METRICS[k]; if(!m) return;
+    const vals = rowVals.map(rv => _kpi3ExtractVal(rv && rv[k])).filter(v => v != null && !Number.isNaN(v));
+    if (!vals.length) { agg[k] = null; return; }
+    if (m.unit === '%' || m.unit === 'ч' || m.unit === 'ед.') agg[k] = vals.reduce((s,v)=>s+v,0) / vals.length;
+    else agg[k] = vals.reduce((s,v)=>s+v,0);
+  });
+  const tpi = _kpi3TilesGrid(_kpi3TpiKeys, agg, 'TPI · операционные', _kpi3TpiKeys.length);
+  const smm = cat === 'member' ? '' : _kpi3TilesGrid(_kpi3SmmKeys, agg, 'SMM · соцсети', 5);
+  target.innerHTML = `<div class="kpi3-pa-groups">${tpi}${smm}</div>`;
 };
 
-/* Прогрев соседних вкладок в фоне */
-window._kpi2WarmRanking = async () => {
-  const others = ['member','team','project'].filter(s => s !== _kpi2.section4Tab);
-  for (const scope of others){
-    if (_kpi2.rankCache[scope] || _kpi2.rankLoading[scope]) continue;
-    const rows = _kpiScopeRows(scope).slice(0, 20);
-    if (!rows.length) continue;
-    _kpi2.rankLoading[scope] = true;
-    try {
-      const enriched = await Promise.all(rows.map(async r => {
-        const [score, trend] = await Promise.all([_kpi2Score(scope, r.id), _kpi2Trend(scope, r.id)]);
-        return { r, score, trend };
-      }));
-      enriched.sort((a,b) => (b.score ?? -1) - (a.score ?? -1));
-      _kpi2.rankCache[scope] = enriched;
-    } catch(e){}
-    _kpi2.rankLoading[scope] = false;
-  }
-};
-
-/* ═══════════ /KPI v2 ═══════════ */
-
-
-/* ═══════════ KPI v2 · модалки: цель и период ═══════════ */
-
-/* ── Открытие: модалка «Новая цель» ── */
-window.kpi2NewGoal = async () => {
-  const p = _kpi2.period; if(!p){ toast('Сначала создайте период'); return; }
-  _kpi2GoalState = { metric_key:null, scope_kind:'agency', scope_id:null, baseline:null, target:null, minimum:null };
-  await _kpi2OpenGoalModal();
-};
-
-window._kpi2GoalState = null;
-
-window._kpi2OpenGoalModal = async () => {
-  const p = _kpi2.period;
-  // Собираем все применимые метрики
-  const cats = [
-    { k:'ops',       l:'TPI · операционные' },
-    { k:'portfolio', l:'Портфель · агентство' },
-    { k:'smm',       l:'SMM · соцсети' },
-  ];
-  const grouped = { ops:[], portfolio:[], smm:[] };
-  Object.entries(KPI_METRICS).forEach(([k, m]) => { if (grouped[m.category]) grouped[m.category].push([k, m]); });
-
-  // Считаем текущее значение для agency чтобы показать «сейчас»
-  const cur = {};
-  await Promise.all(Object.entries(KPI_METRICS).map(async ([k, m]) => {
-    if (!m.scope.includes('agency')) return;
-    const fn = window[window._kpiFnMap[k]]; if(!fn) return;
-    try { const r = await fn('agency', null); if (r) cur[k] = r.value; } catch(e){}
-  }));
-
-  const fmt = (v, m) => v==null?'—':(m.unit==='%'?Math.round(v*10)/10+'%':m.unit==='ч'?Math.round(v*10)/10+'ч':m.unit==='$'?'$'+Math.round(v):m.unit==='чел'?Math.round(v)+' чел':Math.round(v));
-
-  const metricCardHTML = ([k, m]) => `
-    <div class="kpi2-mc" data-mk="${k}" onclick="_kpi2PickMetric('${k}')">
-      <div class="kpi2-mc-t">${m.label} <span class="kpi2-mc-dir" style="color:${m.dir==='up'?'var(--pos)':'var(--warn)'}">${m.dir==='up'?'↑':'↓'}</span></div>
-      <div class="kpi2-mc-c">сейчас ${fmt(cur[k], m)}</div>
-    </div>`;
-
-  const html = `
-    <div class="kpi2-modal-scrim" onclick="if(event.target===this)_kpi2CloseModal()">
-      <div class="kpi2-modal">
-        <div class="kpi2-modal-h">
-          <div class="kpi2-modal-t">Новая цель</div>
-          <button class="kpi2-modal-x" onclick="_kpi2CloseModal()">✕</button>
-        </div>
-        <div class="kpi2-modal-b">
-          <!-- Шаг 1: что улучшаем -->
-          <div class="kpi2-step">
-            <div class="kpi2-step-l"><b>1.</b> Что улучшаем?</div>
-            ${cats.map(c => grouped[c.k].length ? `
-              <div class="kpi2-mc-group">
-                <div class="kpi2-mc-gt">${c.l}</div>
-                <div class="kpi2-mc-grid">${grouped[c.k].map(metricCardHTML).join('')}</div>
-              </div>
-            ` : '').join('')}
-          </div>
-          <!-- Шаг 2: для кого/чего -->
-          <div class="kpi2-step" id="kpi2-step-scope" style="display:none">
-            <div class="kpi2-step-l"><b>2.</b> Для кого ставим цель?</div>
-            <div class="kpi2-scope-chips" id="kpi2-scope-chips"></div>
-            <div class="kpi2-scope-picker" id="kpi2-scope-picker" style="display:none"></div>
-          </div>
-          <!-- Шаг 3: целевые значения -->
-          <div class="kpi2-step" id="kpi2-step-values" style="display:none">
-            <div class="kpi2-step-l"><b>3.</b> Куда хотим прийти к ${p.end_date}?</div>
-            <div class="kpi2-vals">
-              <div class="kpi2-val">
-                <div class="kpi2-val-l">Стартуем с</div>
-                <div class="kpi2-val-v" id="kpi2-val-base">—</div>
-              </div>
-              <div class="kpi2-val kpi2-val-arrow">→</div>
-              <div class="kpi2-val">
-                <div class="kpi2-val-l">Цель <span class="kpi2-val-hint" id="kpi2-val-hint"></span></div>
-                <input class="kpi2-val-inp" type="text" inputmode="decimal" id="kpi2-inp-target" placeholder="" oninput="_kpi2GoalState.target=this.value;_kpi2UpdatePreview()" />
-              </div>
-            </div>
-            <div class="kpi2-preview" id="kpi2-preview"></div>
-          </div>
-        </div>
-        <div class="kpi2-modal-f">
-          <button class="kpi2-modal-btn ghost" onclick="_kpi2CloseModal()">Отмена</button>
-          <button class="kpi2-modal-btn primary" id="kpi2-save-goal" onclick="_kpi2SaveGoal()" disabled>Создать цель</button>
-        </div>
-      </div>
-    </div>`;
-  const wrap = document.createElement('div');
-  wrap.id = 'kpi2-modal-wrap';
-  wrap.innerHTML = html;
-  document.body.appendChild(wrap);
-  _kpi2GoalState._cur = cur;
-};
-
-window._kpi2CloseModal = () => {
-  const w = document.getElementById('kpi2-modal-wrap'); if(w) w.remove();
-};
-
-window._kpi2PickMetric = async (k) => {
-  _kpi2GoalState.metric_key = k;
-  // Выделяем карточку
-  document.querySelectorAll('.kpi2-mc').forEach(el => el.classList.toggle('on', el.dataset.mk === k));
-  // Показываем следующий шаг
-  const m = KPI_METRICS[k];
-  const scopeStep = document.getElementById('kpi2-step-scope');
-  const valStep = document.getElementById('kpi2-step-values');
-
-  // Собираем chips для доступных scope
-  const scopeLbl = { agency:'🌐 Агентство', member:'👤 Сотрудник', team:'👥 Команда', project:'📦 Проект' };
-  const chipsHTML = m.scope.map(sc =>
-    `<div class="kpi2-scope-chip${sc===_kpi2GoalState.scope_kind?' on':''}" onclick="_kpi2PickScope('${sc}')">${scopeLbl[sc]}</div>`
+window._kpi3TilesSkeleton = (cat) => {
+  const n = cat === 'member' ? 4 : 13;
+  const cells = Array.from({length: n}).map(() =>
+    `<div class="kpi3-tile"><div class="kpi3-skel" style="width:70%;height:11px"></div><div class="kpi3-skel" style="width:60%;height:22px;margin-top:8px"></div><div class="kpi3-skel" style="width:50%;height:9px;margin-top:8px"></div></div>`
   ).join('');
-  document.getElementById('kpi2-scope-chips').innerHTML = chipsHTML;
-  scopeStep.style.display = '';
-
-  // Если у метрики только agency scope — сразу переходим к шагу 3
-  if (m.scope.length === 1 && m.scope[0] === 'agency'){
-    _kpi2GoalState.scope_kind = 'agency';
-    _kpi2GoalState.scope_id = null;
-  } else if (!m.scope.includes(_kpi2GoalState.scope_kind)){
-    _kpi2GoalState.scope_kind = m.scope[0];
-    _kpi2GoalState.scope_id = null;
-  }
-  await _kpi2PickScope(_kpi2GoalState.scope_kind);
-  valStep.style.display = '';
+  return `<div class="kpi3-tiles" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">${cells}</div>`;
 };
 
-window._kpi2PickScope = async (sc) => {
-  _kpi2GoalState.scope_kind = sc;
-  _kpi2GoalState.scope_id = null;
-  document.querySelectorAll('.kpi2-scope-chip').forEach(el => el.classList.toggle('on', el.textContent.includes({agency:'Агентство',member:'Сотрудник',team:'Команда',project:'Проект'}[sc])));
-
-  // Показать picker если не agency
-  const picker = document.getElementById('kpi2-scope-picker');
-  if (sc === 'agency'){
-    picker.style.display = 'none';
-  } else {
-    const rows = _kpiScopeRows(sc);
-    if (!rows.length){
-      picker.style.display = '';
-      picker.innerHTML = `<div class="kpi2-empty" style="padding:16px;text-align:left">Нет доступных ${sc==='member'?'сотрудников':sc==='team'?'команд':'проектов'}</div>`;
-      return;
-    }
-    picker.style.display = '';
-    picker.innerHTML = `
-      <select class="kpi2-scope-sel" onchange="_kpi2GoalState.scope_id=this.value;_kpi2UpdateBaseline()">
-        <option value="">— выберите —</option>
-        ${rows.map(r => `<option value="${r.id}">${r.name}${r.subtitle?' · '+r.subtitle:''}</option>`).join('')}
-      </select>`;
-  }
-  await _kpi2UpdateBaseline();
-};
-
-window._kpi2UpdateBaseline = async () => {
-  const st = _kpi2GoalState;
-  const m = KPI_METRICS[st.metric_key];
-  const fn = window[window._kpiFnMap[st.metric_key]];
-  let base = null;
-  if (fn && (st.scope_kind === 'agency' || st.scope_id)){
-    try { const r = await fn(st.scope_kind, st.scope_id); if (r) base = r.value; } catch(e){}
-  }
-  st.baseline = base;
-  const fmt = (v) => v==null?'—':(m.unit==='%'?Math.round(v*10)/10+'%':m.unit==='ч'?Math.round(v*10)/10+'ч':m.unit==='$'?'$'+Math.round(v):m.unit==='чел'?Math.round(v)+' чел':Math.round(v));
-  const bl = document.getElementById('kpi2-val-base'); if(bl) bl.textContent = fmt(base);
-  // Подсказка
-  const suggested = base != null ? kpiSuggestTarget(st.metric_key, base) : null;
-  const hint = document.getElementById('kpi2-val-hint');
-  const inp = document.getElementById('kpi2-inp-target');
-  if (hint) hint.textContent = suggested!=null ? `(рекомендуем ${fmt(suggested)})` : '';
-  if (inp) inp.placeholder = suggested!=null ? String(suggested) : '';
-  _kpi2UpdatePreview();
-};
-
-window._kpi2UpdatePreview = () => {
-  const st = _kpi2GoalState;
-  const m = KPI_METRICS[st.metric_key];
-  const rawT = String(st.target||'').replace(',','.');
-  const tgt = rawT==''?null:Number(rawT);
-  const btn = document.getElementById('kpi2-save-goal');
-  const canSave = st.metric_key && (st.scope_kind==='agency' || st.scope_id) && tgt!=null && !isNaN(tgt) && st.baseline!=null;
-  if (btn) btn.disabled = !canSave;
-
-  const preview = document.getElementById('kpi2-preview'); if(!preview) return;
-  if (!canSave){ preview.innerHTML = ''; return; }
-  const scopeLbl = { agency:'агентства', member:'сотрудника', team:'команды', project:'проекта' }[st.scope_kind];
-  const scopeName = st.scope_id ? (_kpiScopeRows(st.scope_kind).find(r=>r.id===st.scope_id)||{}).name : '';
-  const fmt = v => v==null?'—':(m.unit==='%'?Math.round(v*10)/10+'%':m.unit==='ч'?Math.round(v*10)/10+'ч':m.unit==='$'?'$'+Math.round(v):m.unit==='чел'?Math.round(v)+' чел':Math.round(v));
-  const delta = tgt - st.baseline;
-  const dir = m.dir==='up' ? (delta>0?'вырастет':'снизится') : (delta<0?'снизится':'вырастет');
-  preview.innerHTML = `
-    <div class="kpi2-preview-t">Резюме цели</div>
-    <div class="kpi2-preview-b">
-      К <b>${_kpi2.period.end_date}</b> метрика <b>«${m.label}»</b>${scopeName?` для ${scopeLbl} <b>${scopeName}</b>`:` ${scopeLbl}`}
-      должна ${dir} с <b>${fmt(st.baseline)}</b> до <b>${fmt(tgt)}</b>
-      ${m.unit==='%' ? '' : ` (Δ ${delta>0?'+':''}${fmt(delta)})`}
-    </div>`;
-};
-
-window._kpi2SaveGoal = async () => {
-  const st = _kpi2GoalState;
-  const raw = String(st.target||'').replace(',','.').replace(/[^\d.\-]/g,'');
-  let target = Number(raw);
-  const m = KPI_METRICS[st.metric_key];
-  if (m.unit === '%'){ target = Math.max(0, Math.min(100, target)); }
-  const row = {
-    period_id: _kpi2.period.id,
-    scope_kind: st.scope_kind,
-    scope_id: st.scope_id,
-    metric_key: st.metric_key,
-    baseline: st.baseline,
-    target: target,
-  };
-  const saved = await kpiUpsertTarget(row);
-  if (!saved){ toast('Не удалось сохранить'); return; }
-  _kpi2CloseModal();
-  if (typeof toast==='function') toast('Цель создана');
-  // Сразу перерисовываем секцию с целями и подсвечиваем новую
-  await _kpi2FillGoals();
-  const goalsBox = document.getElementById('kpi2-goals');
-  if (goalsBox){
-    goalsBox.scrollIntoView({behavior:'smooth', block:'center'});
-    setTimeout(() => {
-      const cards = goalsBox.querySelectorAll('.kpi2-goal');
-      const last = cards[cards.length-1];
-      if (last){ last.classList.add('kpi2-just-added'); setTimeout(() => last.classList.remove('kpi2-just-added'), 2000); }
-    }, 300);
-  }
-};
-
-/* ─────── Модалка «Настройка периода» ─────── */
-window.kpi2OpenPeriodMgr = async () => {
-  _kpi2.periods = await kpiFetchPeriods({ limit: 30 });
-  const html = `
-    <div class="kpi2-modal-scrim" onclick="if(event.target===this)_kpi2CloseModal()">
-      <div class="kpi2-modal kpi2-modal-wide">
-        <div class="kpi2-modal-h">
-          <div class="kpi2-modal-t">Периоды KPI</div>
-          <button class="kpi2-modal-x" onclick="_kpi2CloseModal()">✕</button>
-        </div>
-        <div class="kpi2-modal-b">
-          <div class="kpi2-step">
-            <div class="kpi2-step-l">Создать новый</div>
-            <div class="kpi2-newp">
-              <input id="kpi2-np-name" class="kpi2-val-inp" placeholder="Название (напр. Август 2026)" />
-              <div class="kpi2-newp-dates">
-                <div><div class="kpi2-val-l">С</div>${_kpi2DateField("kpi2-np-from", new Date().toISOString().slice(0,10))}</div>
-                <div><div class="kpi2-val-l">По</div>${_kpi2DateField("kpi2-np-to",   new Date(Date.now()+30*86400000).toISOString().slice(0,10))}</div>
-                <div><div class="kpi2-val-l">Окно базы, дней</div><input id="kpi2-np-bw" type="number" min="7" max="180" step="1" class="kpi2-val-inp" value="30" style="width:80px" /></div>
-              </div>
-              <button class="kpi2-modal-btn primary" onclick="_kpi2CreatePeriod()">Создать</button>
+window._kpi3TilesGrid = (keys, agg, title, cols) => `
+  <div>
+    <div class="kpi3-pa-group-t">${title}</div>
+    <div class="kpi3-tiles" style="grid-template-columns:repeat(${cols}, minmax(0, 1fr))">
+      ${keys.map(k => {
+        const m = KPI_METRICS[k]; const v = agg[k];
+        const empty = v == null;
+        const fmt = empty ? '—' : _kpi3Fmt(v, m.unit);
+        const norm = empty ? null : kpiNormalize(k, v);
+        const cls = empty ? 'empty' : (norm == null ? '' : (norm >= 70 ? 'pos' : norm >= 40 ? 'warn' : 'neg'));
+        return `
+          <div class="kpi3-tile ${cls}" title="${_kpi3Esc(m.formula)}">
+            <div class="kpi3-tile-l">${m.label}</div>
+            <div class="kpi3-tile-v">${fmt}</div>
+            ${empty ? '' : `<div class="kpi3-tile-bar"><div class="kpi3-tile-bar-f" style="width:${norm||0}%"></div></div>`}
+            <div class="kpi3-tile-sub">
+              <span>${empty ? 'мало данных' : (m.dir === 'up' ? '↑ лучше выше' : '↓ лучше ниже')}</span>
+              ${!empty && norm != null ? `<span>${norm}/100</span>` : ''}
             </div>
           </div>
-          <div class="kpi2-step">
-            <div class="kpi2-step-l">Существующие</div>
-            <div class="kpi2-plist">
-              ${_kpi2.periods.map(p => {
-                const badge = { active:['var(--pos)','активный'], planning:['var(--violet)','планирование'], closed:['var(--txt-3)','закрыт'] }[p.status] || ['var(--txt-3)', p.status];
-                return `
-                  <div class="kpi2-prow">
-                    <div class="kpi2-prow-b">
-                      <b>${p.name}</b>
-                      <span>${p.start_date} → ${p.end_date} · окно базы ${p.baseline_window_days} дн.</span>
-                    </div>
-                    <div class="kpi2-prow-s" style="color:${badge[0]}">● ${badge[1]}</div>
-                    <div class="kpi2-prow-a">
-                      ${p.status==='planning'?`<button class="kpi2-prow-btn" onclick="_kpi2ActivatePeriod('${p.id}')">Активировать</button>`:''}
-                      ${p.status==='active'?`<button class="kpi2-prow-btn" onclick="_kpi2ClosePeriod('${p.id}')">Закрыть</button>`:''}
-                    </div>
-                  </div>`;
-              }).join('') || '<div class="kpi2-empty" style="text-align:left">Пока нет периодов</div>'}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  const wrap = document.createElement('div');
-  wrap.id = 'kpi2-modal-wrap';
-  wrap.innerHTML = html;
-  document.body.appendChild(wrap);
-};
-
-window._kpi2CreatePeriod = async () => {
-  const name = document.getElementById('kpi2-np-name').value.trim();
-  const start = document.getElementById('kpi2-np-from').value;
-  const end   = document.getElementById('kpi2-np-to').value;
-  const bw    = parseInt(document.getElementById('kpi2-np-bw').value, 10) || 30;
-  if (!name){ toast('Введите название'); return; }
-  if (!start || !end || start > end){ toast('Проверьте даты'); return; }
-  const row = await kpiCreatePeriod({ name, kind:'month', start_date:start, end_date:end, baseline_window_days:bw });
-  if (row){ toast('Период создан'); _kpi2CloseModal(); _kpi2.period = row; renderKPI(); }
-};
-
-window._kpi2ActivatePeriod = async (id) => {
-  if (!confirm('Активировать период? После этого база фиксируется.')) return;
-  await kpiActivatePeriod(id);
-  _kpi2CloseModal(); renderKPI();
-};
-
-window._kpi2ClosePeriod = async (id) => {
-  if (!confirm('Закрыть период? Итоги останутся, но новые данные учитываться не будут.')) return;
-  await kpiClosePeriod(id);
-  _kpi2CloseModal(); renderKPI();
-};
-
-/* Хук в верхнюю панель — шестерёнка рядом с периодом */
-const _kpi2OrigFillTopbar = window._kpi2FillTopbar;
-window._kpi2FillTopbar = () => {
-  _kpi2OrigFillTopbar();
-  const bar = document.querySelector('.kpi2-topbar-r');
-  if (bar && !bar.querySelector('.kpi2-period-cog')){
-    const cog = document.createElement('button');
-    cog.className = 'kpi2-help-btn kpi2-period-cog';
-    cog.title = 'Настроить периоды';
-    cog.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>';
-    cog.onclick = kpi2OpenPeriodMgr;
-    bar.insertBefore(cog, bar.children[bar.children.length - 1]);
-  }
-};
-
-/* Улучшенная карточка цели: показывает scope */
-const _kpi2OrigFillGoals = window._kpi2FillGoals;
-window._kpi2FillGoals = async () => {
-  const box = document.getElementById('kpi2-goals'); if(!box) return;
-  const p = _kpi2.period;
-  if (!p){ box.innerHTML = `<div class="kpi2-card-h"><div class="kpi2-card-t">Мои цели</div></div><div class="kpi2-issues-none">Сначала создайте период — тогда сможете задать цели.</div>`; return; }
-
-  // Тянем ВСЕ цели периода — по всем scope
-  const allTargets = [];
-  for (const sc of ['agency','member','team','project']){
-    const rows = await kpiFetchTargets(p.id, { scope_kind: sc });
-    rows.filter(t => t.target != null).forEach(t => allTargets.push(t));
-  }
-  const now = Date.now();
-  const startMs = new Date(p.start_date+'T00:00:00').getTime();
-  const endMs   = new Date(p.end_date  +'T23:59:59').getTime();
-  const pctTime = 100 * (now - startMs) / Math.max(1, endMs - startMs);
-
-  const nameFor = (sc, id) => {
-    if (sc === 'agency') return 'Агентство';
-    const r = (_kpiScopeRows(sc) || []).find(x => x.id === id);
-    return r ? r.name : id;
-  };
-  const scopeLbl = { agency:'🌐', member:'👤', team:'👥', project:'📦' };
-
-  const cardHTML = async (t) => {
-    const M = KPI_METRICS[t.metric_key]; if(!M) return '';
-    const fn = window[window._kpiFnMap[t.metric_key]];
-    let cur = t.baseline;
-    try { if (fn){ const r = await fn(t.scope_kind, t.scope_id); if(r && r.value!=null) cur = r.value; } } catch(e){}
-    const total = (t.target || 0) - (t.baseline || 0);
-    const done  = (cur || 0) - (t.baseline || 0);
-    const progress = total === 0 ? (cur >= t.target ? 100 : 0) : Math.max(0, Math.min(100, Math.round(100*done/total)));
-    const onTrack = progress >= pctTime - 10;
-    const behind = progress < pctTime - 25;
-    const cls = onTrack ? 'pos' : behind ? 'neg' : 'warn';
-    const status = onTrack ? '✓ в темпе' : behind ? '⚠ отстаём' : '~ идём медленно';
-    const fmt = v => v==null?'—':(M.unit==='%'?Math.round(v*10)/10+'%':M.unit==='ч'?Math.round(v*10)/10+'ч':M.unit==='$'?'$'+Math.round(v):Math.round(v));
-    return `
-      <div class="kpi2-goal ${cls}">
-        <div class="kpi2-goal-h">
-          <div class="kpi2-goal-t">${M.label}</div>
-          <div class="kpi2-goal-scope" title="${{agency:'Агентство',member:'Сотрудник',team:'Команда',project:'Проект'}[t.scope_kind]}">${scopeLbl[t.scope_kind]} ${nameFor(t.scope_kind, t.scope_id)}</div>
-        </div>
-        <div class="kpi2-goal-v">
-          <span class="kpi2-goal-cur">${fmt(cur)}</span>
-          <span class="kpi2-goal-arrow">→</span>
-          <span class="kpi2-goal-tgt">${fmt(t.target)}</span>
-        </div>
-        <div class="kpi2-goal-bar"><div class="kpi2-goal-fill" style="width:${progress}%"></div><div class="kpi2-goal-mark" style="left:${Math.round(pctTime)}%"></div></div>
-        <div class="kpi2-goal-hint">
-          <span>прошло ${Math.round(pctTime)}% времени · пройдено ${progress}%</span>
-          <span class="kpi2-goal-status">${status}</span>
-        </div>
-        <button class="kpi2-goal-del" title="Удалить цель" onclick="_kpi2DelGoal('${t.id}')">✕</button>
-      </div>`;
-  };
-
-  const cards = await Promise.all(allTargets.map(cardHTML));
-  const canEdit = kpiCan('set_target', 'agency', null);
-  box.innerHTML = `
-    <div class="kpi2-card-h">
-      <div class="kpi2-card-t">Мои цели · ${p.name}</div>
-      <div class="kpi2-card-c">до ${p.end_date} · прошло ${Math.round(pctTime)}%</div>
-    </div>
-    ${cards.length ? `<div class="kpi2-goals-list">${cards.join('')}</div>` : `<div class="kpi2-issues-none">Пока не задано ни одной цели. Задайте первую — увидим прогресс.</div>`}
-    ${canEdit ? `<button class="kpi2-add-goal" onclick="kpi2NewGoal()">+ Добавить цель</button>` : ''}
-  `;
-};
-
-window._kpi2DelGoal = async (id) => {
-  if(!confirm('Удалить цель?')) return;
-  if(!SB) return;
-  await SB.from('kpi_targets').delete().eq('id', id);
-  toast('Цель удалена');
-  _kpi2FillGoals();
-};
-
-/* ═══════════ /KPI v2 · модалки ═══════════ */
-
-
-
-
-/* ═══════════ KPI v2 · кастомный date picker ═══════════ */
-window._kpi2DP = window._kpi2DP || { view: null, target: null };
-
-/* Помощник: HTML для инпута-даты с кастомным виджетом */
-window._kpi2DateField = (id, value) => {
-  const v = value || new Date().toISOString().slice(0, 10);
-  return `
-    <input type="hidden" id="${id}" value="${v}">
-    <button type="button" class="kpi2-dp-btn" id="${id}-btn" onclick="_kpi2DPOpen('${id}', event)">
-      <span class="kpi2-dp-txt" id="${id}-txt">${_kpi2FmtDate(v)}</span>
-      <svg class="kpi2-dp-ic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-    </button>`;
-};
-
-window._kpi2FmtDate = (isoStr) => {
-  if (!isoStr) return '—';
-  const d = new Date(isoStr + 'T00:00:00');
-  if (isNaN(d.getTime())) return '—';
-  const MO = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-  return `${d.getDate()} ${MO[d.getMonth()]} ${d.getFullYear()}`;
-};
-
-window._kpi2DPOpen = (targetId, evt) => {
-  evt && evt.stopPropagation && evt.stopPropagation();
-  _kpi2DPClose();   // закрыть если уже открыт
-  const hidden = document.getElementById(targetId); if(!hidden) return;
-  const btn = document.getElementById(targetId + '-btn'); if(!btn) return;
-  const cur = hidden.value || new Date().toISOString().slice(0, 10);
-  const [y, m] = cur.split('-').map(Number);
-  _kpi2DP = { view: { year: y, month: m - 1 }, target: targetId };
-
-  const popup = document.createElement('div');
-  popup.className = 'kpi2-dp-pop';
-  popup.id = 'kpi2-dp-pop';
-  popup.innerHTML = _kpi2DPGridHTML();
-  document.body.appendChild(popup);
-
-  // Позиционирование под кнопкой
-  const rect = btn.getBoundingClientRect();
-  const pw = 288, ph = 320;
-  let left = rect.left;
-  let top  = rect.bottom + 8;
-  if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
-  if (top + ph > window.innerHeight - 12) top = rect.top - ph - 8;
-  popup.style.left = left + 'px';
-  popup.style.top  = top + 'px';
-
-  requestAnimationFrame(() => popup.classList.add('open'));
-
-  // Клик снаружи → закрыть
-  setTimeout(() => {
-    document.addEventListener('mousedown', _kpi2DPOutside, true);
-    document.addEventListener('keydown', _kpi2DPEsc);
-  }, 0);
-};
-
-window._kpi2DPOutside = (e) => {
-  const pop = document.getElementById('kpi2-dp-pop');
-  if (pop && !pop.contains(e.target)) _kpi2DPClose();
-};
-window._kpi2DPEsc = (e) => { if (e.key === 'Escape') _kpi2DPClose(); };
-
-window._kpi2DPClose = () => {
-  const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.remove();
-  document.removeEventListener('mousedown', _kpi2DPOutside, true);
-  document.removeEventListener('keydown', _kpi2DPEsc);
-};
-
-window._kpi2DPGridHTML = () => {
-  const { year, month } = _kpi2DP.view;
-  const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  const yearOptions = [];
-  const nowY = new Date().getFullYear();
-  for (let y = nowY - 3; y <= nowY + 5; y++) yearOptions.push(y);
-
-  // Выбранная и «сегодня»
-  const hidden = document.getElementById(_kpi2DP.target);
-  const selected = hidden && hidden.value ? hidden.value : null;
-  const todayISO = new Date().toISOString().slice(0, 10);
-
-  // Строим сетку 6×7
-  const first = new Date(year, month, 1);
-  const startWeekday = (first.getDay() + 6) % 7;   // Пн = 0
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells = [];
-  // Дни предыдущего месяца
-  for (let i = startWeekday - 1; i >= 0; i--){
-    const d = new Date(year, month, -i);
-    cells.push({ d: d.getDate(), iso: _kpi2ISO(d), muted: true });
-  }
-  // Текущий месяц
-  for (let d = 1; d <= daysInMonth; d++){
-    const dt = new Date(year, month, d);
-    cells.push({ d, iso: _kpi2ISO(dt), muted: false });
-  }
-  // Дополнить до 42 ячеек
-  while (cells.length < 42){
-    const last = cells[cells.length - 1];
-    const dt = new Date(last.iso + 'T00:00:00'); dt.setDate(dt.getDate() + 1);
-    cells.push({ d: dt.getDate(), iso: _kpi2ISO(dt), muted: true });
-  }
-
-  return `
-    <div class="kpi2-dp-h">
-      <button class="kpi2-dp-nav" onclick="_kpi2DPShift(-1)" title="Предыдущий месяц"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <div class="kpi2-dp-title">
-        <select class="kpi2-dp-sel" onchange="_kpi2DPSetMonth(this.value)">
-          ${monthNames.map((n, i) => `<option value="${i}"${i===month?' selected':''}>${n}</option>`).join('')}
-        </select>
-        <select class="kpi2-dp-sel" onchange="_kpi2DPSetYear(this.value)">
-          ${yearOptions.map(y => `<option value="${y}"${y===year?' selected':''}>${y}</option>`).join('')}
-        </select>
-      </div>
-      <button class="kpi2-dp-nav" onclick="_kpi2DPShift(1)" title="Следующий месяц"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></button>
-    </div>
-    <div class="kpi2-dp-wd">
-      ${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(w => `<div class="kpi2-dp-w">${w}</div>`).join('')}
-    </div>
-    <div class="kpi2-dp-grid">
-      ${cells.map(c => {
-        const cls = [
-          'kpi2-dp-c',
-          c.muted ? 'muted' : '',
-          c.iso === selected ? 'sel' : '',
-          c.iso === todayISO ? 'today' : '',
-        ].filter(Boolean).join(' ');
-        return `<button class="${cls}" onclick="_kpi2DPPick('${c.iso}')">${c.d}</button>`;
+        `;
       }).join('')}
     </div>
-    <div class="kpi2-dp-f">
-      <button class="kpi2-dp-tf" onclick="_kpi2DPPick('${todayISO}')">Сегодня</button>
-      <button class="kpi2-dp-tf" onclick="_kpi2DPClose()">Закрыть</button>
-    </div>`;
+  </div>
+`;
+
+window._kpi3FillGoals = async () => {
+  const target = document.getElementById('kpi3-goals'); if(!target) return;
+  if (!_kpi3.period) {
+    target.innerHTML = `<div class="kpi3-empty"><b>Нет активного периода.</b><br/>Создайте период, чтобы ставить цели.<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewPeriod()">+ Период</button></div>`;
+    return;
+  }
+  target.innerHTML = '<div class="kpi3-loading">Загружаем цели…</div>';
+  const allGoals = await kpiFetchTargets(_kpi3.period.id, { scope_kind: _kpi3.category });
+  _kpi3.goals = allGoals;
+  if (!allGoals.length) {
+    target.innerHTML = `<div class="kpi3-empty"><b>Ни одной цели на период.</b><br/>Начните с одной — что важно улучшить в первую очередь?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Первая цель</button></div>`;
+    return;
+  }
+  const goals = _kpi3.category === 'member' ? allGoals.filter(g => (KPI_METRICS[g.metric_key]||{}).category !== 'smm') : allGoals;
+  const cat = _kpi3.category;
+  const rows = _kpiScopeRows(cat);
+  const rowById = Object.fromEntries(rows.map(r => [r.id, r]));
+  const to = new Date().toISOString();
+  const from = new Date(Date.now() - 30*86400000).toISOString();
+  const uniqRowIds = [...new Set(goals.map(g => g.scope_id).filter(Boolean))];
+  await Promise.all(uniqRowIds.map(async rid => {
+    const cacheKey = `${cat}|${rid}`;
+    if (!_kpi3.rowVals[cacheKey]) _kpi3.rowVals[cacheKey] = await kpiComputeAll(cat, rid, from, to).catch(() => ({}));
+  }));
+  target.innerHTML = `<div class="kpi3-goals-list">${goals.map(g => _kpi3GoalCardHTML(g, rowById[g.scope_id])).join('')}</div>`;
 };
 
-window._kpi2ISO = (dt) => {
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, '0');
-  const d = String(dt.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+window._kpi3GoalStatus = (progress, daysLeft, endDate, startDate) => {
+  if (!endDate || !startDate) return { cls:'', label:'—' };
+  const total = (new Date(endDate) - new Date(startDate)) / 86400000;
+  const spent = Math.max(0, total - (daysLeft || 0));
+  const expectedProgress = total > 0 ? (spent / total) * 100 : 0;
+  const gap = progress - expectedProgress;
+  if (progress >= 100)  return { cls:'pos', label:'✓ достигли' };
+  if (gap >= -5)        return { cls:'pos', label:'✓ в темпе' };
+  if (gap >= -20)       return { cls:'warn', label:'⚠ отстаём' };
+  return { cls:'neg', label:'✕ проваливаем' };
 };
 
-window._kpi2DPShift = (delta) => {
-  const v = _kpi2DP.view;
-  v.month += delta;
-  if (v.month < 0){ v.month = 11; v.year--; }
-  if (v.month > 11){ v.month = 0; v.year++; }
-  const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.innerHTML = _kpi2DPGridHTML();
+window._kpi3GoalCardHTML = (g, row) => {
+  const m = KPI_METRICS[g.metric_key]; if(!m) return '';
+  const target = Number(g.target || 0);
+  const baseline = Number(g.baseline || 0);
+  const cacheVal = _kpi3.rowVals[`${_kpi3.category}|${g.scope_id}`];
+  const curV = cacheVal ? _kpi3ExtractVal(cacheVal[g.metric_key]) : null;
+  const total = m.dir === 'up' ? (target - baseline) : (baseline - target);
+  const done = curV == null ? 0 : (m.dir === 'up' ? curV - baseline : baseline - curV);
+  const progress = total === 0 ? 0 : Math.max(0, Math.min(100, (done / total) * 100));
+  const endDate = _kpi3.period && _kpi3.period.end_date ? new Date(_kpi3.period.end_date) : null;
+  const startDate = _kpi3.period && _kpi3.period.start_date ? new Date(_kpi3.period.start_date) : null;
+  const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - new Date()) / 86400000)) : null;
+  const status = _kpi3GoalStatus(progress, daysLeft, endDate, startDate);
+  const isExpanded = _kpi3.expandedGoalId === g.id;
+  const rowName = row ? row.name : '—';
+  const rowSub = row ? (row.subtitle || '') : '';
+  const rawMap = g.action_plan;
+  const map = Array.isArray(rawMap) ? rawMap : (typeof rawMap === 'string' ? _kpi3TryParseJson(rawMap, []) : []);
+  return `
+    <div class="kpi3-goal ${status.cls} ${isExpanded ? 'expanded' : ''}" data-gid="${g.id}">
+      <div class="kpi3-goal-head" onclick="_kpi3ToggleGoal('${g.id}')">
+        <div class="kpi3-goal-info">
+          <div class="kpi3-goal-title">
+            <span class="kpi3-goal-metric">${m.label}</span>
+            <span class="kpi3-goal-row" title="${_kpi3Esc(rowName)} ${rowSub ? '· '+_kpi3Esc(rowSub) : ''}">· ${_kpi3Esc(rowName)}</span>
+          </div>
+          <div class="kpi3-goal-values">
+            <span class="kpi3-goal-cur">${curV != null ? _kpi3Fmt(curV, m.unit) : '—'}</span>
+            <span class="kpi3-goal-arrow">▶</span>
+            <span class="kpi3-goal-tgt">${_kpi3Fmt(target, m.unit)}</span>
+          </div>
+        </div>
+        <div class="kpi3-goal-progress">
+          <div class="kpi3-goal-bar"><div class="kpi3-goal-fill" style="width:${progress}%"></div></div>
+          <div class="kpi3-goal-meta">
+            <span class="kpi3-goal-pct">${Math.round(progress)}%</span>
+            <span class="kpi3-goal-status">${status.label}</span>
+            ${daysLeft != null ? `<span class="kpi3-goal-days">осталось ${daysLeft} дн.</span>` : ''}
+          </div>
+        </div>
+        <div class="kpi3-goal-toggle">${isExpanded ? '−' : '+'}</div>
+      </div>
+      ${isExpanded ? _kpi3RPMHTML(g, m, target, curV, rowName, map) : ''}
+    </div>
+  `;
 };
-window._kpi2DPSetMonth = (m) => { _kpi2DP.view.month = +m; const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.innerHTML = _kpi2DPGridHTML(); };
-window._kpi2DPSetYear  = (y) => { _kpi2DP.view.year  = +y; const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.innerHTML = _kpi2DPGridHTML(); };
 
-window._kpi2DPPick = (iso) => {
-  const targetId = _kpi2DP.target; if(!targetId) return;
-  const hidden = document.getElementById(targetId);
-  const txt = document.getElementById(targetId + '-txt');
-  if (hidden) hidden.value = iso;
-  if (txt) txt.textContent = _kpi2FmtDate(iso);
-  _kpi2DPClose();
+window._kpi3ToggleGoal = (gid) => {
+  _kpi3.expandedGoalId = _kpi3.expandedGoalId === gid ? null : gid;
+  _kpi3FillGoals();
 };
 
-/* ═══════════ /KPI v2 · date picker ═══════════ */
+window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => `
+  <div class="kpi3-rpm" onclick="event.stopPropagation()">
+    <div class="kpi3-rpm-row">
+      <div class="kpi3-rpm-icon">🎯</div>
+      <div>
+        <div class="kpi3-rpm-label">Result · результат</div>
+        <div class="kpi3-rpm-val">${_kpi3Esc(m.label)} у «${_kpi3Esc(rowName)}» → <b style="color:var(--accent)">${_kpi3Fmt(target, m.unit)}</b> к ${_kpi3FmtDate(_kpi3.period && _kpi3.period.end_date)}</div>
+      </div>
+    </div>
+    <div class="kpi3-rpm-row">
+      <div class="kpi3-rpm-icon">💡</div>
+      <div>
+        <div class="kpi3-rpm-label">Purpose · зачем нам это</div>
+        <textarea class="kpi3-rpm-textarea" placeholder="Почему эта цель важна? Что она нам даст: доверие клиентов, MRR, репутация, снижение оттока…" onblur="_kpi3SavePurpose('${g.id}', this.value)">${_kpi3Esc(g.purpose || '')}</textarea>
+      </div>
+    </div>
+    <div class="kpi3-rpm-row">
+      <div class="kpi3-rpm-icon">🚀</div>
+      <div>
+        <div class="kpi3-rpm-label">Massive Action Plan · что мы делаем</div>
+        <div class="kpi3-rpm-map">
+          ${(map||[]).map((step, i) => `
+            <div class="kpi3-rpm-step ${step.done ? 'done' : ''}">
+              <label class="kpi3-rpm-cb">
+                <input type="checkbox" ${step.done ? 'checked' : ''} onchange="_kpi3ToggleStep('${g.id}', ${i}, this.checked)">
+                <span class="kpi3-rpm-cbi"></span>
+              </label>
+              <input class="kpi3-rpm-step-text" value="${_kpi3Esc(step.text || '')}" placeholder="Действие…" onblur="_kpi3EditStep('${g.id}', ${i}, this.value)">
+              <button class="kpi3-rpm-del" onclick="_kpi3DelStep('${g.id}', ${i})" title="Удалить">×</button>
+            </div>
+          `).join('')}
+          <button class="kpi3-rpm-add" onclick="_kpi3AddStep('${g.id}')">+ Добавить шаг</button>
+        </div>
+      </div>
+    </div>
+    <div class="kpi3-rpm-footer">
+      <button class="kpi3-btn kpi3-btn-ghost kpi3-btn-sm" onclick="_kpi3EditGoal('${g.id}')">Изменить цель</button>
+      <button class="kpi3-btn kpi3-btn-danger kpi3-btn-sm" onclick="_kpi3DelGoal('${g.id}')">Удалить</button>
+    </div>
+  </div>
+`;
 
+window._kpi3GetGoal = (gid) => (_kpi3.goals || []).find(g => g.id === gid);
+
+window._kpi3SavePurpose = async (gid, val) => {
+  const g = _kpi3GetGoal(gid); if (!g) return;
+  if ((g.purpose || '') === (val || '')) return;
+  g.purpose = val;
+  const { error } = await SB.from('kpi_targets').update({ purpose: val }).eq('id', gid);
+  if (error) { toast('Не удалось сохранить'); console.warn(error); return; }
+};
+
+window._kpi3CurMap = (g) => {
+  const raw = g.action_plan;
+  const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? _kpi3TryParseJson(raw, []) : []);
+  return Array.isArray(arr) ? arr.slice() : [];
+};
+
+window._kpi3SaveMap = async (gid, map) => {
+  const { error } = await SB.from('kpi_targets').update({ action_plan: map }).eq('id', gid);
+  if (error) { toast('Не удалось сохранить план'); console.warn(error); return false; }
+  return true;
+};
+
+window._kpi3AddStep = async (gid) => {
+  const g = _kpi3GetGoal(gid); if (!g) return;
+  const map = _kpi3CurMap(g);
+  map.push({ text: '', done: false });
+  const ok = await _kpi3SaveMap(gid, map);
+  if (ok) { g.action_plan = map; _kpi3FillGoals(); }
+};
+
+window._kpi3EditStep = async (gid, idx, val) => {
+  const g = _kpi3GetGoal(gid); if (!g) return;
+  const map = _kpi3CurMap(g);
+  if (!map[idx]) return;
+  if (map[idx].text === val) return;
+  map[idx].text = val;
+  const ok = await _kpi3SaveMap(gid, map);
+  if (ok) g.action_plan = map;
+};
+
+window._kpi3ToggleStep = async (gid, idx, checked) => {
+  const g = _kpi3GetGoal(gid); if (!g) return;
+  const map = _kpi3CurMap(g);
+  if (!map[idx]) return;
+  map[idx].done = !!checked;
+  const ok = await _kpi3SaveMap(gid, map);
+  if (ok) { g.action_plan = map; _kpi3FillGoals(); }
+};
+
+window._kpi3DelStep = async (gid, idx) => {
+  const g = _kpi3GetGoal(gid); if (!g) return;
+  const map = _kpi3CurMap(g);
+  if (!map[idx]) return;
+  map.splice(idx, 1);
+  const ok = await _kpi3SaveMap(gid, map);
+  if (ok) { g.action_plan = map; _kpi3FillGoals(); }
+};
+
+window._kpi3DelGoal = async (gid) => {
+  if (!confirm('Удалить эту цель и её план?')) return;
+  const { error } = await SB.from('kpi_targets').delete().eq('id', gid);
+  if (error) { toast('Не удалось удалить'); return; }
+  toast('Цель удалена');
+  _kpi3.expandedGoalId = null;
+  _kpi3FillGoals();
+};
+
+window._kpi3EditGoal = (gid) => {
+  const g = _kpi3GetGoal(gid); if (!g) return;
+  _kpi3OpenGoalModal(g);
+};
+
+window._kpi3FillStats = async () => {
+  const target = document.getElementById('kpi3-stats'); if(!target) return;
+  const cat = _kpi3.category;
+  const rows = _kpiScopeRows(cat);
+  if (!rows.length) {
+    target.innerHTML = `<div class="kpi3-empty">Нет данных.</div>`;
+    return;
+  }
+  target.innerHTML = _kpi3StatsSkeleton(rows.length);
+  const to = new Date().toISOString();
+  const from = new Date(Date.now() - 30*86400000).toISOString();
+  const prevFrom = new Date(Date.now() - 60*86400000).toISOString();
+  const prevTo = new Date(Date.now() - 30*86400000).toISOString();
+  const metrics = _kpi3MetricsFor(cat);
+  const score = (rv) => {
+    if (!rv) return null;
+    const norms = metrics.map(k => {
+      const v = _kpi3ExtractVal(rv[k]);
+      return v == null ? null : kpiNormalize(k, v);
+    }).filter(v => v != null);
+    if (!norms.length) return null;
+    return Math.round(norms.reduce((s,v)=>s+v,0) / norms.length);
+  };
+  const scored = await Promise.all(rows.map(async r => {
+    const cacheKey = `${cat}|${r.id}`;
+    const cur = _kpi3.rowVals[cacheKey] || await kpiComputeAll(cat, r.id, from, to).catch(() => ({}));
+    _kpi3.rowVals[cacheKey] = cur;
+    const prev = await kpiComputeAll(cat, r.id, prevFrom, prevTo).catch(() => ({}));
+    return { row: r, score: score(cur), prevScore: score(prev) };
+  }));
+  scored.sort((a,b) => (b.score||-1) - (a.score||-1));
+  target.innerHTML = `<div class="kpi3-stats-list">${scored.map((it, i) => _kpi3StatsRowHTML(it, i+1)).join('')}</div>`;
+};
+
+window._kpi3StatsSkeleton = (n) => Array.from({length: Math.min(n, 8)}).map(() =>
+  `<div class="kpi3-stats-row"><div class="kpi3-skel" style="width:16px;height:12px"></div><div class="kpi3-skel" style="width:36px;height:36px;border-radius:10px"></div><div><div class="kpi3-skel" style="width:60%;height:13px"></div><div class="kpi3-skel" style="width:40%;height:10px;margin-top:5px"></div></div><div class="kpi3-skel" style="width:60px;height:14px"></div><div class="kpi3-skel" style="width:40px;height:18px"></div><div></div></div>`
+).join('') || `<div class="kpi3-loading">Считаем…</div>`;
+
+window._kpi3StatsRowHTML = (it, n) => {
+  const r = it.row;
+  const s = it.score;
+  const cls = s == null ? '' : (s >= 70 ? 'pos' : s >= 40 ? 'warn' : 'neg');
+  const stars = s == null ? 0 : Math.round(s / 20);
+  const starsStr = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+  let trend = '·', trendCls = 'flat';
+  if (s != null && it.prevScore != null) {
+    const d = s - it.prevScore;
+    if (Math.abs(d) < 1) { trend = '·'; trendCls = 'flat'; }
+    else if (d > 0)      { trend = '+' + Math.round(d); trendCls = 'pos'; }
+    else                 { trend = Math.round(d).toString(); trendCls = 'neg'; }
+  }
+  const escInit = _kpi3Esc(r.initials || '?');
+  const avatarHtml = r.avatarUrl
+    ? `<img src="${_kpi3Esc(r.avatarUrl)}" onerror="this.parentElement.textContent='${escInit}'"/>`
+    : escInit;
+  return `
+    <div class="kpi3-stats-row ${cls}" data-rid="${_kpi3Esc(r.id)}">
+      <div class="kpi3-stats-n">#${n}</div>
+      <div class="kpi3-stats-av">${avatarHtml}</div>
+      <div class="kpi3-stats-nm">
+        <b>${_kpi3Esc(r.name)}</b>
+        <span>${_kpi3Esc(r.subtitle || '')}</span>
+      </div>
+      <div class="kpi3-stats-stars">${starsStr}</div>
+      <div class="kpi3-stats-score">${s != null ? s : '—'}<span class="u">/100</span></div>
+      <div class="kpi3-stats-tr ${trendCls}">${trend}</div>
+    </div>
+  `;
+};
+
+window._kpi3NewGoal = () => _kpi3OpenGoalModal(null);
+
+window._kpi3OpenGoalModal = (existing) => {
+  if (!_kpi3.period) { toast('Сначала создайте период'); return; }
+  const cat = _kpi3.category;
+  const rows = _kpiScopeRows(cat);
+  if (!rows.length) { toast(`Сначала добавьте ${_kpi3CatLabelOne(cat).toLowerCase()}`); return; }
+  const metrics = _kpi3MetricsFor(cat);
+  const state = existing ? {
+    scope_id: existing.scope_id, metric_key: existing.metric_key,
+    target: existing.target, baseline: existing.baseline
+  } : {
+    scope_id: rows[0].id, metric_key: metrics[0],
+    target: null, baseline: null
+  };
+  const scrim = document.createElement('div');
+  scrim.className = 'kpi3-scrim';
+  scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
+  scrim.innerHTML = `
+    <div class="kpi3-modal">
+      <div class="kpi3-modal-h">
+        <div class="kpi3-modal-t">${existing ? 'Изменить цель' : 'Новая цель'} · ${_kpi3CatLabelOne(cat)}</div>
+        <button class="kpi3-modal-x" onclick="this.closest('.kpi3-scrim').remove()">×</button>
+      </div>
+      <div class="kpi3-modal-b" id="kpi3-goal-body">
+        <div class="kpi3-field">
+          <div class="kpi3-field-l">${_kpi3CatLabelOne(cat)}</div>
+          <select class="kpi3-select" id="kpi3-goal-scope">
+            ${rows.map(r => `<option value="${_kpi3Esc(r.id)}" ${r.id === state.scope_id ? 'selected' : ''}>${_kpi3Esc(r.name)}${r.subtitle ? ' — ' + _kpi3Esc(r.subtitle) : ''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="kpi3-field">
+          <div class="kpi3-field-l">Метрика</div>
+          <div class="kpi3-mchoice" id="kpi3-goal-metrics">
+            ${metrics.map(k => {
+              const m = KPI_METRICS[k];
+              return `<button type="button" class="kpi3-mopt ${k === state.metric_key ? 'on' : ''}" data-k="${k}" onclick="_kpi3ModalSetMetric(this)">
+                ${m.label}
+                <div class="kpi3-mopt-cat">${m.category === 'ops' ? 'TPI' : m.category === 'smm' ? 'SMM' : m.category} · ${m.dir === 'up' ? '↑' : '↓'}</div>
+              </button>`;
+            }).join('')}
+          </div>
+        </div>
+        <div class="kpi3-field">
+          <div class="kpi3-field-l">Куда идём (цель)</div>
+          <input type="number" class="kpi3-input" id="kpi3-goal-tgt" placeholder="Например, 90" value="${state.target != null ? state.target : ''}" step="any">
+          <div class="kpi3-field-h">К концу периода: ${_kpi3FmtDate(_kpi3.period.end_date)}</div>
+        </div>
+        <div class="kpi3-field">
+          <div class="kpi3-field-l">Стартовая база (Точка А) · опционально</div>
+          <input type="number" class="kpi3-input" id="kpi3-goal-base" placeholder="Пусто = использовать реальное текущее значение" value="${state.baseline != null ? state.baseline : ''}" step="any">
+          <div class="kpi3-field-h">Если оставить пустым, прогресс будет считаться от текущего фактического значения</div>
+        </div>
+      </div>
+      <div class="kpi3-modal-f">
+        <button class="kpi3-btn kpi3-btn-ghost" onclick="this.closest('.kpi3-scrim').remove()">Отмена</button>
+        <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3SubmitGoal('${existing ? existing.id : ''}')">${existing ? 'Сохранить' : 'Создать цель'}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(scrim);
+};
+
+window._kpi3ModalSetMetric = (btn) => {
+  document.querySelectorAll('#kpi3-goal-metrics .kpi3-mopt').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+};
+
+window._kpi3SubmitGoal = async (existingId) => {
+  const scrim = document.querySelector('.kpi3-scrim'); if (!scrim) return;
+  const scopeId = document.getElementById('kpi3-goal-scope').value;
+  const metricBtn = document.querySelector('#kpi3-goal-metrics .kpi3-mopt.on');
+  const metricKey = metricBtn ? metricBtn.dataset.k : null;
+  const tgtVal = parseFloat(document.getElementById('kpi3-goal-tgt').value);
+  const baseInput = document.getElementById('kpi3-goal-base').value;
+  const baseVal = baseInput === '' ? null : parseFloat(baseInput);
+  if (!scopeId || !metricKey || Number.isNaN(tgtVal)) {
+    toast('Заполните scope, метрику и цель');
+    return;
+  }
+  let baseline = baseVal;
+  if (baseline == null || Number.isNaN(baseline)) {
+    const cat = _kpi3.category;
+    const cacheKey = `${cat}|${scopeId}`;
+    let cur = _kpi3.rowVals[cacheKey];
+    if (!cur || cur[metricKey] == null) {
+      const to = new Date().toISOString();
+      const from = new Date(Date.now() - 30*86400000).toISOString();
+      cur = await kpiComputeAll(cat, scopeId, from, to).catch(() => ({}));
+      _kpi3.rowVals[cacheKey] = cur;
+    }
+    baseline = cur ? _kpi3ExtractVal(cur[metricKey]) : null;
+    if (baseline == null) baseline = 0;
+  }
+  const row = {
+    period_id: _kpi3.period.id,
+    scope_kind: _kpi3.category,
+    scope_id: scopeId,
+    metric_key: metricKey,
+    target: tgtVal,
+    baseline: baseline,
+    baseline_locked_at: new Date().toISOString(),
+  };
+  if (existingId) row.id = existingId;
+  const saved = await kpiUpsertTarget(row);
+  if (!saved) return;
+  toast(existingId ? 'Цель обновлена' : 'Цель создана');
+  scrim.remove();
+  _kpi3.expandedGoalId = saved.id;
+  _kpi3FillGoals();
+};
+
+window._kpi3ShowPeriods = () => {
+  const list = _kpi3.periods || [];
+  const scrim = document.createElement('div');
+  scrim.className = 'kpi3-scrim';
+  scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
+  scrim.innerHTML = `
+    <div class="kpi3-modal">
+      <div class="kpi3-modal-h">
+        <div class="kpi3-modal-t">Периоды</div>
+        <button class="kpi3-modal-x" onclick="this.closest('.kpi3-scrim').remove()">×</button>
+      </div>
+      <div class="kpi3-modal-b">
+        ${list.length ? `<div style="display:flex;flex-direction:column;gap:6px">
+          ${list.map(p => `
+            <div style="padding:12px 14px;background:var(--panel-3);border:1px solid ${_kpi3.period && _kpi3.period.id === p.id ? 'var(--accent)' : 'var(--line)'};border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer" onclick="_kpi3PickPeriod('${p.id}')">
+              <div>
+                <div style="font-weight:700;color:var(--txt-1);font-size:13.5px">${_kpi3Esc(p.name || 'Период')}</div>
+                <div style="color:var(--txt-3);font-size:11.5px;margin-top:3px;font-family:var(--mono)">${_kpi3FmtDate(p.start_date)} — ${_kpi3FmtDate(p.end_date)} · ${p.status}</div>
+              </div>
+              ${_kpi3.period && _kpi3.period.id === p.id ? '<div style="color:var(--accent);font-weight:700;font-size:12px">выбран</div>' : ''}
+            </div>
+          `).join('')}
+        </div>` : '<div class="kpi3-empty">Периодов пока нет.</div>'}
+      </div>
+      <div class="kpi3-modal-f">
+        <button class="kpi3-btn kpi3-btn-ghost" onclick="this.closest('.kpi3-scrim').remove()">Закрыть</button>
+        <button class="kpi3-btn kpi3-btn-primary" onclick="this.closest('.kpi3-scrim').remove();_kpi3NewPeriod()">+ Новый период</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(scrim);
+};
+
+window._kpi3PickPeriod = (pid) => {
+  const p = (_kpi3.periods || []).find(x => x.id === pid); if (!p) return;
+  _kpi3.period = p;
+  document.querySelectorAll('.kpi3-scrim').forEach(s => s.remove());
+  _kpi3FillTopbar();
+  _kpi3FillGoals();
+};
+
+window._kpi3NewPeriod = () => {
+  const today = new Date();
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const startDefault = iso(new Date(today.getFullYear(), today.getMonth(), 1));
+  const endDefault = iso(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+  const nameDefault = new Intl.DateTimeFormat('ru', { month:'long', year:'numeric' }).format(today);
+  const scrim = document.createElement('div');
+  scrim.className = 'kpi3-scrim';
+  scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
+  scrim.innerHTML = `
+    <div class="kpi3-modal">
+      <div class="kpi3-modal-h">
+        <div class="kpi3-modal-t">Новый период</div>
+        <button class="kpi3-modal-x" onclick="this.closest('.kpi3-scrim').remove()">×</button>
+      </div>
+      <div class="kpi3-modal-b">
+        <div class="kpi3-field">
+          <div class="kpi3-field-l">Название</div>
+          <input class="kpi3-input" id="kpi3-per-name" value="${_kpi3Esc(nameDefault)}">
+        </div>
+        <div class="kpi3-field">
+          <div class="kpi3-field-l">Тип</div>
+          <select class="kpi3-select" id="kpi3-per-type">
+            <option value="month" selected>Месяц</option>
+            <option value="week">Неделя</option>
+            <option value="quarter">Квартал</option>
+            <option value="custom">Произвольный</option>
+          </select>
+        </div>
+        <div class="kpi3-field" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div class="kpi3-field-l">Начало</div>
+            <input class="kpi3-input" type="date" id="kpi3-per-start" value="${startDefault}" style="color-scheme:dark">
+          </div>
+          <div>
+            <div class="kpi3-field-l">Конец</div>
+            <input class="kpi3-input" type="date" id="kpi3-per-end" value="${endDefault}" style="color-scheme:dark">
+          </div>
+        </div>
+      </div>
+      <div class="kpi3-modal-f">
+        <button class="kpi3-btn kpi3-btn-ghost" onclick="this.closest('.kpi3-scrim').remove()">Отмена</button>
+        <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3SubmitPeriod()">Создать и активировать</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(scrim);
+};
+
+window._kpi3SubmitPeriod = async () => {
+  const name = document.getElementById('kpi3-per-name').value.trim();
+  const type = document.getElementById('kpi3-per-type').value;
+  const start = document.getElementById('kpi3-per-start').value;
+  const end = document.getElementById('kpi3-per-end').value;
+  if (!name || !start || !end) { toast('Заполните все поля'); return; }
+  const created = await kpiCreatePeriod({ name, kind: type, start_date: start, end_date: end });
+  if (!created) return;
+  await kpiActivatePeriod(created.id);
+  toast('Период создан и активирован');
+  document.querySelectorAll('.kpi3-scrim').forEach(s => s.remove());
+  _kpi3.periods = await kpiFetchPeriods({ limit: 10 });
+  _kpi3.period = _kpi3.periods.find(p => p.id === created.id) || _kpi3.periods[0];
+  _kpi3FillTopbar();
+  _kpi3FillGoals();
+};
+
+/* ═══════════ /KPI v3 ═══════════ */
 
 </script>
 <script>
