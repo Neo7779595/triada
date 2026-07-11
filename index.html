@@ -17906,21 +17906,32 @@ window._kpiFilterByScope = async (raw, scopeKind, scopeId) => {
 window.kpiComputeCycleTime = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
   const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
-  // Для каждой задачи, у которой в периоде был переход в done — найти последний прошлый переход в active
-  const byTask = {};
-  f.taskHist.forEach(h => { (byTask[h.task_id] || (byTask[h.task_id]=[])).push(h); });
+  // Правильное «время задачи» = реально трекнутые часы (time_spent), а не wall-clock.
+  // Wall-clock включает выходные / wait / review / блокировки — искажает картину.
+  // Берём задачи, у которых был done-переход в периоде, и их фактический time_spent из tasks.
+  const doneTaskIds = new Set(f.taskHist.filter(h => h.new_status === 'done').map(h => h.task_id));
   const durs = [];
-  Object.entries(byTask).forEach(([tid, hs]) => {
-    hs.sort((a,b) => a.created_at < b.created_at ? -1 : 1);
-    let lastActiveAt = null;
-    for (const h of hs){
-      if (h.new_status === 'active' && h.old_status !== 'done') lastActiveAt = new Date(h.created_at).getTime();
-      else if (h.new_status === 'done' && lastActiveAt){
-        durs.push((new Date(h.created_at).getTime() - lastActiveAt) / 3600000);
-        lastActiveAt = null;
-      }
-    }
+  doneTaskIds.forEach(tid => {
+    const t = raw.byTask[tid]; if (!t) return;
+    const secs = +t.time_spent || 0;
+    if (secs > 0) durs.push(secs / 3600); // → часы
   });
+  // Fallback: если time_spent не трекается, возвращаемся к wall-clock подходу
+  if (!durs.length) {
+    const byTask = {};
+    f.taskHist.forEach(h => { (byTask[h.task_id] || (byTask[h.task_id]=[])).push(h); });
+    Object.entries(byTask).forEach(([tid, hs]) => {
+      hs.sort((a,b) => a.created_at < b.created_at ? -1 : 1);
+      let lastActiveAt = null;
+      for (const h of hs){
+        if (h.new_status === 'active' && h.old_status !== 'done') lastActiveAt = new Date(h.created_at).getTime();
+        else if (h.new_status === 'done' && lastActiveAt){
+          durs.push((new Date(h.created_at).getTime() - lastActiveAt) / 3600000);
+          lastActiveAt = null;
+        }
+      }
+    });
+  }
   const med = _kpiMedian(durs);
   return { value: med==null ? null : Math.round(med*10)/10, sample_size: durs.length, confidence: _kpiConfidence('cycle_time', durs.length) };
 };
@@ -17946,16 +17957,23 @@ window.kpiComputeOnTimeRate = async (scopeKind, scopeId, fromISO, toISO) => {
   return { value: val, sample_size: total, confidence: _kpiConfidence('ontime_rate', total) };
 };
 
-/* ── 3. rework_rate ── */
+/* ── 3. rework_rate — доля УНИКАЛЬНЫХ задач, которые хоть раз вернули ── */
 window.kpiComputeReworkRate = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
   const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
-  // возвраты: old_status IN ('done','review'), new_status = 'active'
-  const rework = f.taskHist.filter(h => (h.old_status === 'done' || h.old_status === 'review') && h.new_status === 'active').length;
-  // уникальные закрытые задачи (у которых был done в периоде)
-  const uniqDone = new Set(f.taskHist.filter(h => h.new_status === 'done').map(h => h.task_id)).size;
-  const val = uniqDone ? Math.round(1000 * rework / uniqDone) / 10 : null;
-  return { value: val, sample_size: uniqDone, confidence: _kpiConfidence('rework_rate', uniqDone), meta:{rework_events:rework} };
+  // Уникальные задачи которые ХОТЯ БЫ РАЗ вернули (не число событий — иначе >100%)
+  const reworkedTasks = new Set();
+  f.taskHist.forEach(h => {
+    if ((h.old_status === 'done' || h.old_status === 'review') && h.new_status === 'active') {
+      reworkedTasks.add(h.task_id);
+    }
+  });
+  // Уникальные закрытые задачи (был done-переход в периоде)
+  const doneTasks = new Set(f.taskHist.filter(h => h.new_status === 'done').map(h => h.task_id));
+  const uniqDone = doneTasks.size;
+  const uniqRework = reworkedTasks.size;
+  const val = uniqDone ? Math.round(1000 * uniqRework / uniqDone) / 10 : null;
+  return { value: val, sample_size: uniqDone, confidence: _kpiConfidence('rework_rate', uniqDone), meta:{unique_rework:uniqRework} };
 };
 
 /* ── 4. throughput_w ── */
@@ -22092,10 +22110,28 @@ window._kpi3FillPointA = async () => {
   const agg = {};
   _kpi3MetricsFor(cat).forEach(k => {
     const m = KPI_METRICS[k]; if(!m) return;
-    const vals = rowVals.map(rv => _kpi3ExtractVal(rv && rv[k])).filter(v => v != null && !Number.isNaN(v));
-    if (!vals.length) { agg[k] = null; return; }
-    if (m.unit === '%' || m.unit === 'ч' || m.unit === 'ед.') agg[k] = vals.reduce((s,v)=>s+v,0) / vals.length;
-    else agg[k] = vals.reduce((s,v)=>s+v,0);
+    const pairs = rowVals.map(rv => ({
+      v: _kpi3ExtractVal(rv && rv[k]),
+      // Вес: для SMM rate — охват проекта, для TPI — 1 (простой mean)
+      w: (m.category === 'smm' && m.unit === '%')
+        ? (rv && rv.smm_reach ? _kpi3ExtractVal(rv.smm_reach) || 0 : 0)
+        : 1
+    })).filter(p => p.v != null && !Number.isNaN(p.v));
+    if (!pairs.length) { agg[k] = null; return; }
+    // SMM rate → reach-weighted mean (если все веса 0 → плоский mean)
+    if (m.category === 'smm' && m.unit === '%') {
+      let sw = 0, sv = 0;
+      pairs.forEach(p => { if (p.w > 0) { sv += p.v * p.w; sw += p.w; } });
+      agg[k] = sw > 0 ? sv / sw : pairs.reduce((s, p) => s + p.v, 0) / pairs.length;
+      return;
+    }
+    // Абсолютные SMM (Reach/Views/Followers/Growth) и Выработка ед. → сумма
+    if (m.category === 'smm' || (m.category === 'ops' && m.unit === 'ед.')) {
+      agg[k] = pairs.reduce((s, p) => s + p.v, 0);
+      return;
+    }
+    // TPI % и Время задачи → mean (лучше медиана но mean прощает)
+    agg[k] = pairs.reduce((s, p) => s + p.v, 0) / pairs.length;
   });
   const tpi = _kpi3TilesGrid(_kpi3TpiKeys, agg, 'TPI · операционные', _kpi3TpiKeys.length);
   const smm = cat === 'member' ? '' : _kpi3TilesGrid(_kpi3SmmKeys, agg, 'SMM · соцсети', 5);
