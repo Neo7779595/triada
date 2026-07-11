@@ -5182,6 +5182,7 @@ button:active{transform:translateY(.5px) scale(.99)}
           <div class="rl">Агентский кабинет</div>
         </div>
       </div>
+      <div id="ag-plan-chip"></div>
     </div>
     <nav class="nav">
       <div class="nav-h">Навигация</div>
@@ -5707,7 +5708,7 @@ let TARIFFS=[
 ];
 function tariffEdit(i){
   const isNew=(i==null);
-  const p=isNew?{name:'',price:'',per:'мес',pop:false,feats:[[1,'До 10 клиентов'],[1,'Все 8 модулей'],[1,'Командные роли'],[0,'White-label бренд'],[0,'API и вебхуки'],[0,'Приоритетная поддержка']]}:TARIFFS[i];
+  const p=isNew?{name:'',price:'',per:'мес',pop:false,limits:{},feats:[[1,'До 10 клиентов'],[1,'Все 8 модулей'],[1,'Командные роли'],[0,'White-label бренд'],[0,'API и вебхуки'],[0,'Приоритетная поддержка']]}:TARIFFS[i];
   const feats=p.feats.map((f,fi)=>`<label class="tf-row"><input type="checkbox" ${f[0]?'checked':''}><input class="tf-lbl" value="${(f[1]||'').replace(/"/g,'&quot;')}"></label>`).join('');
   pd2Open(`<div class="modal" style="max-width:560px">
     <div class="modal-h"><h3>${isNew?'Новый тариф':'Тариф · '+p.name}</h3><p>Название, цена и состав возможностей</p></div>
@@ -5716,6 +5717,7 @@ function tariffEdit(i){
       <div class="fld" style="margin-top:-6px"><div style="font-size:12px;color:var(--txt-3)">пусто = «по договору» · 0 = «Бесплатно»</div></div>
       <div class="fld2"><div class="fld"><label>Период</label><input id="tf-per" value="${(p.per||'').replace(/"/g,'&quot;')}" placeholder="мес"></div>
       <div class="fld"><label>Популярный</label><div style="display:flex;align-items:center;gap:10px;height:38px"><span class="tgl ${p.pop?'on':''}" id="tf-pop" onclick="this.classList.toggle('on')"><i></i></span><span style="font-size:13px;color:var(--txt-3)">бейдж «Популярный»</span></div></div></div>
+      <div class="fld"><label>Лимит проектов</label><input id="tf-limit-proj" value="${(p.limits&&p.limits.projects)||''}" placeholder="напр. 5 · пусто = безлимит" inputmode="numeric"></div>
       <div class="fld"><label>Возможности — галочка включает, текст редактируется</label><div id="tf-feats">${feats}</div></div>
     </div>
     <div class="modal-f">${isNew?'':`<button class="btn-ghost" style="color:var(--neg);margin-right:auto" onclick="tariffDel(${i})">Удалить</button>`}<button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="tariffSave(${isNew?'null':i})">${isNew?'Создать тариф':'Сохранить'}</button></div>
@@ -5740,16 +5742,17 @@ async function tariffSave(i){
   const per=_v('tf-per')||'';
   const feats=[...document.querySelectorAll('#tf-feats .tf-row')].map(l=>[l.querySelector('input[type=checkbox]').checked?1:0, l.querySelector('.tf-lbl').value.trim()||'—']);
   const pop=!!(document.getElementById('tf-pop')&&document.getElementById('tf-pop').classList.contains('on'));
+  const _limP=(_v('tf-limit-proj')||'').replace(/[^\d]/g,''); const limits={}; if(_limP) limits.projects=Number(_limP);
   const raw=_v('tf-price'); const digits=(raw||'').replace(/[^\d]/g,'');
   const price=(raw||'').trim()===''?null:(digits===''?null:Number(digits));
   if(window.LIVE && window.tPlatTariffSave){
     const cur=(i==null)?null:TARIFFS[i];
-    await window.tPlatTariffSave({ id:cur&&cur.id, name, price, per, popular:pop, feats });
+    await window.tPlatTariffSave({ id:cur&&cur.id, name, price, per, popular:pop, feats, limits });
     pd2Close(); return;
   }
   const priceMem=price===null?'Индивид.':(price===0?'Бесплатно':fmt(price));
-  if(i==null){TARIFFS.push({key:name.toLowerCase().replace(/\s+/g,'_'),name,price:priceMem,per,pop,feats});}
-  else{Object.assign(TARIFFS[i],{name,price:priceMem,per,pop,feats});}
+  if(i==null){TARIFFS.push({key:name.toLowerCase().replace(/\s+/g,'_'),name,price:priceMem,per,pop,feats,limits});}
+  else{Object.assign(TARIFFS[i],{name,price:priceMem,per,pop,feats,limits});}
   pd2Close(); renderTariffs(); toast(i==null?`Тариф «${name}» создан`:`Тариф «${name}» обновлён`);
 }
 async function tariffDel(i){
@@ -5804,7 +5807,7 @@ function renderSettings(){
     accent:'#37E6C8', dark:true, powered_by:true, tz_tashkent:true,
     twofa:true, session_min:30, agency_limit:50,
     alert_churn:true, digest_mrr:true, alert_trials:false,
-    nrr_target:108, trial_conv_target:50, demo_month:48, activated_month:12
+    nrr_target:108, trial_conv_target:50, demo_month:48, activated_month:12, pay_url:''
   }, window.PLATFORM_SETTINGS||{});
   const sw=(id,on)=>`<span class="tgl ${on?'on':''}" id="${id}" onclick="this.classList.toggle('on')"><i></i></span>`;
   const ACC=['#37E6C8','#8A8FFF','#43D88C','#6AA9FF','#E3B567','#F0785C'];
@@ -5834,6 +5837,7 @@ function renderSettings(){
     </div></div>
     <div class="card"><div class="card-h"><div class="t">Уведомления и лимиты</div></div><div class="card-body">
       <div class="set-row"><div class="si"><div class="t">Лимит агентств</div><div class="d">Максимум кабинетов на платформе</div></div><input class="set-inp" id="set-limit" style="width:120px" value="${S.agency_limit}"></div>
+      <div class="set-row"><div class="si"><div class="t">Ссылка на оплату / апгрейд</div><div class="d">Кнопка «Обновить тариф» в кабинете · {slug} и {plan} подставляются</div></div><input class="set-inp" id="set-payurl" style="width:210px" value="${_ddA(S.pay_url||'')}" placeholder="https://t.me/bot?start=pay"></div>
       <div class="set-row"><div class="si"><div class="t">Алерт о churn-риске</div><div class="d">Письмо при 7+ днях без активности</div></div>${sw('set-churn',S.alert_churn)}</div>
       <div class="set-row"><div class="si"><div class="t">Дайджест по MRR</div><div class="d">Еженедельная сводка по выручке</div></div>${sw('set-digest',S.digest_mrr)}</div>
       <div class="set-row"><div class="si"><div class="t">Новые триалы</div><div class="d">Мгновенно при активации демо</div></div>${sw('set-trials',S.alert_trials)}</div>
@@ -5866,7 +5870,8 @@ function saveSettings(){
     twofa:tg('set-2fa'), session_min:numv('set-session',30), agency_limit:numv('set-limit',50),
     alert_churn:tg('set-churn'), digest_mrr:tg('set-digest'), alert_trials:tg('set-trials'),
     nrr_target:numv('set-nrr',108), trial_conv_target:numv('set-conv',50),
-    demo_month:numv('set-demo',48), activated_month:numv('set-activated',12)
+    demo_month:numv('set-demo',48), activated_month:numv('set-activated',12),
+    pay_url:(_v('set-payurl')||'').trim()
   };
   if(window.LIVE && window.tSavePlatformSettings){
     window.tSavePlatformSettings(patch).then(ok=>{ if(ok) toast('Настройки сохранены'); });
@@ -6119,6 +6124,7 @@ function enterAgency(){
   (function(){ const me=(window.tMe&&window.tMe())||{}; const nm=me.agencyName||'DETROYD';
     const ne=document.getElementById('ag-name'); if(ne) ne.textContent=nm; })();
   const _first=applyAgencyPerms(); agNav(_first||'projects');   // меню по правам сотрудника
+  try{agRenderPlanChip();}catch(_){}
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-ag .side')));
 }
 /* ——— единый механизм прав: используется навигацией, поиском И модулями ——— */
@@ -6151,6 +6157,55 @@ function agIsPM(){
   return !!me.is_pm;                                   // сотрудник — только с отметкой PM
 }
 function agMyId(){ const me=(window.tMe&&window.tMe())||null; return me?me.id:null; }
+/* ——— плановый лимит проектов (чип + апселл) ——— */
+function agPlanLimit(){
+  const me=(window.tMe&&window.tMe())||{};
+  const key=me.agencyPlan||'';
+  const t=(typeof TARIFFS!=='undefined')?TARIFFS.find(x=>x.key===key):null;
+  const lim=(t&&t.limits)?Number(t.limits.projects||0):0;
+  return { key, name:(t&&t.name)||(key?key.charAt(0).toUpperCase()+key.slice(1):'—'), limit:(lim>0?lim:0) };
+}
+function agProjUsed(){ return (typeof PROJECTS!=='undefined')?PROJECTS.filter(p=>p&&p.status!=='done').length:0; }
+function agUpgrade(){
+  const me=(window.tMe&&window.tMe())||{};
+  const S=(window.PLATFORM_SETTINGS)||{};
+  let url=(S.pay_url||'').trim();
+  if(url){
+    url=url.replace(/\{slug\}/g,encodeURIComponent(me.agencySlug||'')).replace(/\{plan\}/g,encodeURIComponent(me.agencyPlan||''));
+    window.open(url,'_blank','noopener');
+  } else {
+    pd2Open(`<div class="modal" style="max-width:460px"><div class="modal-h"><h3>Обновление тарифа</h3><p>Ссылка на оплату ещё не настроена</p></div><div class="modal-b"><div style="font-size:14px;color:var(--txt-2);line-height:1.55">Чтобы поднять лимит проектов, свяжитесь с платформой DETROYD для перехода на старший тариф.</div></div><div class="modal-f"><button class="btn-add" onclick="pd2Close()">Понятно</button></div></div>`);
+  }
+}
+function agLimitModal(lim){
+  const used=agProjUsed();
+  const word=(typeof _plural==='function')?_plural(lim.limit,'проект','проекта','проектов'):'проектов';
+  pd2Open(`<div class="modal" style="max-width:480px">
+    <div class="modal-h"><h3>Достигнут лимит тарифа</h3><p>${_ddH(lim.name)} · ${used}/${lim.limit}</p></div>
+    <div class="modal-b"><div style="font-size:14px;color:var(--txt-2);line-height:1.55">Тариф <b>${_ddH(lim.name)}</b> включает <b>${lim.limit}</b> ${word}. Сейчас используется <b>${used}</b>. Чтобы добавить новый проект — перейдите на старший тариф или завершите один из текущих.</div></div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button><button class="btn-add" onclick="pd2Close();agUpgrade()">Перейти к оплате</button></div>
+  </div>`);
+}
+function agRenderPlanChip(){
+  const host=document.getElementById('ag-plan-chip'); if(!host) return;
+  const me=(window.tMe&&window.tMe())||{};
+  if(!me.agency_id && !me.agencyPlan){ host.innerHTML=''; return; }
+  const info=agPlanLimit(); const used=agProjUsed();
+  const box=inner=>`<div style="margin-top:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:10px">${inner}</div>`;
+  const head=`<span style="font-family:var(--mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-2)">${_ddH(info.name)}</span>`;
+  if(!info.limit){
+    host.innerHTML=box(`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">${head}<span style="font-size:12px;color:var(--txt-3)">${used} · безлимит</span></div>`);
+    return;
+  }
+  const over=used>info.limit, full=used>=info.limit;
+  const col=over?'var(--neg)':(full?'var(--warn)':'var(--pos)');
+  const pct=Math.min(100,Math.round(used/info.limit*100));
+  host.innerHTML=box(
+    `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">${head}<span style="font-size:12.5px;font-weight:700;color:${col}">${used}/${info.limit}</span></div>
+     <div style="margin-top:7px;height:5px;border-radius:3px;background:var(--line);overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};transition:width .3s"></div></div>
+     ${full?`<button onclick="agUpgrade()" style="margin-top:9px;width:100%;padding:7px;border:0;border-radius:8px;background:${col};color:#fff;font-size:12px;font-weight:600;cursor:pointer">${over?'Лимит превышен — обновить':'Лимит достигнут — обновить'}</button>`:''}`
+  );
+}
 function _tgBy(){ const me=(window.tMe&&window.tMe())||null;
   if(!me || me.role!=='member') return 'Генеральный профиль · '+((me&&me.agencyName)||'Агентство');
   let s=me.full_name||'Коллега'; if(me.is_pm) s+=' · Проект-менеджер'; return s; }
@@ -6552,6 +6607,7 @@ function openNewProject(){
 }
 function npSaveProject(){
   if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } 
+  const _lim=agPlanLimit(); if(_lim.limit>0 && agProjUsed()>=_lim.limit){ agLimitModal(_lim); return; }   // плановый лимит — жёсткий стоп
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
   const svcsArr=svcCollect(); if(!svcsArr.length){toast('Добавь хотя бы одну услугу');return;}
   const prim=svcPrimary(svcsArr), tot=svcTotals(svcsArr);
@@ -7389,6 +7445,7 @@ const _projCard=(p)=>{
 function _projListHTML(l){ return l.length ? `<div class="list-h">${l.length} ${_plural(l.length,'проект','проекта','проектов')}</div>`+l.map(_projCard).join('') : `<div class="modph"><h3>Нет проектов в этом фильтре</h3><p>Под выбранные фильтры ничего не нашлось — измени категорию, услугу или сбрось фильтры.</p></div>`; }
 function paintProjList(){ const el=document.getElementById('pj-list'); if(el){ el.innerHTML=_projListHTML(projFiltered()); _pjhFit(); } }
 function renderProjects(){
+  try{agRenderPlanChip();}catch(_){}
   if(typeof smmLoadLb==='function' && !window._smmProjLoaded && window.SB){ window._smmProjLoaded=true; try{ var _pr=smmLoadLb(); if(_pr&&_pr.then){ _pr.then(function(){ if(typeof renderProjects==='function') renderProjects(); }).catch(function(){}); } }catch(_e){} }
   const list = projFiltered();
   const cats=[...new Set(PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>(a||'').localeCompare(b||'','ru'));
@@ -16626,7 +16683,7 @@ async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
   if (data && typeof TARIFFS !== 'undefined'){ TARIFFS.length = 0;
     data.forEach(t => TARIFFS.push({ id:t.id, key:t.key, name:t.name, price:t.price, per:t.per, sort:t.sort,
-      pop:t.popular, feats:(t.features||[]).map(x => [x[0], x[1]]) })); }
+      pop:t.popular, limits:t.limits||{}, feats:(t.features||[]).map(x => [x[0], x[1]]) })); }
 }
 
 /* ===== DETROYD · генеральный кабинет: живые тарифы / настройки / история ===== */
@@ -16634,7 +16691,8 @@ window.tPlatTariffSave = async (t) => {
   try{
     const feats = Array.isArray(t.feats) ? t.feats.map(f=>[f[0]?1:0, String((f[1]!=null?f[1]:'')).trim()||'—']) : [];
     const row = { name:t.name, price:(t.price===''||t.price===undefined)?null:t.price,
-                  per:(t.per&&String(t.per).trim())||'мес', popular:!!t.popular, features:feats };
+                  per:(t.per&&String(t.per).trim())||'мес', popular:!!t.popular, features:feats,
+                  limits:(t.limits&&typeof t.limits==='object')?t.limits:{} };
     if (t.id){
       const { error } = await SB.from('tariffs').update(row).eq('id', t.id); if (error) throw error;
     } else {
@@ -21284,6 +21342,7 @@ window.tLoadAll = async (role, opts) => {
   }
   else if (role === 'client'){ await window.tLoadClient(); return; }
   await loadTariffs();
+  try{ if(document.getElementById('app-ag')&&document.getElementById('app-ag').classList.contains('on')&&typeof agRenderPlanChip==='function') agRenderPlanChip(); }catch(_){}
 };
 
 function refreshActive(){
@@ -21374,12 +21433,13 @@ async function routeByProfile(userArg){
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
   ME = data || { role:'member' };
-  try{ if(ME&&ME.id) SB.from('profiles').update({last_seen_at:new Date().toISOString()}).eq('id',ME.id).then(()=>{},()=>{}); }catch(_){}
-  if(!window._hbOn){ window._hbOn=true; setInterval(()=>{ try{ if(ME&&ME.id&&SB) SB.from('profiles').update({last_seen_at:new Date().toISOString()}).eq('id',ME.id).then(()=>{},()=>{}); }catch(_){} }, 120000); }
+  try{ if(ME&&ME.id) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){}                      // отметка активности через безопасную RPC (только своя строка, только last_seen_at)
+  if(!window._hbOn){ window._hbOn=true; setInterval(()=>{ try{ if(ME&&ME.id&&SB) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){} }, 120000); }
   const _jobs=[ window.tLoadAll(ME.role, {fast:true}) ];                              // ядро данных — параллельно с инфо агентства
+  if(window.tLoadPlatformSettings) _jobs.push(window.tLoadPlatformSettings().catch(()=>{}));   // pay_url и настройки платформы — доступны всем ролям (RLS: read authenticated)
   if (ME.agency_id){ _jobs.push(
-    SB.from('agencies').select('slug,accent,name,logo_url,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
-      .then(({data:ag})=>{ if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } })
+    SB.from('agencies').select('slug,accent,name,logo_url,plan,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
+      .then(({data:ag})=>{ if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.agencyPlan = ag.plan||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } })
       .catch(()=>{}) ); }
   await Promise.all(_jobs);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
