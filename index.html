@@ -17266,6 +17266,15 @@ window.tTaskAdd = async (projectId,row) => {
   if(row && row.assignee_id) tgStaffNotify(row.assignee_id,'new_task',{by:_tgBy(), title:row.title, due:row.due_date, due_time:row.due_time, project_name:(_p&&_p.name)||'', project_id:projectId, link:location.origin+'/?p='+projectId});
   toast('Задача создана');
   if(!(_p&&_p._tasks)) await _pwReload(projectId);                                   // локального списка не было — полная загрузка
+  // Форсируем перерасчёт активных модулей (дедлайны/overview/KPI/финансы) —
+  // realtime может задержаться из-за _localTaskWriteTs throttle, а UI должен показать
+  // новую задачу везде: карточках, статистике, дедлайнах.
+  setTimeout(function(){
+    try {
+      window._localTaskWriteTs = 0;
+      if (typeof _rtWorkSync === 'function') _rtWorkSync();
+    } catch(_){}
+  }, 400);
   } catch(e){
     if(_p&&_p._tasks){ const _i=_p._tasks.indexOf(_tmp); if(_i>=0)_p._tasks.splice(_i,1); _pkRerender(); }   // откат временной карточки
     toast('Ошибка: '+(e.message||e)); } };
