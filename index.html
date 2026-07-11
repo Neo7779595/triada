@@ -21311,6 +21311,25 @@ if (window.LIVE){
 
 window._kpi2 = { period: null, section4Tab: 'member' };
 
+/* Map metric_key → compute function name (используется в v2 модалках и целях) */
+window._kpiFnMap = window._kpiFnMap || {
+  // TPI aliases
+  vyrabotka:'kpiComputeVyrabotka', skorost:'kpiComputeSkorost',
+  nadezhnost:'kpiComputeNadezhnost', kachestvo:'kpiComputeKachestvo',
+  // Портфель (agency-only)
+  portfolio_health:'kpiComputePortfolioHealth', ontime_delivery:'kpiComputeOntimeDelivery',
+  velocity_30d:'kpiComputeVelocity30d', otkaty:'kpiComputeOtkaty',
+  mrr:'kpiComputeMRR', margin:'kpiComputeMargin',
+  // SMM
+  smm_reach:'kpiComputeSmmReach', smm_views:'kpiComputeSmmViews',
+  smm_growth_abs:'kpiComputeSmmGrowthAbs', smm_followers:'kpiComputeSmmFollowers',
+  smm_er:'kpiComputeSmmER', smm_lr:'kpiComputeSmmLR',
+  smm_cr:'kpiComputeSmmCR', smm_shr:'kpiComputeSmmSHR', smm_sr:'kpiComputeSmmSR',
+  // Обратная совместимость со старыми ключами snapshot-историй
+  cycle_time:'kpiComputeCycleTime', ontime_rate:'kpiComputeOnTimeRate',
+  rework_rate:'kpiComputeReworkRate', throughput_w:'kpiComputeThroughputWeighted',
+};
+
 /* Единый рендер точки входа — переопределяет всё что было */
 window.renderKPI = async () => {
   const el = document.getElementById('content-ag'); if(!el) return;
@@ -21504,6 +21523,20 @@ window._kpi2ShellHTML = () => `
 .kpi2-just-added{animation:kpi2Flash 1.6s ease-out}
 @keyframes kpi2Flash{0%{box-shadow:0 0 0 0 rgba(55,230,200,.55)}50%{box-shadow:0 0 0 6px rgba(55,230,200,0)}100%{box-shadow:0 0 0 0 rgba(55,230,200,0)}}
 
+
+/* KPI v2 · тёмный date input */
+input.kpi2-val-inp[type="date"]{color-scheme:dark;font-family:var(--mono);letter-spacing:.02em;padding-right:6px;position:relative}
+input.kpi2-val-inp[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.7);cursor:pointer;opacity:.65;padding:2px;border-radius:4px;transition:opacity .14s}
+input.kpi2-val-inp[type="date"]::-webkit-calendar-picker-indicator:hover{opacity:1}
+input.kpi2-val-inp[type="date"]::-webkit-datetime-edit{color:var(--txt-1);font-family:var(--mono);font-weight:600}
+input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-fields-wrapper{color:var(--txt-1)}
+input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-text{color:var(--txt-3);padding:0 2px}
+input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-month-field:focus,
+input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-day-field:focus,
+input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-year-field:focus{background:rgba(55,230,200,.14);color:var(--txt-1);outline:none;border-radius:3px}
+input.kpi2-val-inp[type="number"]{color-scheme:dark}
+/* Fallback для инпутов вне формы модалки */
+input[type="date"], input[type="datetime-local"], input[type="time"], input[type="number"]{color-scheme:dark}
 </style>
   <div class="kpi2-wrap">
     <div class="kpi2-topbar">
@@ -21979,7 +22012,7 @@ window._kpi2OpenGoalModal = async () => {
   const cur = {};
   await Promise.all(Object.entries(KPI_METRICS).map(async ([k, m]) => {
     if (!m.scope.includes('agency')) return;
-    const fn = window[_kpiFnMap[k]]; if(!fn) return;
+    const fn = window[window._kpiFnMap[k]]; if(!fn) return;
     try { const r = await fn('agency', null); if (r) cur[k] = r.value; } catch(e){}
   }));
 
@@ -22107,7 +22140,7 @@ window._kpi2PickScope = async (sc) => {
 window._kpi2UpdateBaseline = async () => {
   const st = _kpi2GoalState;
   const m = KPI_METRICS[st.metric_key];
-  const fn = window[_kpiFnMap[st.metric_key]];
+  const fn = window[window._kpiFnMap[st.metric_key]];
   let base = null;
   if (fn && (st.scope_kind === 'agency' || st.scope_id)){
     try { const r = await fn(st.scope_kind, st.scope_id); if (r) base = r.value; } catch(e){}
@@ -22297,7 +22330,7 @@ window._kpi2FillGoals = async () => {
 
   const cardHTML = async (t) => {
     const M = KPI_METRICS[t.metric_key]; if(!M) return '';
-    const fn = window[_kpiFnMap[t.metric_key]];
+    const fn = window[window._kpiFnMap[t.metric_key]];
     let cur = t.baseline;
     try { if (fn){ const r = await fn(t.scope_kind, t.scope_id); if(r && r.value!=null) cur = r.value; } } catch(e){}
     const total = (t.target || 0) - (t.baseline || 0);
