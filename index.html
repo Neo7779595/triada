@@ -18071,19 +18071,20 @@ const _wmean = (rows, valKey, wKey) => {
 /* ── 1. smm_er (reach-weighted mean ER) ── */
 window.kpiComputeSmmER = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
-  const pids = new Set(await _kpiSmmScopeProjects(scopeKind, scopeId));
-  const rows = raw.rows.filter(r => pids.has(r.project_id));
-  const val = _wmean(rows, 'er', 'total_reach');
-  return { value: val==null ? null : Math.round(val*100)/100, sample_size: rows.length, confidence: _kpiConfidence('smm_er', rows.length) };
+  const pids = await _kpiSmmScopeProjects(scopeKind, scopeId);
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  const val = _kpiWMean(latest, 'er', 'total_reach');
+  return { value: val==null ? null : Math.round(val*100)/100, sample_size: latest.length, confidence: _kpiConfidence('smm_er', latest.length) };
 };
 
 /* ── 2. smm_reach (Reels + Stories, сумма) ── */
 window.kpiComputeSmmReach = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
-  const pids = new Set(await _kpiSmmScopeProjects(scopeKind, scopeId));
-  const rows = raw.rows.filter(r => pids.has(r.project_id));
-  let sum = 0; rows.forEach(r => { sum += (+r.m.reels_reach||0) + (+r.m.stories_reach||0); });
-  return { value: sum, sample_size: rows.length, confidence: _kpiConfidence('smm_reach', rows.length) };
+  const pids = await _kpiSmmScopeProjects(scopeKind, scopeId);
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  let sum = 0;
+  latest.forEach(r => { sum += (+r.m.total_reach) || ((+r.m.reels_reach||0) + (+r.m.stories_reach||0) + (+r.m.posts_reach||0)); });
+  return { value: sum, sample_size: latest.length, confidence: _kpiConfidence('smm_reach', latest.length) };
 };
 
 /* ── 3. smm_growth: % прирост followers ── */
@@ -18146,68 +18147,88 @@ const _kpiWMean = (rows, valKey, wKey) => {
   rows.forEach(r => { const v=+r.m[valKey], w=+r.m[wKey]; if(v!=null && !isNaN(v) && w>0){ sv+=v*w; sw+=w; }});
   return sw ? sv/sw : null;
 };
+
+/* Последний отчёт по каждому проекту из pids. Возвращает массив rows (по одному на проект).
+   Это ключевой хелпер: SMM-метрики теперь считаются только из ПОСЛЕДНЕГО отчёта,
+   а не усредняются между всеми отчётами периода. Это то что видит пользователь как «сейчас». */
+window._kpiSmmLatestByProject = (raw, pids) => {
+  const out = [];
+  pids.forEach(pid => {
+    const rs = (raw.byProj[pid] || []).slice().sort((a,b) => a.at < b.at ? -1 : 1);
+    if (rs.length) out.push(rs[rs.length - 1]);
+  });
+  return out;
+};
+
+/* Weighted-mean по последним отчётам проектов (взвешено по total_reach проекта).
+   Если один проект — возвращает его значение без искажений. Если несколько —
+   более крупный по охвату имеет больше веса. */
+window._kpiSmmLatestWMean = (raw, pids, valKey) => {
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  return _kpiWMean(latest, valKey, 'total_reach');
+};
 window.kpiComputeSmmViews = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
-  const pids = new Set(await _kpiSmmScopeProjects(s, id));
-  const rows = raw.rows.filter(r => pids.has(r.project_id));
+  const pids = await _kpiSmmScopeProjects(s, id);
+  const latest = _kpiSmmLatestByProject(raw, pids);
   let sum = 0;
-  rows.forEach(r => { sum += (+r.m.total_views) || ((+r.m.reels_views||0) + (+r.m.stories_views||0) + (+r.m.posts_views||0)); });
-  return { value: sum, sample_size: rows.length, confidence: _kpiConfidence('smm_views', rows.length) };
+  latest.forEach(r => { sum += (+r.m.total_views) || ((+r.m.reels_views||0) + (+r.m.stories_views||0) + (+r.m.posts_views||0)); });
+  return { value: sum, sample_size: latest.length, confidence: _kpiConfidence('smm_views', latest.length) };
 };
 window.kpiComputeSmmGrowthAbs = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(s, id);
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  // Прирост из последнего отчёта = m.followers - prev.followers (или + m.followers если есть готовый gain)
   let sum = 0, n = 0;
-  pids.forEach(pid => {
-    const rs = (raw.byProj[pid] || []).slice().sort((a,b) => a.at < b.at ? -1 : 1);
-    if (!rs.length) return;
-    const first = rs[0], last = rs[rs.length-1];
-    const sv = (+first.m.followers) || (+first.prev.followers) || (+first.m.subscribers_current);
-    const ev = (+last.m.followers) || (+last.m.subscribers_current);
-    if (sv && ev){ sum += (ev - sv); n++; }
+  latest.forEach(r => {
+    // Явное значение прироста из отчёта, если есть
+    const explicit = (+r.m.followers);
+    const prev = (+r.prev.followers);
+    if (!Number.isNaN(explicit) && !Number.isNaN(prev)) { sum += (explicit - prev); n++; return; }
+    if (!Number.isNaN(explicit)) { sum += explicit; n++; }
   });
   return { value: sum, sample_size: n, confidence: _kpiConfidence('smm_growth_abs', n) };
 };
 window.kpiComputeSmmFollowers = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(s, id);
+  const latest = _kpiSmmLatestByProject(raw, pids);
   let sum = 0, n = 0;
-  pids.forEach(pid => {
-    const rs = (raw.byProj[pid] || []).slice().sort((a,b) => a.at < b.at ? -1 : 1);
-    if (!rs.length) return;
-    const last = rs[rs.length-1];
-    const f = (+last.m.followers) || (+last.m.subscribers_current);
-    if (f){ sum += f; n++; }
+  latest.forEach(r => {
+    // subscribers_current — актуальное состояние аудитории (не сдвиг followers за период)
+    const f = (+r.m.subscribers_current) || (+r.prev.followers) + (+r.m.followers || 0);
+    if (f && !Number.isNaN(f)) { sum += f; n++; }
   });
   return { value: sum, sample_size: n, confidence: _kpiConfidence('smm_followers', n) };
 };
 window.kpiComputeSmmLR = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
-  const pids = new Set(await _kpiSmmScopeProjects(s, id));
-  const rows = raw.rows.filter(r => pids.has(r.project_id));
-  const val = _kpiWMean(rows, 'lr', 'total_reach');
-  return { value: val==null?null:Math.round(val*100)/100, sample_size: rows.length, confidence: _kpiConfidence('smm_lr', rows.length) };
+  const pids = await _kpiSmmScopeProjects(s, id);
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  const val = _kpiWMean(latest, 'lr', 'total_reach');
+  return { value: val==null?null:Math.round(val*100)/100, sample_size: latest.length, confidence: _kpiConfidence('smm_lr', latest.length) };
 };
 window.kpiComputeSmmCR = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
-  const pids = new Set(await _kpiSmmScopeProjects(s, id));
-  const rows = raw.rows.filter(r => pids.has(r.project_id));
-  const val = _kpiWMean(rows, 'tr', 'total_reach');
-  return { value: val==null?null:Math.round(val*100)/100, sample_size: rows.length, confidence: _kpiConfidence('smm_cr', rows.length) };
+  const pids = await _kpiSmmScopeProjects(s, id);
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  const val = _kpiWMean(latest, 'tr', 'total_reach');
+  return { value: val==null?null:Math.round(val*100)/100, sample_size: latest.length, confidence: _kpiConfidence('smm_cr', latest.length) };
 };
 window.kpiComputeSmmSHR = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
-  const pids = new Set(await _kpiSmmScopeProjects(s, id));
-  const rows = raw.rows.filter(r => pids.has(r.project_id));
-  const val = _kpiWMean(rows, 'shr', 'total_reach');
-  return { value: val==null?null:Math.round(val*100)/100, sample_size: rows.length, confidence: _kpiConfidence('smm_shr', rows.length) };
+  const pids = await _kpiSmmScopeProjects(s, id);
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  const val = _kpiWMean(latest, 'shr', 'total_reach');
+  return { value: val==null?null:Math.round(val*100)/100, sample_size: latest.length, confidence: _kpiConfidence('smm_shr', latest.length) };
 };
 window.kpiComputeSmmSR = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
-  const pids = new Set(await _kpiSmmScopeProjects(s, id));
-  const rows = raw.rows.filter(r => pids.has(r.project_id));
-  const val = _kpiWMean(rows, 'sr', 'total_reach');
-  return { value: val==null?null:Math.round(val*100)/100, sample_size: rows.length, confidence: _kpiConfidence('smm_sr', rows.length) };
+  const pids = await _kpiSmmScopeProjects(s, id);
+  const latest = _kpiSmmLatestByProject(raw, pids);
+  const val = _kpiWMean(latest, 'sr', 'total_reach');
+  return { value: val==null?null:Math.round(val*100)/100, sample_size: latest.length, confidence: _kpiConfidence('smm_sr', latest.length) };
 };
 
 /* Сборный вызов SMM для scope — 9 метрик */
