@@ -16699,15 +16699,25 @@ window.tPlatTariffSave = async (t) => {
     const row = { name:t.name, price:(t.price===''||t.price===undefined)?null:t.price,
                   per:(t.per&&String(t.per).trim())||'мес', popular:!!t.popular, features:feats,
                   limits:(t.limits&&typeof t.limits==='object')?t.limits:{} };
-    if (t.id){
-      const { error } = await SB.from('tariffs').update(row).eq('id', t.id); if (error) throw error;
-    } else {
+    let insertKey=null, insertSort=null;
+    if(!t.id){
       let base=(t.name||'tariff').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tariff';
       const used=new Set((typeof TARIFFS!=='undefined'?TARIFFS:[]).map(x=>x.key));
       let key=base, n=2; while(used.has(key)){ key=base+'_'+n; n++; }
-      const maxSort=(typeof TARIFFS!=='undefined'?TARIFFS:[]).reduce((m,x)=>Math.max(m,x.sort||0),0);
-      const { error } = await SB.from('tariffs').insert(Object.assign({ key, sort:maxSort+1 }, row)); if (error) throw error;
+      insertKey=key; insertSort=(typeof TARIFFS!=='undefined'?TARIFFS:[]).reduce((m,x)=>Math.max(m,x.sort||0),0)+1;
     }
+    const _write = (r) => t.id
+      ? SB.from('tariffs').update(r).eq('id', t.id)
+      : SB.from('tariffs').insert(Object.assign({ key:insertKey, sort:insertSort }, r));
+    let { error } = await _write(row);
+    if (error && /limits/i.test(((error.message||'')+' '+(error.code||'')))){
+      const r2=Object.assign({},row); delete r2.limits;                               // колонки limits ещё нет — сохраняем тариф, но честно предупреждаем
+      const res2=await _write(r2); if(res2.error) throw res2.error;
+      await loadTariffs(); if(typeof renderTariffs==='function') renderTariffs();
+      toast('Тариф сохранён, но лимит не записан: нужна колонка tariffs.limits (примени миграцию)');
+      return;
+    }
+    if (error) throw error;
     await loadTariffs(); if(typeof renderTariffs==='function') renderTariffs();
     toast('Тариф сохранён');
   }catch(e){ toast('Ошибка тарифа: '+(e.message||e)); }
