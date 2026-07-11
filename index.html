@@ -22876,7 +22876,7 @@ window._kpi3OpenGoalModal = (existing) => {
   const state = {
     scope_id: initScopeId, metric_key: initMetric,
     target: existing ? existing.target : null,
-    baseline: initBaseline
+    baseline: initBaselineSmart != null ? initBaselineSmart : initBaseline
   };
   // По умолчанию — конец текущего месяца
   const now = new Date();
@@ -22884,6 +22884,20 @@ window._kpi3OpenGoalModal = (existing) => {
   const initTargetDate = existing && existing._period_end
     ? existing._period_end.slice(0, 10)
     : defaultTargetDate;
+  // Умный префилл baseline: агрегат Точки А если drill-down не выбран,
+  // значение конкретного row при drill-down.
+  const initBaselineSmart = (() => {
+    if (existing) return existing.baseline;
+    if (preselectedRow) {
+      const cur = _kpi3.rowVals[`${cat}|${preselectedRow.id}`];
+      const v = cur ? _kpi3ExtractVal(cur[initMetric]) : null;
+      if (v != null && !Number.isNaN(v)) return Math.round(v * 100) / 100;
+    }
+    const agg = (_kpi3.aggregateVals && _kpi3.aggregateVals[cat]) || {};
+    const av = agg[initMetric];
+    if (av != null && !Number.isNaN(av)) return Math.round(av * 100) / 100;
+    return null;
+  })();
   const scrim = document.createElement('div');
   scrim.className = 'kpi3-scrim';
   scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
@@ -23006,7 +23020,13 @@ window._kpi3ModalSetMetric = (btn) => {
   // Не переписываем если пользователь уже что-то ввёл (fromAuto flag)
   if (baseInput.dataset.userEdited === '1') return;
   const cur = _kpi3.rowVals[`${_kpi3.category}|${scopeId}`];
-  const v = cur ? _kpi3ExtractVal(cur[metricKey]) : null;
+  let v = cur ? _kpi3ExtractVal(cur[metricKey]) : null;
+  // Fallback: если конкретного row-значения нет — берём агрегат Точки А
+  if (v == null || Number.isNaN(v)) {
+    const agg = (_kpi3.aggregateVals && _kpi3.aggregateVals[_kpi3.category]) || {};
+    const av = agg[metricKey];
+    if (av != null && !Number.isNaN(av)) v = av;
+  }
   baseInput.value = (v != null && !Number.isNaN(v)) ? Math.round(v * 100) / 100 : '';
   _kpi3RefreshHints();
 };
