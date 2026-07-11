@@ -22884,7 +22884,7 @@ window._kpi3StatsRowHTML = (it, n) => {
 };
 
 window._kpi3NewGoal = () => {
-  // Спец-кейс: если выбрана конкретная команда — сначала спросить проект команды
+  _kpi3.newGoalOverride = null;  // всегда сбрасываем перед новым сценарием
   if (_kpi3.category === 'team' && _kpi3.selectedRowId) {
     _kpi3OpenTeamGoalPicker(_kpi3.selectedRowId);
     return;
@@ -22942,16 +22942,12 @@ window._kpi3OpenTeamGoalPicker = async (teamId) => {
 };
 
 window._kpi3PickTeamGoalScope = (kind, id) => {
-  // Закрываем picker и открываем обычную модалку +Цель для выбранного scope+row
   document.querySelectorAll('.kpi3-scrim').forEach(sc => sc.remove());
-  const prevCat = _kpi3.category;
-  const prevRow = _kpi3.selectedRowId;
-  _kpi3.category = kind;
-  _kpi3.selectedRowId = id;
+  // Override для модалки — читается в OpenGoalModal и SubmitGoal через _kpi3.newGoalOverride.
+  // State (_kpi3.category / selectedRowId) не мутируем — иначе UI ломается и submit
+  // читает не то что видел пользователь.
+  _kpi3.newGoalOverride = { category: kind, rowId: id };
   _kpi3OpenGoalModal(null);
-  // Восстанавливаем UI-контекст (не сбиваем текущую drill-down команду)
-  _kpi3.category = prevCat;
-  _kpi3.selectedRowId = prevRow;
 };
 
 window._kpi3RowDropdownHTML = (rows, selectedId) => {
@@ -23039,11 +23035,14 @@ window._kpi3RowDDPick = (rowId) => {
 };
 
 window._kpi3OpenGoalModal = (existing) => {
-  const cat = _kpi3.category;
+  const override = existing ? null : _kpi3.newGoalOverride;
+  const cat = override ? override.category : _kpi3.category;
   const rows = _kpiScopeRows(cat);
   if (!rows.length) { toast(`Сначала добавьте ${_kpi3CatLabelOne(cat).toLowerCase()}`); return; }
   const metrics = _kpi3MetricsFor(cat);
-  const preselectedRow = (existing ? rows.find(r => r.id === existing.scope_id) : null) || (_kpi3.selectedRowId && rows.find(r => r.id === _kpi3.selectedRowId));
+  const preselectedRow = (existing ? rows.find(r => r.id === existing.scope_id) : null)
+    || (override && override.rowId && rows.find(r => r.id === override.rowId))
+    || (_kpi3.selectedRowId && rows.find(r => r.id === _kpi3.selectedRowId));
   const initScopeId = existing ? existing.scope_id : (preselectedRow ? preselectedRow.id : rows[0].id);
   const initMetric = existing ? existing.metric_key : metrics[0];
   // Префилл baseline актуальным значением из кэша Точки А
@@ -23244,9 +23243,10 @@ window._kpi3SubmitGoal = async (existingId) => {
   // Автосоздание / переиспользование периода
   const periodId = await _kpi3EnsurePeriodForDate(targetDate);
   if (!periodId) { toast('Не удалось создать период'); return; }
+  const override = _kpi3.newGoalOverride;
   const row = {
     period_id: periodId,
-    scope_kind: _kpi3.category,
+    scope_kind: (existingId ? null : (override ? override.category : _kpi3.category)) || _kpi3.category,
     scope_id: scopeId,
     metric_key: metricKey,
     target: tgtVal,
@@ -23259,6 +23259,7 @@ window._kpi3SubmitGoal = async (existingId) => {
   toast(existingId ? 'Цель обновлена' : 'Цель создана');
   scrim.remove();
   _kpi3.expandedGoalId = saved.id;
+  _kpi3.newGoalOverride = null;
   _kpi3FillGoals();
 };
 
