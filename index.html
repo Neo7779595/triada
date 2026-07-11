@@ -8326,12 +8326,28 @@ let PDL_SEG='all', PDL_TYPE='all', PDL_RESP='all', PDL_Q='';
 function pdlSetSeg(v){PDL_SEG=v;if(typeof renderDeadlines==='function')renderDeadlines();}
 function pdlSetType(v){PDL_TYPE=v;if(typeof renderDeadlines==='function')renderDeadlines();}
 function pdlSetResp(v){PDL_RESP=v;if(typeof renderDeadlines==='function')renderDeadlines();}
-function pdlSearch(v){PDL_Q=v;clearTimeout(window._pdlSchT);window._pdlSchT=setTimeout(function(){if(typeof renderDeadlines==='function')renderDeadlines();if(typeof _cycRestoreFocus==='function')_cycRestoreFocus('pdl-q');},220);}
+function pdlSearch(v){
+  PDL_Q=v;
+  var q=(v||'').toLowerCase().trim();
+  // Клиентский фильтр: показать/скрыть .dlx без ререндера — фокус в input не теряется
+  try{
+    var items=document.querySelectorAll('.dlx');
+    items.forEach(function(el){
+      var s=(el.getAttribute('data-search')||'');
+      el.style.display = (!q || s.indexOf(q)>=0) ? '' : 'none';
+    });
+    // Скрыть пустые секции
+    document.querySelectorAll('.dl-sec').forEach(function(sec){
+      var vis=sec.querySelectorAll('.dlx:not([style*="display: none"])').length;
+      sec.style.display = (vis===0 && q) ? 'none' : '';
+    });
+  }catch(_){}
+}
 function pdlReset(){PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';if(typeof renderDeadlines==='function')renderDeadlines();}
 function _pdlMatch(it){
   if(PDL_TYPE!=='all' && it.kind!==PDL_TYPE) return false;
   if(PDL_RESP!=='all'){ if(PDL_RESP==='__none'){ if(it.asg) return false; } else if(String(it.asg||'')!==String(PDL_RESP)) return false; }
-  if(PDL_Q){ const q=PDL_Q.toLowerCase().trim(); if(q && !(((it.title||'')+' '+(it.stage||'')).toLowerCase().includes(q))) return false; }
+  // Поиск теперь клиентский через data-search атрибут — не фильтруем на рендер-этапе
   return true;
 }
 function _pdDueBucket(due,status){
@@ -13699,7 +13715,8 @@ function _dlRow(it){
     ? '<span class="dlx-resp none"><span class="dlx-rq">?</span><span class="rn">Не назначен</span></span>'
     : '<span class="dlx-resp">'+_avInit(o.n,o.c,o.avatar,22)+'<span class="rn">'+o.n+'</span></span>';
   var sp=_dlSpent(it.spent);
-  return '<div class="dlx" style="--cc:'+p.cc+';--cbg:'+p.bg+';--cbg2:'+p.bg2+';--cbd:'+p.bd+';--sbg:'+p.bg+';--sbd:'+p.bd+';--sc:'+p.cc+';--shalo:'+p.halo+'">'
+  var _sh=((it.title||'')+' '+(it.stage||'')+' '+(it.project||'')+' '+(o.n||'')).toLowerCase().replace(/"/g,'');
+  return '<div class="dlx" data-search="'+_sh+'" style="--cc:'+p.cc+';--cbg:'+p.bg+';--cbg2:'+p.bg2+';--cbd:'+p.bd+';--sbg:'+p.bg+';--sbd:'+p.bd+';--sc:'+p.cc+';--shalo:'+p.halo+'">'
     +'<div class="dlx-date"><div class="d">'+it.day+'</div><div class="mo">'+it.mon+'</div>'+timeFooter+'</div>'
     +'<div class="dlx-lg"><div class="dlx-pav">'+logoFill(it.plogoUrl,L)+'</div><div class="dlx-type '+(it.type==='task'?'task':'stage')+'">'+(it.type==='task'?'задача':'этап')+'</div></div>'
     +'<div class="dlx-txt"><div class="dlx-pjn">'+it.project+'</div>'+owner+'<div class="dlx-tl">'+it.stage+'</div></div>'
