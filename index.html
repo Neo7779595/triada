@@ -22537,6 +22537,9 @@ window._kpi3SubmitGoal = async (existingId) => {
 // Иначе создаём новый: start = сегодня, end = targetDate.
 window._kpi3EnsurePeriodForDate = async (targetDate) => {
   if (!SB || !ME) return null;
+  // Защита: end_date не может быть раньше сегодняшней даты
+  const today = new Date().toISOString().slice(0, 10);
+  if (targetDate < today) { toast('Дата цели должна быть в будущем'); return null; }
   // Ищем существующий период с таким end_date среди последних 20
   const { data: existing } = await SB.from('kpi_periods')
     .select('id, end_date, status')
@@ -22550,7 +22553,6 @@ window._kpi3EnsurePeriodForDate = async (targetDate) => {
       return existing[0].id;
     }
   }
-  const today = new Date().toISOString().slice(0, 10);
   const name = `До ${_kpi3FmtDate(targetDate)}`;
   const created = await kpiCreatePeriod({
     name,
@@ -22808,8 +22810,9 @@ window._kpi3DPRender = () => {
     <div class="kpi3-dp-foot">
       <div class="kpi3-dp-presets">
         <button type="button" onclick="_kpi3DPPick('${iso(today)}')">Сегодня</button>
-        <button type="button" onclick="_kpi3DPQuickJump('week')">7 дн.</button>
-        <button type="button" onclick="_kpi3DPQuickJump('month')">Месяц</button>
+        <button type="button" onclick="_kpi3DPQuickJump('week')" title="+7 дней">+ Неделя</button>
+        <button type="button" onclick="_kpi3DPQuickJump('month')" title="+30 дней">+ Месяц</button>
+        <button type="button" onclick="_kpi3DPQuickJump('quarter')" title="+90 дней">+ Квартал</button>
       </div>
       <button type="button" class="kpi3-dp-clr" onclick="_kpi3DPPick('')">Очистить</button>
     </div>
@@ -22817,11 +22820,12 @@ window._kpi3DPRender = () => {
 };
 
 window._kpi3DPQuickJump = (kind) => {
-  // Перепрыгнуть курсор к сегодня и выбрать «неделя назад» или «начало текущего месяца»
+  // Пресеты для «Дата цели / дедлайна» — сдвигают ВПЕРЁД от сегодня
   const now = new Date();
   let target;
-  if (kind === 'week') target = new Date(now.getTime() - 7*86400000);
-  else if (kind === 'month') target = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (kind === 'week')         target = new Date(now.getTime() + 7*86400000);
+  else if (kind === 'month')   target = new Date(now.getTime() + 30*86400000);
+  else if (kind === 'quarter') target = new Date(now.getTime() + 90*86400000);
   else target = now;
   _kpi3DP.cursor = { y: target.getFullYear(), m: target.getMonth() };
   const iso = target.toISOString().slice(0,10);
