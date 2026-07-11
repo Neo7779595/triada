@@ -21480,12 +21480,16 @@ window.tProvisionAgency = async (a) => {
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tUpdateAgency = async (id, patch) => {
-  try { await SB.from('agencies').update(patch).eq('id', id);
+  try { const { data, error } = await SB.from('agencies').update(patch).eq('id', id).select();
+    if (error) throw error;
+    if (!data || !data.length){ toast('Изменения не сохранены: нет прав на правку агентства (RLS-политика agencies_super_all)'); return; }
     toast('Агентство обновлено'); await window.tLoadAll('superadmin'); renderGeneral();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tDeleteAgency = async (id) => {
-  try { await SB.from('agencies').delete().eq('id', id);
+  try { const { data, error } = await SB.from('agencies').delete().eq('id', id).select();
+    if (error) throw error;
+    if (!data || !data.length){ toast('Не удалось удалить: нет прав (RLS-политика agencies_super_all)'); return; }
     toast('Агентство удалено'); await window.tLoadAll('superadmin'); renderGeneral();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
