@@ -21554,6 +21554,31 @@ window._kpi3ShellHTML = () => `
     .kpi3-lock-nm{min-width:0}
     .kpi3-lock-nm b{display:block;color:var(--txt-1);font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .kpi3-lock-nm span{display:block;color:var(--txt-3);font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    /* ── DP триггер (заменяет input[type=date]) ── */
+    .kpi3-dp-trg{width:100%;padding:10px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;color:var(--txt-1);font-size:13.5px;font-family:var(--mono);font-weight:600;cursor:pointer;transition:all .14s;display:inline-flex;align-items:center;gap:8px;text-align:left}
+    .kpi3-dp-trg:hover{border-color:rgba(138,143,255,.32)}
+    .kpi3-dp-trg:focus{outline:none;border-color:rgba(138,143,255,.5)}
+    .kpi3-dp-ic{opacity:.7;font-size:14px;line-height:1}
+    .kpi3-dp-lbl{flex:1}
+    /* ── DP popup ── */
+    .kpi3-dp-pop{position:fixed;z-index:10000;width:300px;background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 24px 48px -12px rgba(0,0,0,.7);animation:kpi3DpIn .16s var(--ease-out)}
+    @keyframes kpi3DpIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+    .kpi3-dp-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+    .kpi3-dp-nav{width:28px;height:28px;background:var(--panel-3);border:1px solid var(--line);border-radius:7px;color:var(--txt-2);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;justify-content:center;transition:all .12s}
+    .kpi3-dp-nav:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
+    .kpi3-dp-sel{flex:1;padding:6px 8px;background:var(--panel-3);border:1px solid var(--line);border-radius:7px;color:var(--txt-1);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer}
+    .kpi3-dp-sel:focus{outline:none;border-color:rgba(138,143,255,.5)}
+    .kpi3-dp-dow{display:grid;grid-template-columns:repeat(7, 1fr);gap:2px;margin-bottom:4px}
+    .kpi3-dp-dow div{text-align:center;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:700;padding:4px 0}
+    .kpi3-dp-grid{display:grid;grid-template-columns:repeat(7, 1fr);gap:2px}
+    .kpi3-dp-cell{background:transparent;border:1px solid transparent;border-radius:7px;color:var(--txt-1);font-family:var(--mono);font-size:12.5px;font-weight:600;padding:8px 0;cursor:pointer;transition:all .1s;line-height:1}
+    .kpi3-dp-cell:hover{background:rgba(138,143,255,.08);border-color:rgba(138,143,255,.2)}
+    .kpi3-dp-cell.other{opacity:.35}
+    .kpi3-dp-cell.today{border-color:var(--accent);color:var(--accent)}
+    .kpi3-dp-cell.sel{background:linear-gradient(135deg,var(--accent),var(--violet));color:#031a15;font-weight:800;box-shadow:0 4px 10px rgba(55,230,200,.35);border-color:transparent}
+    .kpi3-dp-cell.dis{opacity:.2;cursor:not-allowed}
+    .kpi3-dp-cell.dis:hover{background:transparent;border-color:transparent}
+    .kpi3-dp-foot{display:flex;justify-content:space-between;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
     .kpi3-mopt-cat{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);margin-top:2px}
     @media (max-width: 780px){
       .kpi3-goal-head{grid-template-columns:1fr auto;gap:12px}
@@ -21680,11 +21705,11 @@ window._kpi3OpenCustomRange = () => {
         <div class="kpi3-field" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
             <div class="kpi3-field-l">С</div>
-            <input class="kpi3-input" type="date" id="kpi3-range-from" value="${startDef}" style="color-scheme:dark">
+            ${_kpi3DPHTML({ id: 'range-from', value: startDef })}
           </div>
           <div>
             <div class="kpi3-field-l">По</div>
-            <input class="kpi3-input" type="date" id="kpi3-range-to" value="${endDef}" style="color-scheme:dark">
+            ${_kpi3DPHTML({ id: 'range-to', value: endDef })}
           </div>
         </div>
         <div class="kpi3-field-h">Метрики Точки А и Статистика будут пересчитаны за этот период.</div>
@@ -21699,8 +21724,8 @@ window._kpi3OpenCustomRange = () => {
 };
 
 window._kpi3ApplyCustomRange = async () => {
-  const from = document.getElementById('kpi3-range-from').value;
-  const to = document.getElementById('kpi3-range-to').value;
+  const from = _kpi3DPValue('range-from');
+  const to = _kpi3DPValue('range-to');
   if (!from || !to) { toast('Заполните обе даты'); return; }
   if (new Date(to) < new Date(from)) { toast('«По» должно быть позже «С»'); return; }
   _kpi3.window = { kind: 'custom', from, to };
@@ -22349,11 +22374,11 @@ window._kpi3NewPeriod = () => {
         <div class="kpi3-field" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
             <div class="kpi3-field-l">Начало</div>
-            <input class="kpi3-input" type="date" id="kpi3-per-start" value="${startDefault}" style="color-scheme:dark">
+            ${_kpi3DPHTML({ id: 'per-start', value: startDefault })}
           </div>
           <div>
             <div class="kpi3-field-l">Конец</div>
-            <input class="kpi3-input" type="date" id="kpi3-per-end" value="${endDefault}" style="color-scheme:dark">
+            ${_kpi3DPHTML({ id: 'per-end', value: endDefault })}
           </div>
         </div>
       </div>
@@ -22369,8 +22394,8 @@ window._kpi3NewPeriod = () => {
 window._kpi3SubmitPeriod = async () => {
   const name = document.getElementById('kpi3-per-name').value.trim();
   const type = document.getElementById('kpi3-per-type').value;
-  const start = document.getElementById('kpi3-per-start').value;
-  const end = document.getElementById('kpi3-per-end').value;
+  const start = _kpi3DPValue('per-start');
+  const end = _kpi3DPValue('per-end');
   if (!name || !start || !end) { toast('Заполните все поля'); return; }
   const created = await kpiCreatePeriod({ name, kind: type, start_date: start, end_date: end });
   if (!created) return;
@@ -22381,6 +22406,183 @@ window._kpi3SubmitPeriod = async () => {
   _kpi3.period = _kpi3.periods.find(p => p.id === created.id) || _kpi3.periods[0];
   _kpi3FillTopbar();
   _kpi3FillGoals();
+};
+
+
+/* ═══════════ KPI v3 · Кастомный дата-пикер ═══════════
+   API:
+     _kpi3DPHTML({id, value, min, max}) → HTML триггер-кнопки
+     _kpi3DPValue(id) → 'YYYY-MM-DD' | ''
+   Портал popup позиционируется относительно кнопки, z-index 10000.
+*/
+
+window._kpi3DP = { openId: null, values: {}, cursor: null };
+
+window._kpi3DPMonths = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+window._kpi3DPMonthsShort = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+window._kpi3DPWeekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+window._kpi3DPHTML = (opts) => {
+  const { id, value, min, max } = opts || {};
+  const v = value || '';
+  _kpi3DP.values[id] = v;
+  if (min) _kpi3DP.values[id + ':min'] = min;
+  if (max) _kpi3DP.values[id + ':max'] = max;
+  const label = v ? _kpi3DPPrettyDate(v) : 'выберите дату';
+  return `<button type="button" class="kpi3-dp-trg" id="kpi3-dp-trg-${_kpi3Esc(id)}" data-dpid="${_kpi3Esc(id)}" onclick="_kpi3DPOpen('${_kpi3Esc(id)}')">
+    <span class="kpi3-dp-ic">📅</span><span class="kpi3-dp-lbl">${label}</span>
+  </button>`;
+};
+
+window._kpi3DPValue = (id) => _kpi3DP.values[id] || '';
+
+window._kpi3DPPrettyDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getDate()} ${_kpi3DPMonthsShort[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+window._kpi3DPOpen = (id) => {
+  _kpi3DPClose();
+  const trg = document.getElementById('kpi3-dp-trg-' + id); if (!trg) return;
+  _kpi3DP.openId = id;
+  const cur = _kpi3DP.values[id] ? new Date(_kpi3DP.values[id]) : new Date();
+  _kpi3DP.cursor = { y: cur.getFullYear(), m: cur.getMonth() };
+  const pop = document.createElement('div');
+  pop.className = 'kpi3-dp-pop';
+  pop.id = 'kpi3-dp-pop';
+  pop.onclick = (e) => e.stopPropagation();
+  document.body.appendChild(pop);
+  _kpi3DPRender();
+  // Позиционирование
+  const r = trg.getBoundingClientRect();
+  const pw = 300, ph = 350;
+  let left = r.left, top = r.bottom + 6;
+  if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+  if (top + ph > window.innerHeight - 12) top = r.top - ph - 6;
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  // Обработчики закрытия
+  setTimeout(() => {
+    document.addEventListener('mousedown', _kpi3DPOutside, true);
+    document.addEventListener('keydown', _kpi3DPEsc, true);
+  }, 0);
+};
+
+window._kpi3DPOutside = (e) => {
+  const pop = document.getElementById('kpi3-dp-pop');
+  const trg = _kpi3DP.openId ? document.getElementById('kpi3-dp-trg-' + _kpi3DP.openId) : null;
+  if (!pop) return;
+  if (pop.contains(e.target)) return;
+  if (trg && trg.contains(e.target)) return;
+  _kpi3DPClose();
+};
+
+window._kpi3DPEsc = (e) => {
+  if (e.key === 'Escape') _kpi3DPClose();
+};
+
+window._kpi3DPClose = () => {
+  const pop = document.getElementById('kpi3-dp-pop');
+  if (pop) pop.remove();
+  _kpi3DP.openId = null;
+  document.removeEventListener('mousedown', _kpi3DPOutside, true);
+  document.removeEventListener('keydown', _kpi3DPEsc, true);
+};
+
+window._kpi3DPRender = () => {
+  const pop = document.getElementById('kpi3-dp-pop'); if (!pop) return;
+  const c = _kpi3DP.cursor;
+  const id = _kpi3DP.openId;
+  const selISO = _kpi3DP.values[id];
+  const sel = selISO ? new Date(selISO) : null;
+  const today = new Date();
+  const minISO = _kpi3DP.values[id + ':min'];
+  const maxISO = _kpi3DP.values[id + ':max'];
+  const minD = minISO ? new Date(minISO) : null;
+  const maxD = maxISO ? new Date(maxISO) : null;
+  // Сетка
+  const firstOfMonth = new Date(c.y, c.m, 1);
+  // Понедельник = 0. JS getDay: 0=вс, 1=пн...
+  const jsDow = firstOfMonth.getDay();
+  const dowMon = jsDow === 0 ? 6 : jsDow - 1;
+  const gridStart = new Date(c.y, c.m, 1 - dowMon);
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(gridStart.getTime() + i*86400000);
+    cells.push(d);
+  }
+  const inRange = (d) => {
+    if (minD && d < minD) return false;
+    if (maxD && d > maxD) return false;
+    return true;
+  };
+  const iso = (d) => d.toISOString().slice(0,10);
+  const isSame = (a, b) => a && b && iso(a) === iso(b);
+  const years = [];
+  const curYear = today.getFullYear();
+  for (let y = curYear - 5; y <= curYear + 5; y++) years.push(y);
+
+  pop.innerHTML = `
+    <div class="kpi3-dp-head">
+      <button type="button" class="kpi3-dp-nav" onclick="_kpi3DPStep(-1)">◀</button>
+      <select class="kpi3-dp-sel" onchange="_kpi3DPSetMonth(this.value)">
+        ${_kpi3DPMonths.map((mn, i) => `<option value="${i}" ${i === c.m ? 'selected' : ''}>${mn}</option>`).join('')}
+      </select>
+      <select class="kpi3-dp-sel" onchange="_kpi3DPSetYear(this.value)">
+        ${years.map(y => `<option value="${y}" ${y === c.y ? 'selected' : ''}>${y}</option>`).join('')}
+      </select>
+      <button type="button" class="kpi3-dp-nav" onclick="_kpi3DPStep(1)">▶</button>
+    </div>
+    <div class="kpi3-dp-dow">${_kpi3DPWeekdays.map(w => `<div>${w}</div>`).join('')}</div>
+    <div class="kpi3-dp-grid">
+      ${cells.map(d => {
+        const isThisMonth = d.getMonth() === c.m;
+        const isToday = isSame(d, today);
+        const isSelected = isSame(d, sel);
+        const allowed = inRange(d);
+        const cls = [
+          isThisMonth ? '' : 'other',
+          isToday ? 'today' : '',
+          isSelected ? 'sel' : '',
+          !allowed ? 'dis' : ''
+        ].filter(Boolean).join(' ');
+        return `<button type="button" class="kpi3-dp-cell ${cls}" ${allowed ? `onclick="_kpi3DPPick('${iso(d)}')"` : 'disabled'}>${d.getDate()}</button>`;
+      }).join('')}
+    </div>
+    <div class="kpi3-dp-foot">
+      <button type="button" class="kpi3-btn kpi3-btn-sm kpi3-btn-ghost" onclick="_kpi3DPPick('${iso(today)}')">Сегодня</button>
+      <button type="button" class="kpi3-btn kpi3-btn-sm" onclick="_kpi3DPClose()">Закрыть</button>
+    </div>
+  `;
+};
+
+window._kpi3DPStep = (delta) => {
+  const c = _kpi3DP.cursor;
+  c.m += delta;
+  if (c.m < 0) { c.m = 11; c.y -= 1; }
+  if (c.m > 11) { c.m = 0; c.y += 1; }
+  _kpi3DPRender();
+};
+
+window._kpi3DPSetMonth = (m) => { _kpi3DP.cursor.m = Number(m); _kpi3DPRender(); };
+window._kpi3DPSetYear = (y) => { _kpi3DP.cursor.y = Number(y); _kpi3DPRender(); };
+
+window._kpi3DPPick = (iso) => {
+  const id = _kpi3DP.openId; if (!id) return;
+  const minISO = _kpi3DP.values[id + ':min'];
+  const maxISO = _kpi3DP.values[id + ':max'];
+  if (minISO && iso < minISO) return;
+  if (maxISO && iso > maxISO) return;
+  _kpi3DP.values[id] = iso;
+  const trg = document.getElementById('kpi3-dp-trg-' + id);
+  if (trg) {
+    const lbl = trg.querySelector('.kpi3-dp-lbl');
+    if (lbl) lbl.textContent = _kpi3DPPrettyDate(iso);
+  }
+  _kpi3DPClose();
+  // Триггер кастомного события change
+  if (trg) trg.dispatchEvent(new CustomEvent('kpi3-dp-change', { detail: { id, value: iso }, bubbles: true }));
 };
 
 /* ═══════════ /KPI v3 ═══════════ */
