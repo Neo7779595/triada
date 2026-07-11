@@ -21522,6 +21522,12 @@ window._kpi3ShellHTML = () => `
     .kpi3-mopt{padding:9px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;font-size:12.5px;font-weight:600;color:var(--txt-2);cursor:pointer;transition:all .14s;text-align:left}
     .kpi3-mopt:hover{border-color:rgba(138,143,255,.28);color:var(--txt-1)}
     .kpi3-mopt.on{background:linear-gradient(135deg,rgba(55,230,200,.12),rgba(138,143,255,.08));border-color:var(--accent);color:var(--txt-1)}
+    .kpi3-lock-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:linear-gradient(135deg,rgba(55,230,200,.08),rgba(138,143,255,.04));border:1px solid rgba(55,230,200,.28);border-radius:10px}
+    .kpi3-lock-av{width:38px;height:38px;border-radius:10px;overflow:hidden;background:var(--panel-3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--accent);flex:none}
+    .kpi3-lock-av img{width:100%;height:100%;object-fit:cover;display:block}
+    .kpi3-lock-nm{min-width:0}
+    .kpi3-lock-nm b{display:block;color:var(--txt-1);font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi3-lock-nm span{display:block;color:var(--txt-3);font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .kpi3-mopt-cat{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);margin-top:2px}
     @media (max-width: 780px){
       .kpi3-goal-head{grid-template-columns:1fr auto;gap:12px}
@@ -22042,7 +22048,7 @@ window._kpi3OpenGoalModal = (existing) => {
   const rows = _kpiScopeRows(cat);
   if (!rows.length) { toast(`Сначала добавьте ${_kpi3CatLabelOne(cat).toLowerCase()}`); return; }
   const metrics = _kpi3MetricsFor(cat);
-  const preselectedRow = _kpi3.selectedRowId && rows.find(r => r.id === _kpi3.selectedRowId);
+  const preselectedRow = (existing ? rows.find(r => r.id === existing.scope_id) : null) || (_kpi3.selectedRowId && rows.find(r => r.id === _kpi3.selectedRowId));
   const state = existing ? {
     scope_id: existing.scope_id, metric_key: existing.metric_key,
     target: existing.target, baseline: existing.baseline
@@ -22062,9 +22068,21 @@ window._kpi3OpenGoalModal = (existing) => {
       <div class="kpi3-modal-b" id="kpi3-goal-body">
         <div class="kpi3-field">
           <div class="kpi3-field-l">${_kpi3CatLabelOne(cat)}</div>
-          <select class="kpi3-select" id="kpi3-goal-scope">
-            ${rows.map(r => `<option value="${_kpi3Esc(r.id)}" ${r.id === state.scope_id ? 'selected' : ''}>${_kpi3Esc(r.name)}${r.subtitle ? ' — ' + _kpi3Esc(r.subtitle) : ''}</option>`).join('')}
-          </select>
+          ${preselectedRow ? `
+            <div class="kpi3-lock-row">
+              <div class="kpi3-lock-av">${preselectedRow.avatarUrl ? `<img src="${_kpi3Esc(preselectedRow.avatarUrl)}" onerror="this.parentElement.textContent='${_kpi3Esc(preselectedRow.initials||'?')}'"/>` : _kpi3Esc(preselectedRow.initials||'?')}</div>
+              <div class="kpi3-lock-nm">
+                <b>${_kpi3Esc(preselectedRow.name)}</b>
+                ${preselectedRow.subtitle ? `<span>${_kpi3Esc(preselectedRow.subtitle)}</span>` : ''}
+              </div>
+              <input type="hidden" id="kpi3-goal-scope" value="${_kpi3Esc(preselectedRow.id)}">
+            </div>
+            <div class="kpi3-field-h">Цель ставится для этого ${_kpi3CatLabelOne(cat).toLowerCase()}. Чтобы сменить — закройте модалку и выберите другого в панели сверху.</div>
+          ` : `
+            <select class="kpi3-select" id="kpi3-goal-scope">
+              ${rows.map(r => `<option value="${_kpi3Esc(r.id)}" ${r.id === state.scope_id ? 'selected' : ''}>${_kpi3Esc(r.name)}${r.subtitle ? ' — ' + _kpi3Esc(r.subtitle) : ''}</option>`).join('')}
+            </select>
+          `}
         </div>
         <div class="kpi3-field">
           <div class="kpi3-field-l">Метрика</div>
