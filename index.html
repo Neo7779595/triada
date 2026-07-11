@@ -21924,7 +21924,7 @@ window._kpi3ShellHTML = () => `
           <div class="kpi3-block-sub">Клик на цель — график прогресса и заметка</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="kpi3-btn kpi3-btn-ghost" onclick="_kpi3ClearAllGoals()" title="Удалить все цели этого раздела">
+          <button class="kpi3-btn kpi3-btn-ghost" onclick="_kpi3ClearAllGoals()" title="Удалить все цели этого раздела" id="kpi3-clear-all" style="display:none">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
             Очистить всё
           </button>
@@ -21958,6 +21958,7 @@ window._kpi3SwitchCategory = async (cat) => {
   });
   _kpi3FillRowsNav();
   _kpi3UpdatePaSub();
+  _kpi3UpdateClearBtn();
   await Promise.all([
     _kpi3FillPointA(),
     _kpi3FillGoals(),
@@ -22009,6 +22010,7 @@ window._kpi3SelectRow = async (rowId) => {
   _kpi3.expandedGoalId = null;
   _kpi3FillRowsNav();
   _kpi3UpdatePaSub();
+  _kpi3UpdateClearBtn();
   await Promise.all([
     _kpi3FillPointA(),
     _kpi3FillGoals(),
@@ -22116,11 +22118,21 @@ window._kpi3FetchAllTargetsForScope = async (scopeKind) => {
   });
 };
 
+window._kpi3UpdateClearBtn = () => {
+  const btn = document.getElementById('kpi3-clear-all'); if (!btn) return;
+  const goals = _kpi3.goals || [];
+  const visible = _kpi3.selectedRowId
+    ? goals.filter(g => g.scope_id === _kpi3.selectedRowId).length
+    : goals.length;
+  btn.style.display = visible >= 3 ? '' : 'none';
+};
+
 window._kpi3FillGoals = async () => {
   const target = document.getElementById('kpi3-goals'); if(!target) return;
   target.innerHTML = '<div class="kpi3-loading">Загружаем цели…</div>';
   const allGoals = await _kpi3FetchAllTargetsForScope(_kpi3.category);
   _kpi3.goals = allGoals;
+  _kpi3UpdateClearBtn();
   if (!allGoals.length) {
     target.innerHTML = `<div class="kpi3-empty"><b>Ни одной цели.</b><br/>Начните с одной — что важно улучшить в первую очередь?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Первая цель</button></div>`;
     return;
