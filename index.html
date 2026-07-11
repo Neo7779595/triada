@@ -610,9 +610,24 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .dd-btn>svg{width:11px;height:11px;color:var(--txt-3);transition:.18s;margin-left:2px}
 .dd.open .dd-btn>svg{transform:rotate(180deg);color:var(--accent)}
 .dd-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:190px;max-height:300px;overflow:auto;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;box-shadow:0 16px 44px rgba(0,0,0,.55);display:none;animation:ddIn .14s ease}
-.dd-native{width:100%;padding:10px 34px 10px 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;color:var(--txt,#EAECEF);font-size:13.5px;font-family:inherit;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237A828D' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;color-scheme:dark}
-.dd-native:focus{outline:none;border-color:rgba(138,143,255,.5)}
-.dd-native option{background:var(--bg-1);color:var(--txt,#EAECEF)}
+.cdd{position:relative;width:100%}
+.cdd-btn{width:100%;padding:10px 14px 10px 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;color:var(--txt,#EAECEF);font-size:13.5px;font-family:inherit;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;transition:border-color .14s}
+.cdd-btn:hover{border-color:rgba(138,143,255,.28)}
+.cdd.open .cdd-btn{border-color:rgba(138,143,255,.5)}
+.cdd-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdd-chev{display:inline-flex;width:14px;height:14px;color:var(--txt-3);flex:none;transition:transform .16s}
+.cdd-chev svg{width:14px;height:14px}
+.cdd.open .cdd-chev{transform:rotate(180deg);color:var(--accent)}
+.cdd-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg-1);border:1px solid var(--line-2);border-radius:10px;padding:5px;z-index:100;max-height:260px;overflow-y:auto;overscroll-behavior:contain;box-shadow:0 22px 42px -10px rgba(0,0,0,.75);opacity:0;pointer-events:none;transform:translateY(-4px);transition:opacity .14s,transform .14s}
+.cdd.open .cdd-menu{opacity:1;pointer-events:auto;transform:translateY(0)}
+.cdd.up .cdd-menu{top:auto;bottom:calc(100% + 6px);transform:translateY(4px)}
+.cdd.up.open .cdd-menu{transform:translateY(0)}
+.cdd-opt{width:100%;padding:9px 12px;background:transparent;border:none;border-radius:7px;color:var(--txt,#EAECEF);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;transition:background .1s}
+.cdd-opt:hover{background:rgba(255,255,255,.04)}
+.cdd-opt.on{background:rgba(55,230,200,.08);color:var(--txt,#EAECEF)}
+.cdd-opt-l{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdd-ck{width:15px;height:15px;color:var(--accent);flex:none;opacity:0}
+.cdd-opt.on .cdd-ck{opacity:1}
 .dd-menu.dd-portal{position:fixed;top:0;left:0;z-index:2000;box-shadow:0 24px 60px rgba(0,0,0,.6);display:block;max-height:min(360px,60vh);overflow-y:auto;overscroll-behavior:contain}
 .dd.right .dd-menu{left:auto;right:0}
 .dd.open .dd-menu{display:block}
@@ -7128,13 +7143,75 @@ function _ddSelPick(id,v,l){
 }
 
 window._nativeSelect = function(id, options, cur, placeholder){
+  // Кастомный dropdown в фирменном стиле (inline, без портала — работает в модалках)
   const opts = (options||[]).map(o => Array.isArray(o) ? o : [o, o]);
   cur = (cur == null ? '' : String(cur));
-  const attr = v => String(v == null ? '' : v).replace(/"/g,'&quot;');
-  return `<select class="dd-native" id="${id}">${
-    opts.map(o => `<option value="${attr(o[0])}"${String(o[0])===cur?' selected':''}>${(o[1]||'').replace(/</g,'&lt;')}</option>`).join('')
-  }</select>`;
+  const esc = v => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const co = opts.find(o => String(o[0]) === cur);
+  const lbl = co ? co[1] : (placeholder || 'Выбрать');
+  const chev = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  const check = '<svg class="cdd-ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  return `<div class="cdd" id="cdd-${esc(id)}">
+    <input type="hidden" id="${esc(id)}" value="${esc(cur)}">
+    <button type="button" class="cdd-btn" onclick="event.stopPropagation();_cddToggle('${esc(id)}')">
+      <span class="cdd-lbl" id="cdd-${esc(id)}-lbl">${esc(lbl)}</span>
+      <span class="cdd-chev">${chev}</span>
+    </button>
+    <div class="cdd-menu">
+      ${opts.map(o => `<button type="button" class="cdd-opt${String(o[0])===cur?' on':''}" data-v="${esc(o[0])}" data-l="${esc(o[1])}" onclick="event.stopPropagation();_cddPick('${esc(id)}',this.dataset.v,this.dataset.l)">
+        <span class="cdd-opt-l">${esc(o[1])}</span>
+        ${check}
+      </button>`).join('')}
+    </div>
+  </div>`;
 };
+
+window._cddToggle = function(id) {
+  const wrap = document.getElementById('cdd-' + id); if (!wrap) return;
+  const isOpen = wrap.classList.contains('open');
+  // Закрываем все другие cdd
+  document.querySelectorAll('.cdd.open').forEach(w => { if (w !== wrap) w.classList.remove('open'); });
+  wrap.classList.toggle('open', !isOpen);
+  // Открываем вверх если снизу мало места
+  if (!isOpen) {
+    const menu = wrap.querySelector('.cdd-menu');
+    if (menu) {
+      wrap.classList.remove('up');
+      const btnRect = wrap.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - btnRect.bottom;
+      const spaceAbove = btnRect.top;
+      const menuH = menu.offsetHeight;
+      if (spaceBelow < menuH + 20 && spaceAbove > spaceBelow) wrap.classList.add('up');
+    }
+  }
+};
+
+window._cddPick = function(id, v, l) {
+  const hidden = document.getElementById(id);
+  if (hidden) hidden.value = v;
+  const lblEl = document.getElementById('cdd-' + id + '-lbl');
+  if (lblEl) lblEl.textContent = l;
+  const wrap = document.getElementById('cdd-' + id);
+  if (wrap) {
+    wrap.classList.remove('open');
+    // Обновить .on класс на опциях
+    wrap.querySelectorAll('.cdd-opt').forEach(opt => opt.classList.toggle('on', opt.dataset.v === v));
+  }
+  // Trigger change event для тех кто слушает
+  if (hidden) hidden.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+// Глобальный close-on-outside listener (один раз)
+if (typeof document !== 'undefined' && !window._cddInit) {
+  window._cddInit = true;
+  document.addEventListener('click', function(e) {
+    if (e.target.closest && e.target.closest('.cdd')) return;
+    document.querySelectorAll('.cdd.open').forEach(w => w.classList.remove('open'));
+  }, false);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.querySelectorAll('.cdd.open').forEach(w => w.classList.remove('open'));
+  });
+}
 
 function selField(id, options, cur){
   const opts=(options||[]).map(o=>Array.isArray(o)?o:[o,o]);
