@@ -21792,14 +21792,46 @@ if (window.LIVE){
 */
 
 window._kpi3 = {
-  period: null,               // активный период (для группировки целей)
+  period: null,
   periods: [],
   category: 'member',
   selectedRowId: null,
   expandedGoalId: null,
   goals: [],
   rowVals: {},
-  allTargets: [],             // все цели scope, независимо от period_id
+  allTargets: [],
+  tab: 'overview',             // overview | goals | stats
+};
+
+window._kpi3SwitchTab = (tab) => {
+  _kpi3.tab = tab;
+  document.querySelectorAll('.kpi3-tab').forEach(t => t.classList.toggle('on', t.dataset.tab === tab));
+  ['overview','goals','stats'].forEach(t => {
+    const p = document.getElementById(`kpi3-panel-${t}`);
+    if (p) p.style.display = t === tab ? '' : 'none';
+  });
+  _kpi3UpdateTabActions();
+};
+
+window._kpi3UpdateTabActions = () => {
+  const el = document.getElementById('kpi3-tab-actions'); if (!el) return;
+  if (_kpi3.tab === 'goals') {
+    const count = (_kpi3.goals || []).length;
+    const showClear = count >= 3;
+    el.innerHTML = `
+      ${showClear ? `<button class="kpi3-btn kpi3-btn-ghost" onclick="_kpi3ClearAllGoals()" title="Удалить все цели">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+        Очистить
+      </button>` : ''}
+      <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Цель</button>
+    `;
+    const cntEl = document.getElementById('kpi3-tab-cnt-goals');
+    if (cntEl) cntEl.textContent = count ? String(count) : '';
+  } else {
+    el.innerHTML = '';
+    const cntEl = document.getElementById('kpi3-tab-cnt-goals');
+    if (cntEl) cntEl.textContent = (_kpi3.goals || []).length ? String((_kpi3.goals || []).length) : '';
+  }
 };
 
 // Окно данных теперь всегда фиксированное — последние 30 дней
@@ -21892,6 +21924,7 @@ window.renderKPI = async () => {
   jobs.push(kpiFetchPeriods({ limit: 10 }).then(x => _kpi3.periods = x || []));
   await Promise.all(jobs);
   _kpi3.period = _kpi3.periods.find(p => p.status==='active') || _kpi3.periods.find(p => p.status==='planning') || _kpi3.periods[0] || null;
+  _kpi3SwitchTab(_kpi3.tab || 'overview');
   _kpi3SwitchCategory(_kpi3.category, true);
 };
 
@@ -21912,6 +21945,24 @@ window._kpi3ShellHTML = () => `
     .kpi3-btn-danger:hover{background:rgba(242,102,102,.08);color:var(--neg)}
     .kpi3-btn-sm{padding:5px 10px;font-size:11.5px;border-radius:7px}
     .kpi3-headline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    /* Tabs */
+    .kpi3-tabs-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:6px 4px 14px;border-bottom:1px solid var(--line);margin-bottom:16px}
+    .kpi3-tabs{display:inline-flex;gap:2px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;padding:4px}
+    .kpi3-tab{padding:9px 16px;background:transparent;border:none;border-radius:9px;color:var(--txt-3);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .16s var(--ease-out);letter-spacing:.01em}
+    .kpi3-tab svg{width:15px;height:15px;opacity:.9}
+    .kpi3-tab:hover{color:var(--txt)}
+    .kpi3-tab.on{background:linear-gradient(180deg,var(--panel-2),rgba(138,143,255,.05));color:var(--txt);box-shadow:0 0 0 1px rgba(138,143,255,.28), 0 8px 20px -6px rgba(0,0,0,.45)}
+    .kpi3-tab.on svg{color:var(--accent);opacity:1}
+    .kpi3-tab-cnt{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);background:rgba(255,255,255,.05);padding:2px 7px;border-radius:20px;font-weight:700;min-width:20px;text-align:center}
+    .kpi3-tab.on .kpi3-tab-cnt{color:var(--accent);background:rgba(55,230,200,.12)}
+    .kpi3-tab-cnt:empty{display:none}
+    .kpi3-tab-actions{display:flex;gap:8px;align-items:center}
+    /* Panels */
+    .kpi3-panel{animation:kpi3PanelIn .22s var(--ease-out)}
+    @keyframes kpi3PanelIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .kpi3-panel-h{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+    .kpi3-panel-h-t{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--txt-3);font-weight:700}
+    .kpi3-panel-h-sub{font-size:11px;color:var(--txt-3);opacity:.6}
     .kpi3-cats{display:inline-flex;gap:3px;padding:4px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px}
     .kpi3-cat{padding:10px 18px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .16s var(--ease-out);display:inline-flex;align-items:center;gap:8px;border:none;background:transparent}
     .kpi3-cat:hover{color:var(--txt-1)}
@@ -22159,47 +22210,42 @@ window._kpi3ShellHTML = () => `
       </div>
     </div>
     <div class="kpi3-rows-nav" id="kpi3-rows-nav"></div>
-    <div class="kpi3-section">
-      <div class="kpi3-section-h">
-        <div>
-          <div class="kpi3-block-t">Точка А · где мы сейчас</div>
-          <div class="kpi3-block-sub" id="kpi3-pa-sub">Агрегированные метрики за последние 30 дней</div>
-        </div>
+
+    <div class="kpi3-tabs-wrap">
+      <div class="kpi3-tabs">
+        <button class="kpi3-tab on" data-tab="overview" onclick="_kpi3SwitchTab('overview')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span>Обзор</span>
+        </button>
+        <button class="kpi3-tab" data-tab="goals" onclick="_kpi3SwitchTab('goals')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+          <span>Цели</span>
+          <span class="kpi3-tab-cnt" id="kpi3-tab-cnt-goals"></span>
+        </button>
+        <button class="kpi3-tab" data-tab="stats" onclick="_kpi3SwitchTab('stats')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+          <span>Статистика</span>
+        </button>
       </div>
+      <div id="kpi3-tab-actions" class="kpi3-tab-actions"></div>
+    </div>
+
+    <div class="kpi3-panel" id="kpi3-panel-overview">
       <div id="kpi3-pointa"><div class="kpi3-loading">Считаем реальность…</div></div>
-    </div>
-    <div class="kpi3-section" id="kpi3-team-breakdown-section" style="display:none">
-      <div class="kpi3-section-h">
-        <div>
-          <div class="kpi3-block-t">Проекты команды</div>
-          <div class="kpi3-block-sub" id="kpi3-team-breakdown-sub">Разбивка по каждому проекту</div>
+      <div id="kpi3-team-breakdown-section" style="display:none;margin-top:20px">
+        <div class="kpi3-panel-h">
+          <span class="kpi3-panel-h-t">Проекты команды</span>
+          <span class="kpi3-panel-h-sub" id="kpi3-team-breakdown-sub"></span>
         </div>
+        <div id="kpi3-team-breakdown"></div>
       </div>
-      <div id="kpi3-team-breakdown"><div class="kpi3-loading">Загружаем проекты команды…</div></div>
     </div>
-    <div class="kpi3-section">
-      <div class="kpi3-section-h">
-        <div>
-          <div class="kpi3-block-t">Цели · куда идём</div>
-          <div class="kpi3-block-sub">Клик на цель — график прогресса и заметка</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="kpi3-btn kpi3-btn-ghost" onclick="_kpi3ClearAllGoals()" title="Удалить все цели этого раздела" id="kpi3-clear-all" style="display:none">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
-            Очистить всё
-          </button>
-          <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Цель</button>
-        </div>
-      </div>
+
+    <div class="kpi3-panel" id="kpi3-panel-goals" style="display:none">
       <div id="kpi3-goals"><div class="kpi3-loading">Загружаем цели…</div></div>
     </div>
-    <div class="kpi3-section">
-      <div class="kpi3-section-h">
-        <div>
-          <div class="kpi3-block-t">Статистика · кто как выполняет</div>
-          <div class="kpi3-block-sub">Ранжирование по общему проценту KPI и тренду за неделю</div>
-        </div>
-      </div>
+
+    <div class="kpi3-panel" id="kpi3-panel-stats" style="display:none">
       <div id="kpi3-stats"><div class="kpi3-loading">Считаем рейтинг…</div></div>
     </div>
   </div>
@@ -22209,7 +22255,9 @@ window._kpi3FillTopbar = () => { /* убрано — окно данных и к
 
 window._kpi3SwitchCategory = async (cat) => {
   _kpi3.category = cat;
-  _kpi3.selectedRowId = null;     // при смене категории — сброс на «Все»
+  _kpi3.selectedRowId = null;
+  _kpi3.tab = _kpi3.tab || 'overview';
+  _kpi3SwitchTab(_kpi3.tab);     // при смене категории — сброс на «Все»
   _kpi3.expandedGoalId = null;
   document.querySelectorAll('.kpi3-cat').forEach(t => t.classList.toggle('on', t.dataset.cat === cat));
   ['member','team','project'].forEach(c => {
@@ -22403,14 +22451,7 @@ window._kpi3FetchAllTargetsForScope = async (scopeKind) => {
   });
 };
 
-window._kpi3UpdateClearBtn = () => {
-  const btn = document.getElementById('kpi3-clear-all'); if (!btn) return;
-  const goals = _kpi3.goals || [];
-  const visible = _kpi3.selectedRowId
-    ? goals.filter(g => g.scope_id === _kpi3.selectedRowId).length
-    : goals.length;
-  btn.style.display = visible >= 3 ? '' : 'none';
-};
+window._kpi3UpdateClearBtn = () => { _kpi3UpdateTabActions(); };
 
 window._kpi3FillTeamBreakdown = async () => {
   const wrap = document.getElementById('kpi3-team-breakdown');
