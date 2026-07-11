@@ -22062,6 +22062,13 @@ window._kpi3ShellHTML = () => `
     .kpi3-lock-nm{min-width:0}
     .kpi3-lock-nm b{display:block;color:var(--txt-1);font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .kpi3-lock-nm span{display:block;color:var(--txt-3);font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi3-picker-opt{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;cursor:pointer;transition:all .14s;text-align:left;font-family:inherit;width:100%}
+    .kpi3-picker-opt:hover{border-color:rgba(138,143,255,.35);background:rgba(138,143,255,.04)}
+    .kpi3-picker-av{width:36px;height:36px;border-radius:10px;overflow:hidden;background:var(--panel-2);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:var(--accent);flex:none}
+    .kpi3-picker-av img{width:100%;height:100%;object-fit:cover;display:block}
+    .kpi3-picker-nm{min-width:0}
+    .kpi3-picker-nm b{display:block;color:var(--txt);font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi3-picker-nm span{display:block;color:var(--txt-3);font-size:11.5px;margin-top:2px}
     /* ── DP триггер (заменяет input[type=date]) ── */
     .kpi3-dp-trg{width:100%;padding:10px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;color:var(--txt-1);font-size:13.5px;font-family:var(--mono);font-weight:600;cursor:pointer;transition:all .14s;display:inline-flex;align-items:center;gap:9px;text-align:left}
     .kpi3-dp-trg:hover{border-color:rgba(138,143,255,.32)}
@@ -22876,7 +22883,76 @@ window._kpi3StatsRowHTML = (it, n) => {
   `;
 };
 
-window._kpi3NewGoal = () => _kpi3OpenGoalModal(null);
+window._kpi3NewGoal = () => {
+  // Спец-кейс: если выбрана конкретная команда — сначала спросить проект команды
+  if (_kpi3.category === 'team' && _kpi3.selectedRowId) {
+    _kpi3OpenTeamGoalPicker(_kpi3.selectedRowId);
+    return;
+  }
+  _kpi3OpenGoalModal(null);
+};
+
+/* Модалка: выбор объекта для цели в команде — проект команды или вся команда */
+window._kpi3OpenTeamGoalPicker = async (teamId) => {
+  const team = _kpiScopeRows('team').find(t => t.id === teamId);
+  if (!team) { _kpi3OpenGoalModal(null); return; }
+  const pids = await _kpiSmmScopeProjects('team', teamId);
+  const P = (typeof PROJECTS !== 'undefined' ? PROJECTS : []);
+  const projects = pids.map(pid => P.find(p => p.id === pid)).filter(Boolean);
+  const scrim = document.createElement('div');
+  scrim.className = 'kpi3-scrim';
+  scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
+  const escInit = (name) => _kpi3Esc((name || '?').slice(0, 2).toUpperCase());
+  scrim.innerHTML = `
+    <div class="kpi3-modal">
+      <div class="kpi3-modal-h">
+        <div class="kpi3-modal-t">Цель для «${_kpi3Esc(team.name)}»</div>
+        <button class="kpi3-modal-x" onclick="this.closest('.kpi3-scrim').remove()">×</button>
+      </div>
+      <div class="kpi3-modal-b">
+        <div class="kpi3-field-l" style="margin-bottom:10px">Для кого именно?</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="kpi3-picker-opt" onclick="_kpi3PickTeamGoalScope('team','${_kpi3Esc(teamId)}')">
+            <div class="kpi3-picker-av" style="color:var(--violet);background:rgba(138,143,255,.12)">Σ</div>
+            <div class="kpi3-picker-nm">
+              <b>Вся команда · ${_kpi3Esc(team.name)}</b>
+              <span>Общая цель для всей команды сразу</span>
+            </div>
+          </button>
+          ${projects.length ? `
+            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-3);font-weight:700;margin:12px 2px 4px">Или конкретный проект</div>
+          ` : ''}
+          ${projects.map(p => `
+            <button class="kpi3-picker-opt" onclick="_kpi3PickTeamGoalScope('project','${_kpi3Esc(p.id)}')">
+              <div class="kpi3-picker-av">${(p.logoUrl || p.logo_url) ? `<img src="${_kpi3Esc(p.logoUrl || p.logo_url)}" onerror="this.parentElement.textContent='${escInit(p.name)}'"/>` : escInit(p.name)}</div>
+              <div class="kpi3-picker-nm">
+                <b>${_kpi3Esc(p.name)}</b>
+                ${p.service ? `<span>${_kpi3Esc(p.service)}</span>` : ''}
+              </div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="kpi3-modal-f">
+        <button class="kpi3-btn kpi3-btn-ghost" onclick="this.closest('.kpi3-scrim').remove()">Отмена</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(scrim);
+};
+
+window._kpi3PickTeamGoalScope = (kind, id) => {
+  // Закрываем picker и открываем обычную модалку +Цель для выбранного scope+row
+  document.querySelectorAll('.kpi3-scrim').forEach(sc => sc.remove());
+  const prevCat = _kpi3.category;
+  const prevRow = _kpi3.selectedRowId;
+  _kpi3.category = kind;
+  _kpi3.selectedRowId = id;
+  _kpi3OpenGoalModal(null);
+  // Восстанавливаем UI-контекст (не сбиваем текущую drill-down команду)
+  _kpi3.category = prevCat;
+  _kpi3.selectedRowId = prevRow;
+};
 
 window._kpi3RowDropdownHTML = (rows, selectedId) => {
   const sel = rows.find(r => r.id === selectedId) || rows[0];
