@@ -21732,7 +21732,8 @@ window._kpi3ShellHTML = () => `
     .kpi3-goals-list{display:flex;flex-direction:column;gap:10px}
     .kpi3-goal{background:var(--panel-3);border:1px solid var(--line);border-radius:13px;overflow:hidden;transition:all .18s var(--ease-out)}
     .kpi3-goal.expanded{border-color:rgba(138,143,255,.28);box-shadow:0 8px 24px -8px rgba(0,0,0,.4)}
-    .kpi3-goal-head{padding:14px 18px;display:grid;grid-template-columns:1fr auto auto;gap:20px;align-items:center;cursor:pointer;transition:background .14s}
+    .kpi3-goal-head{padding:14px 18px;display:grid;grid-template-columns:1fr auto auto;gap:20px;align-items:center;transition:background .14s}
+    .kpi3-goal-head .kpi3-goal-info:hover{color:var(--txt-1)}
     .kpi3-goal-head:hover{background:rgba(255,255,255,.02)}
     .kpi3-goal-info{min-width:0}
     .kpi3-goal-title{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-size:14px}
@@ -21756,6 +21757,11 @@ window._kpi3ShellHTML = () => `
     .kpi3-goal-days{color:var(--txt-3)}
     .kpi3-goal-toggle{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.03);color:var(--txt-2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;transition:all .14s;line-height:1}
     .kpi3-goal.expanded .kpi3-goal-toggle{background:var(--accent);color:#031a15}
+    .kpi3-goal-actions{display:flex;gap:6px;align-items:center}
+    .kpi3-goal-del{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.03);color:var(--txt-3);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .14s;padding:0}
+    .kpi3-goal-del svg{width:15px;height:15px}
+    .kpi3-goal-del:hover{background:rgba(242,102,102,.12);color:var(--neg)}
+    .kpi3-goal-toggle{cursor:pointer;border:none}
     .kpi3-rpm{padding:0 18px 18px;border-top:1px solid var(--line);background:rgba(138,143,255,.025);animation:kpi3Slide .22s var(--ease-out)}
     @keyframes kpi3Slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
     .kpi3-rpm-row{display:grid;grid-template-columns:36px 1fr;gap:14px;padding:16px 0;border-bottom:1px dashed rgba(255,255,255,.05)}
@@ -22153,8 +22159,8 @@ window._kpi3GoalCardHTML = (g, row) => {
   const map = Array.isArray(rawMap) ? rawMap : (typeof rawMap === 'string' ? _kpi3TryParseJson(rawMap, []) : []);
   return `
     <div class="kpi3-goal ${status.cls} ${isExpanded ? 'expanded' : ''}" data-gid="${g.id}">
-      <div class="kpi3-goal-head" onclick="_kpi3ToggleGoal('${g.id}')">
-        <div class="kpi3-goal-info">
+      <div class="kpi3-goal-head">
+        <div class="kpi3-goal-info" onclick="_kpi3ToggleGoal('${g.id}')" style="cursor:pointer">
           <div class="kpi3-goal-title">
             <span class="kpi3-goal-metric">${m.label}</span>
             <span class="kpi3-goal-row" title="${_kpi3Esc(rowName)} ${rowSub ? '· '+_kpi3Esc(rowSub) : ''}">· ${_kpi3Esc(rowName)}</span>
@@ -22165,7 +22171,7 @@ window._kpi3GoalCardHTML = (g, row) => {
             <span class="kpi3-goal-tgt">${_kpi3Fmt(target, m.unit)}</span>
           </div>
         </div>
-        <div class="kpi3-goal-progress">
+        <div class="kpi3-goal-progress" onclick="_kpi3ToggleGoal('${g.id}')" style="cursor:pointer">
           <div class="kpi3-goal-bar"><div class="kpi3-goal-fill" style="width:${progress}%"></div></div>
           <div class="kpi3-goal-meta">
             <span class="kpi3-goal-pct">${Math.round(progress)}%</span>
@@ -22173,7 +22179,12 @@ window._kpi3GoalCardHTML = (g, row) => {
             ${daysLeft != null ? `<span class="kpi3-goal-days">осталось ${daysLeft} дн.</span>` : ''}
           </div>
         </div>
-        <div class="kpi3-goal-toggle">${isExpanded ? '−' : '+'}</div>
+        <div class="kpi3-goal-actions">
+          <button type="button" class="kpi3-goal-del" onclick="event.stopPropagation();_kpi3DelGoal('${g.id}')" title="Удалить цель">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+          </button>
+          <button type="button" class="kpi3-goal-toggle" onclick="_kpi3ToggleGoal('${g.id}')" title="${isExpanded ? 'Свернуть' : 'Раскрыть RPM'}">${isExpanded ? '−' : '+'}</button>
+        </div>
       </div>
       ${isExpanded ? _kpi3RPMHTML(g, m, target, curV, rowName, map) : ''}
     </div>
