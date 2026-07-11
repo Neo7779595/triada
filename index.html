@@ -5098,22 +5098,25 @@ button:active{transform:translateY(.5px) scale(.99)}
 /* ═══════════ Профиль-модалка v2 · премиум-стекло (сюда перенесён тариф) ═══════════ */
 /* Стекло применяется ТОЛЬКО к .modal.glass — глобальный .modal не трогаем, остальные окна не меняются */
 .modal.glass{
-  position:relative;overflow:hidden;
-  background:linear-gradient(180deg,rgba(21,28,24,.80),rgba(13,17,15,.74));
-  backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);
+  position:relative;overflow:hidden;isolation:isolate;background:transparent;
   border:1px solid var(--line-2);border-radius:20px;
   box-shadow:0 40px 100px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.05);
 }
+/* Стекло вынесено на отдельный слой-подложку (::after), а не на контейнер с контентом:
+   иначе Chromium при backdrop-filter + бесконечной анимации у потомка (пульс презенса) гасит содержимое панели. */
+.modal.glass::after{content:"";position:absolute;inset:0;z-index:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(180deg,rgba(21,28,24,.86),rgba(13,17,15,.82));
+  backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%)}
 /* тонкая световая линия по верхней кромке — язык из login-card */
-.modal.glass::before{content:"";position:absolute;top:0;left:14%;right:14%;height:1px;
+.modal.glass::before{content:"";position:absolute;top:0;left:14%;right:14%;height:1px;z-index:2;
   background:linear-gradient(90deg,transparent,var(--accent-line),transparent);opacity:.7;pointer-events:none}
 /* закрытие */
 .pm2-x{position:absolute;top:14px;right:14px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;
   border:1px solid var(--line-2);background:rgba(255,255,255,.03);color:var(--txt-3);border-radius:10px;cursor:pointer;
-  transition:color .14s var(--ease),border-color .14s var(--ease),background .14s var(--ease);z-index:2}
+  transition:color .14s var(--ease),border-color .14s var(--ease),background .14s var(--ease);z-index:3}
 .pm2-x:hover{color:var(--txt);background:rgba(255,255,255,.07)}
 .pm2-x svg{width:16px;height:16px}
-.pm2{padding:26px 24px 22px}
+.pm2{position:relative;z-index:1;padding:26px 24px 22px}
 /* ——— слой 1 · идентичность ——— */
 .pm2-id{display:flex;align-items:center;gap:16px}
 .pm2-av{position:relative;flex:none}
@@ -5169,23 +5172,20 @@ button:active{transform:translateY(.5px) scale(.99)}
   transition:color .14s var(--ease),border-color .14s var(--ease),background .14s var(--ease)}
 .pm2-tg-act:hover{border-color:var(--accent-line);color:var(--accent);background:var(--accent-dim)}
 .pm2-tg-act svg{width:14px;height:14px}
-/* ——— сигнал лимита на чипе «● detroyd»: тонкие подсвеченные линии по бокам (дыхание) ——— */
+/* ——— сигнал лимита на чипе «● detroyd»: ровное свечение по всему периметру (дыхание) ——— */
 #ag-uchip{position:relative}
 #ag-uchip.plan-warn{border-color:color-mix(in srgb,var(--warn) 34%,var(--line-2))}
 #ag-uchip.plan-over{border-color:color-mix(in srgb,var(--neg) 38%,var(--line-2))}
-#ag-uchip.plan-warn::before,#ag-uchip.plan-over::before,
 #ag-uchip.plan-warn::after,#ag-uchip.plan-over::after{
-  content:"";position:absolute;top:5px;bottom:5px;width:1.5px;border-radius:2px;pointer-events:none;
-  animation:uchipEdge 2.2s var(--ease) infinite}
-#ag-uchip.plan-warn::before,#ag-uchip.plan-over::before{left:-1px}
-#ag-uchip.plan-warn::after,#ag-uchip.plan-over::after{right:-1px;animation-delay:.4s}
-#ag-uchip.plan-warn::before,#ag-uchip.plan-warn::after{background:var(--warn);box-shadow:0 0 8px var(--warn)}
-#ag-uchip.plan-over::before,#ag-uchip.plan-over::after{background:var(--neg);box-shadow:0 0 8px var(--neg)}
-@keyframes uchipEdge{0%,100%{opacity:.2}50%{opacity:1}}
+  content:"";position:absolute;inset:-1px;border-radius:10px;pointer-events:none;border:1px solid transparent;
+  animation:uchipGlow 2.4s var(--ease) infinite}
+#ag-uchip.plan-warn::after{border-color:var(--warn);box-shadow:0 0 10px -1px var(--warn),inset 0 0 9px -4px var(--warn)}
+#ag-uchip.plan-over::after{border-color:var(--neg);box-shadow:0 0 10px -1px var(--neg),inset 0 0 9px -4px var(--neg)}
+@keyframes uchipGlow{0%,100%{opacity:.4}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){
   .pm2-plan-bar i{transition:none}
   .pm2-on::after{animation:none;opacity:0}
-  #ag-uchip.plan-warn::before,#ag-uchip.plan-over::before,#ag-uchip.plan-warn::after,#ag-uchip.plan-over::after{animation:none;opacity:.75}
+  #ag-uchip.plan-warn::after,#ag-uchip.plan-over::after{animation:none;opacity:.85}
 }
 @media(max-width:480px){.modal.glass{border-radius:16px}.pm2{padding:22px 18px 18px}}
 </style>
