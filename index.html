@@ -17124,10 +17124,20 @@ window.tTaskAdd = async (projectId,row) => {
   if(typeof pd2Close==='function')pd2Close();
   try {
   let {data,error}=await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
-  if(error && /review_|difficulty|priority/.test(error.message||'')){                 // каких-то новых колонок ещё нет — шлём без них, значения остаются локально
+  if(error && /review_|difficulty|priority/.test(error.message||'')){                 // каких-то новых колонок ещё нет — шлём без них
     const {review_started,review_spent,difficulty,priority,...row2}=row||{};
     const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}).select('*').single(); error=r2.error; data=r2.data;
     if(!error && data){ if(difficulty!=null)data.difficulty=difficulty; if(priority!=null)data.priority=priority; }
+  }
+  // RLS-фолбэк: если session истёк, auth.uid()=null → my_agency()=null → RLS блокирует.
+  // Пробуем refreshSession и повтор один раз.
+  if(error && /row-level security|violates row-level/i.test(error.message||'')){
+    try { await SB.auth.refreshSession(); } catch(_){}
+    const r3 = await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
+    error = r3.error; data = r3.data;
+    if (error && /row-level security/i.test(error.message||'')) {
+      throw new Error('Сессия истекла. Обновите страницу (Cmd+Shift+R) или перезайдите в аккаунт.');
+    }
   }
   if(error)throw error;
   if(_p&&_p._tasks){ const _i=_p._tasks.indexOf(_tmp);                               // подменяем временную карточку реальной строкой из БД
