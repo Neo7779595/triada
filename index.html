@@ -21691,6 +21691,25 @@ window._kpi3Fmt = (v, unit) => {
   if (unit === 'ед.') return `${n.toFixed(n < 10 ? 1 : 0)}`;
   return _kpi3ShortNum(n);
 };
+
+// Точный формат — с разрядами (1 505 234) для больших мест: RPM-график, детали.
+window._kpi3FmtExact = (v, unit) => {
+  if (v == null || Number.isNaN(v)) return '—';
+  const n = Number(v);
+  if (unit === '%') return `${n.toFixed(n < 10 ? 2 : 1)}%`;
+  if (unit === 'ч') return _kpi3FmtHours(n);
+  if (unit === '$') return `$${_kpi3FmtGrouped(n, 0)}`;
+  if (unit === 'чел') return `${_kpi3FmtGrouped(n, 0)}`;
+  if (unit === 'ед.') return _kpi3FmtGrouped(n, n % 1 === 0 ? 0 : 1);
+  return _kpi3FmtGrouped(n, n % 1 === 0 ? 0 : 0);
+};
+
+window._kpi3FmtGrouped = (n, decimals) => {
+  const rounded = Math.round(n * Math.pow(10, decimals)) / Math.pow(10, decimals);
+  const [intPart, decPart] = String(rounded).split('.');
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return decPart != null && decimals > 0 ? grouped + ',' + decPart.padEnd(decimals, '0') : grouped;
+};
 window._kpi3FmtHours = (hours) => {
   // Часы (число, может быть дробным) → «45 мин» / «1 ч 30 мин» / «2 ч» / «1 д 3 ч»
   if (hours == null || Number.isNaN(hours)) return '—';
@@ -21803,12 +21822,15 @@ window._kpi3ShellHTML = () => `
     .kpi3-goal-metric{font-weight:700;color:var(--txt-1);letter-spacing:-.005em}
     .kpi3-goal-row{color:var(--txt-3);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .kpi3-goal-values{display:flex;align-items:baseline;gap:9px;font-family:var(--mono)}
-    .kpi3-goal-cur{font-size:20px;font-weight:800;color:var(--txt-1)}
-    .kpi3-goal-arrow{color:var(--txt-3);font-size:11px}
+    .kpi3-goal-cur{font-size:20px;font-weight:800;color:var(--txt-1);font-variant-numeric:tabular-nums}
+    .kpi3-goal-tgt{font-variant-numeric:tabular-nums}
+    .kpi3-goal-arrow{width:14px;height:14px;color:var(--txt-3);opacity:.7}
     .kpi3-goal-tgt{font-size:16px;color:var(--accent);font-weight:700}
     .kpi3-goal-progress{min-width:200px;display:flex;flex-direction:column;gap:6px}
-    .kpi3-goal-bar{height:6px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
-    .kpi3-goal-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .4s var(--ease-out)}
+    .kpi3-goal-bar{height:8px;background:rgba(0,0,0,.35);border-radius:5px;overflow:hidden;position:relative;box-shadow:inset 0 1px 2px rgba(0,0,0,.4)}
+    .kpi3-goal-bar::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.04) 0%,transparent 40%);pointer-events:none;border-radius:5px;z-index:2}
+    .kpi3-goal-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));transition:width .5s cubic-bezier(.2,.9,.3,1);position:relative;box-shadow:0 0 12px rgba(55,230,200,.35)}
+    .kpi3-goal-fill::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,.05) 45%,transparent 100%);border-radius:5px;pointer-events:none}
     .kpi3-goal.warn .kpi3-goal-fill{background:linear-gradient(90deg,var(--warn),#E3B567)}
     .kpi3-goal.neg .kpi3-goal-fill{background:linear-gradient(90deg,var(--neg),#F26666)}
     .kpi3-goal-meta{display:flex;align-items:center;gap:10px;font-size:11px;font-family:var(--mono)}
@@ -21827,8 +21849,14 @@ window._kpi3ShellHTML = () => `
     .kpi3-goal-toggle{cursor:pointer;border:none}
     .kpi3-rpm{padding:20px 22px 22px;border-top:1px solid var(--line);background:linear-gradient(180deg,rgba(138,143,255,.03),transparent 60%);animation:kpi3Slide .22s var(--ease-out);display:flex;flex-direction:column;gap:18px}
     @keyframes kpi3Slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-    .kpi3-rpm-graph{position:relative}
-    .kpi3-rpm-graph svg{max-width:100%}
+    .kpi3-rpm-graph{position:relative;padding:6px 0 8px}
+    .kpi3-rpm-graph svg{max-width:100%;filter:drop-shadow(0 4px 20px rgba(0,0,0,.4))}
+    .kpi3-rpm-current{position:absolute;top:50%;left:50%;transform:translate(-50%,-58%);background:linear-gradient(180deg,rgba(11,21,18,.95),rgba(11,21,18,.85));border:1px solid rgba(55,230,200,.18);border-radius:14px;padding:12px 22px;text-align:center;backdrop-filter:blur(8px);pointer-events:none;box-shadow:0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02);min-width:160px}
+    .kpi3-rpm-current-lbl{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin-bottom:4px;font-family:var(--mono)}
+    .kpi3-rpm-current-val{font-size:26px;font-weight:800;color:var(--txt-1);letter-spacing:-.02em;font-family:var(--mono);line-height:1;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .kpi3-rpm-current-delta{font-size:11px;font-weight:700;margin-top:5px;font-family:var(--mono);letter-spacing:.02em}
+    .kpi3-rpm-current-delta.pos{color:var(--pos)}
+    .kpi3-rpm-current-delta.neg{color:var(--warn)}
     .kpi3-rpm-summary{display:flex;align-items:center;gap:14px;padding:12px 18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:11px;margin-top:8px;font-size:13px}
     .kpi3-rpm-summary-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-3);font-weight:700}
     .kpi3-rpm-summary-val{font-weight:700;color:var(--txt-1);flex:1}
@@ -22283,9 +22311,9 @@ window._kpi3GoalCardHTML = (g, row) => {
             <span class="kpi3-goal-row" title="${_kpi3Esc(rowName)} ${rowSub ? '· '+_kpi3Esc(rowSub) : ''}">· ${_kpi3Esc(rowName)}</span>
           </div>
           <div class="kpi3-goal-values">
-            <span class="kpi3-goal-cur">${curV != null ? _kpi3Fmt(curV, m.unit) : '—'}</span>
-            <span class="kpi3-goal-arrow">▶</span>
-            <span class="kpi3-goal-tgt">${_kpi3Fmt(target, m.unit)}</span>
+            <span class="kpi3-goal-cur">${curV != null ? _kpi3FmtExact(curV, m.unit) : '—'}</span>
+            <svg class="kpi3-goal-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            <span class="kpi3-goal-tgt">${_kpi3FmtExact(target, m.unit)}</span>
           </div>
         </div>
         <div class="kpi3-goal-progress" onclick="_kpi3ToggleGoal('${g.id}')" style="cursor:pointer">
@@ -22334,58 +22362,111 @@ window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => {
   const statusLabel = progress >= 1 ? '✓ достигли' : (gap >= -0.05 ? 'в темпе' : gap >= -0.2 ? 'отстаём' : 'проваливаем');
   const gapPct = Math.round(Math.abs(gap) * 100);
 
-  // SVG layout
-  const W = 720, H = 140, padX = 40, padY = 30;
-  const trackY = 78;
+  // Premium SVG layout: раздельные ряды для «сейчас» / «ожидание» чтобы не наезжали
+  const W = 820, H = 220, padX = 70;
+  const trackY = 110;
   const x0 = padX, x1 = W - padX;
   const curX = x0 + (x1 - x0) * progress;
   const expX = x0 + (x1 - x0) * expectedProgress;
+  const showCurLabel = cur != null;
+  // Разъединяем «current» и «expected» метки по-разному чтобы не пересекались
+  const labelsOverlap = showCurLabel && Math.abs(curX - expX) < 90;
+  const curLabelBelow = true; // current всегда снизу
+  const expLabelAbove = true; // expected сверху
 
   return `
   <div class="kpi3-rpm" onclick="event.stopPropagation()">
     <div class="kpi3-rpm-graph">
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}" style="display:block">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" width="100%" height="${H}" style="display:block">
         <defs>
           <linearGradient id="kpi3-fill-${g.id}" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stop-color="var(--accent)"/>
             <stop offset="1" stop-color="var(--violet)"/>
           </linearGradient>
+          <linearGradient id="kpi3-highlight-${g.id}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="rgba(255,255,255,.35)"/>
+            <stop offset=".5" stop-color="rgba(255,255,255,.05)"/>
+            <stop offset="1" stop-color="rgba(0,0,0,.15)"/>
+          </linearGradient>
+          <radialGradient id="kpi3-glow-${g.id}" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="var(--accent)" stop-opacity=".55"/>
+            <stop offset="1" stop-color="var(--accent)" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="kpi3-glow-target-${g.id}" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="var(--violet)" stop-opacity=".45"/>
+            <stop offset="1" stop-color="var(--violet)" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="kpi3-soft-${g.id}" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.2"/>
+          </filter>
         </defs>
-        <!-- фон трека -->
-        <rect x="${x0}" y="${trackY-4}" width="${x1-x0}" height="8" rx="4" fill="rgba(255,255,255,.05)"/>
-        <!-- прогресс fill -->
-        <rect x="${x0}" y="${trackY-4}" width="${Math.max(0, curX - x0)}" height="8" rx="4" fill="url(#kpi3-fill-${g.id})"/>
-        <!-- метка «Ожидание по темпу» — пунктирная -->
-        <line x1="${expX}" y1="${trackY-16}" x2="${expX}" y2="${trackY+16}" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-dasharray="3 3"/>
-        <text x="${expX}" y="${trackY-22}" fill="var(--txt-3)" font-size="11" font-family="var(--mono)" text-anchor="middle" font-weight="600">
-          ожидание · ${Math.round(expectedProgress*100)}%
+
+        <!-- Внешние ticks: 0%, 25%, 50%, 75%, 100% -->
+        ${[0, .25, .5, .75, 1].map(p => {
+          const tx = x0 + (x1-x0)*p;
+          return `<line x1="${tx}" y1="${trackY+16}" x2="${tx}" y2="${trackY+22}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
+        }).join('')}
+
+        <!-- Track background: глубокий рельеф -->
+        <rect x="${x0-2}" y="${trackY-9}" width="${x1-x0+4}" height="18" rx="9" fill="rgba(0,0,0,.35)"/>
+        <rect x="${x0}" y="${trackY-7}" width="${x1-x0}" height="14" rx="7" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.05)" stroke-width="1"/>
+
+        <!-- Внутренние divisions по 25% -->
+        ${[.25, .5, .75].map(p => {
+          const dx = x0 + (x1-x0)*p;
+          return `<line x1="${dx}" y1="${trackY-6}" x2="${dx}" y2="${trackY+6}" stroke="rgba(255,255,255,.04)" stroke-width="1"/>`;
+        }).join('')}
+
+        <!-- Прогресс fill с внутренним highlight -->
+        ${progress > 0 ? `
+          <rect x="${x0}" y="${trackY-7}" width="${Math.max(0, curX - x0)}" height="14" rx="7" fill="url(#kpi3-fill-${g.id})"/>
+          <rect x="${x0}" y="${trackY-7}" width="${Math.max(0, curX - x0)}" height="14" rx="7" fill="url(#kpi3-highlight-${g.id})" opacity=".7"/>
+        ` : ''}
+
+        <!-- Пунктирная линия «Ожидание» -->
+        <line x1="${expX}" y1="${trackY-30}" x2="${expX}" y2="${trackY+30}" stroke="rgba(255,255,255,.28)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <circle cx="${expX}" cy="${trackY-30}" r="2" fill="rgba(255,255,255,.4)"/>
+        <text x="${expX}" y="${trackY-40}" fill="var(--txt-3)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.08em">
+          ОЖИДАНИЕ · ${Math.round(expectedProgress*100)}%
         </text>
-        <!-- метка «Сейчас» — круг -->
-        ${cur != null ? `
-          <circle cx="${curX}" cy="${trackY}" r="10" fill="#0b1512" stroke="var(--accent)" stroke-width="3"/>
-          <circle cx="${curX}" cy="${trackY}" r="4" fill="var(--accent)"/>
-          <text x="${curX}" y="${trackY+34}" fill="var(--txt-1)" font-size="15" font-family="var(--mono)" text-anchor="middle" font-weight="800">
-            ${_kpi3Esc(_kpi3Fmt(cur, m.unit))}
-          </text>
-          <text x="${curX}" y="${trackY+50}" fill="var(--txt-3)" font-size="11" font-family="var(--mono)" text-anchor="middle" font-weight="600">
-            сейчас · ${Math.round(progress*100)}%
-          </text>
+
+        <!-- Точка А (baseline) — subtle -->
+        <circle cx="${x0}" cy="${trackY}" r="14" fill="rgba(255,255,255,.04)"/>
+        <circle cx="${x0}" cy="${trackY}" r="7" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
+        <circle cx="${x0}" cy="${trackY}" r="2.5" fill="rgba(255,255,255,.55)"/>
+        <text x="${x0}" y="${trackY-38}" fill="var(--txt-3)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">ТОЧКА А</text>
+        <text x="${x0}" y="${trackY+52}" fill="var(--txt-1)" font-size="16" font-family="var(--mono)" text-anchor="middle" font-weight="800" letter-spacing="-.01em">${_kpi3Esc(_kpi3FmtExact(baseline, m.unit))}</text>
+
+        <!-- Цель (target) — premium accent -->
+        <circle cx="${x1}" cy="${trackY}" r="20" fill="url(#kpi3-glow-target-${g.id})"/>
+        <circle cx="${x1}" cy="${trackY}" r="11" fill="#0b1512" stroke="var(--violet)" stroke-width="2.5"/>
+        <circle cx="${x1}" cy="${trackY}" r="6" fill="var(--violet)"/>
+        <circle cx="${x1}" cy="${trackY}" r="2" fill="#fff" opacity=".9"/>
+        <text x="${x1}" y="${trackY-38}" fill="var(--violet)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">ЦЕЛЬ</text>
+        <text x="${x1}" y="${trackY+52}" fill="var(--txt-1)" font-size="16" font-family="var(--mono)" text-anchor="middle" font-weight="800" letter-spacing="-.01em">${_kpi3Esc(_kpi3FmtExact(targetV, m.unit))}</text>
+        ${endDate ? `<text x="${x1}" y="${trackY+70}" fill="var(--txt-3)" font-size="10.5" font-family="var(--mono)" text-anchor="middle" font-weight="600">${_kpi3Esc(_kpi3FmtDate(endDate.toISOString()))}</text>` : ''}
+
+        <!-- Маркер «Сейчас» — glow + двойное кольцо + внутренняя точка -->
+        ${showCurLabel ? `
+          <circle cx="${curX}" cy="${trackY}" r="22" fill="url(#kpi3-glow-${g.id})"/>
+          <circle cx="${curX}" cy="${trackY}" r="13" fill="#0b1512" stroke="var(--accent)" stroke-width="2.5"/>
+          <circle cx="${curX}" cy="${trackY}" r="7" fill="var(--accent)"/>
+          <circle cx="${curX}" cy="${trackY}" r="2.5" fill="#fff" opacity=".95"/>
+          <text x="${curX}" y="${trackY-38}" fill="var(--accent)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">СЕЙЧАС · ${Math.round(progress*100)}%</text>
         ` : `
-          <circle cx="${x0}" cy="${trackY}" r="8" fill="#0b1512" stroke="var(--txt-3)" stroke-width="2"/>
           <text x="${x0+30}" y="${trackY+4}" fill="var(--txt-3)" font-size="12" font-family="var(--mono)">нет данных</text>
         `}
-        <!-- Точка А (baseline) слева -->
-        <circle cx="${x0}" cy="${trackY}" r="6" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.35)" stroke-width="2"/>
-        <text x="${x0}" y="${trackY-22}" fill="var(--txt-3)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.1em">ТОЧКА А</text>
-        <text x="${x0}" y="${trackY+34}" fill="var(--txt-2)" font-size="13" font-family="var(--mono)" text-anchor="middle" font-weight="700">${_kpi3Esc(_kpi3Fmt(baseline, m.unit))}</text>
-        <!-- Цель (target) справа -->
-        <circle cx="${x1}" cy="${trackY}" r="8" fill="var(--accent)" stroke="#0b1512" stroke-width="2"/>
-        <text x="${x1}" y="${trackY-22}" fill="var(--accent)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.1em">ЦЕЛЬ</text>
-        <text x="${x1}" y="${trackY+34}" fill="var(--accent)" font-size="15" font-family="var(--mono)" text-anchor="middle" font-weight="800">${_kpi3Esc(_kpi3Fmt(targetV, m.unit))}</text>
-        <text x="${x1}" y="${trackY+50}" fill="var(--txt-3)" font-size="11" font-family="var(--mono)" text-anchor="middle" font-weight="600">
-          ${endDate ? _kpi3Esc(_kpi3FmtDate(endDate.toISOString())) : ''}
-        </text>
       </svg>
+
+      ${showCurLabel ? `
+        <div class="kpi3-rpm-current">
+          <div class="kpi3-rpm-current-lbl">ТЕКУЩЕЕ ЗНАЧЕНИЕ</div>
+          <div class="kpi3-rpm-current-val">${_kpi3Esc(_kpi3FmtExact(cur, m.unit))}</div>
+          <div class="kpi3-rpm-current-delta ${gap >= 0 ? 'pos' : 'neg'}">
+            ${gap >= 0 ? '+' : ''}${Math.round(gap * 100)}% от плана
+          </div>
+        </div>
+      ` : ''}
       <div class="kpi3-rpm-summary ${statusCls}">
         <span class="kpi3-rpm-summary-lbl">Статус</span>
         <span class="kpi3-rpm-summary-val">${statusLabel}${progress < 1 && Math.abs(gap) >= 0.05 ? ` · ${gap < 0 ? 'на ' + gapPct + '% меньше плана' : 'на ' + gapPct + '% опережаем'}` : ''}</span>
