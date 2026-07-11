@@ -21320,10 +21320,30 @@ window._kpi3 = {
   period: null,
   periods: [],
   category: 'member',
-  selectedRowId: null,       // null = агрегат «Все»; иначе конкретный member/team/project
+  selectedRowId: null,
   expandedGoalId: null,
   goals: [],
   rowVals: {},
+  window: { kind: 'month', days: 30, from: null, to: null },  // окно данных
+};
+
+// Хелперы окна: возвращают {from, to, label}
+window._kpi3ResolveWindow = () => {
+  const w = _kpi3.window || { kind: 'month' };
+  const now = new Date();
+  const to = new Date(now);
+  let from, days;
+  if (w.kind === 'week')    { days = 7;  from = new Date(now.getTime() - 7*86400000); }
+  else if (w.kind === 'quarter'){ days = 90; from = new Date(now.getTime() - 90*86400000); }
+  else if (w.kind === 'custom' && w.from && w.to) {
+    from = new Date(w.from);
+    const t = new Date(w.to);
+    to.setTime(t.getTime());
+    days = Math.max(1, Math.round((to - from) / 86400000));
+  } else { days = 30; from = new Date(now.getTime() - 30*86400000); w.kind = 'month'; }
+  const labels = { week:'7 дней', month:'30 дней', quarter:'90 дней' };
+  const label = w.kind === 'custom' ? `${_kpi3FmtDate(from.toISOString())} — ${_kpi3FmtDate(to.toISOString())} · ${days} дн.` : labels[w.kind];
+  return { from: from.toISOString(), to: to.toISOString(), days, label };
 };
 
 window._kpi3TpiKeys = ['vyrabotka','skorost','nadezhnost','kachestvo'];
@@ -21393,6 +21413,12 @@ window._kpi3ShellHTML = () => `
     .kpi3-btn-danger{background:transparent;color:var(--neg);border-color:rgba(242,102,102,.25)}
     .kpi3-btn-danger:hover{background:rgba(242,102,102,.08);color:var(--neg)}
     .kpi3-btn-sm{padding:5px 10px;font-size:11.5px;border-radius:7px}
+    .kpi3-headline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .kpi3-headline .kpi3-top-actions{margin-left:auto}
+    .kpi3-win{display:inline-flex;gap:3px;padding:4px;background:var(--panel-3);border:1px solid var(--line);border-radius:10px}
+    .kpi3-win-chip{padding:8px 14px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s;background:transparent;border:none}
+    .kpi3-win-chip:hover{color:var(--txt-1)}
+    .kpi3-win-chip.on{background:var(--panel-2);color:var(--txt-1);box-shadow:0 0 0 1px rgba(138,143,255,.18)}
     .kpi3-cats{display:inline-flex;gap:3px;padding:4px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px}
     .kpi3-cat{padding:10px 18px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .16s var(--ease-out);display:inline-flex;align-items:center;gap:8px;border:none;background:transparent}
     .kpi3-cat:hover{color:var(--txt-1)}
@@ -21400,7 +21426,7 @@ window._kpi3ShellHTML = () => `
     .kpi3-cat-ic{font-size:16px}
     .kpi3-cat-cnt{font-family:var(--mono);font-size:11px;color:var(--txt-3);background:rgba(255,255,255,.04);padding:2px 7px;border-radius:20px}
     .kpi3-cat.on .kpi3-cat-cnt{color:var(--accent);background:rgba(55,230,200,.1)}
-    .kpi3-rows-nav{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:-4px;padding:0 4px}
+    .kpi3-rows-nav{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start;margin-top:-4px;padding:0 4px}
     .kpi3-row-chip{padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s;background:var(--panel-3);border:1px solid var(--line);display:inline-flex;align-items:center;gap:7px;max-width:220px;overflow:hidden}
     .kpi3-row-chip:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
     .kpi3-row-chip.on{background:linear-gradient(135deg,rgba(55,230,200,.15),rgba(138,143,255,.08));color:var(--txt-1);border-color:var(--accent)}
@@ -21538,14 +21564,7 @@ window._kpi3ShellHTML = () => `
     }
   </style>
   <div class="kpi3-wrap">
-    <div class="kpi3-topbar">
-      <div class="kpi3-title">
-        <b>Панель KPI</b>
-        <span class="kpi3-period-lbl" id="kpi3-period-label">—</span>
-      </div>
-      <div class="kpi3-top-actions" id="kpi3-top-actions"></div>
-    </div>
-    <div style="display:flex;justify-content:center">
+    <div class="kpi3-headline">
       <div class="kpi3-cats" id="kpi3-cats-nav">
         <button class="kpi3-cat on" data-cat="member" onclick="_kpi3SwitchCategory('member')">
           <span class="kpi3-cat-ic">👤</span>Сотрудники<span class="kpi3-cat-cnt" id="kpi3-cnt-member">—</span>
@@ -21557,6 +21576,13 @@ window._kpi3ShellHTML = () => `
           <span class="kpi3-cat-ic">📦</span>Проекты<span class="kpi3-cat-cnt" id="kpi3-cnt-project">—</span>
         </button>
       </div>
+      <div class="kpi3-win" id="kpi3-win-nav">
+        <button class="kpi3-win-chip" data-win="week" onclick="_kpi3SetWindow('week')">Неделя</button>
+        <button class="kpi3-win-chip on" data-win="month" onclick="_kpi3SetWindow('month')">Месяц</button>
+        <button class="kpi3-win-chip" data-win="quarter" onclick="_kpi3SetWindow('quarter')">Квартал</button>
+        <button class="kpi3-win-chip" data-win="custom" onclick="_kpi3OpenCustomRange()"><span id="kpi3-win-custom-lbl">Ручной</span></button>
+      </div>
+      <div class="kpi3-top-actions" id="kpi3-top-actions"></div>
     </div>
     <div class="kpi3-rows-nav" id="kpi3-rows-nav"></div>
     <div class="kpi3-section">
@@ -21591,18 +21617,19 @@ window._kpi3ShellHTML = () => `
 `;
 
 window._kpi3FillTopbar = () => {
-  const lbl = document.getElementById('kpi3-period-label');
   const act = document.getElementById('kpi3-top-actions');
-  if (!lbl || !act) return;
+  if (!act) return;
   const p = _kpi3.period;
   if (!p) {
-    lbl.textContent = 'нет активного периода';
-    act.innerHTML = `<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewPeriod()">+ Период</button>`;
+    act.innerHTML = `<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewPeriod()">+ Период целей</button>`;
     return;
   }
   const dot = ({active:'var(--pos)', planning:'var(--warn)', closed:'var(--txt-3)'})[p.status] || 'var(--txt-3)';
-  lbl.innerHTML = `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dot};margin-right:6px;box-shadow:0 0 6px 0 ${dot}"></span>${_kpi3Esc(p.name || 'Период')} · ${_kpi3FmtDate(p.start_date)} — ${_kpi3FmtDate(p.end_date)}`;
-  act.innerHTML = `<button class="kpi3-btn" onclick="_kpi3ShowPeriods()">Период ▾</button>`;
+  const nm = _kpi3Esc(p.name || 'Период');
+  act.innerHTML = `
+    <button class="kpi3-btn" onclick="_kpi3ShowPeriods()" title="Период для целей: ${_kpi3FmtDate(p.start_date)} — ${_kpi3FmtDate(p.end_date)}">
+      <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dot};margin-right:2px;box-shadow:0 0 6px 0 ${dot}"></span>${nm} ▾
+    </button>`;
 };
 
 window._kpi3SwitchCategory = async (cat) => {
@@ -21623,16 +21650,80 @@ window._kpi3SwitchCategory = async (cat) => {
   ]);
 };
 
+window._kpi3SetWindow = async (kind) => {
+  _kpi3.window = _kpi3.window || {};
+  _kpi3.window.kind = kind;
+  if (kind !== 'custom') { _kpi3.window.from = null; _kpi3.window.to = null; }
+  document.querySelectorAll('.kpi3-win-chip').forEach(b => b.classList.toggle('on', b.dataset.win === kind));
+  // Инвалидация кэша значений — сменилось окно
+  _kpi3.rowVals = {};
+  _kpi3UpdatePaSub();
+  const lbl = document.getElementById('kpi3-win-custom-lbl');
+  if (lbl && kind !== 'custom') lbl.textContent = 'Ручной';
+  await Promise.all([_kpi3FillPointA(), _kpi3FillGoals(), _kpi3FillStats()]);
+};
+
+window._kpi3OpenCustomRange = () => {
+  const today = new Date();
+  const startDef = new Date(today.getTime() - 30*86400000).toISOString().slice(0,10);
+  const endDef = today.toISOString().slice(0,10);
+  const scrim = document.createElement('div');
+  scrim.className = 'kpi3-scrim';
+  scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
+  scrim.innerHTML = `
+    <div class="kpi3-modal" style="max-width:440px">
+      <div class="kpi3-modal-h">
+        <div class="kpi3-modal-t">Ручной диапазон</div>
+        <button class="kpi3-modal-x" onclick="this.closest('.kpi3-scrim').remove()">×</button>
+      </div>
+      <div class="kpi3-modal-b">
+        <div class="kpi3-field" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div class="kpi3-field-l">С</div>
+            <input class="kpi3-input" type="date" id="kpi3-range-from" value="${startDef}" style="color-scheme:dark">
+          </div>
+          <div>
+            <div class="kpi3-field-l">По</div>
+            <input class="kpi3-input" type="date" id="kpi3-range-to" value="${endDef}" style="color-scheme:dark">
+          </div>
+        </div>
+        <div class="kpi3-field-h">Метрики Точки А и Статистика будут пересчитаны за этот период.</div>
+      </div>
+      <div class="kpi3-modal-f">
+        <button class="kpi3-btn kpi3-btn-ghost" onclick="this.closest('.kpi3-scrim').remove()">Отмена</button>
+        <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3ApplyCustomRange()">Применить</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(scrim);
+};
+
+window._kpi3ApplyCustomRange = async () => {
+  const from = document.getElementById('kpi3-range-from').value;
+  const to = document.getElementById('kpi3-range-to').value;
+  if (!from || !to) { toast('Заполните обе даты'); return; }
+  if (new Date(to) < new Date(from)) { toast('«По» должно быть позже «С»'); return; }
+  _kpi3.window = { kind: 'custom', from, to };
+  document.querySelectorAll('.kpi3-scrim').forEach(s => s.remove());
+  document.querySelectorAll('.kpi3-win-chip').forEach(b => b.classList.toggle('on', b.dataset.win === 'custom'));
+  const lbl = document.getElementById('kpi3-win-custom-lbl');
+  if (lbl) lbl.textContent = `${_kpi3FmtDate(from)}—${_kpi3FmtDate(to)}`;
+  _kpi3.rowVals = {};
+  _kpi3UpdatePaSub();
+  await Promise.all([_kpi3FillPointA(), _kpi3FillGoals(), _kpi3FillStats()]);
+};
+
 window._kpi3UpdatePaSub = () => {
   const paSub = document.getElementById('kpi3-pa-sub');
   if (!paSub) return;
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
+  const win = _kpi3ResolveWindow();
   if (_kpi3.selectedRowId) {
     const r = rows.find(x => x.id === _kpi3.selectedRowId);
-    paSub.textContent = r ? `Метрики за 30 дней · ${r.name}${r.subtitle ? ' · ' + r.subtitle : ''}` : 'Метрики за 30 дней';
+    paSub.textContent = r ? `Метрики за ${win.label} · ${r.name}${r.subtitle ? ' · ' + r.subtitle : ''}` : `Метрики за ${win.label}`;
   } else {
-    paSub.textContent = `Агрегированные метрики за 30 дней · все ${rows.length} ${_kpi3CatLabel(cat)}`;
+    paSub.textContent = `Агрегированные метрики за ${win.label} · все ${rows.length} ${_kpi3CatLabel(cat)}`;
   }
 };
 
@@ -21683,8 +21774,9 @@ window._kpi3FillPointA = async () => {
     return;
   }
   target.innerHTML = _kpi3TilesSkeleton(cat);
-  const to = new Date().toISOString();
-  const from = new Date(Date.now() - 30*86400000).toISOString();
+  const win = _kpi3ResolveWindow();
+  const to = win.to;
+  const from = win.from;
 
   // Если выбран конкретный ряд — считаем только для него, без агрегации
   if (_kpi3.selectedRowId) {
@@ -21773,8 +21865,9 @@ window._kpi3FillGoals = async () => {
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
   const rowById = Object.fromEntries(rows.map(r => [r.id, r]));
-  const to = new Date().toISOString();
-  const from = new Date(Date.now() - 30*86400000).toISOString();
+  const win = _kpi3ResolveWindow();
+  const to = win.to;
+  const from = win.from;
   const uniqRowIds = [...new Set(goals.map(g => g.scope_id).filter(Boolean))];
   await Promise.all(uniqRowIds.map(async rid => {
     const cacheKey = `${cat}|${rid}`;
@@ -21976,10 +22069,11 @@ window._kpi3FillStats = async () => {
     return;
   }
   target.innerHTML = _kpi3StatsSkeleton(rows.length);
-  const to = new Date().toISOString();
-  const from = new Date(Date.now() - 30*86400000).toISOString();
-  const prevFrom = new Date(Date.now() - 60*86400000).toISOString();
-  const prevTo = new Date(Date.now() - 30*86400000).toISOString();
+  const win = _kpi3ResolveWindow();
+  const to = win.to;
+  const from = win.from;
+  const prevFrom = new Date(new Date(from).getTime() - win.days*86400000).toISOString();
+  const prevTo = from;
   const metrics = _kpi3MetricsFor(cat);
   const score = (rv) => {
     if (!rv) return null;
@@ -22157,9 +22251,8 @@ window._kpi3SubmitGoal = async (existingId) => {
     const cacheKey = `${cat}|${scopeId}`;
     let cur = _kpi3.rowVals[cacheKey];
     if (!cur || cur[metricKey] == null) {
-      const to = new Date().toISOString();
-      const from = new Date(Date.now() - 30*86400000).toISOString();
-      cur = await kpiComputeAll(cat, scopeId, from, to).catch(() => ({}));
+      const win = _kpi3ResolveWindow();
+      cur = await kpiComputeAll(cat, scopeId, win.from, win.to).catch(() => ({}));
       _kpi3.rowVals[cacheKey] = cur;
     }
     baseline = cur ? _kpi3ExtractVal(cur[metricKey]) : null;
