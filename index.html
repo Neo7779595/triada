@@ -18080,11 +18080,13 @@ window.kpiComputeOnTimeRate = async (scopeKind, scopeId, fromISO, toISO) => {
   let ok = 0, total = 0;
   Object.entries(lastDoneByTask).forEach(([tid, h]) => {
     const t = raw.byTask[tid]; if(!t) return;
-    if (!t.due_date) return; // нет дедлайна — исключаем из выборки
+    if (!t.due_date) return;
     total++;
-    const closedAt = new Date(h.created_at).getTime();
-    const dueAt = new Date(t.due_date + 'T23:59:59').getTime();
-    if (closedAt <= dueAt) ok++;
+    // Сравниваем по датам (без времени) — соответствует прямому SQL в БД.
+    // h.created_at может быть с TZ ('2026-07-10T19:39:11.550903+00'), берём date-часть.
+    const closedDate = String(h.created_at).slice(0, 10);
+    const dueDate = String(t.due_date).slice(0, 10);
+    if (closedDate <= dueDate) ok++;
   });
   const val = total ? Math.round(1000 * ok / total) / 10 : null;
   return { value: val, sample_size: total, confidence: _kpiConfidence('ontime_rate', total) };
@@ -18095,14 +18097,16 @@ window.kpiComputeReworkRate = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
   const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
   // Уникальные задачи которые ХОТЯ БЫ РАЗ вернули (не число событий — иначе >100%)
+  // Сначала множество закрытых задач (был done-переход в периоде)
+  const doneTasks = new Set(f.taskHist.filter(h => h.new_status === 'done').map(h => h.task_id));
+  // Rework — только для задач которые в итоге закрылись в этом периоде.
+  // Если задача была возвращена но не закрыта — она не в знаменателе, не должна быть и в числителе.
   const reworkedTasks = new Set();
   f.taskHist.forEach(h => {
     if ((h.old_status === 'done' || h.old_status === 'review') && h.new_status === 'active') {
-      reworkedTasks.add(h.task_id);
+      if (doneTasks.has(h.task_id)) reworkedTasks.add(h.task_id);
     }
   });
-  // Уникальные закрытые задачи (был done-переход в периоде)
-  const doneTasks = new Set(f.taskHist.filter(h => h.new_status === 'done').map(h => h.task_id));
   const uniqDone = doneTasks.size;
   const uniqRework = reworkedTasks.size;
   const val = uniqDone ? Math.round(1000 * uniqRework / uniqDone) / 10 : null;
