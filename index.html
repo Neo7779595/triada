@@ -17269,10 +17269,35 @@ window.tTaskAdd = async (projectId,row) => {
   // Форсируем перерасчёт активных модулей (дедлайны/overview/KPI/финансы) —
   // realtime может задержаться из-за _localTaskWriteTs throttle, а UI должен показать
   // новую задачу везде: карточках, статистике, дедлайнах.
+  // Обновляем ВСЕ связанные модули (не только активный), чтобы данные были
+  // свежими при переключении в дедлайны/сводку/финансы/KPI и т.д.
   setTimeout(function(){
     try {
       window._localTaskWriteTs = 0;
-      if (typeof _rtWorkSync === 'function') _rtWorkSync();
+      const jobs = [];
+      if (typeof window.tLoadProjectAggregates === 'function') jobs.push(window.tLoadProjectAggregates().catch(()=>{}));
+      if (typeof window.tLoadDeadlines === 'function') jobs.push(window.tLoadDeadlines().catch(()=>{}));
+      if (typeof window.tLoadOverview === 'function') jobs.push(window.tLoadOverview().catch(()=>{}));
+      if (typeof window.tLoadCycles === 'function') jobs.push(window.tLoadCycles().catch(()=>{}));
+      if (typeof window.tLoadTeam === 'function') jobs.push(window.tLoadTeam().catch(()=>{}));
+      if (typeof window.tLoadFinance === 'function') jobs.push(window.tLoadFinance().catch(()=>{}));
+      // Инвалидировать KPI-кэши, чтобы при следующем открытии всё пересчиталось
+      if (typeof window._kpiInvalidateOpsRaw === 'function') window._kpiInvalidateOpsRaw();
+      Promise.all(jobs).then(() => {
+        // Перерисовать активный модуль
+        const ag = document.getElementById('app-ag');
+        const _n = (ag && ag.classList.contains('on')) ? document.querySelector('#app-ag .nav-i.on') : null;
+        const m = _n ? _n.dataset.m : null;
+        try {
+          if (m==='projects' && typeof paintProjList==='function') paintProjList();
+          else if (m==='deadlines' && typeof renderDeadlines==='function') renderDeadlines();
+          else if (m==='overview' && typeof renderOverview==='function') renderOverview();
+          else if (m==='cycles' && typeof renderCycles==='function') renderCycles();
+          else if (m==='team' && typeof renderTeam==='function') renderTeam();
+          else if (m==='finance' && typeof renderFinance==='function') renderFinance();
+          else if (m==='kpi' && typeof renderKPI==='function') renderKPI();
+        } catch(_){}
+      });
     } catch(_){}
   }, 400);
   } catch(e){
