@@ -21895,9 +21895,15 @@ window._kpi3ShellHTML = () => `
       <div class="kpi3-section-h">
         <div>
           <div class="kpi3-block-t">Цели · куда идём</div>
-          <div class="kpi3-block-sub">Клик на цель раскрывает RPM: результат · зачем · план</div>
+          <div class="kpi3-block-sub">Клик на цель — график прогресса и заметка</div>
         </div>
-        <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Цель</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="kpi3-btn kpi3-btn-ghost" onclick="_kpi3ClearAllGoals()" title="Удалить все цели этого раздела">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+            Очистить всё
+          </button>
+          <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Цель</button>
+        </div>
       </div>
       <div id="kpi3-goals"><div class="kpi3-loading">Загружаем цели…</div></div>
     </div>
@@ -22328,6 +22334,26 @@ window._kpi3DelStep = async (gid, idx) => {
   map.splice(idx, 1);
   const ok = await _kpi3SaveMap(gid, map);
   if (ok) { g.action_plan = map; _kpi3FillGoals(); }
+};
+
+window._kpi3ClearAllGoals = async () => {
+  const cat = _kpi3.category;
+  const catLabel = _kpi3CatLabelOne(cat).toLowerCase();
+  const scope = _kpi3.selectedRowId
+    ? `для «${(_kpiScopeRows(cat).find(r => r.id === _kpi3.selectedRowId) || {}).name || catLabel}»`
+    : `по всем ${_kpi3CatLabel(cat)}`;
+  const goals = _kpi3.goals || [];
+  const ids = _kpi3.selectedRowId
+    ? goals.filter(g => g.scope_id === _kpi3.selectedRowId).map(g => g.id)
+    : goals.map(g => g.id);
+  if (!ids.length) { toast('Нет целей для удаления'); return; }
+  if (!confirm(`Удалить все ${ids.length} целей ${scope}?\n\nВосстановить будет нельзя.`)) return;
+  if (!confirm(`Точно? Это уничтожит ${ids.length} целей и все их заметки.`)) return;
+  const { error } = await SB.from('kpi_targets').delete().in('id', ids);
+  if (error) { toast('Не удалось удалить'); console.warn(error); return; }
+  toast(`Удалено: ${ids.length}`);
+  _kpi3.expandedGoalId = null;
+  _kpi3FillGoals();
 };
 
 window._kpi3DelGoal = async (gid) => {
