@@ -18111,8 +18111,10 @@ window.kpiComputeSmmReach = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(scopeKind, scopeId);
   const latest = _kpiSmmLatestByProject(raw, pids);
+  // Как в UI карточки SMM-отчёта: reels_reach + stories_reach (без posts).
+  // total_reach в БД включает posts_reach, что делает KPI не совпадающим с карточкой.
   let sum = 0;
-  latest.forEach(r => { sum += (+r.m.total_reach) || ((+r.m.reels_reach||0) + (+r.m.stories_reach||0) + (+r.m.posts_reach||0)); });
+  latest.forEach(r => { sum += (+r.m.reels_reach||0) + (+r.m.stories_reach||0); });
   return { value: sum, sample_size: latest.length, confidence: _kpiConfidence('smm_reach', latest.length) };
 };
 
@@ -18200,22 +18202,21 @@ window.kpiComputeSmmViews = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(s, id);
   const latest = _kpiSmmLatestByProject(raw, pids);
+  // Как в UI: reels_views + stories_views (без posts_views).
   let sum = 0;
-  latest.forEach(r => { sum += (+r.m.total_views) || ((+r.m.reels_views||0) + (+r.m.stories_views||0) + (+r.m.posts_views||0)); });
+  latest.forEach(r => { sum += (+r.m.reels_views||0) + (+r.m.stories_views||0); });
   return { value: sum, sample_size: latest.length, confidence: _kpiConfidence('smm_views', latest.length) };
 };
 window.kpiComputeSmmGrowthAbs = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(s, id);
   const latest = _kpiSmmLatestByProject(raw, pids);
-  // Прирост из последнего отчёта = m.followers - prev.followers (или + m.followers если есть готовый gain)
+  // В payload поле m.followers — это уже ПРИРОСТ за отчётный период (+358 для UZBEK DONER),
+  // а prev.followers — старое значение подписчиков. Формула = сумма m.followers.
   let sum = 0, n = 0;
   latest.forEach(r => {
-    // Явное значение прироста из отчёта, если есть
-    const explicit = (+r.m.followers);
-    const prev = (+r.prev.followers);
-    if (!Number.isNaN(explicit) && !Number.isNaN(prev)) { sum += (explicit - prev); n++; return; }
-    if (!Number.isNaN(explicit)) { sum += explicit; n++; }
+    const gain = +r.m.followers;
+    if (!Number.isNaN(gain)) { sum += gain; n++; }
   });
   return { value: sum, sample_size: n, confidence: _kpiConfidence('smm_growth_abs', n) };
 };
@@ -18223,11 +18224,11 @@ window.kpiComputeSmmFollowers = async (s, id, from, to) => {
   const raw = await _kpiFetchSmmRaw(from, to); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(s, id);
   const latest = _kpiSmmLatestByProject(raw, pids);
+  // subscribers_current — актуальное общее число подписчиков на конец периода.
   let sum = 0, n = 0;
   latest.forEach(r => {
-    // subscribers_current — актуальное состояние аудитории (не сдвиг followers за период)
-    const f = (+r.m.subscribers_current) || (+r.prev.followers) + (+r.m.followers || 0);
-    if (f && !Number.isNaN(f)) { sum += f; n++; }
+    const f = +r.m.subscribers_current;
+    if (!Number.isNaN(f) && f > 0) { sum += f; n++; }
   });
   return { value: sum, sample_size: n, confidence: _kpiConfidence('smm_followers', n) };
 };
