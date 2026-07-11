@@ -21611,33 +21611,21 @@ if (window.LIVE){
 */
 
 window._kpi3 = {
-  period: null,
+  period: null,               // активный период (для группировки целей)
   periods: [],
   category: 'member',
   selectedRowId: null,
   expandedGoalId: null,
   goals: [],
   rowVals: {},
-  window: { kind: 'month', days: 30, from: null, to: null },  // окно данных
+  allTargets: [],             // все цели scope, независимо от period_id
 };
 
-// Хелперы окна: возвращают {from, to, label}
+// Окно данных теперь всегда фиксированное — последние 30 дней
 window._kpi3ResolveWindow = () => {
-  const w = _kpi3.window || { kind: 'month' };
   const now = new Date();
-  const to = new Date(now);
-  let from, days;
-  if (w.kind === 'week')    { days = 7;  from = new Date(now.getTime() - 7*86400000); }
-  else if (w.kind === 'quarter'){ days = 90; from = new Date(now.getTime() - 90*86400000); }
-  else if (w.kind === 'custom' && w.from && w.to) {
-    from = new Date(w.from);
-    const t = new Date(w.to);
-    to.setTime(t.getTime());
-    days = Math.max(1, Math.round((to - from) / 86400000));
-  } else { days = 30; from = new Date(now.getTime() - 30*86400000); w.kind = 'month'; }
-  const labels = { week:'7 дней', month:'30 дней', quarter:'90 дней' };
-  const label = w.kind === 'custom' ? `${_kpi3FmtDate(from.toISOString())} — ${_kpi3FmtDate(to.toISOString())} · ${days} дн.` : labels[w.kind];
-  return { from: from.toISOString(), to: to.toISOString(), days, label };
+  const from = new Date(now.getTime() - 30*86400000);
+  return { from: from.toISOString(), to: now.toISOString(), days: 30, label: '30 дней' };
 };
 
 window._kpi3TpiKeys = ['vyrabotka','skorost','nadezhnost','kachestvo'];
@@ -21687,7 +21675,6 @@ window.renderKPI = async () => {
   jobs.push(kpiFetchPeriods({ limit: 10 }).then(x => _kpi3.periods = x || []));
   await Promise.all(jobs);
   _kpi3.period = _kpi3.periods.find(p => p.status==='active') || _kpi3.periods.find(p => p.status==='planning') || _kpi3.periods[0] || null;
-  _kpi3FillTopbar();
   _kpi3SwitchCategory(_kpi3.category, true);
 };
 
@@ -21708,11 +21695,6 @@ window._kpi3ShellHTML = () => `
     .kpi3-btn-danger:hover{background:rgba(242,102,102,.08);color:var(--neg)}
     .kpi3-btn-sm{padding:5px 10px;font-size:11.5px;border-radius:7px}
     .kpi3-headline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .kpi3-headline .kpi3-top-actions{margin-left:auto}
-    .kpi3-win{display:inline-flex;gap:3px;padding:4px;background:var(--panel-3);border:1px solid var(--line);border-radius:10px}
-    .kpi3-win-chip{padding:8px 14px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s;background:transparent;border:none}
-    .kpi3-win-chip:hover{color:var(--txt-1)}
-    .kpi3-win-chip.on{background:var(--panel-2);color:var(--txt-1);box-shadow:0 0 0 1px rgba(138,143,255,.18)}
     .kpi3-cats{display:inline-flex;gap:3px;padding:4px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px}
     .kpi3-cat{padding:10px 18px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .16s var(--ease-out);display:inline-flex;align-items:center;gap:8px;border:none;background:transparent}
     .kpi3-cat:hover{color:var(--txt-1)}
@@ -21903,13 +21885,6 @@ window._kpi3ShellHTML = () => `
           <span class="kpi3-cat-ic">📦</span>Проекты<span class="kpi3-cat-cnt" id="kpi3-cnt-project">—</span>
         </button>
       </div>
-      <div class="kpi3-win" id="kpi3-win-nav">
-        <button class="kpi3-win-chip" data-win="week" onclick="_kpi3SetWindow('week')">Неделя</button>
-        <button class="kpi3-win-chip on" data-win="month" onclick="_kpi3SetWindow('month')">Месяц</button>
-        <button class="kpi3-win-chip" data-win="quarter" onclick="_kpi3SetWindow('quarter')">Квартал</button>
-        <button class="kpi3-win-chip" data-win="custom" onclick="_kpi3OpenCustomRange()"><span id="kpi3-win-custom-lbl">Ручной</span></button>
-      </div>
-      <div class="kpi3-top-actions" id="kpi3-top-actions"></div>
     </div>
     <div class="kpi3-rows-nav" id="kpi3-rows-nav"></div>
     <div class="kpi3-section">
@@ -21943,21 +21918,7 @@ window._kpi3ShellHTML = () => `
   </div>
 `;
 
-window._kpi3FillTopbar = () => {
-  const act = document.getElementById('kpi3-top-actions');
-  if (!act) return;
-  const p = _kpi3.period;
-  if (!p) {
-    act.innerHTML = `<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewPeriod()">+ Период целей</button>`;
-    return;
-  }
-  const dot = ({active:'var(--pos)', planning:'var(--warn)', closed:'var(--txt-3)'})[p.status] || 'var(--txt-3)';
-  const nm = _kpi3Esc(p.name || 'Период');
-  act.innerHTML = `
-    <button class="kpi3-btn" onclick="_kpi3ShowPeriods()" title="Период для целей: ${_kpi3FmtDate(p.start_date)} — ${_kpi3FmtDate(p.end_date)}">
-      <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${dot};margin-right:2px;box-shadow:0 0 6px 0 ${dot}"></span>${nm} ▾
-    </button>`;
-};
+window._kpi3FillTopbar = () => { /* убрано — окно данных и кнопка «Период ▾» больше не показываются, период создаётся автоматически из даты цели */ };
 
 window._kpi3SwitchCategory = async (cat) => {
   _kpi3.category = cat;
@@ -21977,80 +21938,16 @@ window._kpi3SwitchCategory = async (cat) => {
   ]);
 };
 
-window._kpi3SetWindow = async (kind) => {
-  _kpi3.window = _kpi3.window || {};
-  _kpi3.window.kind = kind;
-  if (kind !== 'custom') { _kpi3.window.from = null; _kpi3.window.to = null; }
-  document.querySelectorAll('.kpi3-win-chip').forEach(b => b.classList.toggle('on', b.dataset.win === kind));
-  // Инвалидация кэша значений — сменилось окно
-  _kpi3.rowVals = {};
-  _kpi3UpdatePaSub();
-  const lbl = document.getElementById('kpi3-win-custom-lbl');
-  if (lbl && kind !== 'custom') lbl.textContent = 'Ручной';
-  await Promise.all([_kpi3FillPointA(), _kpi3FillGoals(), _kpi3FillStats()]);
-};
-
-window._kpi3OpenCustomRange = () => {
-  const today = new Date();
-  const startDef = new Date(today.getTime() - 30*86400000).toISOString().slice(0,10);
-  const endDef = today.toISOString().slice(0,10);
-  const scrim = document.createElement('div');
-  scrim.className = 'kpi3-scrim';
-  scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
-  scrim.innerHTML = `
-    <div class="kpi3-modal" style="max-width:440px">
-      <div class="kpi3-modal-h">
-        <div class="kpi3-modal-t">Ручной диапазон</div>
-        <button class="kpi3-modal-x" onclick="this.closest('.kpi3-scrim').remove()">×</button>
-      </div>
-      <div class="kpi3-modal-b">
-        <div class="kpi3-field" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div>
-            <div class="kpi3-field-l">С</div>
-            ${_kpi3DPHTML({ id: 'range-from', value: startDef })}
-          </div>
-          <div>
-            <div class="kpi3-field-l">По</div>
-            ${_kpi3DPHTML({ id: 'range-to', value: endDef })}
-          </div>
-        </div>
-        <div class="kpi3-field-h">Метрики Точки А и Статистика будут пересчитаны за этот период.</div>
-      </div>
-      <div class="kpi3-modal-f">
-        <button class="kpi3-btn kpi3-btn-ghost" onclick="this.closest('.kpi3-scrim').remove()">Отмена</button>
-        <button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3ApplyCustomRange()">Применить</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(scrim);
-};
-
-window._kpi3ApplyCustomRange = async () => {
-  const from = _kpi3DPValue('range-from');
-  const to = _kpi3DPValue('range-to');
-  if (!from || !to) { toast('Заполните обе даты'); return; }
-  if (new Date(to) < new Date(from)) { toast('«По» должно быть позже «С»'); return; }
-  _kpi3.window = { kind: 'custom', from, to };
-  document.querySelectorAll('.kpi3-scrim').forEach(s => s.remove());
-  document.querySelectorAll('.kpi3-win-chip').forEach(b => b.classList.toggle('on', b.dataset.win === 'custom'));
-  const lbl = document.getElementById('kpi3-win-custom-lbl');
-  if (lbl) lbl.textContent = `${_kpi3FmtDate(from)}—${_kpi3FmtDate(to)}`;
-  _kpi3.rowVals = {};
-  _kpi3UpdatePaSub();
-  await Promise.all([_kpi3FillPointA(), _kpi3FillGoals(), _kpi3FillStats()]);
-};
-
 window._kpi3UpdatePaSub = () => {
   const paSub = document.getElementById('kpi3-pa-sub');
   if (!paSub) return;
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
-  const win = _kpi3ResolveWindow();
   if (_kpi3.selectedRowId) {
     const r = rows.find(x => x.id === _kpi3.selectedRowId);
-    paSub.textContent = r ? `Метрики за ${win.label} · ${r.name}${r.subtitle ? ' · ' + r.subtitle : ''}` : `Метрики за ${win.label}`;
+    paSub.textContent = r ? `Метрики за 30 дней · ${r.name}${r.subtitle ? ' · ' + r.subtitle : ''}` : 'Метрики за 30 дней';
   } else {
-    paSub.textContent = `Агрегированные метрики за ${win.label} · все ${rows.length} ${_kpi3CatLabel(cat)}`;
+    paSub.textContent = `Агрегированные метрики за 30 дней · все ${rows.length} ${_kpi3CatLabel(cat)}`;
   }
 };
 
@@ -22173,17 +22070,32 @@ window._kpi3TilesGrid = (keys, agg, title, cols) => `
   </div>
 `;
 
+window._kpi3FetchAllTargetsForScope = async (scopeKind) => {
+  if (!SB || !ME) return [];
+  const { data, error } = await SB.from('kpi_targets')
+    .select('*, kpi_periods(name, start_date, end_date, status)')
+    .eq('agency_id', ME.agency_id)
+    .eq('scope_kind', scopeKind)
+    .order('updated_at', { ascending: false });
+  if (error) { console.warn('_kpi3FetchAllTargetsForScope', error); return []; }
+  return (data || []).map(row => {
+    const p = row.kpi_periods || {};
+    return Object.assign({}, row, {
+      _period_name: p.name,
+      _period_start: p.start_date,
+      _period_end: p.end_date,
+      _period_status: p.status,
+    });
+  });
+};
+
 window._kpi3FillGoals = async () => {
   const target = document.getElementById('kpi3-goals'); if(!target) return;
-  if (!_kpi3.period) {
-    target.innerHTML = `<div class="kpi3-empty"><b>Нет активного периода.</b><br/>Создайте период, чтобы ставить цели.<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewPeriod()">+ Период</button></div>`;
-    return;
-  }
   target.innerHTML = '<div class="kpi3-loading">Загружаем цели…</div>';
-  const allGoals = await kpiFetchTargets(_kpi3.period.id, { scope_kind: _kpi3.category });
+  const allGoals = await _kpi3FetchAllTargetsForScope(_kpi3.category);
   _kpi3.goals = allGoals;
   if (!allGoals.length) {
-    target.innerHTML = `<div class="kpi3-empty"><b>Ни одной цели на период.</b><br/>Начните с одной — что важно улучшить в первую очередь?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Первая цель</button></div>`;
+    target.innerHTML = `<div class="kpi3-empty"><b>Ни одной цели.</b><br/>Начните с одной — что важно улучшить в первую очередь?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Первая цель</button></div>`;
     return;
   }
   // Empty check после фильтрации по selectedRowId — сделаем ниже
@@ -22230,8 +22142,8 @@ window._kpi3GoalCardHTML = (g, row) => {
   const total = m.dir === 'up' ? (target - baseline) : (baseline - target);
   const done = curV == null ? 0 : (m.dir === 'up' ? curV - baseline : baseline - curV);
   const progress = total === 0 ? 0 : Math.max(0, Math.min(100, (done / total) * 100));
-  const endDate = _kpi3.period && _kpi3.period.end_date ? new Date(_kpi3.period.end_date) : null;
-  const startDate = _kpi3.period && _kpi3.period.start_date ? new Date(_kpi3.period.start_date) : null;
+  const endDate = g._period_end ? new Date(g._period_end) : (_kpi3.period && _kpi3.period.end_date ? new Date(_kpi3.period.end_date) : null);
+  const startDate = g._period_start ? new Date(g._period_start) : (_kpi3.period && _kpi3.period.start_date ? new Date(_kpi3.period.start_date) : null);
   const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - new Date()) / 86400000)) : null;
   const status = _kpi3GoalStatus(progress, daysLeft, endDate, startDate);
   const isExpanded = _kpi3.expandedGoalId === g.id;
@@ -22279,7 +22191,7 @@ window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => `
       <div class="kpi3-rpm-icon">🎯</div>
       <div>
         <div class="kpi3-rpm-label">Result · результат</div>
-        <div class="kpi3-rpm-val">${_kpi3Esc(m.label)} у «${_kpi3Esc(rowName)}» → <b style="color:var(--accent)">${_kpi3Fmt(target, m.unit)}</b> к ${_kpi3FmtDate(_kpi3.period && _kpi3.period.end_date)}</div>
+        <div class="kpi3-rpm-val">${_kpi3Esc(m.label)} у «${_kpi3Esc(rowName)}» → <b style="color:var(--accent)">${_kpi3Fmt(target, m.unit)}</b> к ${_kpi3FmtDate(g._period_end || (_kpi3.period && _kpi3.period.end_date))}</div>
       </div>
     </div>
     <div class="kpi3-rpm-row">
@@ -22464,7 +22376,6 @@ window._kpi3StatsRowHTML = (it, n) => {
 window._kpi3NewGoal = () => _kpi3OpenGoalModal(null);
 
 window._kpi3OpenGoalModal = (existing) => {
-  if (!_kpi3.period) { toast('Сначала создайте период'); return; }
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
   if (!rows.length) { toast(`Сначала добавьте ${_kpi3CatLabelOne(cat).toLowerCase()}`); return; }
@@ -22484,6 +22395,12 @@ window._kpi3OpenGoalModal = (existing) => {
     target: existing ? existing.target : null,
     baseline: initBaseline
   };
+  // По умолчанию — конец текущего месяца
+  const now = new Date();
+  const defaultTargetDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const initTargetDate = existing && existing._period_end
+    ? existing._period_end.slice(0, 10)
+    : defaultTargetDate;
   const scrim = document.createElement('div');
   scrim.className = 'kpi3-scrim';
   scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
@@ -22527,7 +22444,11 @@ window._kpi3OpenGoalModal = (existing) => {
         <div class="kpi3-field">
           <div class="kpi3-field-l">Куда идём (цель)</div>
           <input type="number" class="kpi3-input" id="kpi3-goal-tgt" placeholder="Например, 90" value="${state.target != null ? state.target : ''}" step="any">
-          <div class="kpi3-field-h">К концу периода: ${_kpi3FmtDate(_kpi3.period.end_date)}</div>
+        </div>
+        <div class="kpi3-field">
+          <div class="kpi3-field-l">Дата цели</div>
+          ${_kpi3DPHTML({ id: 'goal-date', value: initTargetDate })}
+          <div class="kpi3-field-h">Когда должна быть достигнута. Прогресс будет считаться относительно этой даты.</div>
         </div>
         <div class="kpi3-field">
           <div class="kpi3-field-l">Стартовая база (Точка А)</div>
@@ -22568,8 +22489,13 @@ window._kpi3SubmitGoal = async (existingId) => {
   const tgtVal = parseFloat(document.getElementById('kpi3-goal-tgt').value);
   const baseInput = document.getElementById('kpi3-goal-base').value;
   const baseVal = baseInput === '' ? null : parseFloat(baseInput);
+  const targetDate = _kpi3DPValue('goal-date');
   if (!scopeId || !metricKey || Number.isNaN(tgtVal)) {
-    toast('Заполните scope, метрику и цель');
+    toast('Заполните метрику и цель');
+    return;
+  }
+  if (!targetDate) {
+    toast('Выберите дату цели');
     return;
   }
   let baseline = baseVal;
@@ -22585,8 +22511,11 @@ window._kpi3SubmitGoal = async (existingId) => {
     baseline = cur ? _kpi3ExtractVal(cur[metricKey]) : null;
     if (baseline == null) baseline = 0;
   }
+  // Автосоздание / переиспользование периода
+  const periodId = await _kpi3EnsurePeriodForDate(targetDate);
+  if (!periodId) { toast('Не удалось создать период'); return; }
   const row = {
-    period_id: _kpi3.period.id,
+    period_id: periodId,
     scope_kind: _kpi3.category,
     scope_id: scopeId,
     metric_key: metricKey,
@@ -22601,6 +22530,37 @@ window._kpi3SubmitGoal = async (existingId) => {
   scrim.remove();
   _kpi3.expandedGoalId = saved.id;
   _kpi3FillGoals();
+};
+
+// Гарантирует что для указанной target-даты есть kpi_period.
+// Если уже есть период с end_date=targetDate → переиспользуем.
+// Иначе создаём новый: start = сегодня, end = targetDate.
+window._kpi3EnsurePeriodForDate = async (targetDate) => {
+  if (!SB || !ME) return null;
+  // Ищем существующий период с таким end_date среди последних 20
+  const { data: existing } = await SB.from('kpi_periods')
+    .select('id, end_date, status')
+    .eq('agency_id', ME.agency_id)
+    .eq('end_date', targetDate)
+    .limit(1);
+  if (existing && existing.length) {
+    if (existing[0].status === 'closed') {
+      // Не переиспользуем закрытые — создадим новый
+    } else {
+      return existing[0].id;
+    }
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const name = `До ${_kpi3FmtDate(targetDate)}`;
+  const created = await kpiCreatePeriod({
+    name,
+    kind: 'custom',
+    start_date: today,
+    end_date: targetDate,
+  });
+  if (!created) return null;
+  await kpiActivatePeriod(created.id);
+  return created.id;
 };
 
 window._kpi3ShowPeriods = () => {
