@@ -7102,6 +7102,9 @@ document.addEventListener('click',function(e){
   _ddNuke();
 },true);
 const _attr=v=>_ddH(v).replace(/"/g,'&quot;');
+.dd-native{width:100%;padding:10px 34px 10px 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;color:var(--txt,#EAECEF);font-size:13.5px;font-family:inherit;font-weight:600;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237A828D' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;color-scheme:dark}
+.dd-native:focus{outline:none;border-color:rgba(138,143,255,.5)}
+.dd-native option{background:var(--bg-1);color:var(--txt,#EAECEF)}
 /* Кастомный дропдаун в фирменном стиле с произвольным колбэком.
    opts: [[value,label],…]; при выборе вызывает cb(value). Колбэк хранится в реестре по id. */
 window._DDSEL_CB=window._DDSEL_CB||{};
@@ -7123,6 +7126,15 @@ function _ddSelPick(id,v,l){
   if(typeof _closePops==='function'){ _closePops(); setTimeout(_closePops,0); }
   const cb=window._DDSEL_CB[id]; if(typeof cb==='function'){ try{ cb(v); }catch(e){} }
 }
+
+window._nativeSelect = function(id, options, cur, placeholder){
+  const opts = (options||[]).map(o => Array.isArray(o) ? o : [o, o]);
+  cur = (cur == null ? '' : String(cur));
+  const attr = v => String(v == null ? '' : v).replace(/"/g,'&quot;');
+  return `<select class="dd-native" id="${id}">${
+    opts.map(o => `<option value="${attr(o[0])}"${String(o[0])===cur?' selected':''}>${(o[1]||'').replace(/</g,'&lt;')}</option>`).join('')
+  }</select>`;
+};
 
 function selField(id, options, cur){
   const opts=(options||[]).map(o=>Array.isArray(o)?o:[o,o]);
@@ -8066,7 +8078,7 @@ async function _qtOnProject(idStr){
   }
   if(aw){
     const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]); if(agIsPM())return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
-    aw.innerHTML=selField('qt-asg', [['','— не назначен —']].concat(teamArr), '');
+    aw.innerHTML=_nativeSelect('qt-asg', [['','— не назначен —']].concat(teamArr), '');
   }
 }
 function quickTaskCreate(){
@@ -8117,7 +8129,7 @@ async function pdNewTask(st){
       <div class="fld"><label>Этап <span style="color:var(--neg)">*</span></label>${selField('pd2-stg', stArr, _defSt)}</div>
       <div class="fld"><label>Сложность</label>${_diffSegHTML('pd2-diff','')}</div>
       <div class="fld"><label>Приоритет · матрица Эйзенхауэра</label>${_eisenHTML('pd2-prio','')}</div>
-      <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
+      <div class="fld"><label>Исполнитель</label>${_nativeSelect('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate','')}${timeField('pd2-ttime','')}</div></div>
       ${_subFldHtml()}
     </div>
@@ -8169,7 +8181,7 @@ async function pdTaskEdit(id){
       <div class="fld"><label>Этап</label>${selField('pd2-stg', stArr, t.stage_id||'')}</div>
       <div class="fld"><label>Сложность</label>${_diffSegHTML('pd2-diff', t.difficulty||'')}</div>
       <div class="fld"><label>Приоритет · матрица Эйзенхауэра</label>${_eisenHTML('pd2-prio', t.priority||'')}</div>
-      <div class="fld"><label>Исполнитель</label>${selField('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
+      <div class="fld"><label>Исполнитель</label>${_nativeSelect('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate', t.due_date||'')}${timeField('pd2-ttime', t.due_time||'')}</div></div>
       ${_subFldHtml()}
     </div>
