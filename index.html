@@ -21537,6 +21537,39 @@ input.kpi2-val-inp[type="date"]::-webkit-datetime-edit-year-field:focus{backgrou
 input.kpi2-val-inp[type="number"]{color-scheme:dark}
 /* Fallback для инпутов вне формы модалки */
 input[type="date"], input[type="datetime-local"], input[type="time"], input[type="number"]{color-scheme:dark}
+/* KPI v2 · кастомный date picker */
+.kpi2-dp-btn{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;color:var(--txt-1);font-family:var(--mono);font-size:14px;font-weight:700;cursor:pointer;transition:all .16s var(--ease-out);width:100%;text-align:left}
+.kpi2-dp-btn:hover{border-color:rgba(138,143,255,.3)}
+.kpi2-dp-btn:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(55,230,200,.12)}
+.kpi2-dp-txt{flex:1;letter-spacing:.005em}
+.kpi2-dp-ic{color:var(--txt-3);flex:none;transition:color .16s}
+.kpi2-dp-btn:hover .kpi2-dp-ic{color:var(--accent)}
+
+.kpi2-dp-pop{position:fixed;z-index:10001;width:288px;padding:14px;background:linear-gradient(180deg, var(--panel-2), var(--panel-3));border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 50px -12px rgba(0,0,0,.65);opacity:0;transform:translateY(-4px) scale(.98);transition:opacity .16s var(--ease-out), transform .16s var(--ease-out);pointer-events:none}
+.kpi2-dp-pop.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+
+.kpi2-dp-h{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px}
+.kpi2-dp-nav{width:30px;height:30px;border-radius:8px;background:var(--panel-3);border:1px solid var(--line);color:var(--txt-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .14s}
+.kpi2-dp-nav:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28);background:rgba(138,143,255,.06)}
+.kpi2-dp-title{display:flex;gap:5px;flex:1;justify-content:center}
+.kpi2-dp-sel{background:transparent;border:1px solid var(--line);border-radius:7px;color:var(--txt-1);padding:5px 8px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;color-scheme:dark}
+.kpi2-dp-sel:hover{border-color:rgba(138,143,255,.28)}
+.kpi2-dp-sel:focus{outline:none;border-color:var(--accent)}
+
+.kpi2-dp-wd{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.kpi2-dp-w{padding:6px 0;text-align:center;font-size:10.5px;font-weight:700;color:var(--txt-3);text-transform:uppercase;letter-spacing:.05em}
+
+.kpi2-dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.kpi2-dp-c{aspect-ratio:1/1;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--txt-1);font-size:13px;font-weight:600;font-family:var(--mono);cursor:pointer;transition:all .12s var(--ease-out);display:flex;align-items:center;justify-content:center;padding:0}
+.kpi2-dp-c:hover:not(.sel){background:rgba(138,143,255,.08);border-color:rgba(138,143,255,.2)}
+.kpi2-dp-c.muted{color:var(--txt-3);opacity:.4}
+.kpi2-dp-c.today{border-color:rgba(55,230,200,.35);color:var(--accent)}
+.kpi2-dp-c.sel{background:linear-gradient(135deg, var(--accent), var(--violet));color:#06140f;border-color:transparent;font-weight:800;box-shadow:0 4px 10px -4px rgba(55,230,200,.5)}
+
+.kpi2-dp-f{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.kpi2-dp-tf{flex:1;padding:8px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:8px;color:var(--txt-2);font-size:12px;font-weight:600;cursor:pointer;transition:all .14s}
+.kpi2-dp-tf:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
+
 </style>
   <div class="kpi2-wrap">
     <div class="kpi2-topbar">
@@ -22229,8 +22262,8 @@ window.kpi2OpenPeriodMgr = async () => {
             <div class="kpi2-newp">
               <input id="kpi2-np-name" class="kpi2-val-inp" placeholder="Название (напр. Август 2026)" />
               <div class="kpi2-newp-dates">
-                <div><div class="kpi2-val-l">С</div><input id="kpi2-np-from" type="date" class="kpi2-val-inp" value="${new Date().toISOString().slice(0,10)}" /></div>
-                <div><div class="kpi2-val-l">По</div><input id="kpi2-np-to" type="date" class="kpi2-val-inp" value="${new Date(Date.now()+30*86400000).toISOString().slice(0,10)}" /></div>
+                <div><div class="kpi2-val-l">С</div>${_kpi2DateField("kpi2-np-from", new Date().toISOString().slice(0,10))}</div>
+                <div><div class="kpi2-val-l">По</div>${_kpi2DateField("kpi2-np-to",   new Date(Date.now()+30*86400000).toISOString().slice(0,10))}</div>
                 <div><div class="kpi2-val-l">Окно базы, дней</div><input id="kpi2-np-bw" type="number" min="7" max="180" step="1" class="kpi2-val-inp" value="30" style="width:80px" /></div>
               </div>
               <button class="kpi2-modal-btn primary" onclick="_kpi2CreatePeriod()">Создать</button>
@@ -22382,6 +22415,172 @@ window._kpi2DelGoal = async (id) => {
 };
 
 /* ═══════════ /KPI v2 · модалки ═══════════ */
+
+
+
+
+/* ═══════════ KPI v2 · кастомный date picker ═══════════ */
+window._kpi2DP = window._kpi2DP || { view: null, target: null };
+
+/* Помощник: HTML для инпута-даты с кастомным виджетом */
+window._kpi2DateField = (id, value) => {
+  const v = value || new Date().toISOString().slice(0, 10);
+  return `
+    <input type="hidden" id="${id}" value="${v}">
+    <button type="button" class="kpi2-dp-btn" id="${id}-btn" onclick="_kpi2DPOpen('${id}', event)">
+      <span class="kpi2-dp-txt" id="${id}-txt">${_kpi2FmtDate(v)}</span>
+      <svg class="kpi2-dp-ic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    </button>`;
+};
+
+window._kpi2FmtDate = (isoStr) => {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '—';
+  const MO = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  return `${d.getDate()} ${MO[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+window._kpi2DPOpen = (targetId, evt) => {
+  evt && evt.stopPropagation && evt.stopPropagation();
+  _kpi2DPClose();   // закрыть если уже открыт
+  const hidden = document.getElementById(targetId); if(!hidden) return;
+  const btn = document.getElementById(targetId + '-btn'); if(!btn) return;
+  const cur = hidden.value || new Date().toISOString().slice(0, 10);
+  const [y, m] = cur.split('-').map(Number);
+  _kpi2DP = { view: { year: y, month: m - 1 }, target: targetId };
+
+  const popup = document.createElement('div');
+  popup.className = 'kpi2-dp-pop';
+  popup.id = 'kpi2-dp-pop';
+  popup.innerHTML = _kpi2DPGridHTML();
+  document.body.appendChild(popup);
+
+  // Позиционирование под кнопкой
+  const rect = btn.getBoundingClientRect();
+  const pw = 288, ph = 320;
+  let left = rect.left;
+  let top  = rect.bottom + 8;
+  if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+  if (top + ph > window.innerHeight - 12) top = rect.top - ph - 8;
+  popup.style.left = left + 'px';
+  popup.style.top  = top + 'px';
+
+  requestAnimationFrame(() => popup.classList.add('open'));
+
+  // Клик снаружи → закрыть
+  setTimeout(() => {
+    document.addEventListener('mousedown', _kpi2DPOutside, true);
+    document.addEventListener('keydown', _kpi2DPEsc);
+  }, 0);
+};
+
+window._kpi2DPOutside = (e) => {
+  const pop = document.getElementById('kpi2-dp-pop');
+  if (pop && !pop.contains(e.target)) _kpi2DPClose();
+};
+window._kpi2DPEsc = (e) => { if (e.key === 'Escape') _kpi2DPClose(); };
+
+window._kpi2DPClose = () => {
+  const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.remove();
+  document.removeEventListener('mousedown', _kpi2DPOutside, true);
+  document.removeEventListener('keydown', _kpi2DPEsc);
+};
+
+window._kpi2DPGridHTML = () => {
+  const { year, month } = _kpi2DP.view;
+  const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const yearOptions = [];
+  const nowY = new Date().getFullYear();
+  for (let y = nowY - 3; y <= nowY + 5; y++) yearOptions.push(y);
+
+  // Выбранная и «сегодня»
+  const hidden = document.getElementById(_kpi2DP.target);
+  const selected = hidden && hidden.value ? hidden.value : null;
+  const todayISO = new Date().toISOString().slice(0, 10);
+
+  // Строим сетку 6×7
+  const first = new Date(year, month, 1);
+  const startWeekday = (first.getDay() + 6) % 7;   // Пн = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  // Дни предыдущего месяца
+  for (let i = startWeekday - 1; i >= 0; i--){
+    const d = new Date(year, month, -i);
+    cells.push({ d: d.getDate(), iso: _kpi2ISO(d), muted: true });
+  }
+  // Текущий месяц
+  for (let d = 1; d <= daysInMonth; d++){
+    const dt = new Date(year, month, d);
+    cells.push({ d, iso: _kpi2ISO(dt), muted: false });
+  }
+  // Дополнить до 42 ячеек
+  while (cells.length < 42){
+    const last = cells[cells.length - 1];
+    const dt = new Date(last.iso + 'T00:00:00'); dt.setDate(dt.getDate() + 1);
+    cells.push({ d: dt.getDate(), iso: _kpi2ISO(dt), muted: true });
+  }
+
+  return `
+    <div class="kpi2-dp-h">
+      <button class="kpi2-dp-nav" onclick="_kpi2DPShift(-1)" title="Предыдущий месяц"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="kpi2-dp-title">
+        <select class="kpi2-dp-sel" onchange="_kpi2DPSetMonth(this.value)">
+          ${monthNames.map((n, i) => `<option value="${i}"${i===month?' selected':''}>${n}</option>`).join('')}
+        </select>
+        <select class="kpi2-dp-sel" onchange="_kpi2DPSetYear(this.value)">
+          ${yearOptions.map(y => `<option value="${y}"${y===year?' selected':''}>${y}</option>`).join('')}
+        </select>
+      </div>
+      <button class="kpi2-dp-nav" onclick="_kpi2DPShift(1)" title="Следующий месяц"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="kpi2-dp-wd">
+      ${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(w => `<div class="kpi2-dp-w">${w}</div>`).join('')}
+    </div>
+    <div class="kpi2-dp-grid">
+      ${cells.map(c => {
+        const cls = [
+          'kpi2-dp-c',
+          c.muted ? 'muted' : '',
+          c.iso === selected ? 'sel' : '',
+          c.iso === todayISO ? 'today' : '',
+        ].filter(Boolean).join(' ');
+        return `<button class="${cls}" onclick="_kpi2DPPick('${c.iso}')">${c.d}</button>`;
+      }).join('')}
+    </div>
+    <div class="kpi2-dp-f">
+      <button class="kpi2-dp-tf" onclick="_kpi2DPPick('${todayISO}')">Сегодня</button>
+      <button class="kpi2-dp-tf" onclick="_kpi2DPClose()">Закрыть</button>
+    </div>`;
+};
+
+window._kpi2ISO = (dt) => {
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+window._kpi2DPShift = (delta) => {
+  const v = _kpi2DP.view;
+  v.month += delta;
+  if (v.month < 0){ v.month = 11; v.year--; }
+  if (v.month > 11){ v.month = 0; v.year++; }
+  const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.innerHTML = _kpi2DPGridHTML();
+};
+window._kpi2DPSetMonth = (m) => { _kpi2DP.view.month = +m; const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.innerHTML = _kpi2DPGridHTML(); };
+window._kpi2DPSetYear  = (y) => { _kpi2DP.view.year  = +y; const pop = document.getElementById('kpi2-dp-pop'); if (pop) pop.innerHTML = _kpi2DPGridHTML(); };
+
+window._kpi2DPPick = (iso) => {
+  const targetId = _kpi2DP.target; if(!targetId) return;
+  const hidden = document.getElementById(targetId);
+  const txt = document.getElementById(targetId + '-txt');
+  if (hidden) hidden.value = iso;
+  if (txt) txt.textContent = _kpi2FmtDate(iso);
+  _kpi2DPClose();
+};
+
+/* ═══════════ /KPI v2 · date picker ═══════════ */
 
 
 </script>
