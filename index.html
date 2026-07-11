@@ -537,7 +537,7 @@ tbody tr:hover td{background:var(--bg-2)}
 .dr-stats .st .l{font-size:11.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em;margin-top:5px}
 .dr-list{display:flex;flex-direction:column;gap:9px}
 .dr-li{display:flex;align-items:center;gap:11px;font-size:14px}
-.dr-li .ic{width:28px;height:28px;border-radius:7px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;color:var(--txt-2);flex:0 0 auto;font-size:12.5px;font-family:var(--mono)}
+.dr-li .ic{position:relative;overflow:hidden;width:28px;height:28px;border-radius:7px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;color:var(--txt-2);flex:0 0 auto;font-size:12.5px;font-family:var(--mono)}
 .dr-li .meta{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--txt-3)}
 .read-tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--warn);background:var(--warn-dim);padding:4px 9px;border-radius:6px;font-weight:600;letter-spacing:.03em}
 
@@ -5380,6 +5380,7 @@ button:active{transform:translateY(.5px) scale(.99)}
         <div class="fld"><label>Тариф</label><div class="dd seldd" id="seldd-f-plan"><input type="hidden" id="f-plan" value="trial"><button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('f-plan')"><span class="dd-v" id="f-plan-lbl" style="">Trial</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button><div class="dd-menu"><button type="button" class="dd-opt on" data-v="trial" data-l="Trial" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Trial<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="basic" data-l="Basic" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Basic<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="pro" data-l="Pro" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Pro<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button><button type="button" class="dd-opt " data-v="enterprise" data-l="Enterprise" onclick="selPick('f-plan',this.dataset.v,this.dataset.l)">Enterprise<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></button></div></div></div>
       </div>
       <div class="fld"><label>Логотип — URL (необязательно)</label><input id="f-logo" placeholder="https://…/logo.png — иначе буква"></div>
+      <div class="fld"><label>Ниша / отрасль</label><input id="f-vertical" placeholder="например: HoReCa, e-commerce, недвижимость"></div>
       <div class="fld"><label>Владелец — логин</label><input id="f-owner" placeholder="owner"><div class="hint" id="f-email">логин владельца: owner@apex-legal.triada.app</div></div>
       <div class="fld"><label>Пароль владельца</label><input id="f-pass" type="text" placeholder="Минимум 8 символов"></div>
       <div class="fld"><label>Акцент бренда</label>
@@ -5680,6 +5681,7 @@ function statusBadge(s){
   return '<span class="badge b-susp"><span class="bd"></span>Заморожено</span>';
 }
 function renderAnalytics(){
+  if(typeof agEnrichMrr==='function') agEnrichMrr();
   const A=AGENCIES, M=v=>(v/1e6).toFixed(1).replace(/\.0$/,'')+' М';
   const totMrr=platMrr(A);
   const paying=payingCount(A);
@@ -5724,7 +5726,7 @@ function renderAnalytics(){
     </div></div>
   </div>
   <div class="card" style="margin-top:16px"><div class="card-h"><div class="t">Лидеры по выручке</div><div class="c">${A.length} агентств</div></div>
-    <table><thead><tr><th style="width:42px">#</th><th>Агентство</th><th>Вертикаль</th><th>Тариф</th><th>MRR</th><th>Проекты</th><th>Доля</th></tr></thead>
+    <table><thead><tr><th style="width:42px">#</th><th>Агентство</th><th>Ниша</th><th>Тариф</th><th>MRR</th><th>Проекты</th><th>Доля</th></tr></thead>
     <tbody>${leaders.map((a,i)=>`<tr>
       <td><div class="lead-rank ${i<3?'top':''}">${i+1}</div></td>
       <td><div class="ag-name"><span class="ag-dot" style="background:${a.accent}"></span><div><div class="nm">${a.name}</div><div class="sl" style="font-family:var(--font)">${a.slug}.triada.app</div></div></div></td>
@@ -5980,7 +5982,17 @@ function saveSettings(){
   } else { window.PLATFORM_SETTINGS=Object.assign({}, window.PLATFORM_SETTINGS||{}, patch); toast('Настройки сохранены'); }
 }
 function logoFill(url,letter){if(!url)return letter;const u=String(url).replace(/["'<>]/g,'');return `${letter}<img src="${u}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.remove()">`;}
+function agEnrichMrr(){
+  if(typeof AGENCIES==='undefined' || typeof TARIFFS==='undefined' || !TARIFFS.length) return;
+  AGENCIES.forEach(a=>{
+    if(a._mrrDb===undefined) a._mrrDb=a.mrr||0;                       // исходный mrr из БД — один раз
+    const t=TARIFFS.find(x=>x.key===a.plan);
+    const p=(t&&typeof t.price==='number'&&t.price>0)?t.price:0;
+    a.mrr = a._mrrDb>0 ? a._mrrDb : p;                                // нет явного mrr → цена тарифа
+  });
+}
 function renderGeneral(){
+  agEnrichMrr();
   const total=AGENCIES.length;
   const active=AGENCIES.filter(a=>a.status==='active').length;
   const emp=AGENCIES.reduce((s,a)=>s+a.employees,0);
@@ -6020,7 +6032,7 @@ function renderGeneral(){
     <div class="card">
       <div class="card-h"><div class="t">Все агентства <span class="c">${total}</span></div></div>
       <table>
-        <thead><tr><th>Агентство</th><th>Вертикаль</th><th>Тариф</th><th>Статус</th><th>Сотр.</th><th>Проекты</th><th>Клиенты</th><th>MRR</th><th>Активность</th><th></th></tr></thead>
+        <thead><tr><th>Агентство</th><th>Ниша</th><th>Тариф</th><th>Статус</th><th>Сотр.</th><th>Проекты</th><th>MRR</th><th>Активность</th><th></th></tr></thead>
         <tbody>
           ${AGENCIES.map(a=>`
             <tr onclick="openDrawer('${a.id}')">
@@ -6030,7 +6042,6 @@ function renderGeneral(){
               <td style="text-align:right">${statusBadge(a.status)}</td>
               <td>${a.employees}</td>
               <td>${a.projects}</td>
-              <td>${a.clients}</td>
               <td>${a.mrr? money(a.mrr):'<span style="color:var(--txt-3)">—</span>'}</td>
               <td style="color:var(--txt-3)">${a.active}</td>
               <td onclick="event.stopPropagation()"><div class="t-actions">
@@ -6087,13 +6098,13 @@ function openAgency(id){
     document.getElementById('m-title').textContent='Редактировать агентство';
     document.getElementById('m-sub').textContent=a.name;
     document.getElementById('m-save').textContent='Сохранить';
-    f('name',a.name); f('slug',a.slug); f('plan',a.plan); f('owner',a.owner); f('pass',''); f('logo',a.logoUrl||'');
+    f('name',a.name); f('slug',a.slug); f('plan',a.plan); f('owner',a.owner); f('pass',''); f('logo',a.logoUrl||''); f('vertical',(a.vertical&&a.vertical!=='—')?a.vertical:'');
     _accent=a.accent;
   }else{
     document.getElementById('m-title').textContent='Новое агентство';
     document.getElementById('m-sub').textContent='Создаём кабинет агентства и владельца';
     document.getElementById('m-save').textContent='Создать агентство';
-    f('name',''); f('slug',''); f('plan','trial'); f('owner',''); f('pass',''); f('logo','');
+    f('name',''); f('slug',''); f('plan','trial'); f('owner',''); f('pass',''); f('logo',''); f('vertical','');
     _accent=ACCENTS[0];
   }
   [...sw.children].forEach(s=>s.classList.toggle('on',s.style.background===hex2rgb(_accent)||rgbEq(s.style.background,_accent)));
@@ -6111,10 +6122,10 @@ function saveAgency(){
   const name=f('name').trim(); if(!name){toast('Введи название агентства');return;}
   const slug=(f('slug').trim()||name.toLowerCase().replace(/\s+/g,'-')).replace(/[^a-z0-9-]/g,'');
   const plan=f('plan');
-  if(window.LIVE){ if(_editId){ window.tUpdateAgency(_editId,{name,slug,plan,owner_name:f('owner').trim(),accent:_accent,logo_url:f('logo').trim()}); } else { window.tProvisionAgency({name,slug,plan,owner:f('owner').trim(),pass:f('pass'),accent:_accent,logo:f('logo').trim()}); } closeAgency(); return; }
+  if(window.LIVE){ if(_editId){ window.tUpdateAgency(_editId,{name,slug,plan,vertical:f('vertical').trim(),owner_name:f('owner').trim(),accent:_accent,logo_url:f('logo').trim()}); } else { window.tProvisionAgency({name,slug,plan,owner:f('owner').trim(),pass:f('pass'),accent:_accent,logo:f('logo').trim()}); } closeAgency(); return; }
   if(_editId){
     const a=AGENCIES.find(x=>x.id===_editId);
-    a.name=name;a.slug=slug;a.plan=plan;a.owner=f('owner').trim()||a.owner;a.accent=_accent;a.logoUrl=f('logo').trim();
+    a.name=name;a.slug=slug;a.plan=plan;a.vertical=f('vertical').trim()||a.vertical;a.owner=f('owner').trim()||a.owner;a.accent=_accent;a.logoUrl=f('logo').trim();
     toast('Агентство обновлено');
   }else{
     AGENCIES.push({id:_seq++,name,slug,vertical:'Новое агентство',plan,status:plan==='trial'?'trial':'active',accent:_accent,logoUrl:f('logo').trim(),employees:0,clients:0,projects:0,mrr:0,active:'только что',owner:f('owner').trim()||'owner'});
@@ -6147,7 +6158,7 @@ function openDrawer(id){
         <div class="st"><div class="v">${a.clients}</div><div class="l">Клиенты</div></div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:14px"><span style="color:var(--txt-2)">MRR</span><span class="num" style="color:var(--txt)">${a.mrr?money(a.mrr):'—'}</span></div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:14px"><span style="color:var(--txt-2)">Вертикаль</span><span>${a.vertical}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:14px"><span style="color:var(--txt-2)">Ниша</span><span>${a.vertical}</span></div>
       <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:14px"><span style="color:var(--txt-2)">Последняя активность</span><span style="color:var(--txt-3)" class="num">${a.active}</span></div>
     </div>
     <div class="dr-sec">
