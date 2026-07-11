@@ -18464,7 +18464,7 @@ window._kpiFmt = (metricKey, v) => {
   if (v == null) return '—';
   const m = KPI_METRICS[metricKey]; if(!m) return String(v);
   if (m.unit === '%') return (Math.round(v*10)/10) + '%';
-  if (m.unit === 'ч') return v < 24 ? v + ' ч' : Math.round(v/24*10)/10 + ' дн';
+  if (m.unit === 'ч') return (typeof _kpi3FmtHours === 'function') ? _kpi3FmtHours(v) : (v < 24 ? v + ' ч' : Math.round(v/24*10)/10 + ' дн');
   if (m.unit === '$') return v >= 1000 ? Math.round(v/100)/10 + 'k' : '$' + Math.round(v);
   if (m.unit === 'σ') return Math.round(v*100)/100;
   if (m.unit === '' || m.unit === 'ед.'){
@@ -21638,12 +21638,28 @@ window._kpi3Fmt = (v, unit) => {
   if (v == null || Number.isNaN(v)) return '—';
   const n = Number(v);
   if (unit === '%') return `${n.toFixed(n < 10 ? 1 : 0)}%`;
-  if (unit === 'ч') return `${n.toFixed(1)}ч`;
+  if (unit === 'ч') return _kpi3FmtHours(n);
   if (unit === '$') return `$${_kpi3ShortNum(n)}`;
   if (unit === 'чел') return `${_kpi3ShortNum(n)}`;
   if (unit === 'ед.') return `${n.toFixed(n < 10 ? 1 : 0)}`;
   return _kpi3ShortNum(n);
 };
+window._kpi3FmtHours = (hours) => {
+  // Часы (число, может быть дробным) → «45 мин» / «1 ч 30 мин» / «2 ч» / «1 д 3 ч»
+  if (hours == null || Number.isNaN(hours)) return '—';
+  const totalMinutes = Math.round(hours * 60);
+  if (totalMinutes < 1) return '< 1 мин';
+  if (totalMinutes < 60) return `${totalMinutes} мин`;
+  if (totalMinutes < 24 * 60) {
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes - h * 60;
+    return m === 0 ? `${h} ч` : `${h} ч ${m} мин`;
+  }
+  const d = Math.floor(totalMinutes / (24 * 60));
+  const remH = Math.round((totalMinutes - d * 24 * 60) / 60);
+  return remH === 0 ? `${d} д` : `${d} д ${remH} ч`;
+};
+
 window._kpi3ShortNum = (n) => {
   n = Number(n);
   if (Math.abs(n) >= 1000000) return (n/1000000).toFixed(1) + 'M';
