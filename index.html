@@ -21681,15 +21681,16 @@ window._kpi3MetricsFor = (cat) => cat === 'member' ? [..._kpi3TpiKeys] : [..._kp
 window._kpi3CatLabel = (cat) => ({member:'сотрудникам', team:'командам', project:'проектам'})[cat] || cat;
 window._kpi3CatLabelOne = (cat) => ({member:'Сотрудник', team:'Команда', project:'Проект'})[cat] || cat;
 
+// Единый форматтер — везде точные числа с разрядами. Аналитика требует точности.
 window._kpi3Fmt = (v, unit) => {
   if (v == null || Number.isNaN(v)) return '—';
   const n = Number(v);
-  if (unit === '%') return `${n.toFixed(n < 10 ? 1 : 0)}%`;
+  if (unit === '%') return `${n.toFixed(n < 10 ? 2 : 1)}%`;
   if (unit === 'ч') return _kpi3FmtHours(n);
-  if (unit === '$') return `$${_kpi3ShortNum(n)}`;
-  if (unit === 'чел') return `${_kpi3ShortNum(n)}`;
-  if (unit === 'ед.') return `${n.toFixed(n < 10 ? 1 : 0)}`;
-  return _kpi3ShortNum(n);
+  if (unit === '$') return `$${_kpi3FmtGrouped(n, 0)}`;
+  if (unit === 'чел') return _kpi3FmtGrouped(n, 0);
+  if (unit === 'ед.') return _kpi3FmtGrouped(n, n % 1 === 0 ? 0 : 1);
+  return _kpi3FmtGrouped(n, n % 1 === 0 ? 0 : 0);
 };
 
 // Точный формат — с разрядами (1 505 234) для больших мест: RPM-график, детали.
@@ -21801,7 +21802,10 @@ window._kpi3ShellHTML = () => `
     .kpi3-tile{padding:14px 16px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;transition:all .16s var(--ease-out);position:relative;overflow:hidden}
     .kpi3-tile:hover{border-color:rgba(138,143,255,.22);transform:translateY(-1px)}
     .kpi3-tile-l{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:700;margin-bottom:8px}
-    .kpi3-tile-v{font-family:var(--mono);font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--txt-1);line-height:1.05}
+    .kpi3-tile-v{font-family:var(--mono);font-size:24px;font-weight:800;letter-spacing:-.02em;color:var(--txt-1);line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .kpi3-tile-v.kpi3-tile-v-md{font-size:20px;letter-spacing:-.015em}
+    .kpi3-tile-v.kpi3-tile-v-sm{font-size:17px;letter-spacing:-.01em}
+    .kpi3-tile-v.kpi3-tile-v-xs{font-size:14px;letter-spacing:0}
     .kpi3-tile-sub{margin-top:6px;font-size:11px;color:var(--txt-3);font-family:var(--mono);display:flex;align-items:center;justify-content:space-between;gap:6px}
     .kpi3-tile-bar{height:3px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;margin-top:8px}
     .kpi3-tile-bar-f{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));border-radius:3px;transition:width .4s var(--ease-out)}
@@ -21877,7 +21881,7 @@ window._kpi3ShellHTML = () => `
     .kpi3-stats-nm b{font-size:13.5px;font-weight:600;color:var(--txt-1);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .kpi3-stats-nm span{font-size:11.5px;color:var(--txt-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
     .kpi3-stats-stars{color:var(--warn);font-size:14px;letter-spacing:2px;text-align:center}
-    .kpi3-stats-score{font-family:var(--mono);font-size:18px;font-weight:800;color:var(--txt-1);text-align:right}
+    .kpi3-stats-score{font-family:var(--mono);font-size:18px;font-weight:800;color:var(--txt-1);text-align:right;font-variant-numeric:tabular-nums}
     .kpi3-stats-score .u{font-size:11px;color:var(--txt-3);font-weight:600;margin-left:2px}
     .kpi3-stats-row.pos .kpi3-stats-score{color:var(--pos)}
     .kpi3-stats-row.warn .kpi3-stats-score{color:var(--warn)}
@@ -22195,10 +22199,13 @@ window._kpi3TilesGrid = (keys, agg, title, cols) => `
         const fmt = empty ? '—' : _kpi3Fmt(v, m.unit);
         const norm = empty ? null : kpiNormalize(k, v);
         const cls = empty ? 'empty' : (norm == null ? '' : (norm >= 70 ? 'pos' : norm >= 40 ? 'warn' : 'neg'));
+        // Адаптивный размер шрифта: чем длиннее число, тем компактнее
+        const len = fmt.replace(/\s/g, '').length;
+        const sizeCls = len >= 12 ? 'kpi3-tile-v-xs' : len >= 9 ? 'kpi3-tile-v-sm' : len >= 7 ? 'kpi3-tile-v-md' : '';
         return `
           <div class="kpi3-tile ${cls}" title="${_kpi3Esc(m.formula)}">
             <div class="kpi3-tile-l">${m.label}</div>
-            <div class="kpi3-tile-v">${fmt}</div>
+            <div class="kpi3-tile-v ${sizeCls}">${fmt}</div>
             ${empty ? '' : `<div class="kpi3-tile-bar"><div class="kpi3-tile-bar-f" style="width:${norm||0}%"></div></div>`}
             <div class="kpi3-tile-sub">
               <span>${empty ? 'мало данных' : (m.dir === 'up' ? 'лучше выше' : 'лучше ниже')}</span>
