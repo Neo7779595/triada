@@ -10,7 +10,7 @@
 :root{
   --bg:#0A0B0D; --bg-1:#0F1116; --bg-2:#151920; --bg-3:#1C212A; --bg-side:#0C0E12;
   --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
-  --txt:#EAECEF; --txt-2:#9AA1AC; --txt-3:#7A828D;
+  --txt:#EAECEF; --txt-1:#EAECEF; --txt-2:#9AA1AC; --txt-3:#7A828D;
   --accent:#37E6C8; --accent-dim:rgba(55,230,200,.13); --accent-line:rgba(55,230,200,.34); --accent-ink:#04201B;
   --pos:#43D88C; --pos-dim:rgba(67,216,140,.12);
   --neg:#F0785C; --neg-dim:rgba(240,120,92,.12);
@@ -21853,8 +21853,8 @@ window._kpi3ShellHTML = () => `
     .kpi3-goal-toggle{cursor:pointer;border:none}
     .kpi3-rpm{padding:20px 22px 22px;border-top:1px solid var(--line);background:linear-gradient(180deg,rgba(138,143,255,.03),transparent 60%);animation:kpi3Slide .22s var(--ease-out);display:flex;flex-direction:column;gap:18px}
     @keyframes kpi3Slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-    .kpi3-rpm-graph{position:relative;padding:6px 0 8px}
-    .kpi3-rpm-graph svg{max-width:100%;filter:drop-shadow(0 4px 20px rgba(0,0,0,.4))}
+    .kpi3-rpm-graph{position:relative;padding:14px 0 4px}
+    .kpi3-rpm-graph svg{max-width:100%}
     .kpi3-rpm-current{position:absolute;top:50%;left:50%;transform:translate(-50%,-58%);background:linear-gradient(180deg,rgba(11,21,18,.96),rgba(11,21,18,.88));border:1px solid rgba(55,230,200,.18);border-radius:14px;padding:12px 22px;text-align:center;backdrop-filter:blur(8px);pointer-events:none;box-shadow:0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02);min-width:160px;transition:border-color .2s,box-shadow .2s}
     .kpi3-rpm-current.achieved{border-color:rgba(55,230,200,.5);box-shadow:0 16px 40px -8px rgba(55,230,200,.25), 0 0 0 1px rgba(55,230,200,.15), inset 0 0 0 1px rgba(55,230,200,.08)}
     .kpi3-rpm-current-lbl{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin-bottom:4px;font-family:var(--mono)}
@@ -22372,9 +22372,9 @@ window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => {
   const statusLabel = progress >= 1 ? '✓ достигли' : (gap >= -0.05 ? 'в темпе' : gap >= -0.2 ? 'отстаём' : 'проваливаем');
   const gapPct = Math.round(Math.abs(gap) * 100);
 
-  // Premium SVG layout: раздельные ряды для «сейчас» / «ожидание» чтобы не наезжали
-  const W = 820, H = 220, padX = 70;
-  const trackY = 110;
+  // Минималистичный layout: тонкая линия + текст по краям
+  const W = 820, H = 120, padX = 40;
+  const trackY = 60;
   const x0 = padX, x1 = W - padX;
   const curX = x0 + (x1 - x0) * progress;
   const expX = x0 + (x1 - x0) * expectedProgress;
@@ -22394,84 +22394,46 @@ window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => {
             <stop offset="0" stop-color="var(--accent)"/>
             <stop offset="1" stop-color="var(--violet)"/>
           </linearGradient>
-          <linearGradient id="kpi3-highlight-${g.id}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="rgba(255,255,255,.35)"/>
-            <stop offset=".5" stop-color="rgba(255,255,255,.05)"/>
-            <stop offset="1" stop-color="rgba(0,0,0,.15)"/>
-          </linearGradient>
-          <radialGradient id="kpi3-glow-${g.id}" cx=".5" cy=".5" r=".5">
-            <stop offset="0" stop-color="var(--accent)" stop-opacity=".55"/>
-            <stop offset="1" stop-color="var(--accent)" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="kpi3-glow-target-${g.id}" cx=".5" cy=".5" r=".5">
-            <stop offset="0" stop-color="var(--violet)" stop-opacity=".45"/>
-            <stop offset="1" stop-color="var(--violet)" stop-opacity="0"/>
-          </radialGradient>
-          <filter id="kpi3-soft-${g.id}" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="1.2"/>
-          </filter>
         </defs>
 
-        <!-- Внешние ticks: 0%, 25%, 50%, 75%, 100% -->
-        ${[0, .25, .5, .75, 1].map(p => {
-          const tx = x0 + (x1-x0)*p;
-          return `<line x1="${tx}" y1="${trackY+16}" x2="${tx}" y2="${trackY+22}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
-        }).join('')}
+        <!-- Track: тонкая линия, без чёрного фона -->
+        <line x1="${x0}" y1="${trackY}" x2="${x1}" y2="${trackY}" stroke="rgba(234,236,239,.08)" stroke-width="2" stroke-linecap="round"/>
 
-        <!-- Track background: глубокий рельеф -->
-        <rect x="${x0-2}" y="${trackY-9}" width="${x1-x0+4}" height="18" rx="9" fill="rgba(0,0,0,.35)"/>
-        <rect x="${x0}" y="${trackY-7}" width="${x1-x0}" height="14" rx="7" fill="rgba(255,255,255,.035)" stroke="rgba(255,255,255,.05)" stroke-width="1"/>
-
-        <!-- Внутренние divisions по 25% -->
-        ${[.25, .5, .75].map(p => {
-          const dx = x0 + (x1-x0)*p;
-          return `<line x1="${dx}" y1="${trackY-6}" x2="${dx}" y2="${trackY+6}" stroke="rgba(255,255,255,.04)" stroke-width="1"/>`;
-        }).join('')}
-
-        <!-- Прогресс fill с внутренним highlight -->
+        <!-- Прогресс fill: та же тонкая линия, но градиентная -->
         ${progress > 0 ? `
-          <rect x="${x0}" y="${trackY-7}" width="${Math.max(0, curX - x0)}" height="14" rx="7" fill="url(#kpi3-fill-${g.id})"/>
-          <rect x="${x0}" y="${trackY-7}" width="${Math.max(0, curX - x0)}" height="14" rx="7" fill="url(#kpi3-highlight-${g.id})" opacity=".7"/>
+          <line x1="${x0}" y1="${trackY}" x2="${curX}" y2="${trackY}" stroke="url(#kpi3-fill-${g.id})" stroke-width="2" stroke-linecap="round"/>
         ` : ''}
 
         ${achieved ? '' : `
-          <!-- Пунктирная линия «Ожидание» -->
-          <line x1="${expX}" y1="${trackY-30}" x2="${expX}" y2="${trackY+30}" stroke="rgba(255,255,255,.28)" stroke-width="1.5" stroke-dasharray="4 4"/>
-          <circle cx="${expX}" cy="${trackY-30}" r="2" fill="rgba(255,255,255,.4)"/>
-          <text x="${expX}" y="${trackY-40}" fill="var(--txt-3)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.08em">
-            ОЖИДАНИЕ · ${Math.round(expectedProgress*100)}%
-          </text>
+          <!-- Ожидание · пунктир -->
+          <line x1="${expX}" y1="${trackY-8}" x2="${expX}" y2="${trackY+8}" stroke="rgba(234,236,239,.22)" stroke-width="1" stroke-dasharray="2 3"/>
+          <text x="${expX}" y="${trackY-14}" fill="var(--txt-3)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="600" letter-spacing="0.12em">ожидание ${Math.round(expectedProgress*100)}%</text>
         `}
 
-        <!-- Точка А (baseline) — subtle -->
-        <circle cx="${x0}" cy="${trackY}" r="14" fill="rgba(255,255,255,.04)"/>
-        <circle cx="${x0}" cy="${trackY}" r="7" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.3)" stroke-width="1.5"/>
-        <circle cx="${x0}" cy="${trackY}" r="2.5" fill="rgba(255,255,255,.55)"/>
-        <text x="${x0}" y="${trackY-38}" fill="var(--txt-3)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">ТОЧКА А</text>
-        <text x="${x0}" y="${trackY+52}" fill="var(--txt-1)" font-size="16" font-family="var(--mono)" text-anchor="middle" font-weight="800" letter-spacing="-.01em">${_kpi3Esc(_kpi3FmtExact(baseline, m.unit))}</text>
+        <!-- Точка А (baseline) — минимальный точечный маркер -->
+        <circle cx="${x0}" cy="${trackY}" r="5" fill="none" stroke="rgba(234,236,239,.35)" stroke-width="1.5"/>
+        <text x="${x0}" y="${trackY-22}" fill="var(--txt-3)" font-size="10" font-family="var(--mono)" text-anchor="start" font-weight="700" letter-spacing="0.14em">ТОЧКА А</text>
+        <text x="${x0}" y="${trackY+30}" fill="var(--txt)" font-size="15" font-family="var(--mono)" text-anchor="start" font-weight="700" letter-spacing="-.005em">${_kpi3Esc(_kpi3FmtExact(baseline, m.unit))}</text>
 
-        <!-- Цель (target) — premium accent; при достижении сливается с СЕЙЧАС -->
-        <circle cx="${x1}" cy="${trackY}" r="${achieved ? 24 : 20}" fill="url(#kpi3-glow-target-${g.id})"/>
-        <circle cx="${x1}" cy="${trackY}" r="${achieved ? 14 : 11}" fill="#0b1512" stroke="${achieved ? 'var(--accent)' : 'var(--violet)'}" stroke-width="${achieved ? 3 : 2.5}"/>
-        <circle cx="${x1}" cy="${trackY}" r="${achieved ? 8 : 6}" fill="${achieved ? 'var(--accent)' : 'var(--violet)'}"/>
+        <!-- Цель (target) — акцентный маркер -->
         ${achieved ? `
-          <path d="M ${x1-5} ${trackY} L ${x1-1} ${trackY+4} L ${x1+6} ${trackY-4}" stroke="#031a15" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="${x1}" cy="${trackY}" r="9" fill="none" stroke="var(--accent)" stroke-width="1.8"/>
+          <path d="M ${x1-4.5} ${trackY} L ${x1-1} ${trackY+3.5} L ${x1+5} ${trackY-3.5}" stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         ` : `
-          <circle cx="${x1}" cy="${trackY}" r="2" fill="#fff" opacity=".9"/>
+          <circle cx="${x1}" cy="${trackY}" r="7" fill="none" stroke="var(--violet)" stroke-width="2"/>
+          <circle cx="${x1}" cy="${trackY}" r="3" fill="var(--violet)"/>
         `}
-        <text x="${x1}" y="${trackY-38}" fill="${achieved ? 'var(--accent)' : 'var(--violet)'}" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">${achieved ? '✓ ДОСТИГНУТО' : 'ЦЕЛЬ'}</text>
-        <text x="${x1}" y="${trackY+55}" fill="var(--txt-1)" font-size="16" font-family="var(--mono)" text-anchor="middle" font-weight="800" letter-spacing="-.01em">${_kpi3Esc(_kpi3FmtExact(targetV, m.unit))}</text>
-        ${endDate ? `<text x="${x1}" y="${trackY+72}" fill="var(--txt-3)" font-size="10.5" font-family="var(--mono)" text-anchor="middle" font-weight="600">${_kpi3Esc(_kpi3FmtDate(endDate.toISOString()))}</text>` : ''}
+        <text x="${x1}" y="${trackY-22}" fill="${achieved ? 'var(--accent)' : 'var(--violet)'}" font-size="10" font-family="var(--mono)" text-anchor="end" font-weight="700" letter-spacing="0.14em">${achieved ? '✓ ДОСТИГНУТО' : 'ЦЕЛЬ'}</text>
+        <text x="${x1}" y="${trackY+30}" fill="var(--txt)" font-size="15" font-family="var(--mono)" text-anchor="end" font-weight="700" letter-spacing="-.005em">${_kpi3Esc(_kpi3FmtExact(targetV, m.unit))}</text>
+        ${endDate ? `<text x="${x1}" y="${trackY+48}" fill="var(--txt-3)" font-size="10.5" font-family="var(--mono)" text-anchor="end" font-weight="600">${_kpi3Esc(_kpi3FmtDate(endDate.toISOString()))}</text>` : ''}
 
         <!-- Маркер «Сейчас»: только если НЕ слился с baseline/target -->
         ${showCurAsSeparate ? `
-          <circle cx="${curX}" cy="${trackY}" r="22" fill="url(#kpi3-glow-${g.id})"/>
-          <circle cx="${curX}" cy="${trackY}" r="13" fill="#0b1512" stroke="var(--accent)" stroke-width="2.5"/>
-          <circle cx="${curX}" cy="${trackY}" r="7" fill="var(--accent)"/>
-          <circle cx="${curX}" cy="${trackY}" r="2.5" fill="#fff" opacity=".95"/>
-          <text x="${curX}" y="${trackY-38}" fill="var(--accent)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">СЕЙЧАС · ${Math.round(progress*100)}%</text>
+          <circle cx="${curX}" cy="${trackY}" r="7" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <circle cx="${curX}" cy="${trackY}" r="3.5" fill="var(--accent)"/>
+          <text x="${curX}" y="${trackY-22}" fill="var(--accent)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.14em">СЕЙЧАС · ${Math.round(progress*100)}%</text>
         ` : ''}
-        ${!showCurLabel ? `<text x="${(x0+x1)/2}" y="${trackY-38}" fill="var(--txt-3)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">НЕТ ДАННЫХ</text>` : ''}
+        ${!showCurLabel ? `<text x="${(x0+x1)/2}" y="${trackY-22}" fill="var(--txt-3)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.14em">НЕТ ДАННЫХ</text>` : ''}
       </svg>
 
       ${showCurLabel && !achieved ? `
