@@ -7082,7 +7082,23 @@ window.addEventListener('resize',function(){ if(document.querySelector('.dd.open
   }
   function _watchDeep(id){
     var el=document.getElementById(id); if(!el) return;
-    new MutationObserver(function(){
+    new MutationObserver(function(muts){
+      // Игнорируем мутации связанные с открытием/закрытием самих dropdowns.
+      // Иначе dropdown, открытый ВНУТРИ модалки, тут же закрывается своей же
+      // мутацией (portalization / add class).
+      var fromDD = false;
+      for (var i = 0; i < muts.length; i++) {
+        var m = muts[i];
+        var t = m.target;
+        if (t && t.closest && (t.closest('.dd') || t.closest('.cdd') || t.closest('.dd-menu') || t.closest('.cdd-menu'))) { fromDD = true; break; }
+        // Проверим добавленные/удалённые ноды тоже
+        if (m.addedNodes) for (var j = 0; j < m.addedNodes.length; j++) {
+          var n = m.addedNodes[j];
+          if (n && n.classList && (n.classList.contains('dd-menu') || n.classList.contains('cdd-menu') || n.classList.contains('dd-portal'))) { fromDD = true; break; }
+        }
+        if (fromDD) break;
+      }
+      if (fromDD) return;
       if(document.querySelector('.dd-menu.dd-portal')||document.querySelector('.dd.open')) _closePops();
     }).observe(el,{childList:true,subtree:true});
   }
