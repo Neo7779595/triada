@@ -22011,7 +22011,24 @@ window._kpi3ShellHTML = () => `
     .kpi3-stats-tr.pos{color:var(--pos)}
     .kpi3-stats-tr.neg{color:var(--neg)}
     .kpi3-stats-tr.flat{color:var(--txt-3)}
-    .kpi3-empty{padding:28px;text-align:center;color:var(--txt-3);font-size:13.5px;line-height:1.6;display:flex;flex-direction:column;align-items:center;gap:12px}
+    /* Team breakdown table */
+    .kpi3-tbl{width:100%;border-collapse:separate;border-spacing:0;font-family:var(--mono);font-size:12.5px}
+    .kpi3-tbl th,.kpi3-tbl td{padding:10px 8px;text-align:right;vertical-align:middle;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
+    .kpi3-tbl th{font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-3);font-weight:700;padding:8px 8px 12px;border-bottom-color:rgba(255,255,255,.08)}
+    .kpi3-tbl th:first-child,.kpi3-tbl td:first-child{text-align:left;padding-left:2px}
+    .kpi3-tbl tr:last-child td{border-bottom:none}
+    .kpi3-tbl-proj{display:flex;align-items:center;gap:10px;min-width:0}
+    .kpi3-tbl-av{width:28px;height:28px;border-radius:8px;overflow:hidden;background:var(--panel-2);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:var(--accent);flex:none}
+    .kpi3-tbl-av img{width:100%;height:100%;object-fit:cover;display:block}
+    .kpi3-tbl-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;color:var(--txt);font-family:inherit;font-size:13px}
+    .kpi3-tbl-nm-sub{font-size:10.5px;color:var(--txt-3);margin-top:1px;font-weight:600}
+    .kpi3-tbl-cell.pos{color:var(--pos)}
+    .kpi3-tbl-cell.warn{color:var(--warn)}
+    .kpi3-tbl-cell.neg{color:var(--neg)}
+    .kpi3-tbl-cell{font-weight:700;color:var(--txt)}
+    .kpi3-tbl-cell.empty{color:var(--txt-3);opacity:.4}
+    .kpi3-tbl-wrap{overflow-x:auto;margin:0 -4px}
+        .kpi3-empty{padding:28px;text-align:center;color:var(--txt-3);font-size:13.5px;line-height:1.6;display:flex;flex-direction:column;align-items:center;gap:12px}
     .kpi3-empty b{color:var(--txt-1);font-weight:700}
     .kpi3-loading{padding:20px;text-align:center;color:var(--txt-3);font-size:12.5px}
     .kpi3-skel{display:inline-block;background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.08),rgba(255,255,255,.04));background-size:300% 100%;animation:kpi3Skel 1.4s ease infinite;border-radius:4px}
@@ -22136,6 +22153,15 @@ window._kpi3ShellHTML = () => `
       </div>
       <div id="kpi3-pointa"><div class="kpi3-loading">Считаем реальность…</div></div>
     </div>
+    <div class="kpi3-section" id="kpi3-team-breakdown-section" style="display:none">
+      <div class="kpi3-section-h">
+        <div>
+          <div class="kpi3-block-t">Проекты команды</div>
+          <div class="kpi3-block-sub" id="kpi3-team-breakdown-sub">Разбивка по каждому проекту</div>
+        </div>
+      </div>
+      <div id="kpi3-team-breakdown"><div class="kpi3-loading">Загружаем проекты команды…</div></div>
+    </div>
     <div class="kpi3-section">
       <div class="kpi3-section-h">
         <div>
@@ -22182,6 +22208,7 @@ window._kpi3SwitchCategory = async (cat) => {
     _kpi3FillPointA(),
     _kpi3FillGoals(),
     _kpi3FillStats(),
+    _kpi3FillTeamBreakdown(),
   ]);
 };
 
@@ -22234,6 +22261,7 @@ window._kpi3SelectRow = async (rowId) => {
     _kpi3FillPointA(),
     _kpi3FillGoals(),
     _kpi3FillStats(),
+    _kpi3FillTeamBreakdown(),
   ]);
 };
 
@@ -22367,6 +22395,90 @@ window._kpi3UpdateClearBtn = () => {
     ? goals.filter(g => g.scope_id === _kpi3.selectedRowId).length
     : goals.length;
   btn.style.display = visible >= 3 ? '' : 'none';
+};
+
+window._kpi3FillTeamBreakdown = async () => {
+  const wrap = document.getElementById('kpi3-team-breakdown');
+  const section = document.getElementById('kpi3-team-breakdown-section');
+  const sub = document.getElementById('kpi3-team-breakdown-sub');
+  if (!wrap || !section) return;
+  // Показывать только когда выбрана категория 'team' и есть selectedRowId (конкретная команда)
+  if (_kpi3.category !== 'team' || !_kpi3.selectedRowId) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  wrap.innerHTML = '<div class="kpi3-loading">Считаем метрики по проектам команды…</div>';
+  const teamId = _kpi3.selectedRowId;
+  const pids = await _kpiSmmScopeProjects('team', teamId);
+  if (!pids.length) {
+    wrap.innerHTML = '<div class="kpi3-empty"><b>У команды нет проектов.</b><br/>Назначьте участников команды в PM/лидов проектов.</div>';
+    if (sub) sub.textContent = 'Нет проектов';
+    return;
+  }
+  if (sub) sub.textContent = `${pids.length} проект${pids.length===1?'':(pids.length<5?'а':'ов')} за 30 дней`;
+  const P = (typeof PROJECTS !== 'undefined' ? PROJECTS : []);
+  const projects = pids.map(pid => P.find(p => p.id === pid)).filter(Boolean);
+  const now = new Date().toISOString();
+  const from = new Date(Date.now() - 30*86400000).toISOString();
+  // Параллельно считаем все метрики по каждому проекту
+  const results = await Promise.all(projects.map(p => kpiComputeAll('project', p.id, from, now).catch(() => ({}))));
+
+  // Формируем таблицу: [Проект] [Выработка] [Время] [Надёжн.] [Качество] [Охват] [Просм.] [Прирост] [ER]
+  const cols = [
+    { key: 'vyrabotka',   label: 'Выработка',   short: true },
+    { key: 'skorost',     label: 'Время',       short: true },
+    { key: 'nadezhnost',  label: 'Надёжн.',     short: true },
+    { key: 'kachestvo',   label: 'Качество',    short: true },
+    { key: 'smm_reach',   label: 'Охват',       short: false },
+    { key: 'smm_views',   label: 'Просмотры',   short: false },
+    { key: 'smm_growth_abs', label: 'Прирост',  short: false },
+    { key: 'smm_er',      label: 'ER',          short: true },
+  ];
+  const rowsHtml = projects.map((p, i) => {
+    const rv = results[i] || {};
+    const cells = cols.map(c => {
+      const m = KPI_METRICS[c.key];
+      const cell = rv[c.key];
+      const v = cell != null ? _kpi3ExtractVal(cell) : null;
+      if (v == null || Number.isNaN(v)) return `<td class="kpi3-tbl-cell empty">—</td>`;
+      const norm = kpiNormalize(c.key, v);
+      const cls = norm == null ? '' : (norm >= 70 ? 'pos' : norm >= 40 ? 'warn' : 'neg');
+      return `<td class="kpi3-tbl-cell ${cls}" title="${norm != null ? norm + '/100' : ''}">${_kpi3Esc(_kpi3Fmt(v, m.unit))}</td>`;
+    }).join('');
+    const escInit = _kpi3Esc((p.name || '?').slice(0,2).toUpperCase());
+    const av = (p.logoUrl || p.logo_url)
+      ? `<img src="${_kpi3Esc(p.logoUrl || p.logo_url)}" onerror="this.parentElement.textContent='${escInit}'"/>`
+      : escInit;
+    return `
+      <tr>
+        <td>
+          <div class="kpi3-tbl-proj">
+            <div class="kpi3-tbl-av">${av}</div>
+            <div style="min-width:0">
+              <div class="kpi3-tbl-nm">${_kpi3Esc(p.name || '—')}</div>
+              ${p.service ? `<div class="kpi3-tbl-nm-sub">${_kpi3Esc(p.service)}</div>` : ''}
+            </div>
+          </div>
+        </td>
+        ${cells}
+      </tr>
+    `;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="kpi3-tbl-wrap">
+      <table class="kpi3-tbl">
+        <thead>
+          <tr>
+            <th style="min-width:180px">Проект</th>
+            ${cols.map(c => `<th>${c.label}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
 };
 
 window._kpi3FillGoals = async () => {
