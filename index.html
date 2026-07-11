@@ -21997,7 +21997,11 @@ window._kpi3ShellHTML = () => `
     .kpi3-tile-v.kpi3-tile-v-xs{font-size:14px;letter-spacing:0}
     .kpi3-tile-bar{height:4px;background:rgba(0,0,0,.4);border-radius:4px;overflow:hidden;margin-top:12px;position:relative;box-shadow:inset 0 1px 1px rgba(0,0,0,.35)}
     .kpi3-tile-bar-f{height:100%;background:linear-gradient(90deg,var(--accent),var(--violet));border-radius:4px;transition:width .5s cubic-bezier(.2,.9,.3,1);box-shadow:0 0 10px rgba(55,230,200,.35)}
-    .kpi3-tile.pos{border-color:rgba(72,207,138,.2)}
+    .kpi3-tile.top{border-color:rgba(138,143,255,.28)}
+    .kpi3-tile.top::after{content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;background:radial-gradient(circle,rgba(138,143,255,.18),transparent 65%);pointer-events:none}
+    .kpi3-tile.top .kpi3-tile-v{background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .kpi3-tile.top .kpi3-tile-bar-f{background:linear-gradient(90deg,var(--accent),var(--violet));box-shadow:0 0 12px rgba(138,143,255,.4)}
+        .kpi3-tile.pos{border-color:rgba(72,207,138,.2)}
     .kpi3-tile.pos::after{content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;background:radial-gradient(circle,rgba(72,207,138,.14),transparent 65%);pointer-events:none}
     .kpi3-tile.pos .kpi3-tile-v{background:linear-gradient(135deg,var(--pos),#7DE7A8);-webkit-background-clip:text;background-clip:text;color:transparent}
     .kpi3-tile.pos .kpi3-tile-bar-f{background:linear-gradient(90deg,var(--pos),#7DE7A8);box-shadow:0 0 12px rgba(72,207,138,.4)}
@@ -22077,6 +22081,13 @@ window._kpi3ShellHTML = () => `
     .kpi3-stats-nm span{font-size:11.5px;color:var(--txt-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;margin-top:2px}
     .kpi3-stats-score{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--txt);text-align:right;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.02em}
     .kpi3-stats-score .u{font-size:11px;color:var(--txt-3);font-weight:600;margin-left:3px;letter-spacing:0}
+    .kpi3-stats-row.top{border-color:rgba(138,143,255,.35);background:linear-gradient(180deg,rgba(138,143,255,.06),rgba(11,21,18,.5))}
+    .kpi3-stats-row.top .kpi3-stats-score{background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .kpi3-rel-lbl{font-family:var(--mono);font-weight:700;opacity:.9}
+    .kpi3-stats-row.top .kpi3-rel-lbl{color:var(--violet)}
+    .kpi3-stats-row.pos .kpi3-rel-lbl{color:var(--pos)}
+    .kpi3-stats-row.warn .kpi3-rel-lbl{color:var(--warn)}
+    .kpi3-stats-row.neg .kpi3-rel-lbl{color:var(--neg)}
     .kpi3-stats-row.pos .kpi3-stats-score{background:linear-gradient(135deg,var(--pos),#7DE7A8);-webkit-background-clip:text;background-clip:text;color:transparent}
     .kpi3-stats-row.warn .kpi3-stats-score{color:var(--warn)}
     .kpi3-stats-row.neg .kpi3-stats-score{color:var(--neg)}
@@ -22380,6 +22391,13 @@ window._kpi3FillPointA = async () => {
   // Агрегат по всем
   const rowVals = await Promise.all(rows.map(r => kpiComputeAll(cat, r.id, from, to).catch(() => ({}))));
   rows.forEach((r, i) => { _kpi3.rowVals[`${cat}|${r.id}`] = rowVals[i]; });
+  const relByMetric = {};
+  _kpi3MetricsFor(cat).forEach(k => {
+    const vals = rowVals.map(rv => _kpi3ExtractVal(rv && rv[k])).filter(v => v != null && !Number.isNaN(v));
+    relByMetric[k] = _kpi3RelStats(vals);
+  });
+  _kpi3.aggregateVals = _kpi3.aggregateVals || {};
+  _kpi3.aggregateVals[cat + ':rel'] = relByMetric;
   const agg = {};
   _kpi3MetricsFor(cat).forEach(k => {
     const m = KPI_METRICS[k]; if(!m) return;
@@ -22428,7 +22446,15 @@ window._kpi3TilesGrid = (keys, agg, title, cols) => `
         const empty = v == null;
         const fmt = empty ? '—' : _kpi3Fmt(v, m.unit);
         const norm = empty ? null : kpiNormalize(k, v);
-        const cls = empty ? 'empty' : (norm == null ? '' : (norm >= 70 ? 'pos' : norm >= 40 ? 'warn' : 'neg'));
+        let cls;
+        const rel = (_kpi3.aggregateVals && _kpi3.aggregateVals[_kpi3.category + ':rel'] || {})[k];
+        if (empty) cls = 'empty';
+        else if (_kpi3.selectedRowId && rel && rel.count >= 2) {
+          const rc = _kpi3RelClass(v, rel, m.dir);
+          cls = ({top:'top', good:'pos', mid:'', weak:'warn', bottom:'neg'})[rc] || '';
+        } else {
+          cls = norm == null ? '' : (norm >= 70 ? 'pos' : norm >= 40 ? 'warn' : 'neg');
+        }
         // Адаптивный размер шрифта: чем длиннее число, тем компактнее
         const len = fmt.replace(/\s/g, '').length;
         const sizeCls = len >= 12 ? 'kpi3-tile-v-xs' : len >= 9 ? 'kpi3-tile-v-sm' : len >= 7 ? 'kpi3-tile-v-md' : '';
@@ -22905,6 +22931,8 @@ window._kpi3FillStats = async () => {
     return { row: r, score: score(cur), prevScore: score(prev) };
   }));
   scored.sort((a,b) => (b.score||-1) - (a.score||-1));
+  const scoreRel = _kpi3RelStats(scored.map(it => it.score));
+  scored.forEach(it => { it.scoreCls = _kpi3RelClass(it.score, scoreRel, 'up'); });
   // Отмечаем позицию (rank) до фильтрации; если выбран row — показываем только его
   const withRank = scored.map((it, i) => Object.assign({}, it, { rank: i+1 }));
   const shown = _kpi3.selectedRowId ? withRank.filter(it => it.row.id === _kpi3.selectedRowId) : withRank;
@@ -22918,8 +22946,10 @@ window._kpi3StatsSkeleton = (n) => Array.from({length: Math.min(n, 8)}).map(() =
 window._kpi3StatsRowHTML = (it, n) => {
   const r = it.row;
   const s = it.score;
-  const cls = s == null ? '' : (s >= 70 ? 'pos' : s >= 40 ? 'warn' : 'neg');
+  const relCls = it.scoreCls || 'mid';
+  const cls = s == null ? '' : ({top:'top', good:'pos', mid:'', weak:'warn', bottom:'neg'}[relCls] || '');
   const rankCls = n <= 3 ? `rank-${n}` : '';
+  const relLabel = ({top:'лидер', good:'выше среднего', mid:'на уровне', weak:'ниже среднего', bottom:'отстаёт'})[relCls] || '';
   let trend = '·', trendCls = 'flat';
   if (s != null && it.prevScore != null) {
     const d = s - it.prevScore;
@@ -22937,7 +22967,7 @@ window._kpi3StatsRowHTML = (it, n) => {
       <div class="kpi3-stats-av">${avatarHtml}</div>
       <div class="kpi3-stats-nm">
         <b>${_kpi3Esc(r.name)}</b>
-        <span>${_kpi3Esc(r.subtitle || '')}</span>
+        <span>${_kpi3Esc(r.subtitle || '')}${relLabel ? ' · <span class="kpi3-rel-lbl">'+relLabel+'</span>' : ''}</span>
       </div>
       <div class="kpi3-stats-score">${s != null ? s : '—'}<span class="u">/100</span></div>
       <div class="kpi3-stats-tr ${trendCls}">${trend}</div>
