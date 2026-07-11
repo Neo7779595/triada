@@ -21855,7 +21855,8 @@ window._kpi3ShellHTML = () => `
     @keyframes kpi3Slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
     .kpi3-rpm-graph{position:relative;padding:6px 0 8px}
     .kpi3-rpm-graph svg{max-width:100%;filter:drop-shadow(0 4px 20px rgba(0,0,0,.4))}
-    .kpi3-rpm-current{position:absolute;top:50%;left:50%;transform:translate(-50%,-58%);background:linear-gradient(180deg,rgba(11,21,18,.95),rgba(11,21,18,.85));border:1px solid rgba(55,230,200,.18);border-radius:14px;padding:12px 22px;text-align:center;backdrop-filter:blur(8px);pointer-events:none;box-shadow:0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02);min-width:160px}
+    .kpi3-rpm-current{position:absolute;top:50%;left:50%;transform:translate(-50%,-58%);background:linear-gradient(180deg,rgba(11,21,18,.96),rgba(11,21,18,.88));border:1px solid rgba(55,230,200,.18);border-radius:14px;padding:12px 22px;text-align:center;backdrop-filter:blur(8px);pointer-events:none;box-shadow:0 12px 32px -8px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02);min-width:160px;transition:border-color .2s,box-shadow .2s}
+    .kpi3-rpm-current.achieved{border-color:rgba(55,230,200,.5);box-shadow:0 16px 40px -8px rgba(55,230,200,.25), 0 0 0 1px rgba(55,230,200,.15), inset 0 0 0 1px rgba(55,230,200,.08)}
     .kpi3-rpm-current-lbl{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin-bottom:4px;font-family:var(--mono)}
     .kpi3-rpm-current-val{font-size:26px;font-weight:800;color:var(--txt-1);letter-spacing:-.02em;font-family:var(--mono);line-height:1;font-variant-numeric:tabular-nums;background:linear-gradient(135deg,var(--accent),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
     .kpi3-rpm-current-delta{font-size:11px;font-weight:700;margin-top:5px;font-family:var(--mono);letter-spacing:.02em}
@@ -22376,10 +22377,11 @@ window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => {
   const curX = x0 + (x1 - x0) * progress;
   const expX = x0 + (x1 - x0) * expectedProgress;
   const showCurLabel = cur != null;
-  // Разъединяем «current» и «expected» метки по-разному чтобы не пересекались
-  const labelsOverlap = showCurLabel && Math.abs(curX - expX) < 90;
-  const curLabelBelow = true; // current всегда снизу
-  const expLabelAbove = true; // expected сверху
+  // Пороги «слияния» маркеров: если СЕЙЧАС ближе 34px к цели или Точке А — сливаем
+  const nearTarget = showCurLabel && Math.abs(curX - x1) < 34;
+  const nearBaseline = showCurLabel && Math.abs(curX - x0) < 34;
+  const showCurAsSeparate = showCurLabel && !nearTarget && !nearBaseline;
+  const achieved = progress >= 0.98 || nearTarget;
 
   return `
   <div class="kpi3-rpm" onclick="event.stopPropagation()">
@@ -22444,33 +22446,39 @@ window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => {
         <text x="${x0}" y="${trackY-38}" fill="var(--txt-3)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">ТОЧКА А</text>
         <text x="${x0}" y="${trackY+52}" fill="var(--txt-1)" font-size="16" font-family="var(--mono)" text-anchor="middle" font-weight="800" letter-spacing="-.01em">${_kpi3Esc(_kpi3FmtExact(baseline, m.unit))}</text>
 
-        <!-- Цель (target) — premium accent -->
-        <circle cx="${x1}" cy="${trackY}" r="20" fill="url(#kpi3-glow-target-${g.id})"/>
-        <circle cx="${x1}" cy="${trackY}" r="11" fill="#0b1512" stroke="var(--violet)" stroke-width="2.5"/>
-        <circle cx="${x1}" cy="${trackY}" r="6" fill="var(--violet)"/>
-        <circle cx="${x1}" cy="${trackY}" r="2" fill="#fff" opacity=".9"/>
-        <text x="${x1}" y="${trackY-38}" fill="var(--violet)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">ЦЕЛЬ</text>
-        <text x="${x1}" y="${trackY+52}" fill="var(--txt-1)" font-size="16" font-family="var(--mono)" text-anchor="middle" font-weight="800" letter-spacing="-.01em">${_kpi3Esc(_kpi3FmtExact(targetV, m.unit))}</text>
-        ${endDate ? `<text x="${x1}" y="${trackY+70}" fill="var(--txt-3)" font-size="10.5" font-family="var(--mono)" text-anchor="middle" font-weight="600">${_kpi3Esc(_kpi3FmtDate(endDate.toISOString()))}</text>` : ''}
+        <!-- Цель (target) — premium accent; при достижении сливается с СЕЙЧАС -->
+        <circle cx="${x1}" cy="${trackY}" r="${achieved ? 24 : 20}" fill="url(#kpi3-glow-target-${g.id})"/>
+        <circle cx="${x1}" cy="${trackY}" r="${achieved ? 14 : 11}" fill="#0b1512" stroke="${achieved ? 'var(--accent)' : 'var(--violet)'}" stroke-width="${achieved ? 3 : 2.5}"/>
+        <circle cx="${x1}" cy="${trackY}" r="${achieved ? 8 : 6}" fill="${achieved ? 'var(--accent)' : 'var(--violet)'}"/>
+        ${achieved ? `
+          <path d="M ${x1-5} ${trackY} L ${x1-1} ${trackY+4} L ${x1+6} ${trackY-4}" stroke="#031a15" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        ` : `
+          <circle cx="${x1}" cy="${trackY}" r="2" fill="#fff" opacity=".9"/>
+        `}
+        <text x="${x1}" y="${trackY-38}" fill="${achieved ? 'var(--accent)' : 'var(--violet)'}" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">${achieved ? '✓ ДОСТИГНУТО' : 'ЦЕЛЬ'}</text>
+        <text x="${x1}" y="${trackY+55}" fill="var(--txt-1)" font-size="16" font-family="var(--mono)" text-anchor="middle" font-weight="800" letter-spacing="-.01em">${_kpi3Esc(_kpi3FmtExact(targetV, m.unit))}</text>
+        ${endDate ? `<text x="${x1}" y="${trackY+72}" fill="var(--txt-3)" font-size="10.5" font-family="var(--mono)" text-anchor="middle" font-weight="600">${_kpi3Esc(_kpi3FmtDate(endDate.toISOString()))}</text>` : ''}
 
-        <!-- Маркер «Сейчас» — glow + двойное кольцо + внутренняя точка -->
-        ${showCurLabel ? `
+        <!-- Маркер «Сейчас»: только если НЕ слился с baseline/target -->
+        ${showCurAsSeparate ? `
           <circle cx="${curX}" cy="${trackY}" r="22" fill="url(#kpi3-glow-${g.id})"/>
           <circle cx="${curX}" cy="${trackY}" r="13" fill="#0b1512" stroke="var(--accent)" stroke-width="2.5"/>
           <circle cx="${curX}" cy="${trackY}" r="7" fill="var(--accent)"/>
           <circle cx="${curX}" cy="${trackY}" r="2.5" fill="#fff" opacity=".95"/>
           <text x="${curX}" y="${trackY-38}" fill="var(--accent)" font-size="9.5" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">СЕЙЧАС · ${Math.round(progress*100)}%</text>
-        ` : `
-          <text x="${x0+30}" y="${trackY+4}" fill="var(--txt-3)" font-size="12" font-family="var(--mono)">нет данных</text>
-        `}
+        ` : ''}
+        ${!showCurLabel ? `<text x="${(x0+x1)/2}" y="${trackY-38}" fill="var(--txt-3)" font-size="10" font-family="var(--mono)" text-anchor="middle" font-weight="700" letter-spacing="0.12em">НЕТ ДАННЫХ</text>` : ''}
       </svg>
 
       ${showCurLabel ? `
-        <div class="kpi3-rpm-current">
-          <div class="kpi3-rpm-current-lbl">ТЕКУЩЕЕ ЗНАЧЕНИЕ</div>
+        <div class="kpi3-rpm-current ${achieved ? 'achieved' : ''}">
+          <div class="kpi3-rpm-current-lbl">${achieved ? '✓ ЦЕЛЬ ДОСТИГНУТА' : 'ТЕКУЩЕЕ ЗНАЧЕНИЕ'}</div>
           <div class="kpi3-rpm-current-val">${_kpi3Esc(_kpi3FmtExact(cur, m.unit))}</div>
-          <div class="kpi3-rpm-current-delta ${gap >= 0 ? 'pos' : 'neg'}">
-            ${gap >= 0 ? '+' : ''}${Math.round(gap * 100)}% от плана
+          <div class="kpi3-rpm-current-delta ${achieved ? 'pos' : gap >= 0 ? 'pos' : 'neg'}">
+            ${achieved
+              ? `${progress >= 1 ? 'превышение +' + Math.round((progress-1)*100) + '%' : 'на цели'}`
+              : `${gap >= 0 ? '+' : ''}${Math.round(gap * 100)}% от плана`
+            }
           </div>
         </div>
       ` : ''}
