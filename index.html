@@ -5682,7 +5682,7 @@ function statusBadge(s){
 }
 function renderAnalytics(){
   if(typeof agEnrichMrr==='function') agEnrichMrr();
-  const A=AGENCIES, M=v=>(v/1e6).toFixed(1).replace(/\.0$/,'')+' М';
+  const A=AGENCIES, M=v=>Number(Math.round(v)||0).toLocaleString('ru-RU');
   const totMrr=platMrr(A);
   const paying=payingCount(A);
   const trial=A.filter(a=>a.status==='trial').length;
@@ -5691,9 +5691,13 @@ function renderAnalytics(){
   const projects=A.reduce((s,a)=>s+a.projects,0);
   const arpa=paying?totMrr/paying:0;
   const medMrr=mrrMedian(A);
-  const planRev=planRevenue(A);
-  const planMax=Math.max(...Object.values(planRev),1);
-  const planColor={basic:'#8A8FFF',pro:'#37E6C8',enterprise:'#43D88C'};
+  const _planRevMap={}; A.forEach(a=>{ if(a.status!=='suspended') _planRevMap[a.plan]=(_planRevMap[a.plan]||0)+(a.mrr||0); });
+  const _palette=['#37E6C8','#8A8FFF','#43D88C','#6AA9FF','#E3B567','#F0785C','#C77DFF','#FF9E64'];
+  let _plans=(typeof TARIFFS!=='undefined'&&TARIFFS.length)? TARIFFS.map(t=>({key:t.key,name:t.name||t.key})) : [];
+  A.forEach(a=>{ if(a.plan && !_plans.some(p=>p.key===a.plan)) _plans.push({key:a.plan,name:a.plan}); });
+  const _planRev=_plans.map((p,i)=>({name:p.name,key:p.key,rev:_planRevMap[p.key]||0,color:_palette[i%_palette.length]})).sort((x,y)=>y.rev-x.rev);
+  const _planMax=Math.max(..._planRev.map(x=>x.rev),1);
+  const _topPlan=_planRev[0]||null;
   const leaders=[...A].sort((x,y)=>y.mrr-x.mrr);
   const verts={}; A.forEach(a=>{verts[a.vertical]=(verts[a.vertical]||0)+a.mrr;});
   const vMax=Math.max(...Object.values(verts),1);
@@ -5716,13 +5720,13 @@ function renderAnalytics(){
     <div class="kpi"><div class="l">NRR</div><div class="v num" style="color:var(--pos)">${(_S.nrr_target!=null?_S.nrr_target:108)}<span class="u">%</span></div><div class="sub">цель · задаётся в настройках</div><div class="kfoot pos">расширение > отток</div></div>
   </div>
   <div class="row2" style="margin-top:16px">
-    <div class="card"><div class="card-h"><div class="t">Рост MRR платформы</div><div class="c">млн сум${trendReal?' · '+trendV.length+' мес':' · история копится'}</div></div><div class="card-body">${trendReal?svgLine(trendV,trendL)+`<div style="text-align:center;font-size:13px;color:var(--pos);margin-top:6px">↑ +${Math.round((trendV[trendV.length-1]/trendV[0]-1)*100)}% за период</div>`:`<div style="text-align:center;padding:26px 0"><div class="num" style="font-size:30px;color:var(--accent)">${M(totMrr)} <span style="font-size:15px;color:var(--txt-3)">сум</span></div><div style="font-size:12.5px;color:var(--txt-3);margin-top:8px">Тренд появится со второго месячного снимка</div></div>`}</div></div>
+    <div class="card"><div class="card-h"><div class="t">Рост MRR платформы</div><div class="c">сум${trendReal?' · '+trendV.length+' мес':' · история копится'}</div></div><div class="card-body">${trendReal?svgLine(trendV,trendL)+`<div style="text-align:center;font-size:13px;color:var(--pos);margin-top:6px">↑ +${Math.round((trendV[trendV.length-1]/trendV[0]-1)*100)}% за период</div>`:`<div style="text-align:center;padding:26px 0"><div class="num" style="font-size:30px;color:var(--accent)">${M(totMrr)} <span style="font-size:15px;color:var(--txt-3)">сум</span></div><div style="font-size:12.5px;color:var(--txt-3);margin-top:8px">Тренд появится со второго месячного снимка</div></div>`}</div></div>
     <div class="card"><div class="card-h"><div class="t">MRR по тарифам</div></div><div class="card-body">
-      ${['enterprise','pro','basic'].map(k=>`<div style="margin-top:14px">
-        <div style="display:flex;justify-content:space-between;font-size:14px"><span style="display:flex;align-items:center;gap:8px;text-transform:capitalize"><span style="width:8px;height:8px;border-radius:2px;background:${planColor[k]}"></span>${k}</span><span class="num">${M(planRev[k])} сум</span></div>
-        <div style="height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:7px"><div class="bf" style="width:${planRev[k]/planMax*100}%;height:100%;background:${planColor[k]};border-radius:4px"></div></div>
+      ${_planRev.map(p=>`<div style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;font-size:14px"><span style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:${p.color}"></span>${_ddH(p.name)}</span><span class="num">${p.rev?M(p.rev)+' сум':'0 сум'}</span></div>
+        <div style="height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:7px"><div class="bf" style="width:${p.rev/_planMax*100}%;height:100%;background:${p.color};border-radius:4px"></div></div>
       </div>`).join('')}
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:13.5px"><span style="color:var(--txt-3)">Enterprise даёт</span><span class="num" style="color:var(--accent)">${totMrr?Math.round(planRev.enterprise/totMrr*100):0}% выручки</span></div>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:13.5px"><span style="color:var(--txt-3)">${_topPlan?_ddH(_topPlan.name)+' даёт':'Ведущий тариф'}</span><span class="num" style="color:var(--accent)">${(_topPlan&&totMrr)?Math.round(_topPlan.rev/totMrr*100):0}% выручки</span></div>
     </div></div>
   </div>
   <div class="card" style="margin-top:16px"><div class="card-h"><div class="t">Лидеры по выручке</div><div class="c">${A.length} агентств</div></div>
@@ -5867,7 +5871,7 @@ async function tariffDel(i){
   TARIFFS.splice(i,1); pd2Close(); renderTariffs(); toast(`Тариф «${n}» удалён`);
 }
 function renderTariffs(){
-  const A=AGENCIES, M=v=>(v/1e6).toFixed(1).replace(/\.0$/,'')+' М';
+  const A=AGENCIES, M=v=>Number(Math.round(v)||0).toLocaleString('ru-RU');
   const cnt={trial:A.filter(a=>a.status==='trial').length,basic:A.filter(a=>a.plan==='basic').length,pro:A.filter(a=>a.plan==='pro').length,enterprise:A.filter(a=>a.plan==='enterprise').length};
   const planRev=planRevenue(A);
   const totMrr=platMrr(A), paying=payingCount(A), medMrr=mrrMedian(A);
@@ -6014,7 +6018,7 @@ function renderGeneral(){
       <div class="kpi"><div class="l">Активных</div><div class="v num">${active}</div><div class="sub pos">${total?Math.round(active/total*100):0}% базы</div></div>
       <div class="kpi"><div class="l">Сотрудников</div><div class="v num">${emp}</div><div class="sub">по всем агентствам</div></div>
       <div class="kpi"><div class="l">Проектов</div><div class="v num">${proj}</div><div class="sub">в работе</div></div>
-      <div class="kpi"><div class="l">MRR платформы</div><div class="v num">${fmt(Math.round(mrr/1e6))}<span class="u">M сум</span></div><div class="sub">MRR под управлением</div></div>
+      <div class="kpi"><div class="l">MRR платформы</div><div class="v num">${fmt(Math.round(mrr))}<span class="u">сум</span></div><div class="sub">MRR под управлением</div></div>
       <div class="kpi"><div class="l">Онлайн сейчас</div><div class="v num">${onlineAg}<span class="u">/${total}</span></div><div class="sub">${onlineUsers?onlineUsers+' польз. активны':'нет активных'}</div></div>
     </div>
 
