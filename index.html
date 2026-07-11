@@ -17354,10 +17354,16 @@ window.kpiMetric = (key) => KPI_METRICS[key] || null;
 /* Нормализация значения в 0-100 с учётом направления и baseline/target (или scale) */
 window.kpiNormalize = (metricKey, value, baseline, target) => {
   const m = KPI_METRICS[metricKey]; if(!m || value==null) return null;
+  // Для 'up':  lo=baseline/soft (нижняя «плохо»),   hi=target/hard (верхняя «отлично»).
+  //           pct = 100*(value - lo)/(hi - lo). Value=hi → 100, value=lo → 0.
+  // Для 'down': soft — «хорошее» малое значение, hard — «плохое» большое (в конфиге soft<hard).
+  //           pct = 100*(hi - value)/(hi - lo). Value=lo(soft) → 100, value=hi(hard) → 0.
   const lo = baseline!=null ? baseline : m.scale.soft;
   const hi = target!=null   ? target   : m.scale.hard;
   if (lo === hi) return value >= hi ? 100 : 0;
-  let pct = (m.dir === 'up') ? 100*(value - lo)/(hi - lo) : 100*(lo - value)/(lo - hi);
+  let pct = (m.dir === 'up')
+    ? 100*(value - lo)/(hi - lo)
+    : 100*(hi - value)/(hi - lo);
   return Math.max(0, Math.min(100, Math.round(pct)));
 };
 
@@ -21314,6 +21320,7 @@ window._kpi3 = {
   period: null,
   periods: [],
   category: 'member',
+  selectedRowId: null,       // null = агрегат «Все»; иначе конкретный member/team/project
   expandedGoalId: null,
   goals: [],
   rowVals: {},
@@ -21393,6 +21400,13 @@ window._kpi3ShellHTML = () => `
     .kpi3-cat-ic{font-size:16px}
     .kpi3-cat-cnt{font-family:var(--mono);font-size:11px;color:var(--txt-3);background:rgba(255,255,255,.04);padding:2px 7px;border-radius:20px}
     .kpi3-cat.on .kpi3-cat-cnt{color:var(--accent);background:rgba(55,230,200,.1)}
+    .kpi3-rows-nav{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:-4px;padding:0 4px}
+    .kpi3-row-chip{padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--txt-3);cursor:pointer;transition:all .14s;background:var(--panel-3);border:1px solid var(--line);display:inline-flex;align-items:center;gap:7px;max-width:220px;overflow:hidden}
+    .kpi3-row-chip:hover{color:var(--txt-1);border-color:rgba(138,143,255,.28)}
+    .kpi3-row-chip.on{background:linear-gradient(135deg,rgba(55,230,200,.15),rgba(138,143,255,.08));color:var(--txt-1);border-color:var(--accent)}
+    .kpi3-row-chip-av{width:18px;height:18px;border-radius:5px;overflow:hidden;background:var(--panel-2);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:9px;color:var(--accent);flex:none}
+    .kpi3-row-chip-av img{width:100%;height:100%;object-fit:cover;display:block}
+    .kpi3-row-chip-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .kpi3-section{padding:22px 24px;background:var(--panel-2);border:1px solid var(--line);border-radius:16px}
     .kpi3-block-t{font-size:15px;font-weight:800;letter-spacing:-.005em;color:var(--txt-1)}
     .kpi3-block-sub{font-size:12px;color:var(--txt-3);margin-top:2px}
@@ -21538,6 +21552,7 @@ window._kpi3ShellHTML = () => `
         </button>
       </div>
     </div>
+    <div class="kpi3-rows-nav" id="kpi3-rows-nav"></div>
     <div class="kpi3-section">
       <div class="kpi3-section-h">
         <div>
@@ -21586,14 +21601,66 @@ window._kpi3FillTopbar = () => {
 
 window._kpi3SwitchCategory = async (cat) => {
   _kpi3.category = cat;
+  _kpi3.selectedRowId = null;     // при смене категории — сброс на «Все»
   _kpi3.expandedGoalId = null;
   document.querySelectorAll('.kpi3-cat').forEach(t => t.classList.toggle('on', t.dataset.cat === cat));
   ['member','team','project'].forEach(c => {
     const el = document.getElementById('kpi3-cnt-' + c);
     if (el) el.textContent = _kpiScopeRows(c).length;
   });
+  _kpi3FillRowsNav();
+  _kpi3UpdatePaSub();
+  await Promise.all([
+    _kpi3FillPointA(),
+    _kpi3FillGoals(),
+    _kpi3FillStats(),
+  ]);
+};
+
+window._kpi3UpdatePaSub = () => {
   const paSub = document.getElementById('kpi3-pa-sub');
-  if (paSub) paSub.textContent = `Агрегированные метрики за 30 дней · ${_kpiScopeRows(cat).length} ${_kpi3CatLabel(cat)}`;
+  if (!paSub) return;
+  const cat = _kpi3.category;
+  const rows = _kpiScopeRows(cat);
+  if (_kpi3.selectedRowId) {
+    const r = rows.find(x => x.id === _kpi3.selectedRowId);
+    paSub.textContent = r ? `Метрики за 30 дней · ${r.name}${r.subtitle ? ' · ' + r.subtitle : ''}` : 'Метрики за 30 дней';
+  } else {
+    paSub.textContent = `Агрегированные метрики за 30 дней · все ${rows.length} ${_kpi3CatLabel(cat)}`;
+  }
+};
+
+window._kpi3FillRowsNav = () => {
+  const nav = document.getElementById('kpi3-rows-nav'); if (!nav) return;
+  const cat = _kpi3.category;
+  const rows = _kpiScopeRows(cat);
+  if (rows.length <= 1) { nav.innerHTML = ''; return; }
+  const allOn = _kpi3.selectedRowId == null;
+  const chips = [
+    `<button class="kpi3-row-chip ${allOn ? 'on' : ''}" onclick="_kpi3SelectRow(null)">
+       <span class="kpi3-row-chip-av" style="color:var(--violet);background:rgba(138,143,255,.1)">∑</span>
+       <span class="kpi3-row-chip-nm">Все · агрегат</span>
+     </button>`,
+    ...rows.map(r => {
+      const on = _kpi3.selectedRowId === r.id;
+      const escInit = _kpi3Esc(r.initials || '?');
+      const av = r.avatarUrl
+        ? `<img src="${_kpi3Esc(r.avatarUrl)}" onerror="this.parentElement.textContent='${escInit}'"/>`
+        : escInit;
+      return `<button class="kpi3-row-chip ${on ? 'on' : ''}" onclick="_kpi3SelectRow('${_kpi3Esc(r.id)}')" title="${_kpi3Esc(r.name)}${r.subtitle ? ' · ' + _kpi3Esc(r.subtitle) : ''}">
+        <span class="kpi3-row-chip-av">${av}</span>
+        <span class="kpi3-row-chip-nm">${_kpi3Esc(r.name)}</span>
+      </button>`;
+    })
+  ];
+  nav.innerHTML = chips.join('');
+};
+
+window._kpi3SelectRow = async (rowId) => {
+  _kpi3.selectedRowId = rowId;
+  _kpi3.expandedGoalId = null;
+  _kpi3FillRowsNav();
+  _kpi3UpdatePaSub();
   await Promise.all([
     _kpi3FillPointA(),
     _kpi3FillGoals(),
@@ -21612,9 +21679,28 @@ window._kpi3FillPointA = async () => {
   target.innerHTML = _kpi3TilesSkeleton(cat);
   const to = new Date().toISOString();
   const from = new Date(Date.now() - 30*86400000).toISOString();
+
+  // Если выбран конкретный ряд — считаем только для него, без агрегации
+  if (_kpi3.selectedRowId) {
+    const row = rows.find(r => r.id === _kpi3.selectedRowId);
+    if (!row) { _kpi3.selectedRowId = null; return _kpi3FillPointA(); }
+    const cacheKey = `${cat}|${row.id}`;
+    const rv = _kpi3.rowVals[cacheKey] || await kpiComputeAll(cat, row.id, from, to).catch(() => ({}));
+    _kpi3.rowVals[cacheKey] = rv;
+    const agg = {};
+    _kpi3MetricsFor(cat).forEach(k => {
+      agg[k] = _kpi3ExtractVal(rv && rv[k]);
+      if (agg[k] != null && Number.isNaN(agg[k])) agg[k] = null;
+    });
+    const tpi = _kpi3TilesGrid(_kpi3TpiKeys, agg, 'TPI · операционные', _kpi3TpiKeys.length);
+    const smm = cat === 'member' ? '' : _kpi3TilesGrid(_kpi3SmmKeys, agg, 'SMM · соцсети', 5);
+    target.innerHTML = `<div class="kpi3-pa-groups">${tpi}${smm}</div>`;
+    return;
+  }
+
+  // Агрегат по всем
   const rowVals = await Promise.all(rows.map(r => kpiComputeAll(cat, r.id, from, to).catch(() => ({}))));
   rows.forEach((r, i) => { _kpi3.rowVals[`${cat}|${r.id}`] = rowVals[i]; });
-
   const agg = {};
   _kpi3MetricsFor(cat).forEach(k => {
     const m = KPI_METRICS[k]; if(!m) return;
@@ -21675,7 +21761,9 @@ window._kpi3FillGoals = async () => {
     target.innerHTML = `<div class="kpi3-empty"><b>Ни одной цели на период.</b><br/>Начните с одной — что важно улучшить в первую очередь?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Первая цель</button></div>`;
     return;
   }
-  const goals = _kpi3.category === 'member' ? allGoals.filter(g => (KPI_METRICS[g.metric_key]||{}).category !== 'smm') : allGoals;
+  // Empty check после фильтрации по selectedRowId — сделаем ниже
+  let goals = _kpi3.category === 'member' ? allGoals.filter(g => (KPI_METRICS[g.metric_key]||{}).category !== 'smm') : allGoals;
+  if (_kpi3.selectedRowId) goals = goals.filter(g => g.scope_id === _kpi3.selectedRowId);
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
   const rowById = Object.fromEntries(rows.map(r => [r.id, r]));
@@ -21686,6 +21774,12 @@ window._kpi3FillGoals = async () => {
     const cacheKey = `${cat}|${rid}`;
     if (!_kpi3.rowVals[cacheKey]) _kpi3.rowVals[cacheKey] = await kpiComputeAll(cat, rid, from, to).catch(() => ({}));
   }));
+  if (!goals.length && _kpi3.selectedRowId) {
+    const row = _kpiScopeRows(_kpi3.category).find(r => r.id === _kpi3.selectedRowId);
+    const nm = row ? row.name : 'выбранного объекта';
+    target.innerHTML = `<div class="kpi3-empty"><b>Нет целей для «${_kpi3Esc(nm)}».</b><br/>Добавьте первую — куда идём?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Цель</button></div>`;
+    return;
+  }
   target.innerHTML = `<div class="kpi3-goals-list">${goals.map(g => _kpi3GoalCardHTML(g, rowById[g.scope_id])).join('')}</div>`;
 };
 
@@ -21898,7 +21992,10 @@ window._kpi3FillStats = async () => {
     return { row: r, score: score(cur), prevScore: score(prev) };
   }));
   scored.sort((a,b) => (b.score||-1) - (a.score||-1));
-  target.innerHTML = `<div class="kpi3-stats-list">${scored.map((it, i) => _kpi3StatsRowHTML(it, i+1)).join('')}</div>`;
+  // Отмечаем позицию (rank) до фильтрации; если выбран row — показываем только его
+  const withRank = scored.map((it, i) => Object.assign({}, it, { rank: i+1 }));
+  const shown = _kpi3.selectedRowId ? withRank.filter(it => it.row.id === _kpi3.selectedRowId) : withRank;
+  target.innerHTML = `<div class="kpi3-stats-list">${shown.map(it => _kpi3StatsRowHTML(it, it.rank)).join('')}</div>`;
 };
 
 window._kpi3StatsSkeleton = (n) => Array.from({length: Math.min(n, 8)}).map(() =>
@@ -21923,7 +22020,7 @@ window._kpi3StatsRowHTML = (it, n) => {
     ? `<img src="${_kpi3Esc(r.avatarUrl)}" onerror="this.parentElement.textContent='${escInit}'"/>`
     : escInit;
   return `
-    <div class="kpi3-stats-row ${cls}" data-rid="${_kpi3Esc(r.id)}">
+    <div class="kpi3-stats-row ${cls}" data-rid="${_kpi3Esc(r.id)}" onclick="_kpi3SelectRow('${_kpi3Esc(r.id)}')" style="cursor:pointer">
       <div class="kpi3-stats-n">#${n}</div>
       <div class="kpi3-stats-av">${avatarHtml}</div>
       <div class="kpi3-stats-nm">
@@ -21945,11 +22042,12 @@ window._kpi3OpenGoalModal = (existing) => {
   const rows = _kpiScopeRows(cat);
   if (!rows.length) { toast(`Сначала добавьте ${_kpi3CatLabelOne(cat).toLowerCase()}`); return; }
   const metrics = _kpi3MetricsFor(cat);
+  const preselectedRow = _kpi3.selectedRowId && rows.find(r => r.id === _kpi3.selectedRowId);
   const state = existing ? {
     scope_id: existing.scope_id, metric_key: existing.metric_key,
     target: existing.target, baseline: existing.baseline
   } : {
-    scope_id: rows[0].id, metric_key: metrics[0],
+    scope_id: preselectedRow ? preselectedRow.id : rows[0].id, metric_key: metrics[0],
     target: null, baseline: null
   };
   const scrim = document.createElement('div');
