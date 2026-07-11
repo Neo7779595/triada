@@ -23059,25 +23059,7 @@ window._kpi3OpenGoalModal = (existing) => {
   const initScopeId = existing ? existing.scope_id : (preselectedRow ? preselectedRow.id : rows[0].id);
   const initMetric = existing ? existing.metric_key : metrics[0];
   // Префилл baseline актуальным значением из кэша Точки А
-  const initBaseline = existing ? existing.baseline : (() => {
-    const cur = _kpi3.rowVals[`${cat}|${initScopeId}`];
-    if (!cur) return null;
-    const v = _kpi3ExtractVal(cur[initMetric]);
-    return (v != null && !Number.isNaN(v)) ? Math.round(v * 100) / 100 : null;
-  })();
-  const state = {
-    scope_id: initScopeId, metric_key: initMetric,
-    target: existing ? existing.target : null,
-    baseline: initBaselineSmart != null ? initBaselineSmart : initBaseline
-  };
-  // По умолчанию — конец текущего месяца
-  const now = new Date();
-  const defaultTargetDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-  const initTargetDate = existing && existing._period_end
-    ? existing._period_end.slice(0, 10)
-    : defaultTargetDate;
-  // Умный префилл baseline: агрегат Точки А если drill-down не выбран,
-  // значение конкретного row при drill-down.
+  // Префилл baseline: сначала row (drill-down / preselected), потом агрегат Точки А, потом старый initBaseline
   const initBaselineSmart = (() => {
     if (existing) return existing.baseline;
     if (preselectedRow) {
@@ -23090,6 +23072,22 @@ window._kpi3OpenGoalModal = (existing) => {
     if (av != null && !Number.isNaN(av)) return Math.round(av * 100) / 100;
     return null;
   })();
+  const initBaseline = existing ? existing.baseline : (() => {
+    const cur = _kpi3.rowVals[`${cat}|${initScopeId}`];
+    if (!cur) return null;
+    const v = _kpi3ExtractVal(cur[initMetric]);
+    return (v != null && !Number.isNaN(v)) ? Math.round(v * 100) / 100 : null;
+  })();
+  const now = new Date();
+  const defaultTargetDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const initTargetDate = existing && existing._period_end
+    ? existing._period_end.slice(0, 10)
+    : defaultTargetDate;
+  const state = {
+    scope_id: initScopeId, metric_key: initMetric,
+    target: existing ? existing.target : null,
+    baseline: initBaselineSmart != null ? initBaselineSmart : initBaseline
+  };
   const scrim = document.createElement('div');
   scrim.className = 'kpi3-scrim';
   scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
