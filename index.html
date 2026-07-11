@@ -17998,12 +17998,19 @@ window._kpiFetchOpsRaw = async (fromISO, toISO) => {
 window._kpiInvalidateOpsRaw = () => { _kpiOpsRawCache = { key:null, ts:0, data:null }; };
 
 /* Резолвер team_members на дату (для scope='team') */
+window._kpiTeamMembersCache = window._kpiTeamMembersCache || {};
 window._kpiTeamMembers = async (teamId, atISO) => {
   if(!SB || !teamId) return [];
-  const { data, error } = await SB.from('team_members').select('member_id,joined_at,left_at').eq('team_id', teamId);
-  if (error || !data) return [];
+  const cacheKey = teamId;
+  let rows = _kpiTeamMembersCache[cacheKey];
+  if (!rows) {
+    const { data, error } = await SB.from('team_members').select('member_id,joined_at,left_at').eq('team_id', teamId);
+    if (error || !data) return [];
+    rows = data;
+    _kpiTeamMembersCache[cacheKey] = rows;
+  }
   const at = atISO ? new Date(atISO).getTime() : Date.now();
-  return data.filter(r => new Date(r.joined_at).getTime() <= at && (!r.left_at || new Date(r.left_at).getTime() >= at)).map(r => r.member_id);
+  return rows.filter(r => new Date(r.joined_at).getTime() <= at && (!r.left_at || new Date(r.left_at).getTime() >= at)).map(r => r.member_id);
 };
 
 /* Внутренний фильтр задач/истории по scope */
@@ -22884,7 +22891,9 @@ window._kpi3StatsRowHTML = (it, n) => {
 };
 
 window._kpi3NewGoal = () => {
-  _kpi3.newGoalOverride = null;  // всегда сбрасываем перед новым сценарием
+  // Idempotent: удаляем все существующие модалки чтобы не накапливались
+  document.querySelectorAll('.kpi3-scrim').forEach(sc => sc.remove());
+  _kpi3.newGoalOverride = null;
   if (_kpi3.category === 'team' && _kpi3.selectedRowId) {
     _kpi3OpenTeamGoalPicker(_kpi3.selectedRowId);
     return;
@@ -22896,9 +22905,13 @@ window._kpi3NewGoal = () => {
 window._kpi3OpenTeamGoalPicker = async (teamId) => {
   const team = _kpiScopeRows('team').find(t => t.id === teamId);
   if (!team) { _kpi3OpenGoalModal(null); return; }
+  // Синхронно из уже загруженных проектов, БЕЗ обращения в БД.
+  // _kpiSmmScopeProjects использовал _kpiTeamMembers — теперь кэширован,
+  // повторные вызовы моментальны.
   const pids = await _kpiSmmScopeProjects('team', teamId);
   const P = (typeof PROJECTS !== 'undefined' ? PROJECTS : []);
   const projects = pids.map(pid => P.find(p => p.id === pid)).filter(Boolean);
+  document.querySelectorAll('.kpi3-scrim').forEach(sc => sc.remove());
   const scrim = document.createElement('div');
   scrim.className = 'kpi3-scrim';
   scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
@@ -23080,6 +23093,8 @@ window._kpi3OpenGoalModal = (existing) => {
   const scrim = document.createElement('div');
   scrim.className = 'kpi3-scrim';
   scrim.onclick = (e) => { if (e.target === scrim) scrim.remove(); };
+  // Idempotent: если уже есть открытая модалка +Цель — удаляем перед новой
+  document.querySelectorAll('.kpi3-scrim').forEach(sc => sc.remove());
   scrim.innerHTML = `
     <div class="kpi3-modal">
       <div class="kpi3-modal-h">
