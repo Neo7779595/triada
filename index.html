@@ -7236,7 +7236,7 @@ function cmbKey(e,id){ if(e.key==='Enter'){ e.preventDefault(); const list=docum
     const nb=list.querySelector('.cmb-new'); if(nb){ cmbPick(id,nb.dataset.v,true); return; }
     const first=list.querySelector('.dd-opt'); if(first)cmbPick(id,first.dataset.v); }
   else if(e.key==='Escape'){ const c=document.getElementById('cmb-'+id); if(c)c.classList.remove('open'); } }
-document.addEventListener('click',e=>{if(!e.target.closest('.dd'))document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));});
+document.addEventListener('click',e=>{if(!e.target.closest('.dd')&&!e.target.closest('.dd-menu'))document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open'));});
 function setAgCat(v){agCat=v;renderProjects();}
 function setAgSvc(v){agSvc=v;renderProjects();}
 function setAgCplx(v){agCplx=v;renderProjects();}
@@ -17123,11 +17123,23 @@ window.tTaskAdd = async (projectId,row) => {
   if(_p&&_p._tasks){ _p._tasks.push(_tmp); window._localTaskWriteTs=Date.now(); _pkRerender(); }
   if(typeof pd2Close==='function')pd2Close();
   try {
-  let {data,error}=await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
-  if(error && /review_|difficulty|priority/.test(error.message||'')){                 // каких-то новых колонок ещё нет — шлём без них
-    const {review_started,review_spent,difficulty,priority,...row2}=row||{};
-    const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}).select('*').single(); error=r2.error; data=r2.data;
-    if(!error && data){ if(difficulty!=null)data.difficulty=difficulty; if(priority!=null)data.priority=priority; }
+  // Определяем: если пользователь не agency_owner — прямой INSERT почти всегда упадёт RLS.
+  // Идём сразу через RPC (не засоряем консоль 403 ошибками).
+  const _skipDirect = (window.ME && ME.role && ME.role !== 'agency_owner' && ME.role !== 'superadmin');
+  let data, error;
+  if (_skipDirect) {
+    const payload = Object.assign({project_id:projectId}, row);
+    const rc = await SB.rpc('create_project_task', { payload });
+    if (rc.error) { error = rc.error; data = null; }
+    else { data = Array.isArray(rc.data) ? rc.data[0] : rc.data; error = null; }
+  } else {
+    const r1 = await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
+    error = r1.error; data = r1.data;
+    if(error && /review_|difficulty|priority/.test(error.message||'')){
+      const {review_started,review_spent,difficulty,priority,...row2}=row||{};
+      const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}).select('*').single(); error=r2.error; data=r2.data;
+      if(!error && data){ if(difficulty!=null)data.difficulty=difficulty; if(priority!=null)data.priority=priority; }
+    }
   }
   // RLS-фолбэк: если прямой INSERT заблокирован RLS — идём через SECURITY DEFINER RPC.
   // RPC проверяет права explicitly (role + permissions.projects.edit) и вставляет от имени сервиса.
