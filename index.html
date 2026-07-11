@@ -19850,7 +19850,7 @@ window._kpiScopeRows = (scope) => {
     return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done').map(p => ({
       id: p.id,
       name: p.name || '—',
-      subtitle: (p.service || '—') + (p.category ? ' · ' + p.category : ''),
+      subtitle: ((p.service ? p.service : '') + (p.category ? (p.service ? ' · ' : '') + p.category : '')) || '',
       avatarUrl: p.logoUrl || p.logo_url || null,
       color: 'var(--accent)',
       initials: (p.name||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase(),
@@ -20884,7 +20884,7 @@ window._kpiScopeRows = (scope) => {
     return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done').map(p => ({
       id: p.id,
       name: p.name || '—',
-      subtitle: (p.service || '—') + (p.category ? ' · ' + p.category : ''),
+      subtitle: ((p.service ? p.service : '') + (p.category ? (p.service ? ' · ' : '') + p.category : '')) || '',
       // logo_url — реальный URL; logo — обычно одна буква для fallback
       avatarUrl: _kpiIsValidUrl(p.logoUrl) ? p.logoUrl : (_kpiIsValidUrl(p.logo_url) ? p.logo_url : null),
       color: 'var(--accent)',
@@ -21859,6 +21859,32 @@ window._kpi3ShellHTML = () => `
     .kpi3-dp-clr{padding:6px 10px;background:transparent;border:none;color:var(--txt-3);font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;transition:color .12s}
     .kpi3-dp-clr:hover{color:var(--neg)}
     .kpi3-mopt-cat{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);margin-top:2px}
+    /* — метрики: группы TPI/SMM — */
+    .kpi3-mgroup{margin-bottom:14px}
+    .kpi3-mgroup:last-child{margin-bottom:0}
+    .kpi3-mgroup-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+    .kpi3-mgroup-t{font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:700}
+    .kpi3-mgroup-hint{font-size:11px;color:var(--txt-3);opacity:.7}
+    .kpi3-mopt-nm{font-size:13px;font-weight:700;color:inherit;line-height:1.15}
+    .kpi3-mopt-dir{font-size:10.5px;color:var(--txt-3);margin-top:4px;font-weight:600;letter-spacing:0}
+    .kpi3-mopt.on .kpi3-mopt-dir{color:var(--accent);opacity:.85}
+    /* — row-dropdown (заменяет native select) — */
+    .kpi3-rowdd{position:relative}
+    .kpi3-rowdd-trg{width:100%;padding:10px 14px;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--txt-1);cursor:pointer;display:flex;align-items:center;gap:12px;text-align:left;transition:all .14s;font-family:inherit}
+    .kpi3-rowdd-trg:hover{border-color:rgba(138,143,255,.32)}
+    .kpi3-rowdd.open .kpi3-rowdd-trg{border-color:rgba(138,143,255,.5)}
+    .kpi3-rowdd-av{width:34px;height:34px;border-radius:9px;overflow:hidden;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:var(--accent);flex:none}
+    .kpi3-rowdd-av img{width:100%;height:100%;object-fit:cover;display:block}
+    .kpi3-rowdd-nm{flex:1;min-width:0}
+    .kpi3-rowdd-nm b{display:block;font-size:13.5px;font-weight:700;color:var(--txt-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi3-rowdd-nm span{display:block;font-size:11.5px;color:var(--txt-3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .kpi3-rowdd-chev{width:16px;height:16px;color:var(--txt-3);transition:transform .16s}
+    .kpi3-rowdd.open .kpi3-rowdd-chev{transform:rotate(180deg);color:var(--accent)}
+    .kpi3-rowdd-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#0b1512;border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:5px;z-index:10001;max-height:280px;overflow-y:auto;box-shadow:0 22px 42px -10px rgba(0,0,0,.75)}
+    .kpi3-rowdd-item{width:100%;padding:8px 10px;background:transparent;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:11px;text-align:left;color:var(--txt-1);transition:background .1s;font-family:inherit}
+    .kpi3-rowdd-item:hover{background:rgba(255,255,255,.04)}
+    .kpi3-rowdd-item.on{background:rgba(55,230,200,.08)}
+    .kpi3-rowdd-check{width:15px;height:15px;color:var(--accent);flex:none;margin-left:auto}
     @media (max-width: 780px){
       .kpi3-goal-head{grid-template-columns:1fr auto;gap:12px}
       .kpi3-goal-progress{grid-column:1/-1;min-width:0}
@@ -22446,6 +22472,90 @@ window._kpi3StatsRowHTML = (it, n) => {
 
 window._kpi3NewGoal = () => _kpi3OpenGoalModal(null);
 
+window._kpi3RowDropdownHTML = (rows, selectedId) => {
+  const sel = rows.find(r => r.id === selectedId) || rows[0];
+  return `
+    <div class="kpi3-rowdd" id="kpi3-rowdd">
+      <button type="button" class="kpi3-rowdd-trg" onclick="_kpi3RowDDToggle()" id="kpi3-rowdd-trg">
+        ${_kpi3RowDDRowHTML(sel)}
+        <svg class="kpi3-rowdd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <input type="hidden" id="kpi3-goal-scope" value="${_kpi3Esc(sel.id)}">
+      <div class="kpi3-rowdd-menu" id="kpi3-rowdd-menu" style="display:none">
+        ${rows.map(r => `
+          <button type="button" class="kpi3-rowdd-item ${r.id === sel.id ? 'on' : ''}" onclick="_kpi3RowDDPick('${_kpi3Esc(r.id)}')">
+            ${_kpi3RowDDRowHTML(r)}
+            ${r.id === sel.id ? '<svg class="kpi3-rowdd-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : ''}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+};
+
+window._kpi3RowDDRowHTML = (r) => {
+  const escInit = _kpi3Esc(r.initials || '?');
+  const av = r.avatarUrl
+    ? `<img src="${_kpi3Esc(r.avatarUrl)}" onerror="this.parentElement.textContent='${escInit}'"/>`
+    : escInit;
+  const sub = (r.subtitle && r.subtitle !== '—') ? r.subtitle : '';
+  return `
+    <div class="kpi3-rowdd-av">${av}</div>
+    <div class="kpi3-rowdd-nm">
+      <b>${_kpi3Esc(r.name)}</b>
+      ${sub ? `<span>${_kpi3Esc(sub)}</span>` : ''}
+    </div>
+  `;
+};
+
+window._kpi3RowDDToggle = () => {
+  const menu = document.getElementById('kpi3-rowdd-menu');
+  const dd = document.getElementById('kpi3-rowdd');
+  if (!menu || !dd) return;
+  const willOpen = menu.style.display === 'none';
+  menu.style.display = willOpen ? 'block' : 'none';
+  dd.classList.toggle('open', willOpen);
+  if (willOpen) {
+    setTimeout(() => document.addEventListener('mousedown', _kpi3RowDDOutside, true), 0);
+  } else {
+    document.removeEventListener('mousedown', _kpi3RowDDOutside, true);
+  }
+};
+
+window._kpi3RowDDOutside = (e) => {
+  const dd = document.getElementById('kpi3-rowdd');
+  if (!dd || dd.contains(e.target)) return;
+  const menu = document.getElementById('kpi3-rowdd-menu');
+  if (menu) { menu.style.display = 'none'; dd.classList.remove('open'); }
+  document.removeEventListener('mousedown', _kpi3RowDDOutside, true);
+};
+
+window._kpi3RowDDPick = (rowId) => {
+  const hidden = document.getElementById('kpi3-goal-scope');
+  if (hidden) hidden.value = rowId;
+  // Найдём row в текущей категории для перерисовки триггера
+  const rows = _kpiScopeRows(_kpi3.category);
+  const r = rows.find(x => x.id === rowId);
+  const trg = document.getElementById('kpi3-rowdd-trg');
+  if (r && trg) {
+    const chev = trg.querySelector('.kpi3-rowdd-chev');
+    trg.innerHTML = _kpi3RowDDRowHTML(r);
+    if (chev) trg.appendChild(chev.cloneNode(true));
+    else {
+      const s = document.createElement('span');
+      s.innerHTML = '<svg class="kpi3-rowdd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+      trg.appendChild(s.firstChild);
+    }
+  }
+  // Обновить active в меню
+  document.querySelectorAll('#kpi3-rowdd-menu .kpi3-rowdd-item').forEach(it => it.classList.remove('on'));
+  // Закрыть
+  _kpi3RowDDToggle();
+  // Тригер: обновить baseline префилл под новую row+metric
+  const metricBtn = document.querySelector('#kpi3-goal-metrics-wrap .kpi3-mopt.on');
+  if (metricBtn) _kpi3ModalSetMetric(metricBtn);
+};
+
 window._kpi3OpenGoalModal = (existing) => {
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
@@ -22495,22 +22605,32 @@ window._kpi3OpenGoalModal = (existing) => {
             </div>
             <div class="kpi3-field-h">Цель ставится для этого ${_kpi3CatLabelOne(cat).toLowerCase()}. Чтобы сменить — закройте модалку и выберите другого в панели сверху.</div>
           ` : `
-            <select class="kpi3-select" id="kpi3-goal-scope">
-              ${rows.map(r => `<option value="${_kpi3Esc(r.id)}" ${r.id === state.scope_id ? 'selected' : ''}>${_kpi3Esc(r.name)}${r.subtitle ? ' — ' + _kpi3Esc(r.subtitle) : ''}</option>`).join('')}
-            </select>
+            ${_kpi3RowDropdownHTML(rows, state.scope_id)}
           `}
         </div>
-        <div class="kpi3-field">
-          <div class="kpi3-field-l">Метрика</div>
-          <div class="kpi3-mchoice" id="kpi3-goal-metrics">
-            ${metrics.map(k => {
-              const m = KPI_METRICS[k];
-              return `<button type="button" class="kpi3-mopt ${k === state.metric_key ? 'on' : ''}" data-k="${k}" onclick="_kpi3ModalSetMetric(this)">
-                ${m.label}
-                <div class="kpi3-mopt-cat">${m.category === 'ops' ? 'TPI' : m.category === 'smm' ? 'SMM' : m.category} · ${m.dir === 'up' ? 'лучше выше' : 'лучше ниже'}</div>
-              </button>`;
-            }).join('')}
-          </div>
+        <div class="kpi3-field" id="kpi3-goal-metrics-wrap">
+          ${(() => {
+            const tpiKeys = metrics.filter(k => (KPI_METRICS[k]||{}).category === 'ops');
+            const smmKeys = metrics.filter(k => (KPI_METRICS[k]||{}).category === 'smm');
+            const renderGroup = (title, keys, hint) => keys.length ? `
+              <div class="kpi3-mgroup">
+                <div class="kpi3-mgroup-h">
+                  <span class="kpi3-mgroup-t">${title}</span>
+                  <span class="kpi3-mgroup-hint">${hint}</span>
+                </div>
+                <div class="kpi3-mchoice" id="kpi3-goal-metrics">
+                  ${keys.map(k => {
+                    const m = KPI_METRICS[k];
+                    return `<button type="button" class="kpi3-mopt ${k === state.metric_key ? 'on' : ''}" data-k="${k}" onclick="_kpi3ModalSetMetric(this)">
+                      <div class="kpi3-mopt-nm">${m.label}</div>
+                      <div class="kpi3-mopt-dir">${m.dir === 'up' ? '↑ лучше выше' : '↓ лучше ниже'}</div>
+                    </button>`;
+                  }).join('')}
+                </div>
+              </div>` : '';
+            return renderGroup('TPI · операционные', tpiKeys, 'скорость и качество работы')
+                 + renderGroup('SMM · соцсети', smmKeys, 'охват, вовлечённость, рост');
+          })()}
         </div>
         <div class="kpi3-field">
           <div class="kpi3-field-l">Куда идём (цель)</div>
@@ -22537,7 +22657,7 @@ window._kpi3OpenGoalModal = (existing) => {
 };
 
 window._kpi3ModalSetMetric = (btn) => {
-  document.querySelectorAll('#kpi3-goal-metrics .kpi3-mopt').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('#kpi3-goal-metrics-wrap .kpi3-mopt').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   // Обновить префилл baseline под новую метрику
   const metricKey = btn.dataset.k;
@@ -22555,7 +22675,7 @@ window._kpi3ModalSetMetric = (btn) => {
 window._kpi3SubmitGoal = async (existingId) => {
   const scrim = document.querySelector('.kpi3-scrim'); if (!scrim) return;
   const scopeId = document.getElementById('kpi3-goal-scope').value;
-  const metricBtn = document.querySelector('#kpi3-goal-metrics .kpi3-mopt.on');
+  const metricBtn = document.querySelector('#kpi3-goal-metrics-wrap .kpi3-mopt.on');
   const metricKey = metricBtn ? metricBtn.dataset.k : null;
   const tgtVal = parseFloat(document.getElementById('kpi3-goal-tgt').value);
   const baseInput = document.getElementById('kpi3-goal-base').value;
