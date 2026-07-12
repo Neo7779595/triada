@@ -22587,6 +22587,7 @@ window._kpi3FillTopbar = () => { /* убрано — окно данных и к
 window._kpi3SwitchCategory = async (cat) => {
   _kpi3.category = cat;
   _kpi3.selectedRowId = null;
+  if (!_kpi3.goalFilter) _kpi3.goalFilter = { search: '', status: 'all', sort: 'progress', density: 'auto', groupBy: 'none' };
   _kpi3.tab = _kpi3.tab || 'overview';
   _kpi3SwitchTab(_kpi3.tab);     // при смене категории — сброс на «Все»
   _kpi3.expandedGoalId = null;
@@ -22625,6 +22626,52 @@ window._kpi3FillRowsNav = () => {
   const rows = _kpiScopeRows(cat);
   if (rows.length <= 1) { nav.innerHTML = ''; return; }
   const allOn = _kpi3.selectedRowId == null;
+  // Порог: >15 — компактный picker с поиском; ≤15 — чипы как раньше
+  if (rows.length > 15) {
+    const cur = allOn ? null : rows.find(r => r.id === _kpi3.selectedRowId);
+    const curName = cur ? cur.name : 'Все · агрегат';
+    const curAv = cur
+      ? (cur.avatarUrl ? `<img src="${_kpi3Esc(cur.avatarUrl)}" onerror="this.parentElement.textContent='${_kpi3Esc(cur.initials||'?')}'"/>` : _kpi3Esc(cur.initials||'?'))
+      : `<span style="color:var(--violet)">∑</span>`;
+    nav.innerHTML = `
+      <div class="kpi3-row-picker">
+        <button class="kpi3-row-picker-btn" onclick="_kpi3OpenRowPicker(event)" title="${_kpi3Esc(curName)}">
+          <span class="kpi3-row-chip-av">${curAv}</span>
+          <span class="kpi3-row-picker-nm">${_kpi3Esc(curName)}</span>
+          <span class="kpi3-row-picker-count">${rows.length} · выбрать</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="kpi3-row-picker-menu" id="kpi3-row-picker-menu" style="display:none">
+          <div class="kpi3-row-picker-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="kpi3-row-picker-q" placeholder="Поиск среди ${rows.length} объектов…" oninput="_kpi3RowPickerFilter(this.value)" autofocus/>
+          </div>
+          <div class="kpi3-row-picker-list" id="kpi3-row-picker-list">
+            <button class="kpi3-row-picker-item ${allOn?'on':''}" data-search="все агрегат all" onclick="_kpi3PickRow(null)">
+              <span class="kpi3-row-chip-av" style="color:var(--violet);background:rgba(138,143,255,.1)">∑</span>
+              <span class="kpi3-row-picker-item-nm">Все · агрегат</span>
+            </button>
+            ${rows.map(r => {
+              const on = _kpi3.selectedRowId === r.id;
+              const escInit = _kpi3Esc(r.initials || '?');
+              const av = r.avatarUrl
+                ? `<img src="${_kpi3Esc(r.avatarUrl)}" onerror="this.parentElement.textContent='${escInit}'"/>`
+                : escInit;
+              const searchStr = ((r.name||'') + ' ' + (r.subtitle||'')).toLowerCase();
+              return `<button class="kpi3-row-picker-item ${on?'on':''}" data-search="${_kpi3Esc(searchStr)}" onclick="_kpi3PickRow('${_kpi3Esc(r.id)}')">
+                <span class="kpi3-row-chip-av">${av}</span>
+                <span class="kpi3-row-picker-item-info">
+                  <span class="kpi3-row-picker-item-nm">${_kpi3Esc(r.name)}</span>
+                  ${r.subtitle ? `<span class="kpi3-row-picker-item-sub">${_kpi3Esc(r.subtitle)}</span>` : ''}
+                </span>
+              </button>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
   const chips = [
     `<button class="kpi3-row-chip ${allOn ? 'on' : ''}" onclick="_kpi3SelectRow(null)">
        <span class="kpi3-row-chip-av" style="color:var(--violet);background:rgba(138,143,255,.1)">∑</span>
@@ -22643,6 +22690,42 @@ window._kpi3FillRowsNav = () => {
     })
   ];
   nav.innerHTML = chips.join('');
+};
+
+window._kpi3OpenRowPicker = (ev) => {
+  ev && ev.stopPropagation();
+  const menu = document.getElementById('kpi3-row-picker-menu');
+  if (!menu) return;
+  const shown = menu.style.display !== 'none';
+  if (shown) { menu.style.display = 'none'; return; }
+  menu.style.display = '';
+  const inp = document.getElementById('kpi3-row-picker-q');
+  if (inp) { inp.value = ''; _kpi3RowPickerFilter(''); setTimeout(() => inp.focus(), 30); }
+  setTimeout(() => {
+    const close = (e) => {
+      if (!menu.contains(e.target) && !e.target.closest('.kpi3-row-picker-btn')) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', close, true);
+      }
+    };
+    document.addEventListener('click', close, true);
+  }, 20);
+};
+
+window._kpi3RowPickerFilter = (q) => {
+  const list = document.getElementById('kpi3-row-picker-list');
+  if (!list) return;
+  const qq = (q||'').toLowerCase().trim();
+  list.querySelectorAll('.kpi3-row-picker-item').forEach(el => {
+    const s = el.getAttribute('data-search') || '';
+    el.style.display = (!qq || s.includes(qq)) ? '' : 'none';
+  });
+};
+
+window._kpi3PickRow = (rid) => {
+  const menu = document.getElementById('kpi3-row-picker-menu');
+  if (menu) menu.style.display = 'none';
+  _kpi3SelectRow(rid);
 };
 
 window._kpi3SelectRow = async (rowId) => {
@@ -22893,15 +22976,13 @@ window._kpi3FillGoals = async () => {
     target.innerHTML = `<div class="kpi3-empty"><b>Ни одной цели.</b><br/>Начните с одной — что важно улучшить в первую очередь?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Первая цель</button></div>`;
     return;
   }
-  // Empty check после фильтрации по selectedRowId — сделаем ниже
   let goals = _kpi3.category === 'member' ? allGoals.filter(g => (KPI_METRICS[g.metric_key]||{}).category !== 'smm') : allGoals;
   if (_kpi3.selectedRowId) goals = goals.filter(g => g.scope_id === _kpi3.selectedRowId);
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
   const rowById = Object.fromEntries(rows.map(r => [r.id, r]));
   const win = _kpi3ResolveWindow();
-  const to = win.to;
-  const from = win.from;
+  const to = win.to; const from = win.from;
   const uniqRowIds = [...new Set(goals.map(g => g.scope_id).filter(Boolean))];
   await Promise.all(uniqRowIds.map(async rid => {
     const cacheKey = `${cat}|${rid}`;
@@ -22913,7 +22994,171 @@ window._kpi3FillGoals = async () => {
     target.innerHTML = `<div class="kpi3-empty"><b>Нет целей для «${_kpi3Esc(nm)}».</b><br/>Добавьте первую — куда идём?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Цель</button></div>`;
     return;
   }
-  target.innerHTML = `<div class="kpi3-goals-list">${goals.map(g => _kpi3GoalCardHTML(g, rowById[g.scope_id])).join('')}</div>`;
+  // Вычисляем meta для каждой цели: progress/status/daysLeft — для фильтра/сортировки
+  const now = new Date();
+  const withMeta = goals.map(g => {
+    const m = KPI_METRICS[g.metric_key];
+    const t = Number(g.target||0), b = Number(g.baseline||0);
+    const cv = _kpi3.rowVals[`${cat}|${g.scope_id}`];
+    const curV = cv ? _kpi3ExtractVal(cv[g.metric_key]) : null;
+    const total = m ? (m.dir==='up' ? (t-b) : (b-t)) : 0;
+    const done = curV==null ? 0 : (m ? (m.dir==='up' ? curV-b : b-curV) : 0);
+    const progress = total===0 ? 0 : Math.max(0, Math.min(100, (done/total)*100));
+    const endDate = g._period_end ? new Date(g._period_end) : (_kpi3.period && _kpi3.period.end_date ? new Date(_kpi3.period.end_date) : null);
+    const startDate = g._period_start ? new Date(g._period_start) : (_kpi3.period && _kpi3.period.start_date ? new Date(_kpi3.period.start_date) : null);
+    const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - now)/86400000)) : 9999;
+    const st = _kpi3GoalStatus(progress, daysLeft, endDate, startDate);
+    return { g, m, progress, daysLeft, statusCls: st.cls, statusLabel: st.label };
+  });
+  // Filter
+  const F = _kpi3.goalFilter || { search:'', status:'all', sort:'progress', density:'auto', groupBy:'none' };
+  const q = (F.search||'').toLowerCase().trim();
+  let filtered = withMeta.filter(it => {
+    if (q) {
+      const rw = rowById[it.g.scope_id];
+      const hay = ((it.m && it.m.label ? it.m.label : it.g.metric_key) + ' ' + (rw ? rw.name+' '+(rw.subtitle||'') : '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (F.status && F.status !== 'all') {
+      if (F.status === 'ach' && it.progress < 100) return false;
+      if (F.status === 'pos' && (it.progress >= 100 || it.statusCls !== 'pos')) return false;
+      if (F.status === 'warn' && it.statusCls !== 'warn') return false;
+      if (F.status === 'neg' && it.statusCls !== 'neg') return false;
+    }
+    return true;
+  });
+  // Sort
+  const sortFn = {
+    progress: (a,b) => b.progress - a.progress,
+    progressAsc: (a,b) => a.progress - b.progress,
+    days: (a,b) => a.daysLeft - b.daysLeft,
+    name: (a,b) => (a.m?.label||'').localeCompare(b.m?.label||''),
+  }[F.sort] || ((a,b) => b.progress - a.progress);
+  filtered.sort(sortFn);
+  // Density auto
+  const density = F.density === 'auto' ? (filtered.length >= 30 ? 'compact' : 'std') : F.density;
+  const listCls = density === 'compact' ? 'kpi3-goals-list compact' : 'kpi3-goals-list';
+  // Group
+  let groupsHTML = '';
+  const renderList = (arr) => `<div class="${listCls}">${arr.map(it => _kpi3GoalCardHTML(it.g, rowById[it.g.scope_id], density)).join('')}</div>`;
+  if (F.groupBy && F.groupBy !== 'none') {
+    const groups = {};
+    const orderKeys = [];
+    filtered.forEach(it => {
+      let key = 'other', label = 'Другое';
+      if (F.groupBy === 'status') {
+        if (it.progress >= 100) { key='ach'; label='✓ Достигнуто'; }
+        else if (it.statusCls === 'pos') { key='pos'; label='В темпе'; }
+        else if (it.statusCls === 'warn') { key='warn'; label='⚠ Отстаём'; }
+        else if (it.statusCls === 'neg') { key='neg'; label='✕ Проваливаем'; }
+      } else if (F.groupBy === 'metric') {
+        key = it.g.metric_key; label = (it.m && it.m.label) || key;
+      } else if (F.groupBy === 'row') {
+        const rw = rowById[it.g.scope_id];
+        key = it.g.scope_id || 'none'; label = rw ? rw.name : '—';
+      }
+      if (!groups[key]) { groups[key] = { label, items: [] }; orderKeys.push(key); }
+      groups[key].items.push(it);
+    });
+    const statusOrder = ['neg','warn','pos','ach','other'];
+    if (F.groupBy === 'status') orderKeys.sort((a,b) => statusOrder.indexOf(a) - statusOrder.indexOf(b));
+    groupsHTML = orderKeys.map(k => `
+      <div class="kpi3-goals-group">
+        <div class="kpi3-goals-group-h">${_kpi3Esc(groups[k].label)} <span class="kpi3-goals-group-n">${groups[k].items.length}</span></div>
+        ${renderList(groups[k].items)}
+      </div>
+    `).join('');
+  } else {
+    groupsHTML = renderList(filtered);
+  }
+  const counterHTML = q || F.status !== 'all'
+    ? `<span class="kpi3-goals-count">${filtered.length} из ${withMeta.length}</span>`
+    : `<span class="kpi3-goals-count">${withMeta.length}</span>`;
+  const toolbarHTML = `
+    <div class="kpi3-goals-toolbar">
+      <div class="kpi3-goals-toolbar-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Поиск по метрике или объекту…" value="${_kpi3Esc(F.search||'')}" oninput="_kpi3SetGoalFilter('search', this.value)"/>
+        ${F.search ? `<button class="kpi3-goals-toolbar-clear" onclick="_kpi3SetGoalFilter('search','')" title="Очистить">×</button>` : ''}
+      </div>
+      <div class="kpi3-goals-toolbar-filters">
+        <button class="kpi3-goals-filter-chip ${F.status==='all'?'on':''}" onclick="_kpi3SetGoalFilter('status','all')">Все ${counterHTML}</button>
+        <button class="kpi3-goals-filter-chip ${F.status==='pos'?'on':''} pos" onclick="_kpi3SetGoalFilter('status','pos')">В темпе</button>
+        <button class="kpi3-goals-filter-chip ${F.status==='warn'?'on':''} warn" onclick="_kpi3SetGoalFilter('status','warn')">Отстаём</button>
+        <button class="kpi3-goals-filter-chip ${F.status==='neg'?'on':''} neg" onclick="_kpi3SetGoalFilter('status','neg')">Проваливаем</button>
+        <button class="kpi3-goals-filter-chip ${F.status==='ach'?'on':''} ach" onclick="_kpi3SetGoalFilter('status','ach')">Достигнуто</button>
+      </div>
+      <div class="kpi3-goals-toolbar-controls">
+        <div class="kpi3-goals-sel">
+          <label>Сортировка</label>
+          <select onchange="_kpi3SetGoalFilter('sort', this.value)">
+            <option value="progress" ${F.sort==='progress'?'selected':''}>Прогресс ↓</option>
+            <option value="progressAsc" ${F.sort==='progressAsc'?'selected':''}>Прогресс ↑</option>
+            <option value="days" ${F.sort==='days'?'selected':''}>Дедлайн ↑</option>
+            <option value="name" ${F.sort==='name'?'selected':''}>По алфавиту</option>
+          </select>
+        </div>
+        <div class="kpi3-goals-sel">
+          <label>Группировка</label>
+          <select onchange="_kpi3SetGoalFilter('groupBy', this.value)">
+            <option value="none" ${F.groupBy==='none'?'selected':''}>Без группировки</option>
+            <option value="status" ${F.groupBy==='status'?'selected':''}>По статусу</option>
+            <option value="metric" ${F.groupBy==='metric'?'selected':''}>По метрике</option>
+            <option value="row" ${F.groupBy==='row'?'selected':''}>По объекту</option>
+          </select>
+        </div>
+        <div class="kpi3-goals-density" title="Плотность">
+          <button class="${density==='std'?'on':''}" onclick="_kpi3SetGoalFilter('density','std')" title="Стандарт">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg>
+          </button>
+          <button class="${density==='compact'?'on':''}" onclick="_kpi3SetGoalFilter('density','compact')" title="Компакт">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  if (!filtered.length) {
+    target.innerHTML = toolbarHTML + `<div class="kpi3-empty" style="margin-top:14px"><b>Ничего не нашли.</b><br/>Попробуйте изменить фильтр или очистить поиск.</div>`;
+    return;
+  }
+  target.innerHTML = toolbarHTML + groupsHTML;
+  // Не потерять фокус поиска
+  const inp = target.querySelector('.kpi3-goals-toolbar-search input');
+  if (inp && document.activeElement !== inp && F.search) { inp.focus(); const n = inp.value.length; inp.setSelectionRange(n,n); }
+};
+
+window._kpi3SetGoalFilter = (key, val) => {
+  if (!_kpi3.goalFilter) _kpi3.goalFilter = { search:'', status:'all', sort:'progress', density:'auto', groupBy:'none' };
+  // Дебаунс для поиска
+  if (key === 'search') {
+    // Обновляем состояние сразу, но перерендер — через таймаут, чтобы не терять фокус
+    _kpi3.goalFilter.search = val;
+    clearTimeout(_kpi3._goalSearchT);
+    _kpi3._goalSearchT = setTimeout(() => {
+      // Клиентский фильтр: пробегаем по строкам и скрываем/показываем
+      const t = document.getElementById('kpi3-goals');
+      if (!t) return;
+      const q = (val||'').toLowerCase().trim();
+      let shown = 0, total = 0;
+      t.querySelectorAll('.kpi3-goal').forEach(el => {
+        total++;
+        const s = (el.getAttribute('data-search') || '').toLowerCase();
+        const ok = !q || s.includes(q);
+        el.style.display = ok ? '' : 'none';
+        if (ok) shown++;
+      });
+      const cnt = t.querySelector('.kpi3-goals-count');
+      if (cnt) cnt.textContent = q ? `${shown} из ${total}` : `${total}`;
+      // Обновим clear-кнопку
+      const clr = t.querySelector('.kpi3-goals-toolbar-clear');
+      if (q && !clr) _kpi3FillGoals();
+      if (!q && clr) _kpi3FillGoals();
+    }, 150);
+    return;
+  }
+  _kpi3.goalFilter[key] = val;
+  _kpi3FillGoals();
 };
 
 window._kpi3GoalStatus = (progress, daysLeft, endDate, startDate) => {
@@ -22928,7 +23173,7 @@ window._kpi3GoalStatus = (progress, daysLeft, endDate, startDate) => {
   return { cls:'neg', label:'✕ проваливаем' };
 };
 
-window._kpi3GoalCardHTML = (g, row) => {
+window._kpi3GoalCardHTML = (g, row, density) => {
   const m = KPI_METRICS[g.metric_key]; if(!m) return '';
   const target = Number(g.target || 0);
   const baseline = Number(g.baseline || 0);
@@ -22946,8 +23191,10 @@ window._kpi3GoalCardHTML = (g, row) => {
   const rowSub = row ? (row.subtitle || '') : '';
   const rawMap = g.action_plan;
   const map = Array.isArray(rawMap) ? rawMap : (typeof rawMap === 'string' ? _kpi3TryParseJson(rawMap, []) : []);
+  const searchHay = ((m.label||'') + ' ' + (rowName||'') + ' ' + (rowSub||'')).toLowerCase();
+  const compact = density === 'compact';
   return `
-    <div class="kpi3-goal ${status.cls} ${isExpanded ? 'expanded' : ''}" data-gid="${g.id}">
+    <div class="kpi3-goal ${status.cls} ${isExpanded ? 'expanded' : ''} ${compact ? 'compact' : ''}" data-gid="${g.id}" data-search="${_kpi3Esc(searchHay)}">
       <div class="kpi3-goal-head">
         <div class="kpi3-goal-info" onclick="_kpi3ToggleGoal('${g.id}')" style="cursor:pointer">
           <div class="kpi3-goal-title">
@@ -23194,7 +23441,84 @@ window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => {
 .kpi3-rpm-path-track.pos ~ .kpi3-rpm-path-legend .kpi3-rpm-path-leg-c{color:var(--pos)}
 .kpi3-rpm-path-track.warn ~ .kpi3-rpm-path-legend .kpi3-rpm-path-leg-c{color:var(--warn)}
 .kpi3-rpm-path-track.neg ~ .kpi3-rpm-path-legend .kpi3-rpm-path-leg-c{color:var(--neg)}
-.kpi3-rpm-path-leg-c.ach{color:var(--accent);display:inline-flex;align-items:center;gap:5px}`;
+.kpi3-rpm-path-leg-c.ach{color:var(--accent);display:inline-flex;align-items:center;gap:5px}
+/* Row picker (>15 объектов) */
+.kpi3-row-picker{position:relative;width:100%;max-width:520px}
+.kpi3-row-picker-btn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:11px;color:var(--txt);cursor:pointer;transition:border-color .15s,background .15s;font:inherit}
+.kpi3-row-picker-btn:hover{border-color:rgba(138,143,255,.24);background:rgba(255,255,255,.02)}
+.kpi3-row-picker-nm{flex:1;text-align:left;font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi3-row-picker-count{font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;background:rgba(255,255,255,.04);border-radius:6px;font-weight:700}
+.kpi3-row-picker-btn svg{width:14px;height:14px;color:var(--txt-3);flex:none}
+.kpi3-row-picker-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 60px -10px rgba(0,0,0,.6),0 8px 24px -8px rgba(0,0,0,.4);z-index:60;max-height:420px;display:flex;flex-direction:column;overflow:hidden;animation:kpi3PickerIn .15s ease-out}
+@keyframes kpi3PickerIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.kpi3-row-picker-search{display:flex;align-items:center;gap:8px;padding:11px 13px;border-bottom:1px solid var(--line)}
+.kpi3-row-picker-search svg{width:14px;height:14px;color:var(--txt-3);flex:none}
+.kpi3-row-picker-search input{flex:1;background:transparent;border:0;outline:0;color:var(--txt);font-size:13.5px;font-family:inherit}
+.kpi3-row-picker-search input::placeholder{color:var(--txt-3)}
+.kpi3-row-picker-list{overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:2px}
+.kpi3-row-picker-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:transparent;border:0;border-radius:8px;color:var(--txt);cursor:pointer;text-align:left;font:inherit;transition:background .12s}
+.kpi3-row-picker-item:hover{background:rgba(255,255,255,.04)}
+.kpi3-row-picker-item.on{background:rgba(55,230,200,.08);color:var(--accent)}
+.kpi3-row-picker-item.on .kpi3-row-picker-item-nm{color:var(--accent)}
+.kpi3-row-picker-item-info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.kpi3-row-picker-item-nm{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi3-row-picker-item-sub{font-size:11px;color:var(--txt-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Goals toolbar */
+.kpi3-goals-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;padding:12px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);border:1px solid var(--line);border-radius:12px}
+.kpi3-goals-toolbar-search{position:relative;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel-3);border:1px solid var(--line);border-radius:9px;transition:border-color .15s}
+.kpi3-goals-toolbar-search:focus-within{border-color:rgba(138,143,255,.4);background:rgba(255,255,255,.04)}
+.kpi3-goals-toolbar-search svg{width:14px;height:14px;color:var(--txt-3);flex:none}
+.kpi3-goals-toolbar-search input{flex:1;background:transparent;border:0;outline:0;color:var(--txt);font-size:13.5px;font-family:inherit}
+.kpi3-goals-toolbar-search input::placeholder{color:var(--txt-3)}
+.kpi3-goals-toolbar-clear{background:rgba(255,255,255,.06);border:0;width:22px;height:22px;border-radius:6px;color:var(--txt-3);cursor:pointer;font-size:14px;line-height:1;padding:0;transition:all .12s}
+.kpi3-goals-toolbar-clear:hover{background:rgba(242,102,102,.15);color:var(--neg)}
+.kpi3-goals-toolbar-filters{display:flex;flex-wrap:wrap;gap:6px}
+.kpi3-goals-filter-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--panel-3);border:1px solid var(--line);border-radius:20px;color:var(--txt-3);font-size:12px;font-weight:700;cursor:pointer;transition:all .14s;font-family:inherit}
+.kpi3-goals-filter-chip:hover{color:var(--txt);border-color:rgba(138,143,255,.24)}
+.kpi3-goals-filter-chip.on{background:rgba(138,143,255,.14);border-color:rgba(138,143,255,.36);color:var(--txt)}
+.kpi3-goals-filter-chip.on.pos{background:rgba(72,207,138,.14);border-color:rgba(72,207,138,.36);color:var(--pos)}
+.kpi3-goals-filter-chip.on.warn{background:rgba(227,181,103,.14);border-color:rgba(227,181,103,.36);color:var(--warn)}
+.kpi3-goals-filter-chip.on.neg{background:rgba(242,102,102,.14);border-color:rgba(242,102,102,.36);color:var(--neg)}
+.kpi3-goals-filter-chip.on.ach{background:rgba(55,230,200,.14);border-color:rgba(55,230,200,.36);color:var(--accent)}
+.kpi3-goals-count{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);padding:1px 6px;background:rgba(0,0,0,.35);border-radius:5px;font-weight:700;margin-left:2px}
+.kpi3-goals-filter-chip.on .kpi3-goals-count{background:rgba(255,255,255,.1);color:inherit}
+.kpi3-goals-toolbar-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end}
+.kpi3-goals-sel{display:flex;align-items:center;gap:6px}
+.kpi3-goals-sel label{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:700;font-family:var(--mono)}
+.kpi3-goals-sel select{background:var(--panel-3);border:1px solid var(--line);border-radius:8px;padding:5px 9px;color:var(--txt);font-size:12.5px;font-family:inherit;cursor:pointer;transition:border-color .14s;font-weight:600}
+.kpi3-goals-sel select:hover{border-color:rgba(138,143,255,.24)}
+.kpi3-goals-sel select:focus{outline:none;border-color:rgba(138,143,255,.4)}
+.kpi3-goals-density{display:flex;background:var(--panel-3);border:1px solid var(--line);border-radius:8px;padding:2px}
+.kpi3-goals-density button{background:transparent;border:0;padding:5px 8px;border-radius:6px;color:var(--txt-3);cursor:pointer;transition:all .14s;display:flex;align-items:center;justify-content:center}
+.kpi3-goals-density button:hover{color:var(--txt)}
+.kpi3-goals-density button.on{background:rgba(138,143,255,.16);color:var(--txt)}
+.kpi3-goals-density button svg{width:14px;height:14px}
+
+/* Groups */
+.kpi3-goals-group{margin-bottom:14px}
+.kpi3-goals-group-h{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--txt-3);font-weight:800;font-family:var(--mono);padding:8px 4px 6px;display:flex;align-items:center;gap:8px}
+.kpi3-goals-group-n{background:rgba(255,255,255,.06);color:var(--txt);padding:1px 7px;border-radius:5px;font-family:var(--mono);font-size:10px;letter-spacing:0}
+
+/* Compact goal card */
+.kpi3-goals-list.compact{gap:5px}
+.kpi3-goal.compact .kpi3-goal-head{padding:9px 14px;grid-template-columns:1fr 240px auto;gap:14px}
+.kpi3-goal.compact .kpi3-goal-title{margin-bottom:0;font-size:13px}
+.kpi3-goal.compact .kpi3-goal-values{gap:6px}
+.kpi3-goal.compact .kpi3-goal-cur{font-size:14px}
+.kpi3-goal.compact .kpi3-goal-tgt{font-size:12.5px}
+.kpi3-goal.compact .kpi3-goal-progress{gap:3px}
+.kpi3-goal.compact .kpi3-goal-bar{height:5px}
+.kpi3-goal.compact .kpi3-goal-meta{font-size:11px}
+.kpi3-goal.compact .kpi3-goal-info{display:flex;align-items:center;gap:14px}
+.kpi3-goal.compact .kpi3-goal-values{margin-left:auto}
+
+@media(max-width:780px){
+  .kpi3-goals-toolbar-controls{justify-content:flex-start}
+  .kpi3-goal.compact .kpi3-goal-head{grid-template-columns:1fr;gap:8px}
+  .kpi3-goal.compact .kpi3-goal-info{flex-direction:column;align-items:flex-start;gap:4px}
+}
+`;
   document.head.appendChild(st);
 })();
 window._kpi3GetGoal = (gid) => (_kpi3.goals || []).find(g => g.id === gid);
