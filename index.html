@@ -16766,6 +16766,1104 @@ function renderModule(m){
 
 document.getElementById('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 _initCounters();
+
+
+/* ═══════════ DETROYD · PLATFORM COMMAND CENTER (встроено) ═══════════ */
+/* ══════════════════════════════════════════════════════════════════════════════
+   DETROYD · PLATFORM COMMAND CENTER
+   Приборная панель управления платформой.
+
+   КУДА ВСТАВИТЬ: в конец ПЕРВОГО script-блока (перед закрывающим тегом на строке 16769).
+   Блок только ПЕРЕОПРЕДЕЛЯЕТ функции генерального кабинета — правок в
+   существующем коде не требуется. Кабинеты агентства и клиента не затронуты.
+
+   Принцип: каждое число — ФАКТ (из БД), ЦЕЛЬ (введена человеком) или
+   НЕТ ДАННЫХ (честно серым). Выдуманных чисел на экране нет.
+   ══════════════════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+/* ─────────────────────────── 0. Стили ─────────────────────────── */
+const CSS = `
+.cc-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.cc-tile{position:relative;background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:15px 16px 13px;cursor:pointer;transition:border-color .18s var(--ease),transform .18s var(--ease-out);overflow:hidden}
+.cc-tile:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.cc-tile.mute{cursor:default}.cc-tile.mute:hover{transform:none;border-color:var(--line)}
+.cc-tile .l{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:600;display:flex;align-items:center;gap:6px}
+.cc-tile .v{font-size:29px;line-height:1.15;margin-top:9px;font-weight:600;letter-spacing:-.02em}
+.cc-tile .v .u{font-size:14px;color:var(--txt-3);margin-left:4px;font-weight:500}
+.cc-tile .s{font-size:12.5px;color:var(--txt-2);margin-top:5px}
+.cc-tile .f{font-size:11.5px;color:var(--txt-3);margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.cc-tile .spark{position:absolute;right:0;bottom:0;left:0;height:34px;opacity:.5;pointer-events:none}
+.cc-tile.alarm{border-color:rgba(240,120,92,.4);background:linear-gradient(180deg,rgba(240,120,92,.07),transparent 60%)}
+.cc-tile.gold{border-color:rgba(55,230,200,.32);background:linear-gradient(180deg,rgba(55,230,200,.06),transparent 60%)}
+.cc-dot{width:6px;height:6px;border-radius:50%;flex:none}
+
+.cc-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:var(--r-xs);
+  letter-spacing:.04em;text-transform:uppercase;vertical-align:middle}
+.cc-tag.fact{background:var(--accent-dim);color:var(--accent)}
+.cc-tag.goal{background:var(--warn-dim);color:var(--warn)}
+.cc-tag.none{background:rgba(255,255,255,.05);color:var(--txt-3)}
+
+.cc-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:34px 20px;text-align:center}
+.cc-empty .ttl{font-size:14px;color:var(--txt-2);font-weight:500}
+.cc-empty .sub{font-size:12.5px;color:var(--txt-3);max-width:420px;line-height:1.55}
+.cc-empty code{font-family:var(--mono);font-size:11.5px;background:var(--bg-3);padding:1px 5px;border-radius:4px;color:var(--txt-2)}
+
+.cc-hh{display:flex;align-items:center;gap:8px}
+.cc-sub{font-size:12.5px;color:var(--txt-3);line-height:1.5;margin:-4px 0 14px;max-width:1000px}
+.cc-sub b{color:var(--txt-2);font-weight:600}
+
+.cc-hp{display:inline-flex;align-items:center;gap:7px;min-width:74px}
+.cc-hbar{width:34px;height:5px;border-radius:3px;background:var(--bg-3);overflow:hidden;flex:none}
+.cc-hbar i{display:block;height:100%;border-radius:3px}
+.cc-hnum{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+
+.cc-rsn{display:inline-block;font-size:11.5px;padding:2px 7px;border-radius:var(--r-xs);background:var(--bg-3);color:var(--txt-2);margin:2px 4px 2px 0}
+.cc-rsn.bad{background:var(--neg-dim);color:var(--neg)}
+.cc-rsn.warn{background:var(--warn-dim);color:var(--warn)}
+.cc-rsn.good{background:var(--pos-dim);color:var(--pos)}
+
+.cc-btn{font-family:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:var(--r-sm);cursor:pointer;
+  border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);transition:all .15s var(--ease);white-space:nowrap}
+.cc-btn:hover{border-color:var(--accent-line);color:var(--txt)}
+.cc-btn.up{border-color:var(--accent-line);color:var(--accent);background:var(--accent-dim)}
+.cc-btn.dn{border-color:rgba(240,120,92,.35);color:var(--neg);background:var(--neg-dim)}
+.cc-acts{display:flex;gap:6px;justify-content:flex-end}
+
+.cc-quad-l{font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;fill:var(--txt-3)}
+.cc-bub{cursor:pointer;transition:opacity .15s}
+.cc-bub:hover{opacity:.75}
+
+.cc-leg{display:flex;flex-wrap:wrap;gap:12px;padding:11px 16px 0;border-top:1px solid var(--line);margin-top:2px}
+.cc-leg i{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt-3);font-style:normal}
+.cc-leg .sw{width:8px;height:8px;border-radius:2px;flex:none}
+
+.cc-wf{display:flex;align-items:flex-end;gap:8px;height:190px;padding:14px 4px 0}
+.cc-wf .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px;cursor:pointer}
+.cc-wf .col.mute{cursor:default}
+.cc-wf .bar{width:100%;border-radius:5px 5px 0 0;min-height:3px;transition:opacity .15s}
+.cc-wf .col:hover .bar{opacity:.8}
+.cc-wf .n{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;color:var(--txt-2)}
+.cc-wf .cl{font-size:11px;color:var(--txt-3);text-align:center;line-height:1.3;min-height:26px}
+
+.cc-kv{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.cc-kv:last-child{border-bottom:0}
+.cc-kv .k{color:var(--txt-2);display:flex;align-items:center;gap:7px}
+.cc-kv .vv{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--txt)}
+
+.cc-hint{font-size:11.5px;color:var(--txt-3);cursor:help;border-bottom:1px dotted var(--txt-3)}
+.cc-drill{max-width:720px}
+.cc-drill table{width:100%;font-size:13.5px}
+`;
+if(!document.getElementById('cc-css')){ const s=document.createElement('style'); s.id='cc-css'; s.textContent=CSS; document.head.appendChild(s); }
+
+/* ─────────────────────────── 1. Утилиты ─────────────────────────── */
+const D = 86400000;
+const N  = n => (Number(n)||0);
+const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const pctOf = (a,b)=> b ? Math.round(a/b*100) : 0;
+const num = n => N(n).toLocaleString('ru-RU').replace(/,/g,'\u202F');
+/* Компактные деньги: 45,2 млн — на плитках не должно быть простыней из цифр */
+const K = n => { n=N(n); const sg=n<0?'−':''; n=Math.abs(n);
+  if(n>=1e9) return sg+(n/1e9).toFixed(n>=1e10?0:1).replace('.',',')+' млрд';
+  if(n>=1e6) return sg+(n/1e6).toFixed(n>=1e7?0:1).replace('.',',')+' млн';
+  if(n>=1e3) return sg+Math.round(n/1e3)+' тыс';
+  return sg+num(n); };
+const money = n => num(Math.round(n))+' сум';
+const A_ = () => (typeof AGENCIES!=='undefined' ? AGENCIES : []);
+const T_ = () => (typeof TARIFFS !=='undefined' ? TARIFFS  : []);
+const SET = () => (window.PLATFORM_SETTINGS || {});
+const say = m => (typeof toast==='function' ? toast(m) : console.log(m));
+
+/* Метки достоверности — ключевой контракт дашборда */
+const TAG = { fact:'<span class="cc-tag fact">факт</span>',
+              goal:'<span class="cc-tag goal">цель</span>',
+              none:'<span class="cc-tag none">нет данных</span>' };
+
+/* ─────────────────────────── 2. Догрузка данных ───────────────────────────
+   Всё через window.SB — правок в module-слое не требуется.
+   Любая недоступная таблица → блок честно показывает «нет данных», не падает. */
+const S = { loaded:false, created:{}, active7:{}, active30:{}, contract:{}, snaps:null, snapsState:'idle' };
+
+async function loadExtra(force){
+  const SB = window.SB;
+  if(!SB) return;
+  if(S.loaded && !force) return;
+  S.loaded = true;
+
+  /* активность людей: 7 и 30 дней — из profiles.last_seen_at */
+  try{
+    const { data, error } = await SB.from('profiles').select('agency_id,last_seen_at');
+    if(!error && data){
+      const now=Date.now(); S.active7={}; S.active30={};
+      data.forEach(p=>{
+        if(!p.agency_id || !p.last_seen_at) return;
+        const d = now - new Date(p.last_seen_at).getTime();
+        if(d < 7*D)  S.active7[p.agency_id]  = (S.active7[p.agency_id]||0)+1;
+        if(d < 30*D) S.active30[p.agency_id] = (S.active30[p.agency_id]||0)+1;
+      });
+    }
+  }catch(_){}
+
+  /* дата создания (когорты, возраст триала) + сумма договора Enterprise */
+  try{
+    let r = await SB.from('agencies').select('id,created_at,contract_mrr');
+    if(r.error) r = await SB.from('agencies').select('id,created_at');       // колонки ещё нет — мягкий откат
+    (r.data||[]).forEach(a=>{
+      if(a.created_at) S.created[a.id] = new Date(a.created_at).getTime();
+      if(a.contract_mrr!=null) S.contract[a.id] = N(a.contract_mrr);
+    });
+  }catch(_){}
+
+  /* история по агентствам — без неё нет моста, NRR и оттока */
+  try{
+    const { data, error } = await SB.from('agency_snapshots')
+      .select('period,agency_id,plan,status,own_mrr,managed_mrr,projects,health').order('period');
+    if(error) throw error;
+    S.snaps = data||[];
+    S.snapsState = S.snaps.length ? 'ok' : 'empty';
+  }catch(e){ S.snaps=null; S.snapsState='no_table'; }
+}
+
+/* ─────────────────────────── 3. Экономика ───────────────────────────
+   ГЛАВНОЕ ИСПРАВЛЕНИЕ: разводим две разные валюты, которые сейчас
+   смешаны в поле agencies.mrr (agEnrichMrr подставляет цену тарифа,
+   если mrr пуст — из-за этого «MRR платформы» складывает несравнимое). */
+
+/* сохранить исходный mrr из БД до того, как его перезапишет agEnrichMrr */
+function keepRaw(){ A_().forEach(a=>{ if(a._mrrDb===undefined) a._mrrDb = N(a.mrr); }); }
+
+function tariffOf(a){ return T_().find(t=>t.key===a.plan) || null; }
+
+/* Цена тарифа числом. null = «по договору» (Enterprise). 0 = бесплатно. */
+function priceOf(t){
+  if(!t) return null;
+  const p = t.price;
+  if(typeof p === 'number') return p;
+  if(typeof p === 'string'){
+    if(/бесплат/i.test(p)) return 0;
+    const d = p.replace(/[^\d]/g,'');
+    return d ? Number(d) : null;
+  }
+  return null;
+}
+
+/* ⬤ СОБСТВЕННАЯ ВЫРУЧКА DETROYD с агентства — то, чего на экране не было. */
+function ownMrr(a){
+  if(a.status==='suspended' || a.status==='trial') return 0;   // триал не платит; заморозка не приносит
+  const p = priceOf(tariffOf(a));
+  if(p === null) return S.contract[a.id]!=null ? S.contract[a.id] : 0;   // «по договору»
+  return p;
+}
+/* Enterprise без зафиксированной суммы → выручка неизвестна, а не ноль. Честно считаем «дырой». */
+function ownUnknown(a){
+  return a.status==='active' && priceOf(tariffOf(a))===null && S.contract[a.id]==null;
+}
+/* ⬤ MRR ПОД УПРАВЛЕНИЕМ — деньги клиентов агентства. Это не наши деньги. */
+function managedMrr(a){ return a.status==='suspended' ? 0 : N(a._mrrDb); }
+
+function economics(){
+  const A = A_();
+  const own      = A.reduce((s,a)=>s+ownMrr(a),0);
+  const managed  = A.reduce((s,a)=>s+managedMrr(a),0);
+  const paying   = A.filter(a=>ownMrr(a)>0).length;
+  const unknown  = A.filter(ownUnknown).length;
+  const trial    = A.filter(a=>a.status==='trial').length;
+  const susp     = A.filter(a=>a.status==='suspended').length;
+  return {
+    own, arr: own*12, managed, paying, unknown, trial, susp,
+    total: A.length,
+    arpa: paying ? own/paying : 0,
+    takeRate: managed ? own/managed*100 : null      // какую долю создаваемой ценности монетизируем
+  };
+}
+
+/* ─────────────────────────── 4. Health Score ───────────────────────────
+   Recency 35 · Breadth 20 · Depth 25 · Commercial 20 → 0..100 */
+let _medPC = null;
+function medianPC(){
+  if(_medPC!=null) return _medPC;
+  const v = A_().filter(a=>a.status!=='suspended').map(a=>N(a.projects)+N(a.clients)).sort((x,y)=>x-y);
+  if(!v.length) return (_medPC=1);
+  const m = Math.floor(v.length/2);
+  _medPC = Math.max(1, v.length%2 ? v[m] : (v[m-1]+v[m])/2);
+  return _medPC;
+}
+const trialWindow = () => N(SET().trial_window_days) || 14;
+function trialAge(a){ const c=S.created[a.id]; return c ? (Date.now()-c)/D : null; }
+function daysSilent(a){ return a.lastSeenTs ? (Date.now()-a.lastSeenTs)/D : null; }
+
+function health(a){
+  /* Recency 35% — давность последнего входа кого-либо из агентства */
+  const ds = daysSilent(a);
+  const rec = ds===null ? 0 : ds<=2 ? 100 : ds<=7 ? 75 : ds<=14 ? 45 : ds<=30 ? 20 : 0;
+
+  /* Breadth 20% — доля сотрудников, заходивших за 7 дней (продукт живёт у команды, не у одного) */
+  const emp = N(a.employees), a7 = N(S.active7[a.id]);
+  const haveA7 = Object.keys(S.active7).length > 0;
+  /* нет данных об активности → не штрафуем всех одинаково, наследуем recency */
+  const bre = !haveA7 ? rec : (emp ? clamp(a7/emp,0,1)*100 : 0);
+
+  /* Depth 25% — глубина использования, лог-шкала чтобы гиганты не ломали её остальным.
+     ВАЖНО: глубина гасится давностью. Проекты — это ОСТАТОК, а не активность.
+     Аккаунт с 8 проектами, куда 21 день никто не заходил, — не «глубокий», а мёртвый:
+     без этого множителя он попадал в «Чемпионы», будучи первым в списке риска. */
+  const pc = N(a.projects)+N(a.clients);
+  const depRaw = 100*clamp(Math.log1p(pc)/Math.log1p(2*medianPC()), 0, 1);
+  const dep = depRaw * (rec/100);
+
+  /* Commercial 20% */
+  let com;
+  const ta = trialAge(a);
+  if(a.status==='suspended')  com = 0;
+  else if(a.status==='trial') com = (ta===null || ta<=trialWindow()) ? 50 : 20;
+  else com = ownMrr(a)>0 ? 100 : 60;
+
+  const score = Math.round(.35*rec + .20*bre + .25*dep + .20*com);
+
+  /* Причины — дашборд должен объяснять сам себя, а не выдавать магическое число */
+  const R = [];
+  if(ds===null)      R.push({t:'ни одного входа', k:'bad'});
+  else if(ds>30)     R.push({t:'тишина '+Math.round(ds)+' дн', k:'bad'});
+  else if(ds>14)     R.push({t:'тишина '+Math.round(ds)+' дн', k:'bad'});
+  else if(ds>7)      R.push({t:'тишина '+Math.round(ds)+' дн', k:'warn'});
+  if(emp && a7===0)  R.push({t:'команда не заходит', k:'bad'});
+  else if(emp && a7/emp < .34) R.push({t:'работает 1 из '+emp, k:'warn'});
+  if(N(a.projects)===0) R.push({t:'нет проектов', k:'bad'});
+  if(a.status==='trial' && ta!==null && ta>trialWindow()) R.push({t:'триал просрочен на '+Math.round(ta-trialWindow())+' дн', k:'bad'});
+  if(a.status==='suspended') R.push({t:'заморожено', k:'bad'});
+  if(!R.length) R.push({t:'в норме', k:'good'});
+
+  return { score, rec, bre, dep, com, ds, a7, reasons:R };
+}
+const hColor = s => s>=70 ? 'var(--pos)' : s>=40 ? 'var(--warn)' : 'var(--neg)';
+
+/* ─────────────────────────── 5. Риск, апсейл, концентрация ─────────────────────────── */
+const RISK_TH = 40;   // health ниже — деньги под угрозой
+
+function riskFlags(a){
+  if(a.status==='suspended') return null;
+  const h=health(a), ds=daysSilent(a), own=ownMrr(a), F=[];
+  /* Платит и молчит — деньги, о которых вот-вот забудут. Вес наивысший. */
+  if(own>0 && (ds===null || ds>14))
+    F.push({t:'платит, но молчит '+(ds===null?'всегда':Math.round(ds)+' дн'), k:'bad', w:3});
+  /* Активен, но продуктом не пользуется. */
+  if(a.status==='active' && N(a.projects)===0)
+    F.push({t:'нет проектов', k:'bad', w:2});
+  /* Интегральный балл ниже порога. */
+  if(h.score < RISK_TH)
+    F.push({t:'Health '+h.score, k:'bad', w:3});
+  /* Команда не заходит — продукт живёт у одного человека. */
+  const emp=N(a.employees), a7=N(S.active7[a.id]);
+  if(emp && a7===0 && ds!==null && ds>7)
+    F.push({t:'команда не заходит', k:'warn', w:1});
+  /* Просроченный триал. */
+  const ta=trialAge(a);
+  if(a.status==='trial' && ta!==null && ta>trialWindow())
+    F.push({t:'триал просрочен на '+Math.round(ta-trialWindow())+' дн', k:'warn', w:1});
+  return F.length ? {a, h, own, flags:F, w:F.reduce((s,f)=>s+f.w,0)} : null;
+}
+function risk(){
+  const list = A_().map(riskFlags).filter(Boolean)
+    .sort((x,y)=> (y.own-x.own) || (y.w-x.w));                   // сортировка по ДЕНЬГАМ, не по алфавиту
+  return { list, total: list.reduce((s,x)=>s+x.own,0) };
+}
+/* Молчащие плательщики — деньги, о которых вот-вот забудут */
+function dark(){
+  return A_().filter(a=>{ const ds=daysSilent(a); return ownMrr(a)>0 && (ds===null || ds>14); })
+             .map(a=>({a, own:ownMrr(a), ds:daysSilent(a)}))
+             .sort((x,y)=>y.own-x.own);
+}
+/* Зомби — числятся активными, но продуктом не пользуются */
+function zombies(){
+  return A_().filter(a=>a.status==='active' && N(a.projects)===0).map(a=>({a, own:ownMrr(a)}));
+}
+function staleTrials(){
+  return A_().filter(a=>{ if(a.status!=='trial') return false; const t=trialAge(a); return t!==null && t>trialWindow(); })
+             .map(a=>({a, age:trialAge(a)})).sort((x,y)=>y.age-x.age);
+}
+
+/* Лестница тарифов по цене — для апгрейда */
+function ladder(){
+  return T_().map(t=>({t, p:priceOf(t)})).filter(x=>typeof x.p==='number' && x.p>0).sort((x,y)=>x.p-y.p);
+}
+function nextTariff(a){
+  const cur = priceOf(tariffOf(a));
+  if(cur===null) return null;                              // уже на «по договору» — выше некуда
+  const up = ladder().find(x=>x.p>cur);
+  if(up) return { t:up.t, p:up.p, contract:false };
+  /* Ступеней с ценой выше нет, но есть тариф «по договору» (Enterprise):
+     это и есть самый крупный апсейл. Сумма неизвестна — показываем, но не суммируем. */
+  const ent = T_().find(t=>priceOf(t)===null);
+  return ent ? { t:ent, p:null, contract:true } : null;
+}
+function utilization(a){
+  const t = tariffOf(a);
+  const lim = t && t.limits && Number(t.limits.projects);
+  if(!lim) return null;                          // безлимит или лимит не задан
+  return N(a.projects)/lim;
+}
+/* ⬤ UPSELL POTENTIAL — конкретная сумма, которую можно забрать в этом месяце */
+function upsell(){
+  const list=[];
+  A_().forEach(a=>{
+    if(a.status!=='active') return;
+    const u = utilization(a);
+    if(u===null || u < .8) return;                         // ещё не упёрлись в лимит
+    const nx = nextTariff(a);
+    if(!nx) return;
+    const cur = priceOf(tariffOf(a)) || 0;
+    list.push({ a, u, to:nx.t, contract:nx.contract,
+                gain: nx.contract ? null : nx.p-cur });    // null = сумма по договору, не выдумываем
+  });
+  list.sort((x,y)=>(y.gain||0)-(x.gain||0));
+  return { list,
+           total: list.reduce((s,x)=>s+(x.gain||0),0),     // суммируем только известное
+           contractCnt: list.filter(x=>x.contract).length };
+}
+/* Переплачивают → уйдут при первом ревью бюджета */
+function downsell(){
+  return A_().filter(a=>{ const u=utilization(a); return a.status==='active' && u!==null && u<.2 && ownMrr(a)>0; })
+             .map(a=>({a, u:utilization(a), own:ownMrr(a)})).sort((x,y)=>y.own-x.own);
+}
+/* Концентрация: HHI + доля топ-1/топ-3. Зависимость от одного клиента — риск платформы. */
+function concentration(){
+  const own = A_().map(a=>ownMrr(a)).filter(v=>v>0).sort((x,y)=>y-x);
+  const tot = own.reduce((s,v)=>s+v,0);
+  if(!tot) return null;
+  const shares = own.map(v=>v/tot);
+  const hhi = Math.round(shares.reduce((s,v)=>s+v*v,0)*10000);
+  return {
+    hhi, tot,
+    top1: Math.round((shares[0]||0)*100),
+    top3: Math.round(shares.slice(0,3).reduce((s,v)=>s+v,0)*100),
+    level: hhi>=2500 ? 'высокая' : hhi>=1500 ? 'умеренная' : 'низкая'
+  };
+}
+
+/* ─────────────────────────── 6. Динамика (нужна agency_snapshots) ─────────────────────────── */
+function periods(){ return S.snaps ? [...new Set(S.snaps.map(r=>r.period))].sort() : []; }
+function byPeriod(p){ const m={}; (S.snaps||[]).filter(r=>r.period===p).forEach(r=>m[r.agency_id]=r); return m; }
+
+/* ⬤ MRR-МОСТ: New + Expansion + Reactivation − Contraction − Churn */
+function bridge(){
+  if(S.snapsState==='no_table') return {ok:false, why:'no_table'};
+  const P = periods();
+  if(P.length < 2) return {ok:false, why:'need_two', have:P.length};
+
+  const cur=P[P.length-1], prv=P[P.length-2];
+  const C=byPeriod(cur), V=byPeriod(prv);
+  let neu=0, exp=0, rea=0, con=0, chu=0;
+  const B = {neu:[], exp:[], rea:[], con:[], chu:[]};
+
+  Object.keys(C).forEach(id=>{
+    const c = N(C[id].own_mrr);
+    const has = Object.prototype.hasOwnProperty.call(V,id);
+    const p = has ? N(V[id].own_mrr) : null;
+    if(p===null){ if(c>0){ neu+=c; B.neu.push({id, v:c}); } return; }
+    if(p===0 && c>0){ rea+=c; B.rea.push({id, v:c}); return; }
+    if(c>p){ exp+=c-p; B.exp.push({id, v:c-p}); }
+    else if(c<p){ con+=p-c; B.con.push({id, v:p-c}); }
+  });
+  Object.keys(V).forEach(id=>{
+    if(!C[id]){ const p=N(V[id].own_mrr); if(p>0){ chu+=p; B.chu.push({id, v:p}); } }
+  });
+
+  const start = Object.values(V).reduce((s,r)=>s+N(r.own_mrr),0);
+  const end   = Object.values(C).reduce((s,r)=>s+N(r.own_mrr),0);
+  const lost  = chu+con;
+  return { ok:true, cur, prv, start, end, neu, exp, rea, con, chu,
+           net: neu+exp+rea-con-chu,
+           qr: lost>0 ? (neu+exp)/lost : null,          // Quick Ratio: здоровый SaaS > 4
+           buckets:B };
+}
+/* NRR / GRR по когорте предыдущего периода */
+function retention(){
+  if(S.snapsState==='no_table') return {ok:false, why:'no_table'};
+  const P = periods();
+  if(P.length < 2) return {ok:false, why:'need_two', have:P.length};
+  const cur=P[P.length-1], prv=P[P.length-2];
+  const C=byPeriod(cur), V=byPeriod(prv);
+  let base=0, nrrV=0, grrV=0, lost=0;
+  Object.keys(V).forEach(id=>{
+    const p=N(V[id].own_mrr); if(p<=0) return;
+    base+=p;
+    const c = C[id] ? N(C[id].own_mrr) : 0;
+    nrrV += c;
+    grrV += Math.min(c,p);                     // GRR не учитывает расширение
+    if(c===0) lost++;
+  });
+  if(!base) return {ok:false, why:'empty'};
+  const cohort = Object.keys(V).filter(id=>N(V[id].own_mrr)>0).length;
+  return { ok:true, cur, prv, cohort,
+           nrr: Math.round(nrrV/base*100),
+           grr: Math.round(grrV/base*100),
+           logoChurn: cohort ? Math.round(lost/cohort*100) : 0,
+           revChurn: Math.round((base-grrV)/base*100) };
+}
+
+/* ─────────────────────────── 7. Матрица портфеля ───────────────────────────
+   Чемпионы · Растить · Спасать · Отпустить — язык управления, не список строк */
+const H_TH = 55;
+function portfolio(){
+  const A = A_().filter(a=>a.status!=='suspended');
+  const owns = A.map(a=>ownMrr(a)).filter(v=>v>0).sort((x,y)=>x-y);
+  const m = owns.length ? (owns.length%2 ? owns[(owns.length-1)/2] : (owns[owns.length/2-1]+owns[owns.length/2])/2) : 0;
+  const mid = m || 1;
+  const pts = A.map(a=>{
+    const h=health(a), own=ownMrr(a);
+    const hi = h.score>=H_TH, rich = own>=mid;
+    const q = hi&&rich ? 'champ' : hi&&!rich ? 'grow' : !hi&&rich ? 'save' : 'let';
+    return {a, h, own, q};
+  });
+  return { pts, mid,
+    champ: pts.filter(p=>p.q==='champ'), grow: pts.filter(p=>p.q==='grow'),
+    save:  pts.filter(p=>p.q==='save'),  let_: pts.filter(p=>p.q==='let') };
+}
+
+/* ─────────────────────────── 8. Отрисовка: вспомогательное ─────────────────────────── */
+function sparkline(vals, color){
+  if(!vals || vals.length<2) return '';
+  const W=260,H=34,max=Math.max(...vals)||1,min=Math.min(...vals);
+  const rng=(max-min)||1;
+  const pt=vals.map((v,i)=>`${(i/(vals.length-1)*W).toFixed(1)},${(H-2-((v-min)/rng)*(H-6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polygon points="0,${H} ${pt} ${W},${H}" fill="${color}" opacity=".13"/>
+    <polyline points="${pt}" fill="none" stroke="${color}" stroke-width="1.6"/></svg>`;
+}
+function emptyBlock(why, what, have){
+  const M = {
+    no_table: ['Нужна миграция', 'Таблица <code>agency_snapshots</code> не создана. Без истории по агентствам '+what+' посчитать математически невозможно — это не вопрос кода. Примени <code>01_migrations.sql</code>.'],
+    need_two: ['История копится', 'Есть снимков: <b>'+(have||0)+'</b>. Нужно минимум <b>2</b> месячных — сравнивать пока не с чем. Первый снимок уже пишется автоматически.'],
+    empty:    ['Пока пусто', 'Снимки есть, но платящих агентств в них нет.']
+  };
+  const m = M[why] || ['Нет данных',''];
+  return `<div class="cc-empty">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="var(--txt-3)" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div class="ttl">${m[0]}</div><div class="sub">${m[1]}</div></div>`;
+}
+function healthCell(h){
+  return `<div class="cc-hp"><span class="cc-hnum" style="color:${hColor(h.score)}">${h.score}</span>
+    <span class="cc-hbar"><i style="width:${h.score}%;background:${hColor(h.score)}"></i></span></div>`;
+}
+const agCell = a => `<div class="ag-name"><span class="ag-dot" style="background:${a.accent}"></span>
+  <div><div class="nm">${esc(a.name)}</div><div class="sl">${esc(a.slug)}.triada.app</div></div></div>`;
+
+/* ─────────────────────────── 9. Действия (реальные, через существующие функции) ─────────────────────────── */
+window.ccOpen = id => { if(typeof openDrawer==='function') openDrawer(id); };
+window.ccEdit = id => { if(typeof openAgency==='function') openAgency(id); };
+window.ccFreeze = async id => {
+  const a = A_().find(x=>String(x.id)===String(id)); if(!a) return;
+  if(!confirm(`Заморозить «${a.name}»? Доступ прекратится, выручка перестанет учитываться.`)) return;
+  if(window.tUpdateAgency) await window.tUpdateAgency(id, {status:'suspended'});
+  ccRefresh();
+};
+window.ccActivate = async id => {
+  const a = A_().find(x=>String(x.id)===String(id)); if(!a) return;
+  if(window.tUpdateAgency) await window.tUpdateAgency(id, {status:'active'});
+  ccRefresh();
+};
+window.ccUpgrade = async (id, key) => {
+  const a = A_().find(x=>String(x.id)===String(id)); if(!a) return;
+  const t = T_().find(x=>x.key===key); if(!t) return;
+  if(!confirm(`Перевести «${a.name}» на тариф «${t.name}»?`)) return;
+  if(window.tUpdateAgency) await window.tUpdateAgency(id, {plan:key});
+  ccRefresh();
+};
+function ccRefresh(){ S.loaded=false; _medPC=null; if(typeof pd2Close==='function') pd2Close(); renderPulse(); }
+
+/* ─────────────────────────── 10. Drill-down ───────────────────────────
+   Ни одна цифра не должна быть тупиком: клик → список → действие */
+function drill(title, sub, rows, cols){
+  const html = `<div class="modal cc-drill">
+    <div class="modal-h"><h3>${esc(title)}</h3><p>${sub||''}</p></div>
+    <div class="modal-b" style="max-height:60vh;overflow:auto">
+      ${rows.length ? `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows.join('')}</tbody></table>`
+      : '<div class="cc-empty"><div class="ttl">Здесь пусто</div><div class="sub">И это хорошая новость.</div></div>'}
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div></div>`;
+  if(typeof pd2Open==='function') pd2Open(html);
+}
+window.ccDrillRisk = () => {
+  const r = risk();
+  drill('Деньги под угрозой', `${r.list.length} агентств · ${money(r.total)} собственной выручки под угрозой`,
+    r.list.map(x=>`<tr>
+      <td>${agCell(x.a)}</td>
+      <td>${healthCell(x.h)}</td>
+      <td>${x.flags.slice(0,3).map(z=>`<span class="cc-rsn ${z.k}">${esc(z.t)}</span>`).join('')}</td>
+      <td class="num" style="color:var(--neg)">${x.own?K(x.own):'—'}</td>
+      <td><div class="cc-acts">
+        <button class="cc-btn" onclick="ccOpen('${x.a.id}')">Открыть</button>
+        <button class="cc-btn dn" onclick="ccFreeze('${x.a.id}')">Заморозить</button></div></td>
+    </tr>`),
+    ['Агентство','Health','Причина','MRR под угрозой','']);
+};
+window.ccDrillUpsell = () => {
+  const u = upsell();
+  drill('Кандидаты на апгрейд', `${u.list.length} упёрлись в лимит · потенциал ${money(u.total)}/мес${u.contractCnt?' + '+u.contractCnt+' по договору (сумма не выдумывается)':''}`,
+    u.list.map(x=>`<tr>
+      <td>${agCell(x.a)}</td>
+      <td><span class="badge b-mut" style="text-transform:uppercase">${esc(x.a.plan)}</span></td>
+      <td><div class="eff"><span style="color:${x.u>=1?'var(--neg)':'var(--warn)'}">${Math.round(x.u*100)}%</span>
+        <div class="bar"><i style="width:${Math.min(100,x.u*100)}%;background:${x.u>=1?'var(--neg)':'var(--warn)'}"></i></div></div></td>
+      <td class="num" style="color:var(--accent)">${x.gain===null?'<span style="color:var(--warn)">по договору</span>':'+'+K(x.gain)}</td>
+      <td><div class="cc-acts"><button class="cc-btn up" onclick="ccUpgrade('${x.a.id}','${x.to.key}')">→ ${esc(x.to.name)}</button></div></td>
+    </tr>`),
+    ['Агентство','Тариф','Лимит проектов','Прирост','']);
+};
+window.ccDrillDark = () => {
+  const d = dark();
+  drill('Молчащие плательщики', `${d.length} агентств платят, но не заходят дольше 14 дней`,
+    d.map(x=>`<tr><td>${agCell(x.a)}</td>
+      <td class="num">${x.ds===null?'ни разу':Math.round(x.ds)+' дн'}</td>
+      <td class="num">${K(x.own)}</td>
+      <td><div class="cc-acts"><button class="cc-btn" onclick="ccOpen('${x.a.id}')">Открыть</button></div></td></tr>`),
+    ['Агентство','Тишина','MRR','']);
+};
+window.ccDrillTrials = () => {
+  const t = staleTrials();
+  drill('Просроченные триалы', `Окно триала — ${trialWindow()} дн. Эти его превысили и не оплатили.`,
+    t.map(x=>`<tr><td>${agCell(x.a)}</td>
+      <td class="num" style="color:var(--neg)">${Math.round(x.age)} дн</td>
+      <td class="num">${N(x.a.projects)}</td>
+      <td><div class="cc-acts">
+        <button class="cc-btn" onclick="ccEdit('${x.a.id}')">Тариф</button>
+        <button class="cc-btn dn" onclick="ccFreeze('${x.a.id}')">Заморозить</button></div></td></tr>`),
+    ['Агентство','Возраст триала','Проекты','']);
+};
+window.ccDrillQuad = q => {
+  const P = portfolio();
+  const M = { champ:['Чемпионы','Высокий Health, высокая выручка. Источник кейсов и референсов.'],
+              grow:['Растить','Продукт зашёл, денег мало. Здесь лежит апсейл.'],
+              save:['Спасать','Платят много, но угасают. Звонить сегодня.'],
+              let_:['Отпустить','Мало и того, и другого. Не тратить на них ресурс.'] };
+  const list = P[q]||[];
+  drill(M[q][0], M[q][1]+` · ${list.length} агентств`,
+    list.sort((x,y)=>y.own-x.own).map(x=>`<tr>
+      <td>${agCell(x.a)}</td><td>${healthCell(x.h)}</td>
+      <td class="num">${x.own?K(x.own):'—'}</td><td class="num">${N(x.a.projects)}</td>
+      <td><div class="cc-acts"><button class="cc-btn" onclick="ccOpen('${x.a.id}')">Открыть</button></div></td></tr>`),
+    ['Агентство','Health','MRR','Проекты','']);
+};
+window.ccDrillBridge = k => {
+  const b = bridge(); if(!b.ok) return;
+  const M = {neu:'Новые',exp:'Расширение',rea:'Возврат',con:'Сжатие',chu:'Отток'};
+  const rows = (b.buckets[k]||[]).sort((x,y)=>y.v-x.v).map(x=>{
+    const a = A_().find(z=>String(z.id)===String(x.id));
+    return `<tr><td>${a?agCell(a):esc(x.id)}</td>
+      <td class="num" style="color:${k==='con'||k==='chu'?'var(--neg)':'var(--pos)'}">${k==='con'||k==='chu'?'−':'+'}${K(x.v)}</td></tr>`;
+  });
+  drill(M[k], `${b.prv} → ${b.cur}`, rows, ['Агентство','Изменение MRR']);
+};
+
+/* ─────────────────────────── 11. ПУЛЬС — главный экран ─────────────────────────── */
+function renderPulse(){
+  const host = document.getElementById('content');
+  if(!host) return;
+  keepRaw(); _medPC=null;
+
+  const E   = economics();
+  const R   = risk();
+  const U   = upsell();
+  const P   = portfolio();
+  const B   = bridge();
+  const RET = retention();
+  const CN  = concentration();
+  const ST  = staleTrials();
+  const DK  = dark();
+  const ZB  = zombies();
+
+  const onlineAg = A_().filter(a=>N(a.online)>0).length;
+  const onlineUs = A_().reduce((s,a)=>s+N(a.online),0);
+
+  /* тренд собственной выручки — из agency_snapshots, иначе не рисуем */
+  let trend=[];
+  if(S.snaps && S.snaps.length){
+    trend = periods().map(p=>Object.values(byPeriod(p)).reduce((s,r)=>s+N(r.own_mrr),0));
+  }
+  const netCol = B.ok ? (B.net>=0?'var(--pos)':'var(--neg)') : 'var(--txt)';
+
+  host.innerHTML = `
+  <div class="ph">
+    <div><div class="eyebrow">Платформа · командный центр</div><h1>Пульс DETROYD</h1>
+      <div class="s">Слева направо: сколько зарабатываю · куда движется · что теряю · где следующий рубль.</div></div>
+    <button class="btn-add" onclick="ccSnapshot()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Снять срез</button>
+  </div>
+
+  <div class="cc-sub">
+    <b>Выручка DETROYD</b> — сумма цен тарифов активных агентств. Это ваши деньги.
+    <b>MRR под управлением</b> — деньги клиентов агентств; они проходят мимо вас и показаны отдельно.
+    Всё, что нельзя посчитать по данным, помечено ${TAG.none} — а не выдумано.
+  </div>
+  <div class="cc-tiles">
+
+    <div class="cc-tile gold mute">
+      <div class="l"><span class="cc-dot" style="background:var(--accent)"></span>Выручка платформы</div>
+      <div class="v num" style="color:var(--accent)">${K(E.arr)}<span class="u">сум / год</span></div>
+      <div class="s">${K(E.own)} сум в месяц</div>
+      <div class="f">${E.paying} платящих · ARPA ${K(E.arpa)}${E.unknown?` · <span style="color:var(--warn)">${E.unknown} без суммы договора</span>`:''}</div>
+      ${trend.length>1?sparkline(trend,'#37E6C8'):''}
+    </div>
+
+    <div class="cc-tile ${B.ok?'':'mute'}" ${B.ok?'onclick="ccDrillBridge(\'neu\')"':''}>
+      <div class="l">Net New MRR ${B.ok?'':TAG.none}</div>
+      ${B.ok
+        ? `<div class="v num" style="color:${netCol}">${B.net>=0?'+':''}${K(B.net)}<span class="u">сум/мес</span></div>
+           <div class="s">${B.prv} → ${B.cur}</div>
+           <div class="f">Quick Ratio: ${B.qr===null?'<span style="color:var(--pos)">потерь нет</span>':`<b style="color:${B.qr>=4?'var(--pos)':B.qr>=1?'var(--warn)':'var(--neg)'}">${B.qr.toFixed(1)}</b> ${B.qr>=4?'· здорово':B.qr>=1?'· растём медленно':'· теряем быстрее, чем растём'}`}</div>`
+        : `<div class="v num" style="color:var(--txt-3)">—</div>
+           <div class="s">нужна история по агентствам</div>
+           <div class="f">${S.snapsState==='no_table'?'применить 01_migrations.sql':'копится: '+(B.have||0)+' из 2 снимков'}</div>`}
+    </div>
+
+    <div class="cc-tile ${R.total?'alarm':''}" onclick="ccDrillRisk()">
+      <div class="l"><span class="cc-dot" style="background:var(--neg)"></span>Деньги под угрозой</div>
+      <div class="v num" style="color:${R.total?'var(--neg)':'var(--txt-3)'}">${R.total?K(R.total):'0'}<span class="u">сум/мес</span></div>
+      <div class="s">${R.list.length} агентств · Health &lt; ${RISK_TH}</div>
+      <div class="f">${DK.length} молчат &gt;14 дн · ${ZB.length} без проектов</div>
+    </div>
+
+    <div class="cc-tile ${U.total?'gold':''}" onclick="ccDrillUpsell()">
+      <div class="l"><span class="cc-dot" style="background:var(--accent)"></span>Потенциал апгрейда</div>
+      <div class="v num" style="color:${U.total?'var(--accent)':'var(--txt-3)'}">${U.total?'+'+K(U.total):'0'}<span class="u">сум/мес</span></div>
+      <div class="s">${U.list.length} упёрлись в лимит тарифа</div>
+      <div class="f">${U.total&&E.own?'+'+pctOf(U.total,E.own)+'% к выручке':'кандидатов нет'}${U.contractCnt?` · <span style="color:var(--warn)">${U.contractCnt} по договору</span>`:''}</div>
+    </div>
+
+    <div class="cc-tile mute">
+      <div class="l"><span class="cc-dot" style="background:${onlineUs?'var(--pos)':'var(--txt-3)'}"></span>Живёт сейчас</div>
+      <div class="v num">${onlineAg}<span class="u">/ ${E.total}</span></div>
+      <div class="s">${onlineUs?onlineUs+' человек в системе':'никого онлайн'}</div>
+      <div class="f">${E.trial} триал · ${E.susp} заморожено</div>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-h"><div class="t">MRR-мост ${TAG.fact}</div><div class="c">${B.ok?B.prv+' → '+B.cur:'—'}</div></div>
+      <div class="card-body">${B.ok ? waterfall(B) : emptyBlock(B.why, 'отток, расширение и Net New MRR', B.have)}</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="t">Матрица портфеля</div><div class="c">${P.pts.length} агентств</div></div>
+      <div class="card-body" style="padding-top:4px">${matrix(P)}</div>
+    </div>
+  </div>
+  ${actionTable(R, ST, U, DK)}
+  <div class="row2" style="margin-top:16px">
+    <div class="card">
+      <div class="card-h"><div class="t">Удержание выручки</div><div class="c">${RET.ok?'когорта '+RET.prv:'—'}</div></div>
+      <div class="card-body">${RET.ok ? retentionBlock(RET) : emptyBlock(RET.why, 'NRR, GRR и отток', RET.have)}</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="t">Концентрация и монетизация ${TAG.fact}</div></div>
+      <div class="card-body">${concBlock(CN, E)}</div>
+    </div>
+  </div>`;
+}
+
+/* ── Водопад MRR ── */
+function waterfall(b){
+  const steps = [
+    {k:null,  l:b.prv,          v:b.start, c:'var(--txt-3)',  type:'base'},
+    {k:'neu', l:'Новые',        v:b.neu,   c:'var(--accent)', type:'up'},
+    {k:'exp', l:'Расширение',   v:b.exp,   c:'var(--pos)',    type:'up'},
+    {k:'rea', l:'Возврат',      v:b.rea,   c:'var(--violet)', type:'up'},
+    {k:'con', l:'Сжатие',       v:b.con,   c:'var(--warn)',   type:'dn'},
+    {k:'chu', l:'Отток',        v:b.chu,   c:'var(--neg)',    type:'dn'},
+    {k:null,  l:b.cur,          v:b.end,   c:'var(--accent)', type:'base'}
+  ];
+  const max = Math.max(b.start, b.end, 1);
+  return `<div class="cc-wf">${steps.map(s=>{
+    const h = s.type==='base' ? clamp(s.v/max*100,2,100) : clamp(s.v/max*100,1,100);
+    const sign = s.type==='up' ? '+' : s.type==='dn' ? '−' : '';
+    return `<div class="col ${s.k?'':'mute'}" ${s.k?`onclick="ccDrillBridge('${s.k}')"`:''}>
+      <div class="n" style="color:${s.type==='base'?'var(--txt)':s.c}">${s.v?sign+K(s.v):'0'}</div>
+      <div class="bar" style="height:${h}%;background:${s.c};opacity:${s.type==='base'?.9:.75}"></div>
+      <div class="cl">${esc(s.l)}</div></div>`;
+  }).join('')}</div>
+  <div class="cc-leg"><i>Итог месяца: <b style="color:${b.net>=0?'var(--pos)':'var(--neg)'};margin-left:4px">${b.net>=0?'+':''}${money(b.net)}</b></i>
+  <i style="margin-left:auto">клик по столбцу → список агентств</i></div>`;
+}
+
+/* ── Матрица портфеля 2×2 ── */
+function matrix(P){
+  const W=560, H=330, pad={l:52,r:16,t:14,b:38};
+  const iW=W-pad.l-pad.r, iH=H-pad.t-pad.b;
+  const maxOwn = Math.max(...P.pts.map(p=>p.own), P.mid*2, 1);
+  const x = h => pad.l + iW*clamp(h/100,0,1);
+  const y = v => pad.t + iH - iH*clamp(Math.log1p(v)/Math.log1p(maxOwn),0,1);
+  const r = p => clamp(4+Math.sqrt(N(p.a.projects))*2.6, 5, 20);
+  const xq = x(H_TH), yq = y(P.mid);
+
+  /* X = Health (вправо больше), Y = собственный MRR (вверх больше) */
+  const Q2 = [
+    {k:'save', x:pad.l+8,   y:pad.t+16,  l:'СПАСАТЬ',   a:'start'},   // мало health, много денег
+    {k:'champ',x:W-pad.r-8, y:pad.t+16,  l:'ЧЕМПИОНЫ',  a:'end'},     // много health, много денег
+    {k:'let_', x:pad.l+8,   y:H-pad.b-8, l:'ОТПУСТИТЬ', a:'start'},   // мало health, мало денег
+    {k:'grow', x:W-pad.r-8, y:H-pad.b-8, l:'РАСТИТЬ',   a:'end'}      // много health, мало денег
+  ];
+
+  const bubbles = P.pts.map(p=>{
+    const cx=x(p.h.score), cy=y(p.own), rr=r(p);
+    return `<g class="cc-bub" onclick="ccDrillQuad('${p.q}')"><title>${esc(p.a.name)} · Health ${p.h.score} · ${p.own?K(p.own)+' сум':'без выручки'} · ${N(p.a.projects)} проектов</title>
+      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.a.accent}" opacity=".2"/>
+      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" fill="none" stroke="${p.a.accent}" stroke-width="1.6"/></g>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;height:auto">
+    <rect x="${pad.l}" y="${pad.t}" width="${xq-pad.l}" height="${yq-pad.t}" fill="var(--neg)" opacity=".045"/>
+    <rect x="${xq}" y="${pad.t}" width="${W-pad.r-xq}" height="${yq-pad.t}" fill="var(--accent)" opacity=".05"/>
+    <line x1="${xq}" y1="${pad.t}" x2="${xq}" y2="${H-pad.b}" stroke="var(--line-2)" stroke-dasharray="4 4"/>
+    <line x1="${pad.l}" y1="${yq}" x2="${W-pad.r}" y2="${yq}" stroke="var(--line-2)" stroke-dasharray="4 4"/>
+    <line x1="${pad.l}" y1="${H-pad.b}" x2="${W-pad.r}" y2="${H-pad.b}" stroke="var(--line)"/>
+    <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H-pad.b}" stroke="var(--line)"/>
+    ${Q2.map(q=>`<text class="cc-quad-l" x="${q.x}" y="${q.y}" text-anchor="${q.a}">${q.l}</text>`).join('')}
+    ${bubbles}
+    <text x="${pad.l}" y="${H-10}" fill="#5B616B" font-size="10.5">0</text>
+    <text x="${W-pad.r}" y="${H-10}" text-anchor="end" fill="#5B616B" font-size="10.5">Health 100 →</text>
+    <text x="${pad.l-8}" y="${pad.t+10}" text-anchor="end" fill="#5B616B" font-size="10.5">${K(maxOwn)}</text>
+    <text x="${pad.l-8}" y="${H-pad.b}" text-anchor="end" fill="#5B616B" font-size="10.5">0</text>
+  </svg>
+  <div class="cc-leg">
+    <i><span class="sw" style="background:var(--neg);opacity:.5"></span>Спасать · ${P.save.length}</i>
+    <i><span class="sw" style="background:var(--accent)"></span>Чемпионы · ${P.champ.length}</i>
+    <i><span class="sw" style="background:var(--pos)"></span>Растить · ${P.grow.length}</i>
+    <i><span class="sw" style="background:var(--txt-3)"></span>Отпустить · ${P.let_.length}</i>
+    <i style="margin-left:auto">размер = проекты · клик → список</i>
+  </div>`;
+}
+
+/* ── Таблица «сегодня» — отсортирована по деньгам, а не по алфавиту ── */
+function actionTable(R, ST, U, DK){
+  const rows = [];
+  const seen = new Set();
+  const push = (a, why, kind, amount, act) => {
+    const key = String(a.id)+'|'+kind;
+    if(seen.has(key)) return;
+    seen.add(key);
+    rows.push({a, why, kind, amount, act});
+  };
+
+  R.list.forEach(x=> push(x.a, x.flags.slice(0,2), 'risk', x.own,
+    `<button class="cc-btn" onclick="ccOpen('${x.a.id}')">Открыть</button><button class="cc-btn dn" onclick="ccFreeze('${x.a.id}')">Заморозить</button>`));
+  DK.forEach(x=> push(x.a, [{t:'платит, но молчит '+(x.ds===null?'всегда':Math.round(x.ds)+' дн'), k:'bad'}], 'dark', x.own,
+    `<button class="cc-btn" onclick="ccOpen('${x.a.id}')">Открыть</button>`));
+  ST.forEach(x=> push(x.a, [{t:'триал просрочен на '+Math.round(x.age-trialWindow())+' дн', k:'warn'}], 'trial', 0,
+    `<button class="cc-btn" onclick="ccEdit('${x.a.id}')">Назначить тариф</button><button class="cc-btn dn" onclick="ccFreeze('${x.a.id}')">Заморозить</button>`));
+  U.list.forEach(x=> push(x.a, [{t:'лимит тарифа на '+Math.round(x.u*100)+'%'+(x.contract?' · сумма по договору':''), k:'good'}], 'upsell', x.gain||0,
+    `<button class="cc-btn up" onclick="ccUpgrade('${x.a.id}','${x.to.key}')">Апгрейд → ${esc(x.to.name)}</button>`));
+
+  rows.sort((a,b)=> b.amount - a.amount);
+
+  const KND = { risk:['Риск','var(--neg)'], dark:['Молчит','var(--warn)'], trial:['Триал','var(--violet)'], upsell:['Апсейл','var(--accent)'] };
+
+  return `<div class="card" style="margin-top:16px">
+    <div class="card-h">
+      <div class="t">Требует действия сегодня</div>
+      <div class="c">${rows.length} позиций · отсортировано по деньгам</div>
+    </div>
+    ${rows.length ? `<table>
+      <thead><tr><th>Агентство</th><th>Тип</th><th>Причина</th><th style="text-align:right">Сумма</th><th></th></tr></thead>
+      <tbody>${rows.slice(0,12).map(r=>`<tr>
+        <td>${agCell(r.a)}</td>
+        <td><span class="cc-rsn" style="color:${KND[r.kind][1]};background:transparent;border:1px solid ${KND[r.kind][1]}40">${KND[r.kind][0]}</span></td>
+        <td>${r.why.map(z=>`<span class="cc-rsn ${z.k}">${esc(z.t)}</span>`).join('')}</td>
+        <td class="num" style="text-align:right;color:${r.kind==='upsell'?'var(--accent)':r.amount?'var(--neg)':'var(--txt-3)'}">${r.amount?(r.kind==='upsell'?'+':'')+K(r.amount):'—'}</td>
+        <td onclick="event.stopPropagation()"><div class="cc-acts">${r.act}</div></td>
+      </tr>`).join('')}</tbody></table>
+      ${rows.length>12?`<div style="padding:11px 16px;font-size:12.5px;color:var(--txt-3);border-top:1px solid var(--line)">…и ещё ${rows.length-12}. Разберите верх списка — там деньги.</div>`:''}`
+    : `<div class="cc-empty"><div class="ttl">Сегодня всё спокойно</div>
+        <div class="sub">Ни одного агентства в зоне риска, просроченных триалов нет, апсейл-кандидатов нет.</div></div>`}
+  </div>`;
+}
+
+/* ── Удержание ── */
+function retentionBlock(r){
+  const c = v => v>=100?'var(--pos)':v>=90?'var(--warn)':'var(--neg)';
+  const goalNrr = SET().nrr_target;
+  return `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px">
+    <div><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:600">NRR ${TAG.fact}</div>
+      <div class="num" style="font-size:30px;font-weight:600;color:${c(r.nrr)};margin-top:6px">${r.nrr}<span style="font-size:15px;color:var(--txt-3)">%</span></div>
+      <div style="font-size:12px;color:var(--txt-3);margin-top:3px">с расширением${goalNrr?` · цель ${goalNrr}% ${TAG.goal}`:''}</div></div>
+    <div><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:600">GRR ${TAG.fact}</div>
+      <div class="num" style="font-size:30px;font-weight:600;color:${c(r.grr)};margin-top:6px">${r.grr}<span style="font-size:15px;color:var(--txt-3)">%</span></div>
+      <div style="font-size:12px;color:var(--txt-3);margin-top:3px">без расширения — «чистое» удержание</div></div>
+  </div>
+  <div class="cc-kv"><span class="k">Отток по логотипам</span><span class="vv" style="color:${r.logoChurn?'var(--neg)':'var(--pos)'}">${r.logoChurn}%</span></div>
+  <div class="cc-kv"><span class="k">Отток по выручке</span><span class="vv" style="color:${r.revChurn?'var(--neg)':'var(--pos)'}">${r.revChurn}%</span></div>
+  <div class="cc-kv"><span class="k">Когорта</span><span class="vv">${r.cohort} платящих на ${r.prv}</span></div>
+  <div style="margin-top:12px;font-size:12px;color:var(--txt-3);line-height:1.5">
+    ${r.revChurn>r.logoChurn
+      ? 'Выручка утекает быстрее логотипов — <b style="color:var(--neg)">уходят крупные</b>.'
+      : r.logoChurn>r.revChurn
+        ? 'Логотипов уходит больше, чем денег — <b style="color:var(--warn)">осыпается мелочь</b>.'
+        : 'Отток пропорционален размеру.'}
+  </div>`;
+}
+
+/* ── Концентрация + take rate ── */
+function concBlock(cn, E){
+  if(!cn) return emptyBlock('empty','концентрацию');
+  const risky = cn.top1 >= 30;
+  return `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px">
+    <div><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:600">Take rate</div>
+      <div class="num" style="font-size:30px;font-weight:600;color:var(--accent);margin-top:6px">${E.takeRate===null?'—':E.takeRate.toFixed(1).replace('.',',')}<span style="font-size:15px;color:var(--txt-3)">%</span></div>
+      <div style="font-size:12px;color:var(--txt-3);margin-top:3px">${K(E.own)} из ${K(E.managed)} под управлением</div></div>
+    <div><div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--txt-3);font-weight:600">HHI</div>
+      <div class="num" style="font-size:30px;font-weight:600;color:${risky?'var(--neg)':'var(--txt)'};margin-top:6px">${cn.hhi}</div>
+      <div style="font-size:12px;color:var(--txt-3);margin-top:3px">концентрация ${cn.level}</div></div>
+  </div>
+  <div class="cc-kv"><span class="k">Доля крупнейшего</span><span class="vv" style="color:${risky?'var(--neg)':'var(--txt)'}">${cn.top1}%</span></div>
+  <div class="cc-kv"><span class="k">Доля топ-3</span><span class="vv">${cn.top3}%</span></div>
+  <div style="margin-top:12px;font-size:12px;color:var(--txt-3);line-height:1.5">
+    ${risky
+      ? '<b style="color:var(--neg)">Зависимость от одного клиента.</b> Уход крупнейшего снесёт '+cn.top1+'% выручки. Диверсифицировать базу.'
+      : 'Выручка распределена. Уход любого одного агентства не критичен.'}
+    <br>Take rate — какую долю созданной агентствами ценности платформа монетизирует. Главный рычаг ценообразования.
+  </div>`;
+}
+
+/* ─────────────────────────── 12. Ручной срез ─────────────────────────── */
+window.ccSnapshot = async () => {
+  const SB = window.SB;
+  if(!SB){ say('Офлайн-режим: срез не сохранить'); return; }
+  keepRaw();
+  const d = new Date();
+  const period = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+  const rows = A_().map(a=>({
+    period, agency_id:a.id, plan:a.plan, status:a.status,
+    own_mrr: ownMrr(a), managed_mrr: managedMrr(a),
+    projects:N(a.projects), clients:N(a.clients), employees:N(a.employees),
+    active7: N(S.active7[a.id]),
+    last_seen_at: a.lastSeenTs ? new Date(a.lastSeenTs).toISOString() : null,
+    health: health(a).score, taken_at: new Date().toISOString()
+  }));
+  try{
+    const { error } = await SB.from('agency_snapshots').upsert(rows, { onConflict:'period,agency_id' });
+    if(error) throw error;
+    /* и собственную выручку — в общий снимок */
+    try{ await SB.from('platform_snapshots').update({ own_mrr: economics().own }).eq('period', period); }catch(_){}
+    say('Срез за '+period+' сохранён · '+rows.length+' агентств');
+    S.loaded=false; await loadExtra(true); renderPulse();
+  }catch(e){
+    say(/relation|does not exist|schema cache/i.test(e.message||'')
+      ? 'Нужна таблица agency_snapshots — примени 01_migrations.sql'
+      : 'Не удалось сохранить срез: '+(e.message||e));
+  }
+};
+/* Автосрез: раз в сутки, тихо */
+async function autoSnapshot(){
+  try{
+    const key='cc:lastSnap';
+    const last=+localStorage.getItem(key)||0;
+    if(Date.now()-last < D) return;
+    if(S.snapsState==='no_table') return;
+    localStorage.setItem(key, String(Date.now()));
+    const SB=window.SB; if(!SB || !A_().length) return;
+    keepRaw();
+    const d=new Date(), period=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+    const rows=A_().map(a=>({ period, agency_id:a.id, plan:a.plan, status:a.status,
+      own_mrr:ownMrr(a), managed_mrr:managedMrr(a), projects:N(a.projects), clients:N(a.clients),
+      employees:N(a.employees), active7:N(S.active7[a.id]),
+      last_seen_at:a.lastSeenTs?new Date(a.lastSeenTs).toISOString():null,
+      health:health(a).score, taken_at:new Date().toISOString() }));
+    await SB.from('agency_snapshots').upsert(rows,{onConflict:'period,agency_id'});
+  }catch(_){}
+}
+
+/* ─────────────────────────── 13. Агентства — операционный список ─────────────────────────── */
+const _renderGeneralOld = window.renderGeneral;
+window.renderGeneral = function(){
+  const host=document.getElementById('content'); if(!host) return;
+  if(typeof agEnrichMrr==='function') agEnrichMrr();
+  keepRaw(); _medPC=null;
+
+  const E=economics();
+  const rows=A_().map(a=>({a, h:health(a), own:ownMrr(a), u:utilization(a)}))
+                 .sort((x,y)=> (x.h.score-y.h.score) || (y.own-x.own));   // худшие сверху — там работа
+
+  host.innerHTML=`
+  <div class="ph">
+    <div><div class="eyebrow">Платформа · агентства</div><h1>Агентства на DETROYD</h1>
+      <div class="s">Отсортированы по Health: сверху те, кем нужно заняться. Клик по строке — карточка.</div></div>
+    <button class="btn-add" onclick="openAgency()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новое агентство</button>
+  </div>
+  <div class="kpis" style="grid-template-columns:repeat(6,1fr)">
+    <div class="kpi"><div class="l">Всего</div><div class="v num">${E.total}</div><div class="sub">${E.paying} платящих</div></div>
+    <div class="kpi"><div class="l">Выручка DETROYD</div><div class="v num" style="color:var(--accent)">${K(E.own)}<span class="u">сум/мес</span></div><div class="sub">наши деньги</div></div>
+    <div class="kpi"><div class="l">Под управлением</div><div class="v num">${K(E.managed)}<span class="u">сум/мес</span></div><div class="sub">деньги клиентов агентств</div></div>
+    <div class="kpi"><div class="l">Take rate</div><div class="v num">${E.takeRate===null?'—':E.takeRate.toFixed(1).replace('.',',')}<span class="u">%</span></div><div class="sub">монетизация</div></div>
+    <div class="kpi"><div class="l">Триал</div><div class="v num">${E.trial}</div><div class="sub">${staleTrials().length} просрочено</div></div>
+    <div class="kpi"><div class="l">Заморожено</div><div class="v num">${E.susp}</div><div class="sub">не приносят дохода</div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><div class="t">Все агентства <span class="c">${E.total}</span></div><div class="c">Health · тишина · лимит тарифа</div></div>
+    <table>
+      <thead><tr><th>Агентство</th><th>Health</th><th>Причина</th><th>Тариф</th><th>Статус</th><th>Проекты</th><th>Лимит</th><th>Выручка</th><th>Тишина</th><th></th></tr></thead>
+      <tbody>${rows.map(r=>{
+        const a=r.a, ds=r.h.ds;
+        return `<tr onclick="ccOpen('${a.id}')">
+          <td>${agCell(a)}</td>
+          <td>${healthCell(r.h)}</td>
+          <td>${r.h.reasons.slice(0,2).map(z=>`<span class="cc-rsn ${z.k}">${esc(z.t)}</span>`).join('')}</td>
+          <td><span class="plan">${esc(a.plan)}</span></td>
+          <td style="text-align:right">${typeof statusBadge==='function'?statusBadge(a.status):esc(a.status)}</td>
+          <td class="num">${N(a.projects)}</td>
+          <td>${r.u===null?'<span style="color:var(--txt-3)">∞</span>'
+            :`<div class="eff"><span style="color:${r.u>=1?'var(--neg)':r.u>=.8?'var(--warn)':'var(--txt-2)'}">${Math.round(r.u*100)}%</span>
+               <div class="bar"><i style="width:${Math.min(100,r.u*100)}%;background:${r.u>=1?'var(--neg)':r.u>=.8?'var(--warn)':'var(--accent)'}"></i></div></div>`}</td>
+          <td class="num" style="color:${r.own?'var(--accent)':'var(--txt-3)'}">${r.own?K(r.own):(ownUnknown(a)?'<span style="color:var(--warn)">по договору</span>':'—')}</td>
+          <td class="num" style="color:${ds===null||ds>14?'var(--neg)':ds>7?'var(--warn)':'var(--txt-3)'}">${ds===null?'—':Math.round(ds)+' дн'}</td>
+          <td onclick="event.stopPropagation()"><div class="t-actions">
+            <button class="act" title="Открыть" onclick="ccOpen('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="act" title="Редактировать" onclick="openAgency('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>
+            <button class="act del" title="Удалить" onclick="askDel('${a.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
+          </div></td></tr>`;
+      }).join('')}</tbody>
+    </table>
+  </div>`;
+};
+
+/* ─────────────────────────── 14. Аналитика — экономика без вранья ─────────────────────────── */
+window.renderAnalytics = function(){
+  const host=document.getElementById('content'); if(!host) return;
+  if(typeof agEnrichMrr==='function') agEnrichMrr();
+  keepRaw(); _medPC=null;
+
+  const E=economics(), B=bridge(), RET=retention(), CN=concentration(), U=upsell(), DS=downsell();
+  const A=A_();
+
+  /* выручка по тарифам — по СОБСТВЕННЫМ деньгам */
+  const pal=['#37E6C8','#8A8FFF','#43D88C','#6AA9FF','#E3B567','#F0785C'];
+  const byPlan={};
+  A.forEach(a=>{ const o=ownMrr(a); if(o>0) byPlan[a.plan]=(byPlan[a.plan]||0)+o; });
+  const plans=Object.entries(byPlan).map(([k,v],i)=>{
+    const t=T_().find(x=>x.key===k);
+    return {k, name:t?t.name:k, v, c:pal[i%pal.length]};
+  }).sort((x,y)=>y.v-x.v);
+  const pMax=Math.max(...plans.map(p=>p.v),1);
+
+  /* вертикали — тоже по нашим деньгам */
+  const verts={};
+  A.forEach(a=>{ const o=ownMrr(a); if(o>0) verts[a.vertical||'—']=(verts[a.vertical||'—']||0)+o; });
+  const vList=Object.entries(verts).sort((x,y)=>y[1]-x[1]);
+  const vMax=Math.max(...vList.map(v=>v[1]),1);
+
+  host.innerHTML=`
+  <div class="ph"><div><div class="eyebrow">Платформа · экономика</div><h1>Экономика платформы</h1></div>
+    <button class="btn-add" onclick="exportAgencies()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Экспорт</button></div>
+
+  <div class="cc-sub">
+    Здесь только собственные деньги DETROYD — сумма цен тарифов активных агентств.
+    <b>MRR под управлением</b> (${K(E.managed)} сум) — это выручка агентств от их клиентов, она не ваша и вынесена в take rate.
+    ${E.unknown?`<b style="color:var(--warn)">${E.unknown} агентств на тарифе «по договору» без суммы</b> — их выручка не учтена. Задайте <code>agencies.contract_mrr</code>.`:''}
+  </div>
+
+  <div class="cc-tiles" style="grid-template-columns:repeat(4,1fr)">
+    <div class="cc-tile gold mute"><div class="l">ARR ${TAG.fact}</div>
+      <div class="v num" style="color:var(--accent)">${K(E.arr)}<span class="u">сум</span></div>
+      <div class="s">${K(E.own)} сум/мес</div><div class="f">${E.paying} платящих агентств</div></div>
+    <div class="cc-tile mute"><div class="l">ARPA ${TAG.fact}</div>
+      <div class="v num">${K(E.arpa)}<span class="u">сум</span></div>
+      <div class="s">на платящее агентство</div><div class="f">${E.total?pctOf(E.paying,E.total):0}% базы платит</div></div>
+    <div class="cc-tile mute"><div class="l">Take rate ${TAG.fact}</div>
+      <div class="v num">${E.takeRate===null?'—':E.takeRate.toFixed(1).replace('.',',')}<span class="u">%</span></div>
+      <div class="s">от денег под управлением</div><div class="f">рычаг ценообразования</div></div>
+    <div class="cc-tile ${B.ok?'':'mute'}"><div class="l">Quick Ratio ${B.ok?TAG.fact:TAG.none}</div>
+      <div class="v num" style="color:${B.ok&&B.qr!==null?(B.qr>=4?'var(--pos)':B.qr>=1?'var(--warn)':'var(--neg)'):'var(--txt-3)'}">${B.ok?(B.qr===null?'∞':B.qr.toFixed(1)):'—'}</div>
+      <div class="s">${B.ok?'рост ÷ потери':'нужна история'}</div><div class="f">здоровый SaaS &gt; 4</div></div>
+  </div>
+
+  <div class="row2" style="margin-top:16px">
+    <div class="card"><div class="card-h"><div class="t">MRR-мост ${TAG.fact}</div><div class="c">${B.ok?B.prv+' → '+B.cur:'—'}</div></div>
+      <div class="card-body">${B.ok?waterfall(B):emptyBlock(B.why,'отток и расширение',B.have)}</div></div>
+    <div class="card"><div class="card-h"><div class="t">Удержание</div></div>
+      <div class="card-body">${RET.ok?retentionBlock(RET):emptyBlock(RET.why,'NRR и GRR',RET.have)}</div></div>
+  </div>
+
+  <div class="row2" style="margin-top:16px">
+    <div class="card"><div class="card-h"><div class="t">Наша выручка по тарифам ${TAG.fact}</div></div><div class="card-body">
+      ${plans.length?plans.map(p=>`<div style="margin-top:13px">
+        <div style="display:flex;justify-content:space-between;font-size:14px">
+          <span style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:2px;background:${p.c}"></span>${esc(p.name)}</span>
+          <span class="num">${money(p.v)}</span></div>
+        <div style="height:7px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:7px">
+          <div class="bf" style="width:${p.v/pMax*100}%;height:100%;background:${p.c};border-radius:4px"></div></div>
+      </div>`).join('')+`<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:13.5px">
+        <span style="color:var(--txt-3)">${esc(plans[0].name)} даёт</span>
+        <span class="num" style="color:var(--accent)">${pctOf(plans[0].v,E.own)}% выручки</span></div>`
+      :'<div class="cc-empty"><div class="ttl">Платящих агентств нет</div><div class="sub">Все на триале или заморожены.</div></div>'}
+    </div></div>
+    <div class="card"><div class="card-h"><div class="t">Концентрация ${TAG.fact}</div></div>
+      <div class="card-body">${concBlock(CN,E)}</div></div>
+  </div>
+
+  <div class="row2" style="margin-top:16px">
+    <div class="card"><div class="card-h"><div class="t">Наша выручка по вертикалям ${TAG.fact}</div></div><div class="card-body">
+      ${vList.length?vList.map(([v,m])=>`<div style="margin-top:13px">
+        <div style="display:flex;justify-content:space-between;font-size:14px"><span>${esc(v)}</span><span class="num">${money(m)}</span></div>
+        <div style="height:6px;background:var(--bg-3);border-radius:4px;overflow:hidden;margin-top:6px">
+          <div class="bf" style="width:${m/vMax*100}%;height:100%;background:var(--accent);border-radius:4px"></div></div>
+      </div>`).join(''):'<div class="cc-empty"><div class="ttl">Нет данных</div></div>'}
+    </div></div>
+    <div class="card"><div class="card-h"><div class="t">Ценовое давление ${TAG.fact}</div><div class="c">апсейл и переплата</div></div><div class="card-body">
+      <div class="cc-kv"><span class="k"><span class="cc-dot" style="background:var(--accent)"></span>Упёрлись в лимит (≥80%)</span>
+        <span class="vv" style="color:var(--accent)">${U.list.length} · +${K(U.total)} сум/мес${U.contractCnt?' + '+U.contractCnt+' догов.':''}</span></div>
+      <div class="cc-kv"><span class="k"><span class="cc-dot" style="background:var(--warn)"></span>Переплачивают (&lt;20% лимита)</span>
+        <span class="vv" style="color:var(--warn)">${DS.length} · ${K(DS.reduce((s,x)=>s+x.own,0))} сум/мес в риске</span></div>
+      <div class="cc-kv"><span class="k">Тариф «по договору» без суммы</span>
+        <span class="vv" style="color:${E.unknown?'var(--warn)':'var(--txt)'}">${E.unknown}</span></div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="cc-btn up" onclick="ccDrillUpsell()">Кандидаты на апгрейд</button>
+        <button class="cc-btn" onclick="ccDrillRisk()">Деньги под угрозой</button></div>
+      <div style="margin-top:12px;font-size:12px;color:var(--txt-3);line-height:1.5">
+        Апсейл — единственный рост, который не требует новых логотипов. Переплата — самый дешёвый способ потерять клиента при первом ревью бюджета.</div>
+    </div></div>
+  </div>`;
+};
+
+/* ─────────────────────────── 15. Роутер ─────────────────────────── */
+const TITLES = { pulse:'Пульс', agencies:'Агентства', analytics:'Экономика', tariffs:'Тарифы', settings:'Настройки' };
+
+function ensureNavItem(){
+  const nav=document.getElementById('nav-general'); if(!nav) return;
+  if(nav.querySelector('[data-gm="pulse"]')) return;
+  const el=document.createElement('div');
+  el.className='nav-i'; el.dataset.gm='pulse';
+  el.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Пульс';
+  el.onclick=()=>window.genNav('pulse');
+  nav.insertBefore(el, nav.querySelector('.nav-i'));
+}
+
+window.genNav = async function(m){
+  ensureNavItem();
+  document.querySelectorAll('#nav-general .nav-i').forEach(n=>n.classList.toggle('on', n.dataset.gm===m));
+  const tb=document.getElementById('tb-title'); if(tb) tb.textContent = TITLES[m]||'Пульс';
+  const ct=document.getElementById('nav-ag-ct'); if(ct) ct.textContent = A_().length;
+
+  if(m==='tariffs'){ renderTariffs(); return; }
+  if(m==='settings'){ renderSettings(); return; }
+
+  await loadExtra();               // догрузка активности/истории — один раз
+  autoSnapshot();                  // тихий срез раз в сутки
+
+  if(m==='analytics') window.renderAnalytics();
+  else if(m==='agencies') window.renderGeneral();
+  else renderPulse();
+};
+window.goGeneral = () => window.genNav('pulse');       // приземляемся на Пульс, а не на список
+window.renderPulse = renderPulse;
+window.CC = { economics, health, risk, upsell, bridge, retention, concentration, portfolio, ownMrr, managedMrr, S };
+
+ensureNavItem();
+})();
+
 </script>
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
