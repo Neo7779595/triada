@@ -22287,7 +22287,7 @@ window._kpi3ShellHTML = () => `
     .kpi3-tab-cnt:empty{display:none}
     .kpi3-tab-actions{display:flex;gap:8px;align-items:center}
     /* Panels */
-    .kpi3-panel{animation:kpi3PanelIn .22s var(--ease-out)}
+    .kpi3-panel{transition:opacity .12s ease;animation:kpi3PanelIn .22s var(--ease-out)}
     @keyframes kpi3PanelIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
     .kpi3-panel-h{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
     .kpi3-panel-h-t{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--txt-3);font-weight:700}
@@ -22616,26 +22616,56 @@ window._kpi3ShellHTML = () => `
 window._kpi3FillTopbar = () => { /* убрано — окно данных и кнопка «Период ▾» больше не показываются, период создаётся автоматически из даты цели */ };
 
 window._kpi3SwitchCategory = async (cat) => {
+  const wasCat = _kpi3.category;
   _kpi3.category = cat;
   _kpi3.selectedRowId = null;
   if (!_kpi3.goalFilter) _kpi3.goalFilter = { search: '', status: 'all', sort: 'progress', density: 'auto', groupBy: 'none' };
   _kpi3.tab = _kpi3.tab || 'overview';
-  _kpi3SwitchTab(_kpi3.tab);     // при смене категории — сброс на «Все»
   _kpi3.expandedGoalId = null;
+  // ── SYNC-фаза: мгновенный визуальный отклик ──
   document.querySelectorAll('.kpi3-cat').forEach(t => t.classList.toggle('on', t.dataset.cat === cat));
   ['member','team','project'].forEach(c => {
     const el = document.getElementById('kpi3-cnt-' + c);
     if (el) el.textContent = _kpiScopeRows(c).length;
   });
+  _kpi3SwitchTab(_kpi3.tab);
   _kpi3FillRowsNav();
   _kpi3UpdatePaSub();
   _kpi3UpdateClearBtn();
+  // ── ASYNC-фаза: fill'ы используют кеш если он уже прогрет префетчем ──
   await Promise.all([
     _kpi3FillPointA(),
     _kpi3FillGoals(),
     _kpi3FillStats(),
     _kpi3FillTeamBreakdown(),
   ]);
+  // ── PREFETCH: остальные категории в фоне (не блокируя) ──
+  _kpi3PrefetchOtherCategories(cat);
+};
+
+// Префетч данных других категорий в фоне. Не блокирует UI.
+// После prefetch переключение на другую категорию будет мгновенным (кеш hit).
+window._kpi3PrefetchOtherCategories = (currentCat) => {
+  if (_kpi3._prefetching) return; // уже идёт префетч
+  _kpi3._prefetching = true;
+  const win = _kpi3ResolveWindow();
+  const from = win.from, to = win.to;
+  const others = ['member','team','project'].filter(c => c !== currentCat);
+  const jobs = [];
+  others.forEach(cat => {
+    const rows = _kpiScopeRows(cat);
+    rows.forEach(r => {
+      const key = `${cat}|${r.id}`;
+      if (_kpi3.rowVals[key]) return; // уже в кеше
+      jobs.push(
+        kpiComputeAll(cat, r.id, from, to)
+          .then(rv => { _kpi3.rowVals[key] = rv; })
+          .catch(() => {})
+      );
+    });
+  });
+  // Ждём всё, но не блокируем — вызывающий не await'ит
+  Promise.all(jobs).finally(() => { _kpi3._prefetching = false; });
 };
 
 window._kpi3UpdatePaSub = () => {
@@ -22806,9 +22836,16 @@ window._kpi3FillPointA = async () => {
     return;
   }
 
-  // Агрегат по всем
-  const rowVals = await Promise.all(rows.map(r => kpiComputeAll(cat, r.id, from, to).catch(() => ({}))));
-  rows.forEach((r, i) => { _kpi3.rowVals[`${cat}|${r.id}`] = rowVals[i]; });
+  // Агрегат по всем — если все rowVals в кеше, работаем sync (мгновенно)
+  const missing = rows.filter(r => !_kpi3.rowVals[`${cat}|${r.id}`]);
+  let rowVals;
+  if (missing.length === 0) {
+    rowVals = rows.map(r => _kpi3.rowVals[`${cat}|${r.id}`]);
+  } else {
+    const fetched = await Promise.all(missing.map(r => kpiComputeAll(cat, r.id, from, to).catch(() => ({}))));
+    missing.forEach((r, i) => { _kpi3.rowVals[`${cat}|${r.id}`] = fetched[i]; });
+    rowVals = rows.map(r => _kpi3.rowVals[`${cat}|${r.id}`]);
+  }
   const relByMetric = {};
   _kpi3MetricsFor(cat).forEach(k => {
     const vals = rowVals.map(rv => _kpi3ExtractVal(rv && rv[k])).filter(v => v != null && !Number.isNaN(v));
