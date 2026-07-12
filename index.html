@@ -17882,6 +17882,380 @@ window.CC = { economics, health, risk, upsell, bridge, retention, concentration,
 ensureNavItem();
 })();
 
+
+
+/* ═══════════ DETROYD · ПЛАТЕЖИ (Telegram-бот) ═══════════ */
+/* ══════════════════════════════════════════════════════════════════════════════
+   DETROYD · ПЛАТЕЖИ — фронт
+   1) Экран «Задайте пароль» по одноразовой ссылке из Telegram (#invite=TOKEN)
+   2) Раздел «Платежи» в генеральном кабинете: очередь модерации + реквизиты
+
+   Вставляется в конец первого script-блока (после блока командного центра).
+   Только добавляет — существующий код не трогает.
+   ══════════════════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+const CSS = `
+.iv-ov{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);padding:20px}
+.iv-card{width:100%;max-width:420px;background:var(--bg-1);border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:30px 28px;box-shadow:var(--sh-lg)}
+.iv-card h2{font-size:20px;font-weight:600;letter-spacing:-.01em;margin:0 0 6px}
+.iv-card .sub{font-size:13.5px;color:var(--txt-3);line-height:1.55;margin-bottom:22px}
+.iv-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;
+  border-bottom:1px solid var(--line);font-size:13.5px}
+.iv-row .k{color:var(--txt-3)}
+.iv-row .v{font-family:var(--mono);color:var(--txt)}
+.iv-fld{margin-top:16px}
+.iv-fld label{display:block;font-size:12px;color:var(--txt-3);margin-bottom:6px}
+.iv-fld input{width:100%;background:var(--bg-2);border:1px solid var(--line-2);border-radius:var(--r-sm);
+  padding:11px 12px;color:var(--txt);font-family:inherit;font-size:14px;outline:none}
+.iv-fld input:focus{border-color:var(--accent-line)}
+.iv-btn{width:100%;margin-top:18px;padding:12px;border:0;border-radius:var(--r-sm);cursor:pointer;
+  background:var(--accent);color:var(--accent-ink);font-family:inherit;font-weight:700;font-size:14.5px}
+.iv-btn:disabled{opacity:.5;cursor:default}
+.iv-err{margin-top:12px;font-size:13px;color:var(--neg);line-height:1.5}
+.iv-ok{text-align:center}
+.iv-ok .big{font-size:44px;color:var(--pos);line-height:1}
+
+.pay-chk{display:inline-flex;gap:4px;font-family:var(--mono);font-size:12px}
+.pay-chk i{font-style:normal;padding:1px 5px;border-radius:4px}
+.pay-chk i.y{background:var(--pos-dim);color:var(--pos)}
+.pay-chk i.n{background:var(--neg-dim);color:var(--neg)}
+.pay-amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pay-amt b{color:var(--accent)}
+.pay-amt s{color:var(--neg);text-decoration:none}
+`;
+if(!document.getElementById('pay-css')){ const s=document.createElement('style'); s.id='pay-css'; s.textContent=CSS; document.head.appendChild(s); }
+
+const esc = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const M   = n => Number(Math.round(n)||0).toLocaleString('ru-RU').replace(/,/g,'\u202F');
+const say = m => (typeof toast==='function' ? toast(m) : alert(m));
+
+/* ждём, пока module-слой поднимет Supabase */
+function whenSB(cb, tries){
+  tries = tries||60;
+  if(window.SB) return cb(window.SB);
+  if(tries<=0)  return cb(null);
+  setTimeout(()=>whenSB(cb, tries-1), 100);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   1. ЭКРАН УСТАНОВКИ ПАРОЛЯ  —  https://detroyd.com/#invite=TOKEN
+   Ссылка одноразовая и живёт 24 часа. Пароль клиент придумывает сам,
+   поэтому он нигде не «оседает» — ни в чате, ни у нас.
+   ═══════════════════════════════════════════════════════════════════ */
+function inviteFlow(token){
+  const ov = document.createElement('div');
+  ov.className = 'iv-ov';
+  ov.innerHTML = `<div class="iv-card" id="iv-card">
+    <h2>Проверяем ссылку…</h2>
+    <div class="sub">Секунду.</div>
+  </div>`;
+  document.body.appendChild(ov);
+  const card = () => document.getElementById('iv-card');
+
+  const fail = msg => { card().innerHTML =
+    `<h2>Ссылка недействительна</h2>
+     <div class="sub">${esc(msg)}</div>
+     <div class="sub">Попросите новую ссылку в Telegram-боте — команда /start.</div>`; };
+
+  whenSB(async SB => {
+    if(!SB) return fail('Не удалось связаться с сервером.');
+
+    let r;
+    try{
+      const { data, error } = await SB.functions.invoke('redeem-invite', { body:{ token, action:'check' } });
+      r = error ? { ok:false, error:(error.message||'ошибка') } : data;
+    }catch(e){ return fail('Не удалось связаться с сервером.'); }
+
+    if(!r || !r.ok) return fail(r && r.error ? r.error : 'Ссылка не найдена.');
+
+    card().innerHTML = `
+      <h2>Добро пожаловать</h2>
+      <div class="sub">Кабинет агентства <b style="color:var(--txt)">${esc(r.agency||'')}</b> создан.
+        Осталось придумать пароль — и можно работать.</div>
+      <div class="iv-row"><span class="k">Логин</span><span class="v">${esc(r.login||'')}</span></div>
+      <div class="iv-fld"><label>Пароль (минимум 8 символов)</label>
+        <input type="password" id="iv-p1" autocomplete="new-password" placeholder="••••••••"></div>
+      <div class="iv-fld"><label>Повторите пароль</label>
+        <input type="password" id="iv-p2" autocomplete="new-password" placeholder="••••••••"></div>
+      <button class="iv-btn" id="iv-go">Задать пароль и войти</button>
+      <div class="iv-err" id="iv-err" style="display:none"></div>`;
+
+    const err = m => { const e=document.getElementById('iv-err'); e.style.display='block'; e.textContent=m; };
+    const go  = document.getElementById('iv-go');
+
+    go.onclick = async () => {
+      const p1 = document.getElementById('iv-p1').value;
+      const p2 = document.getElementById('iv-p2').value;
+      if(p1.length < 8)  return err('Пароль слишком короткий — нужно минимум 8 символов.');
+      if(p1 !== p2)      return err('Пароли не совпадают.');
+
+      go.disabled = true; go.textContent = 'Сохраняем…';
+      try{
+        const { data, error } = await SB.functions.invoke('redeem-invite', { body:{ token, password:p1 } });
+        const res = error ? { ok:false, error:(error.message||'ошибка') } : data;
+        if(!res || !res.ok){ go.disabled=false; go.textContent='Задать пароль и войти'; return err(res && res.error ? res.error : 'Не удалось.'); }
+
+        card().innerHTML = `<div class="iv-ok">
+          <div class="big">✓</div>
+          <h2 style="margin-top:14px">Пароль установлен</h2>
+          <div class="sub">Входим в кабинет…</div></div>`;
+
+        /* сразу авторизуем — клиенту не нужно ничего вводить второй раз */
+        const email = res.login + '@' + (res.slug || res.login) + '.triada.app';
+        try{ await SB.auth.signInWithPassword({ email, password:p1 }); }catch(_){}
+        history.replaceState(null, '', location.pathname);
+        setTimeout(()=>location.reload(), 900);
+      }catch(e){
+        go.disabled=false; go.textContent='Задать пароль и войти';
+        err('Ошибка сети. Попробуйте ещё раз.');
+      }
+    };
+    document.getElementById('iv-p2').addEventListener('keydown', e => { if(e.key==='Enter') go.click(); });
+    document.getElementById('iv-p1').focus();
+  });
+}
+
+/* перехватываем ссылку до всего остального */
+(function(){
+  const m = String(location.hash||'').match(/invite=([A-Za-z0-9]{20,})/);
+  if(!m) return;
+  const run = () => inviteFlow(m[1]);
+  if(document.body) run(); else document.addEventListener('DOMContentLoaded', run);
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   2. РАЗДЕЛ «ПЛАТЕЖИ» В ГЕНЕРАЛЬНОМ КАБИНЕТЕ
+   ═══════════════════════════════════════════════════════════════════ */
+const P = { orders:[], receipts:{}, loaded:false };
+
+async function loadPay(){
+  const SB = window.SB; if(!SB) return;
+  try{
+    const { data:o } = await SB.from('orders').select('*').order('created_at',{ascending:false}).limit(100);
+    P.orders = o || [];
+    const ids = P.orders.map(x=>x.id);
+    if(ids.length){
+      const { data:r } = await SB.from('payment_receipts').select('*').in('order_id', ids).order('created_at',{ascending:false});
+      P.receipts = {};
+      (r||[]).forEach(x=>{ if(!P.receipts[x.order_id]) P.receipts[x.order_id]=x; });   // последний чек по заказу
+    }
+    P.loaded = true;
+  }catch(e){ P.orders=[]; P.loaded='error'; }
+}
+
+window.payConfirm = async (id) => {
+  const o = P.orders.find(x=>x.id===id); if(!o) return;
+  if(!confirm(`Подтвердить платёж «${o.ag_name}» на ${M(o.amount)} сум?\n\nАгентство будет создано, клиенту уйдёт ссылка на пароль.`)) return;
+  try{
+    const { data, error } = await window.SB.functions.invoke('tg-pay', { body:{ task:'confirm', order_id:id } });
+    if(error || (data && data.ok===false)) throw new Error((error&&error.message) || (data&&data.error) || 'ошибка');
+    say('Подтверждено — кабинет создан, ссылка отправлена');
+    P.loaded=false; await loadPay(); renderPayments();
+  }catch(e){ say('Не удалось: '+(e.message||e)); }
+};
+window.payReject = async (id) => {
+  const o = P.orders.find(x=>x.id===id); if(!o) return;
+  if(!confirm(`Отклонить платёж «${o.ag_name}»?`)) return;
+  try{
+    const { error } = await window.SB.functions.invoke('tg-pay', { body:{ task:'reject', order_id:id } });
+    if(error) throw error;
+    say('Отклонено');
+    P.loaded=false; await loadPay(); renderPayments();
+  }catch(e){ say('Не удалось: '+(e.message||e)); }
+};
+window.paySaveReq = async () => {
+  const g = id => { const e=document.getElementById(id); return e ? e.value.trim() : ''; };
+  const patch = {
+    pay_card:       g('pr-card'),
+    pay_holder:     g('pr-holder'),
+    pay_admin_chat: g('pr-admin'),
+    pay_host:       g('pr-host') || location.origin
+  };
+  if(window.tSavePlatformSettings){
+    const ok = await window.tSavePlatformSettings(patch);
+    if(ok) say('Реквизиты сохранены');
+  }
+};
+
+const ST = {
+  pending:     ['Ждёт оплаты',   'var(--txt-3)'],
+  receipt:     ['На проверке',   'var(--warn)'],
+  paid:        ['Оплачен',       'var(--pos)'],
+  provisioned: ['Кабинет создан','var(--accent)'],
+  expired:     ['Истёк',         'var(--txt-3)'],
+  rejected:    ['Отклонён',      'var(--neg)']
+};
+
+function checksCell(rc){
+  if(!rc || !rc.checks) return '<span style="color:var(--txt-3)">—</span>';
+  const c = rc.checks;
+  const L = [['amount','сум'],['receipt','чек'],['card','карта'],['fresh','время'],['duplicate','дубль']];
+  return `<span class="pay-chk">${L.map(([k,l])=>{
+    const v = k==='duplicate' ? !c[k] : !!c[k];
+    return `<i class="${v?'y':'n'}">${l}</i>`;
+  }).join('')}</span>`;
+}
+
+function renderPayments(){
+  const host = document.getElementById('content'); if(!host) return;
+
+  const queue = P.orders.filter(o=>o.status==='receipt');
+  const done  = P.orders.filter(o=>o.status==='provisioned');
+  const month = done.filter(o=>{
+    const d=new Date(o.confirmed_at||o.created_at);
+    return d.getMonth()===new Date().getMonth() && d.getFullYear()===new Date().getFullYear();
+  });
+  const revenue = month.reduce((s,o)=>s+Number(o.base_amount||0),0);
+  const waiting = P.orders.filter(o=>o.status==='pending').length;
+
+  const S = window.PLATFORM_SETTINGS || {};
+
+  host.innerHTML = `
+  <div class="ph">
+    <div><div class="eyebrow">Платформа · платежи</div><h1>Платежи</h1>
+      <div class="s">Оплата приходит через Telegram-бот. Сумма каждого заказа уникальна — по ней платёж и опознаётся.</div></div>
+  </div>
+
+  <div class="cc-tiles" style="grid-template-columns:repeat(4,1fr)">
+    <div class="cc-tile ${queue.length?'alarm':'mute'}" ${queue.length?'onclick="document.getElementById(\'pay-queue\').scrollIntoView({behavior:\'smooth\'})"':''}>
+      <div class="l"><span class="cc-dot" style="background:${queue.length?'var(--warn)':'var(--txt-3)'}"></span>Ждут проверки</div>
+      <div class="v num" style="color:${queue.length?'var(--warn)':'var(--txt-3)'}">${queue.length}</div>
+      <div class="s">${queue.length?'нужно подтвердить':'всё разобрано'}</div>
+      <div class="f">${waiting} ждут оплаты</div>
+    </div>
+    <div class="cc-tile gold mute">
+      <div class="l">Оплачено в этом месяце</div>
+      <div class="v num" style="color:var(--accent)">${M(revenue)}<span class="u">сум</span></div>
+      <div class="s">${month.length} подписок</div>
+      <div class="f">за всё время: ${done.length}</div>
+    </div>
+    <div class="cc-tile mute">
+      <div class="l">Всего заказов</div>
+      <div class="v num">${P.orders.length}</div>
+      <div class="s">за последние 100</div>
+      <div class="f">${P.orders.filter(o=>o.status==='rejected').length} отклонено</div>
+    </div>
+    <div class="cc-tile mute">
+      <div class="l">Реквизиты</div>
+      <div class="v num" style="font-size:19px;color:${S.pay_card?'var(--pos)':'var(--neg)'}">${S.pay_card?'заданы':'не заданы'}</div>
+      <div class="s">${S.pay_card?esc(String(S.pay_card)):'бот не сможет выставить счёт'}</div>
+      <div class="f">${S.pay_admin_chat?'модерация настроена':'нет админ-чата'}</div>
+    </div>
+  </div>
+
+  <div class="card" id="pay-queue" style="margin-top:16px">
+    <div class="card-h"><div class="t">На проверке</div><div class="c">${queue.length} платежей</div></div>
+    ${queue.length ? `<table>
+      <thead><tr><th>Агентство</th><th>Тариф</th><th>Ожидали</th><th>В чеке</th><th>Проверки</th><th>Чек №</th><th></th></tr></thead>
+      <tbody>${queue.map(o=>{
+        const rc = P.receipts[o.id];
+        const got = rc && rc.amount != null ? Number(rc.amount) : null;
+        const same = got != null && Math.abs(got - Number(o.amount)) < 1;
+        return `<tr>
+          <td><div class="ag-name"><span class="ag-dot" style="background:var(--accent)"></span>
+            <div><div class="nm">${esc(o.ag_name)}</div><div class="sl">${esc(o.ag_slug)} · ${esc(o.owner_name||'')} · ${esc(o.owner_phone||'')}</div></div></div></td>
+          <td>${esc(o.tariff_name||o.tariff_key)}</td>
+          <td class="pay-amt"><b>${M(o.amount)}</b></td>
+          <td class="pay-amt">${got==null?'—':(same?M(got):`<s>${M(got)}</s>`)}</td>
+          <td>${checksCell(rc)}</td>
+          <td style="font-family:var(--mono);font-size:12px;color:var(--txt-3)">${esc((rc&&rc.receipt_no)||'—')}</td>
+          <td onclick="event.stopPropagation()"><div class="cc-acts">
+            <button class="cc-btn up" onclick="payConfirm('${o.id}')">Подтвердить</button>
+            <button class="cc-btn dn" onclick="payReject('${o.id}')">Отклонить</button>
+          </div></td>
+        </tr>`;
+      }).join('')}</tbody></table>
+      <div style="padding:11px 16px;font-size:12px;color:var(--txt-3);border-top:1px solid var(--line)">
+        Перед подтверждением сверьте поступление в приложении банка. Скрин чека можно подделать — сумма и номер чека лишь помогают опознать платёж.
+      </div>`
+    : `<div class="cc-empty"><div class="ttl">Очередь пуста</div>
+        <div class="sub">Новые платежи появятся здесь, как только клиент пришлёт чек боту.</div></div>`}
+  </div>
+
+  <div class="row2" style="margin-top:16px">
+    <div class="card">
+      <div class="card-h"><div class="t">История</div><div class="c">последние 20</div></div>
+      ${P.orders.length ? `<table>
+        <thead><tr><th>Агентство</th><th>Сумма</th><th>Статус</th><th>Кто подтвердил</th><th>Дата</th></tr></thead>
+        <tbody>${P.orders.slice(0,20).map(o=>`<tr>
+          <td>${esc(o.ag_name||'—')}<div class="sl" style="font-size:11.5px;color:var(--txt-3)">${esc(o.ag_slug||'')}</div></td>
+          <td class="pay-amt">${M(o.amount)}</td>
+          <td><span style="color:${(ST[o.status]||['','var(--txt-3)'])[1]}">${(ST[o.status]||[o.status])[0]}</span></td>
+          <td style="color:var(--txt-3);font-size:12.5px">${o.confirmed_by==='bank'?'банк (авто)':o.confirmed_by==='manual'?'вручную':o.confirmed_by==='auto'?'авто':'—'}</td>
+          <td style="color:var(--txt-3);font-size:12.5px">${new Date(o.created_at).toLocaleDateString('ru-RU')}</td>
+        </tr>`).join('')}</tbody></table>`
+      : '<div class="cc-empty"><div class="ttl">Заказов пока нет</div></div>'}
+    </div>
+
+    <div class="card">
+      <div class="card-h"><div class="t">Реквизиты и бот</div></div>
+      <div class="card-body">
+        <div class="set-row"><div class="si"><div class="t">Карта для перевода</div>
+          <div class="d">Её бот показывает клиенту. Payme / Uzum</div></div>
+          <input class="set-inp" id="pr-card" style="width:190px" value="${esc(S.pay_card||'')}" placeholder="8600 1234 5678 9012"></div>
+        <div class="set-row"><div class="si"><div class="t">Получатель</div>
+          <div class="d">Имя на карте — чтобы клиент не ошибся</div></div>
+          <input class="set-inp" id="pr-holder" style="width:190px" value="${esc(S.pay_holder||'')}" placeholder="ISMOILOV A."></div>
+        <div class="set-row"><div class="si"><div class="t">Chat ID для модерации</div>
+          <div class="d">Куда бот шлёт чеки на подтверждение. Узнать: @userinfobot</div></div>
+          <input class="set-inp" id="pr-admin" style="width:190px" value="${esc(S.pay_admin_chat||'')}" placeholder="123456789"></div>
+        <div class="set-row"><div class="si"><div class="t">Адрес платформы</div>
+          <div class="d">Основа ссылки на установку пароля</div></div>
+          <input class="set-inp" id="pr-host" style="width:190px" value="${esc(S.pay_host||location.origin)}" placeholder="https://detroyd.com"></div>
+        <button class="btn-add" style="margin-top:14px;width:100%" onclick="paySaveReq()">Сохранить реквизиты</button>
+        <div style="margin-top:12px;font-size:12px;color:var(--txt-3);line-height:1.5">
+          Пока карта не задана, бот не сможет выставить счёт. Без Chat ID вы не увидите платежи на подтверждение.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+window.renderPayments = renderPayments;
+
+/* ── пункт меню + роутер ── */
+function addNav(){
+  const nav = document.getElementById('nav-general'); if(!nav) return;
+  if(nav.querySelector('[data-gm="payments"]')) return;
+  const el = document.createElement('div');
+  el.className = 'nav-i'; el.dataset.gm = 'payments';
+  el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>Платежи <span class="ct" id="nav-pay-ct">0</span>';
+  el.onclick = () => window.genNav('payments');
+  const tariffs = nav.querySelector('[data-gm="tariffs"]');
+  nav.insertBefore(el, tariffs || null);
+}
+
+const _genNavPrev = window.genNav;
+window.genNav = async function(m){
+  addNav();
+  if(m === 'payments'){
+    document.querySelectorAll('#nav-general .nav-i').forEach(n=>n.classList.toggle('on', n.dataset.gm==='payments'));
+    const tb = document.getElementById('tb-title'); if(tb) tb.textContent = 'Платежи';
+    if(!P.loaded) { document.getElementById('content').innerHTML = '<div class="cc-empty"><div class="ttl">Загружаем платежи…</div></div>'; await loadPay(); }
+    renderPayments();
+    badge();
+    return;
+  }
+  await _genNavPrev(m);
+  addNav();
+  badge();
+};
+
+/* счётчик «ждут проверки» в меню — чтобы не пропустить платёж */
+async function badge(){
+  if(!P.loaded) await loadPay();
+  const n = P.orders.filter(o=>o.status==='receipt').length;
+  const b = document.getElementById('nav-pay-ct');
+  if(b){ b.textContent = n; b.style.background = n?'var(--warn-dim)':'var(--bg-3)'; b.style.color = n?'var(--warn)':'var(--txt-2)'; }
+}
+
+addNav();
+})();
+
 </script>
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
