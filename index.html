@@ -18258,7 +18258,7 @@ window._kpiFetchOpsRaw = async (fromISO, toISO) => {
   if(!SB || !ME) return null;
   const key = `${ME.agency_id}|${fromISO}|${toISO}`;
   const now = Date.now();
-  if (_kpiOpsRawCache.key === key && (now - _kpiOpsRawCache.ts) < 120000) return _kpiOpsRawCache.data;
+  if (_kpiOpsRawCache.key === key && (now - _kpiOpsRawCache.ts) < 300000) return _kpiOpsRawCache.data;
   const [tr, thr, hr] = await Promise.all([
     SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,created_at,time_spent,difficulty,priority'),
     SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at').gte('created_at', fromISO).lte('created_at', toISO),
@@ -18471,7 +18471,7 @@ window._kpiFetchSmmRaw = async (fromISO, toISO) => {
   if(!SB || !ME) return null;
   const key = `${ME.agency_id}|${fromISO}|${toISO}`;
   const now = Date.now();
-  if (_kpiSmmRawCache.key === key && (now - _kpiSmmRawCache.ts) < 120000) return _kpiSmmRawCache.data;
+  if (_kpiSmmRawCache.key === key && (now - _kpiSmmRawCache.ts) < 300000) return _kpiSmmRawCache.data;
   // Все SMM-отчёты периода. Проектов агентства без RLS фильтровать не надо (RLS отсечёт).
   const { data, error } = await SB.from('reports').select('id,project_id,published_at,payload')
     .eq('kind','SMM').gte('published_at', fromISO).lte('published_at', toISO)
@@ -22446,6 +22446,12 @@ window._kpi3ShellHTML = () => `
         .kpi3-empty{padding:28px;text-align:center;color:var(--txt-3);font-size:13.5px;line-height:1.6;display:flex;flex-direction:column;align-items:center;gap:12px}
     .kpi3-empty b{color:var(--txt-1);font-weight:700}
     .kpi3-loading{padding:20px;text-align:center;color:var(--txt-3);font-size:12.5px}
+        /* Обновляем без skeleton flash: тонкий индикатор + слегка приглушённое содержимое */
+        .kpi3-refreshing{position:relative;transition:opacity .18s ease}
+        .kpi3-refreshing::after{content:'обновляем…';position:absolute;top:-2px;right:0;font-size:10px;font-family:var(--mono);color:var(--txt-3);letter-spacing:.08em;background:rgba(0,0,0,.4);padding:3px 8px;border-radius:5px;pointer-events:none;animation:kpi3RefFade .3s ease-out;z-index:5}
+        @keyframes kpi3RefFade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+        /* Плавное появление контента после обновления */
+        .kpi3-goal, .kpi3-tile, .kpi3-stat, .kpi3-team-b-row{transition:opacity .18s ease, transform .18s ease}
     .kpi3-skel{display:inline-block;background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.08),rgba(255,255,255,.04));background-size:300% 100%;animation:kpi3Skel 1.4s ease infinite;border-radius:4px}
     @keyframes kpi3Skel{0%{background-position:100% 50%}100%{background-position:-100% 50%}}
     .kpi3-scrim{position:fixed;inset:0;background:rgba(6,20,15,.72);backdrop-filter:blur(8px);z-index:9990;display:flex;align-items:center;justify-content:center;padding:24px;animation:kpi3FadeIn .18s var(--ease-out)}
@@ -22775,7 +22781,7 @@ window._kpi3FillPointA = async () => {
     target.innerHTML = `<div class="kpi3-empty">В категории <b>${_kpi3CatLabelOne(cat).toLowerCase()}</b> нет данных.<br/>${cat==='team' ? 'Добавьте команды в модуле «Команды»' : cat==='project' ? 'Добавьте проекты в модуле «Проекты»' : 'Добавьте сотрудников в модуле «Команда»'}.</div>`;
     return;
   }
-  target.innerHTML = _kpi3TilesSkeleton(cat);
+  if (!target.querySelector('.kpi3-tiles')) target.innerHTML = _kpi3TilesSkeleton(cat); else target.classList.add('kpi3-refreshing');
   const win = _kpi3ResolveWindow();
   const to = win.to;
   const from = win.from;
@@ -22918,7 +22924,7 @@ window._kpi3FillTeamBreakdown = async () => {
     return;
   }
   section.style.display = '';
-  wrap.innerHTML = '<div class="kpi3-loading">Считаем метрики по проектам команды…</div>';
+  if (!wrap.querySelector('.kpi3-tiles, .kpi3-team-b-row')) wrap.innerHTML = '<div class="kpi3-loading">Считаем метрики по проектам команды…</div>'; else wrap.classList.add('kpi3-refreshing');
   const teamId = _kpi3.selectedRowId;
   const pids = await _kpiSmmScopeProjects('team', teamId);
   if (!pids.length) {
@@ -23036,7 +23042,11 @@ window._kpi3DDClose = (id) => {
 
 window._kpi3FillGoals = async () => {
   const target = document.getElementById('kpi3-goals'); if(!target) return;
-  target.innerHTML = '<div class="kpi3-loading">Загружаем цели…</div>';
+  // Skeleton — ТОЛЬКО при первом рендере (пустой контейнер). При обновлении оставляем старый контент,
+  // подмешиваем тонкий индикатор «обновляем» справа сверху — чтобы не моргало.
+  const hasContent = target.querySelector('.kpi3-goals-list, .kpi3-goals-toolbar, .kpi3-goal');
+  if (!hasContent) target.innerHTML = '<div class="kpi3-loading">Загружаем цели…</div>';
+  else target.classList.add('kpi3-refreshing');
   const allGoals = await _kpi3FetchAllTargetsForScope(_kpi3.category);
   _kpi3.goals = allGoals;
   _kpi3UpdateClearBtn();
@@ -23193,10 +23203,10 @@ window._kpi3FillGoals = async () => {
     </div>
   `;
   if (!filtered.length) {
-    target.innerHTML = toolbarHTML + `<div class="kpi3-empty" style="margin-top:14px"><b>Ничего не нашли.</b><br/>Попробуйте изменить фильтр или очистить поиск.</div>`;
+    target.innerHTML = toolbarHTML + `<div class="kpi3-empty" style="margin-top:14px"><b>Ничего не нашли.</b><br/>Попробуйте изменить фильтр или очистить поиск.</div>`; target.classList.remove('kpi3-refreshing');
     return;
   }
-  target.innerHTML = toolbarHTML + groupsHTML;
+  target.innerHTML = toolbarHTML + groupsHTML; target.classList.remove('kpi3-refreshing');
   // Не потерять фокус поиска
   const inp = target.querySelector('.kpi3-goals-toolbar-search input');
   if (inp && document.activeElement !== inp && F.search) { inp.focus(); const n = inp.value.length; inp.setSelectionRange(n,n); }
@@ -23302,8 +23312,53 @@ window._kpi3GoalCardHTML = (g, row, density) => {
 };
 
 window._kpi3ToggleGoal = (gid) => {
-  _kpi3.expandedGoalId = _kpi3.expandedGoalId === gid ? null : gid;
-  _kpi3FillGoals();
+  const prevId = _kpi3.expandedGoalId;
+  const nextId = prevId === gid ? null : gid;
+  _kpi3.expandedGoalId = nextId;
+  // Мягкое локальное обновление — БЕЗ пересчёта всех целей и без skeleton flash.
+  // Схлопнем предыдущую, раскроем новую. Слушать в списке.
+  const list = document.getElementById('kpi3-goals'); if (!list) return;
+  const doCollapse = (id) => {
+    const card = list.querySelector('.kpi3-goal[data-gid="' + id + '"]');
+    if (!card) return;
+    card.classList.remove('expanded');
+    const rpm = card.querySelector('.kpi3-rpm'); if (rpm) rpm.remove();
+    const t = card.querySelector('.kpi3-goal-toggle'); if (t) t.textContent = '+';
+    const tt = card.querySelector('.kpi3-goal-toggle'); if (tt) tt.setAttribute('title', 'Раскрыть RPM');
+  };
+  const doExpand = (id) => {
+    const card = list.querySelector('.kpi3-goal[data-gid="' + id + '"]');
+    if (!card) return false;
+    const g = (_kpi3.goals || []).find(x => x.id === id); if (!g) return false;
+    const m = KPI_METRICS[g.metric_key]; if (!m) return false;
+    const target = Number(g.target || 0);
+    const cv = _kpi3.rowVals[`${_kpi3.category}|${g.scope_id}`];
+    const curV = cv ? _kpi3ExtractVal(cv[g.metric_key]) : null;
+    const rows = _kpiScopeRows(_kpi3.category);
+    const row = rows.find(r => r.id === g.scope_id);
+    const rowName = row ? row.name : '—';
+    const rawMap = g.action_plan;
+    const map = Array.isArray(rawMap) ? rawMap : (typeof rawMap === 'string' ? _kpi3TryParseJson(rawMap, []) : []);
+    card.classList.add('expanded');
+    // Вставляем RPM внутрь карточки
+    card.insertAdjacentHTML('beforeend', _kpi3RPMHTML(g, m, target, curV, rowName, map));
+    const t = card.querySelector('.kpi3-goal-toggle'); if (t) { t.textContent = '−'; t.setAttribute('title', 'Свернуть'); }
+    // Плавный scroll — если RPM ушёл за экран
+    setTimeout(() => {
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom > window.innerHeight - 40) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 250);
+    return true;
+  };
+  if (prevId && prevId !== nextId) doCollapse(prevId);
+  if (nextId) {
+    if (!doExpand(nextId)) {
+      // Не смогли локально (нет данных) — fallback на полный рендер
+      _kpi3FillGoals();
+    }
+  }
 };
 
 window._kpi3RPMHTML = (g, m, target, curV, rowName, map) => {
