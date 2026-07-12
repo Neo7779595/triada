@@ -19151,7 +19151,7 @@ window.kpiFingerprint = (kind, scopeKind, scopeId, metricKey) =>
 
 /* ═══ БД: периоды ═══ */
 window.kpiFetchPeriods = async (opts={}) => {
-  if(!SB || !ME) return [];
+  if(!SB || !ME || !ME.agency_id) return [];
   let q = SB.from('kpi_periods').select('*').eq('agency_id', ME.agency_id).order('start_date',{ascending:false});
   if (opts.status) q = q.eq('status', opts.status);
   if (opts.limit)  q = q.limit(opts.limit);
@@ -19227,7 +19227,7 @@ window.kpiFetchSnapshots = async (scopeKind, scopeId, metricKey, fromISO) => {
 
 /* ═══ БД: риски (RMP) ═══ */
 window.kpiFetchRisks = async (opts={}) => {
-  if(!SB || !ME) return [];
+  if(!SB || !ME || !ME.agency_id) return [];
   let q = SB.from('kpi_risks').select('*').eq('agency_id', ME.agency_id);
   if (opts.scope_kind) q = q.eq('scope_kind', opts.scope_kind);
   if (opts.scope_id)   q = q.eq('scope_id',   opts.scope_id);
@@ -19269,7 +19269,7 @@ window.kpiRaiseAlert = async (row) => {
   return data;
 };
 window.kpiFetchAlerts = async (opts={}) => {
-  if(!SB || !ME) return [];
+  if(!SB || !ME || !ME.agency_id) return [];      // без агентства запрос невалиден для PostgREST (400)
   let q = SB.from('kpi_alerts').select('*').eq('agency_id', ME.agency_id).is('resolved_at', null);
   if (opts.scope_kind) q = q.eq('scope_kind', opts.scope_kind);
   if (opts.scope_id)   q = q.eq('scope_id',   opts.scope_id);
@@ -19286,7 +19286,7 @@ window.kpiResolveAlert = async (id) => {
 
 /* ═══ БД: команды (формальная модель) ═══ */
 window.kpiFetchTeams = async () => {
-  if(!SB || !ME) return [];
+  if(!SB || !ME || !ME.agency_id) return [];
   const { data, error } = await SB.from('teams')
     .select('*, team_members(member_id, role_in_team, joined_at, left_at)')
     .eq('agency_id', ME.agency_id).is('archived_at', null).order('name');
@@ -19322,7 +19322,7 @@ window.kpiCan = (action, scopeKind, scopeId) => {
   );
 };
 window.kpiLoadMyPerms = async () => {
-  if(!SB || !ME) return;
+  if(!SB || !ME || !ME.agency_id) return;
   const { data, error } = await SB.from('kpi_permissions').select('*')
     .eq('agency_id', ME.agency_id).eq('member_id', ME.id);
   window.MY_KPI_PERMS = (error || !data) ? [] : data;
@@ -19868,7 +19868,7 @@ window.kpiComputeMRR = async (scopeKind, scopeId, fromISO, toISO) => {
 
 /* ── nrr: (mrr_end / mrr_start same-cohort) × 100 ── */
 window.kpiComputeNRR = async (scopeKind, scopeId, fromISO, toISO) => {
-  if(!SB || !ME) return {value:null,sample_size:0,confidence:null};
+  if(!SB || !ME || !ME.agency_id) return {value:null,sample_size:0,confidence:null};
   if (scopeKind !== 'agency' && scopeKind) return {value:null,sample_size:0,confidence:null};
   const { data } = await SB.from('fin_snapshots').select('period,mrr').eq('agency_id', ME.agency_id).order('period');
   const rows = (data||[]).filter(r => r.period && r.mrr!=null);
@@ -22359,7 +22359,7 @@ window.kpiComputeSmmScore = async (scopeKind, scopeId, fromISO, toISO) => {
 window._kpiAlertsCache = { ts:0, count:0, critical:0 };
 
 window._kpiRefreshNavBadge = async () => {
-  if (!SB || !ME) return;
+  if (!SB || !ME || !ME.agency_id) return;        // у суперадмина нет агентства — KPI-бейдж к нему не относится
   const now = Date.now();
   // Кэш 2 минуты
   if (_kpiAlertsCache.ts && now - _kpiAlertsCache.ts < 120000) { _kpiApplyNavBadge(); return; }
