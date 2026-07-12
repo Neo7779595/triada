@@ -17416,27 +17416,12 @@ window.tTaskMove = async (id,status) => { if(String(id).indexOf('tmp_')===0){ to
       patch.timer_started=(status==='active')?now:null;       // рабочий таймер — только в «В работе»
       patch.review_started=(status==='review')?now:null;      // таймер утверждения — только в «На утверждении»
       t.status=status; t.time_spent=spent; t.review_spent=rspent; t.timer_started=patch.timer_started; t.review_started=patch.review_started; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }
-    // Определяем: если не agency_owner — сразу RPC чтобы не ловить 403
-    const _skipDirect = (window.ME && ME.role && ME.role !== 'agency_owner' && ME.role !== 'superadmin');
-    let error;
-    if (_skipDirect) {
-      const rc = await SB.rpc('update_project_task', { task_id: id, patch });
-      error = rc.error;
-    } else {
-      const r1 = await SB.from('project_tasks').update(patch).eq('id',id);
-      error = r1.error;
-      if(error && /review_/.test(error.message||'')){
-        const {error:e2}=await SB.from('project_tasks').update({status:patch.status,time_spent:patch.time_spent,timer_started:patch.timer_started}).eq('id',id);
-        if(e2) throw e2; error=null; toast('Перенос выполнен. Таймер утверждения отключён — примените SQL-миграцию 08');
-      }
+    // Всегда через SECURITY DEFINER RPC — обходит RLS, работает для всех ролей.
+    const rc = await SB.rpc('update_project_task', { task_id: id, patch });
+    if (rc.error) {
+      console.error('update_project_task rpc error:', rc.error);
+      throw new Error(rc.error.message || 'Не удалось изменить задачу');
     }
-    // RLS-fallback: если 403 при прямом UPDATE — идём через RPC
-    if(error && /row-level security|violates row-level|403|forbidden/i.test((error.message||error.code||''))){
-      const rc = await SB.rpc('update_project_task', { task_id: id, patch });
-      if (rc.error) throw new Error('Нет прав на изменение задачи: '+(rc.error.message||''));
-      error = null;
-    }
-    if(error)throw error;
     if(_wlog) _logWork(_wlog);
     if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); }   // запись подтверждена — держим локальное состояние; реалтайм-эхо не перезагружаем (без гонки)
   } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
@@ -17446,21 +17431,11 @@ window.tTaskDel = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('С�
   if(_t){ _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>(x._tasks||[]).indexOf(_t)>=0)||null;
     if(_p){ _ix=_p._tasks.indexOf(_t); _p._tasks.splice(_ix,1); window._localTaskWriteTs=Date.now(); _pkRerender(); } }
   try {
-    const _skipDirect = (window.ME && ME.role && ME.role !== 'agency_owner' && ME.role !== 'superadmin');
-    let error;
-    if (_skipDirect) {
-      const rc = await SB.rpc('delete_project_task', { task_id: id });
-      error = rc.error;
-    } else {
-      const r1 = await SB.from('project_tasks').delete().eq('id',id);
-      error = r1.error;
+    const rc = await SB.rpc('delete_project_task', { task_id: id });
+    if (rc.error) {
+      console.error('delete_project_task rpc error:', rc.error);
+      throw new Error(rc.error.message || 'Не удалось удалить задачу');
     }
-    if(error && /row-level security|violates row-level|403|forbidden/i.test((error.message||error.code||''))){
-      const rc = await SB.rpc('delete_project_task', { task_id: id });
-      if (rc.error) throw new Error('Нет прав на удаление: '+(rc.error.message||''));
-      error = null;
-    }
-    if(error)throw error;
   toast('Задача удалена'); if(!_p) await _pwReload(curProjId()); } catch(e){
     if(_p&&_t){ _p._tasks.splice(Math.min(Math.max(_ix,0),_p._tasks.length),0,_t); _pkRerender(); }           // откат
     toast('Ошибка: '+(e.message||e)); } };
