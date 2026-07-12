@@ -6233,7 +6233,7 @@ function openDrawer(id){
     <div class="dr-h">
       <div class="dr-av" style="background:${a.accent}">${logoFill(a.logoUrl,a.name[0])}</div>
       <div><div style="font-weight:700;font-size:18px">${a.name}</div><div style="font-family:var(--mono);font-size:12.5px;color:var(--txt-3);margin-top:3px">${a.slug}.triada.app</div>
-      <div style="margin-top:9px;display:flex;gap:8px;align-items:center">${statusBadge(a.status)}<span class="plan">${a.plan}</span></div></div>
+      <div style="margin-top:9px;display:flex;gap:8px;align-items:center">${statusBadge(a.status)}<span class="plan" style="text-transform:none">${(window.planLabel?planLabel(a):a.plan)}</span></div></div>
       <button class="x" onclick="closeDrawer()">×</button>
     </div>
     <div class="dr-sec">
@@ -16950,6 +16950,11 @@ async function loadExtra(force){
 function keepRaw(){ A_().forEach(a=>{ if(a._mrrDb===undefined) a._mrrDb = N(a.mrr); }); }
 
 function tariffOf(a){ return T_().find(t=>t.key===a.plan) || null; }
+/* agencies.plan хранит КЛЮЧ тарифа (tariffs.key), а не название.
+   Ключ генерируется один раз при создании и при переименовании НЕ меняется —
+   поэтому тариф «DTR CORE» мог остаться с ключом 'tariff'. На экране нужно имя. */
+function planLabel(a){ const t=tariffOf(a); return (t && t.name) ? t.name : (a.plan || '—'); }
+window.planLabel = planLabel;
 
 /* Цена тарифа числом. null = «по договору» (Enterprise). 0 = бесплатно. */
 function priceOf(t){
@@ -17320,7 +17325,7 @@ window.ccDrillUpsell = () => {
   drill('Кандидаты на апгрейд', `${u.list.length} упёрлись в лимит · потенциал ${money(u.total)}/мес${u.contractCnt?' + '+u.contractCnt+' по договору (сумма не выдумывается)':''}`,
     u.list.map(x=>`<tr>
       <td>${agCell(x.a)}</td>
-      <td><span class="badge b-mut" style="text-transform:uppercase">${esc(x.a.plan)}</span></td>
+      <td><span class="badge b-mut">${esc(planLabel(x.a))}</span></td>
       <td><div class="eff"><span style="color:${x.u>=1?'var(--neg)':'var(--warn)'}">${Math.round(x.u*100)}%</span>
         <div class="bar"><i style="width:${Math.min(100,x.u*100)}%;background:${x.u>=1?'var(--neg)':'var(--warn)'}"></i></div></div></td>
       <td class="num" style="color:var(--accent)">${x.gain===null?'<span style="color:var(--warn)">по договору</span>':'+'+K(x.gain)}</td>
@@ -17725,7 +17730,7 @@ window.renderGeneral = function(){
           <td>${agCell(a)}</td>
           <td>${healthCell(r.h)}</td>
           <td>${r.h.reasons.slice(0,2).map(z=>`<span class="cc-rsn ${z.k}">${esc(z.t)}</span>`).join('')}</td>
-          <td><span class="plan">${esc(a.plan)}</span></td>
+          <td><span class="plan" style="text-transform:none">${esc(planLabel(a))}</span></td>
           <td style="text-align:right">${typeof statusBadge==='function'?statusBadge(a.status):esc(a.status)}</td>
           <td class="num">${N(a.projects)}</td>
           <td>${r.u===null?'<span style="color:var(--txt-3)">∞</span>'
