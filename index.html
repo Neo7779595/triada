@@ -22179,6 +22179,41 @@ window._kpi3ExtractVal = (v) => {
   return Number(v);
 };
 
+// Относительная статистика по значениям (min/mean/max) — для адаптивной нормализации.
+window._kpi3RelStats = (values) => {
+  const clean = (values || []).map(v => Number(v)).filter(v => v != null && !Number.isNaN(v));
+  if (!clean.length) return null;
+  const sorted = clean.slice().sort((a,b) => a-b);
+  const sum = sorted.reduce((s,v) => s+v, 0);
+  return {
+    min: sorted[0],
+    max: sorted[sorted.length-1],
+    mean: sum / sorted.length,
+    median: sorted.length%2 ? sorted[(sorted.length-1)/2] : (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2,
+    count: sorted.length,
+  };
+};
+
+// Классификация значения относительно распределения группы:
+// 'top' → лидер (max для up, min для down)
+// 'good' → выше среднего (>15% mean-based delta)
+// 'mid' → около среднего
+// 'weak' → ниже среднего
+// 'bottom' → аутсайдер
+window._kpi3RelClass = (v, rel, dir) => {
+  if (v == null || Number.isNaN(v) || !rel || rel.count < 2) return 'mid';
+  const isUp = dir === 'up';
+  const best = isUp ? rel.max : rel.min;
+  const worst = isUp ? rel.min : rel.max;
+  if (v === best) return 'top';
+  if (v === worst) return 'bottom';
+  const range = Math.max(Math.abs(rel.max - rel.mean), Math.abs(rel.min - rel.mean), 1);
+  const delta = (v - rel.mean) / range;
+  const better = isUp ? delta > 0 : delta < 0;
+  if (Math.abs(delta) < 0.15) return 'mid';
+  return better ? 'good' : 'weak';
+};
+
 window.renderKPI = async () => {
   const el = document.getElementById('content-ag'); if(!el) return;
   el.innerHTML = _kpi3ShellHTML();
