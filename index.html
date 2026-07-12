@@ -16207,23 +16207,69 @@ function setKbProj(p){kbProj=p;renderKB();}
 let KB_AUTO = {};                       // кеш по project.id
 function kbCurProj(){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(p){return p.name===kbProj;}) || null; }
 function _kbFmtD(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString('ru-RU'); }catch(e){ return String(iso); } }
-function _kbMoney(n){ if(n==null||n==='') return ''; try{ return Number(n).toLocaleString('ru-RU').replace(/,/g,' ')+' сум'; }catch(e){ return String(n); } }
+function _kbMoney(n){ if(n==null||n==='') return ''; try{ return Number(n).toLocaleString('ru-RU').replace(/,/g,' ')+' сум'; }catch(e){ return String(n); } }
 function _kbArr(v){ return Array.isArray(v)?v.join(', '):(v==null?'':String(v)); }
+function _kbNum(v){ var n=Number(v); if(!isFinite(n)) return String(v); return (Math.round(n*100)/100).toLocaleString('ru-RU'); }
+function _kbEscAttr(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/[<>]/g,''); }
+
+/* копирование в буфер + тост */
+function kbCopy(val,ev){ if(ev){ ev.stopPropagation&&ev.stopPropagation(); } var t=String(val==null?'':val);
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(function(){ if(typeof toast==='function')toast('Скопировано'); },function(){ _kbCopyFallback(t); }); return; } }catch(e){}
+  _kbCopyFallback(t);
+}
+function _kbCopyFallback(t){ try{ var a=document.createElement('textarea'); a.value=t; a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); document.execCommand('copy'); document.body.removeChild(a); if(typeof toast==='function')toast('Скопировано'); }catch(e){ if(typeof toast==='function')toast('Не удалось скопировать'); } }
+function kbOpenUrl(u,ev){ if(ev){ ev.stopPropagation&&ev.stopPropagation(); } var url=String(u||''); if(!/^https?:/i.test(url)) url='https://'+url.replace(/^\/+/,''); url=url.replace(/['"<>]/g,''); window.open(url,'_blank','noopener'); }
+function kbOpenProj(tab,ev){ if(ev){ ev.stopPropagation&&ev.stopPropagation(); } var p=kbCurProj(); if(!p) return; var i=(typeof PROJECTS!=='undefined'?PROJECTS:[]).findIndex(function(x){return x.id===p.id;}); if(i<0) return; try{ openProject(i); if(tab&&typeof pdTab==='function') setTimeout(function(){ pdTab(tab); },20); }catch(e){} }
+
+/* иконки */
+var _KBIC={
+  phone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3-8.6A2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.3 1.8.6 2.6a2 2 0 01-.5 2.1L8 9.6a16 16 0 006 6l1.2-1.2a2 2 0 012.1-.5c.8.3 1.7.5 2.6.6a2 2 0 011.7 2z"/></svg>',
+  tg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>',
+  link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>',
+  ext:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg>'
+};
+var _KB_CHAN={instagram:'Instagram',youtube:'YouTube',telegram:'Telegram',tiktok:'TikTok',facebook:'Facebook',website:'Сайт',site:'Сайт',vk:'VK',threads:'Threads'};
+var _KB_CHANCOL={instagram:'#E1306C',youtube:'#FF0000',telegram:'#37E6C8',tiktok:'#8A8FFF',facebook:'#6AA9FF',website:'#43D88C',site:'#43D88C',vk:'#6AA9FF',threads:'#9AA1AC'};
+
+/* чипы */
+function _kbCopyChip(icon,text,color){ if(text==null||text==='') return ''; var c=color||'var(--txt-2)'; var e=_kbEscAttr(text);
+  return '<span class="kb-chip" onclick="kbCopy(\''+e+'\',event)" title="Скопировать"><span class="ci" style="color:'+c+'">'+icon+'</span>'+escH(String(text))+'<span class="cc">'+_KBIC.copy+'</span></span>'; }
+function _kbTgChip(tg){ if(!tg) return ''; var uname=String(tg).replace(/^@/,'').replace(/^https?:\/\/(t\.me|telegram\.me)\//i,''); var disp='@'+uname.replace(/^\+/,'').replace(/[^A-Za-z0-9_+].*$/,'')||('@'+uname);
+  var link=/^https?:/i.test(tg)?tg:('https://t.me/'+uname); var e=_kbEscAttr(tg);
+  return '<span class="kb-chip" title="Открыть / скопировать"><span class="ci" style="color:#37E6C8">'+_KBIC.tg+'</span><span onclick="kbOpenUrl(\''+_kbEscAttr(link)+'\',event)" style="cursor:pointer">'+escH(String(tg).replace(/^https?:\/\//,''))+'</span><span class="cc" onclick="kbCopy(\''+e+'\',event)" title="Скопировать">'+_KBIC.copy+'</span></span>'; }
+function _kbLinkChip(key,url){ if(!url) return ''; var lbl=_KB_CHAN[key]||key; var col=_KB_CHANCOL[key]||'var(--accent)'; var e=_kbEscAttr(url);
+  return '<span class="kb-chip kb-chip-link" onclick="kbOpenUrl(\''+e+'\',event)" title="'+_kbEscAttr(url)+'"><span class="ci" style="color:'+col+'">'+_KBIC.link+'</span>'+escH(lbl)+'<span class="cc">'+_KBIC.ext+'</span></span>'; }
 
 function kbAutoCss(){
   if(document.getElementById('kb-auto-css')) return;
   var s=document.createElement('style'); s.id='kb-auto-css';
   s.textContent=".kb-auto-head{font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-3);font-family:var(--mono);margin:2px 4px 10px}"
-    +".kb-kv{display:flex;gap:12px;padding:7px 12px;border-bottom:1px solid var(--line);font-size:13.5px;align-items:flex-start}"
-    +".kb-kv:last-child{border-bottom:0}"
-    +".kb-kv .k{color:var(--txt-3);min-width:130px;flex:0 0 auto;font-family:var(--mono);font-size:12px}"
-    +".kb-kv .v{color:var(--txt);flex:1;word-break:break-word;white-space:pre-wrap}"
-    +".kb-sub-h{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3);padding:11px 12px 3px;font-family:var(--mono)}"
     +".kb-auto-sec{margin-bottom:12px}"
-    +".kb-mtile{display:flex;gap:10px;flex-wrap:wrap;padding:10px 12px}"
-    +".kb-mtile .m{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:92px;flex:1}"
-    +".kb-mtile .m .v{font-family:var(--mono);font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}"
-    +".kb-mtile .m .l{font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.07em;margin-top:2px}";
+    +".kb-kv{display:flex;gap:12px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13.5px;align-items:flex-start}"
+    +".kb-kv:last-child{border-bottom:0}"
+    +".kb-kv .k{color:var(--txt-3);min-width:132px;flex:0 0 auto;font-family:var(--mono);font-size:12px}"
+    +".kb-kv .v{color:var(--txt);flex:1;word-break:break-word;white-space:pre-wrap}"
+    +".kb-sub-h{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);padding:12px 12px 6px;font-family:var(--mono)}"
+    +".kb-chips{display:flex;flex-wrap:wrap;gap:7px;padding:2px 0}"
+    +".kb-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:999px;padding:5px 10px;font-size:12.5px;font-family:var(--mono);color:var(--txt);cursor:pointer;transition:all .14s var(--ease-out);user-select:none}"
+    +".kb-chip:hover{border-color:var(--accent-line);background:var(--bg-3);transform:translateY(-1px)}"
+    +".kb-chip .ci{display:inline-flex}.kb-chip .cc{display:inline-flex;color:var(--txt-3);opacity:.6}.kb-chip:hover .cc{opacity:1;color:var(--accent)}"
+    +".kb-ccard{padding:12px;border-bottom:1px solid var(--line)}.kb-ccard:last-child{border-bottom:0}"
+    +".kb-ccard-top{display:flex;align-items:center;gap:11px;margin-bottom:9px}"
+    +".kb-ccard-av{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:15px;flex:0 0 auto}"
+    +".kb-ccard-nm{font-weight:600;font-size:14px;line-height:1.2}.kb-ccard-role{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-top:1px}"
+    +".kb-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px;padding:11px 12px}"
+    +".kb-card{background:var(--bg-2);border:1px solid var(--line);border-radius:11px;padding:11px 12px;cursor:pointer;transition:all .14s var(--ease-out);display:flex;flex-direction:column;gap:7px;min-width:0}"
+    +".kb-card:hover{border-color:var(--accent-line);transform:translateY(-2px);box-shadow:var(--sh-2)}"
+    +".kb-card-t{font-size:13px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}"
+    +".kb-card-m{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--txt-3);font-family:var(--mono)}"
+    +".kb-badge{display:inline-flex;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:600;font-family:var(--mono);letter-spacing:.04em}"
+    +".kb-mtile{display:flex;gap:9px;flex-wrap:wrap;padding:11px 12px}"
+    +".kb-mtile .m{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:84px;flex:1}"
+    +".kb-mtile .m .v{font-family:var(--mono);font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}"
+    +".kb-mtile .m .l{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.07em;margin-top:4px}"
+    +".kb-mtile .m .g{font-size:9.5px;font-family:var(--mono);margin-top:3px}";
   document.head.appendChild(s);
 }
 function kbSec(title,color,body,count){
@@ -16237,7 +16283,7 @@ function _kbKV(k,v){ if(v==null||v===''||v==='—') return ''; return '<div clas
 function kbAutoEnsure(){
   if(!window.LIVE||!window.SB) return;
   var p=kbCurProj(); if(!p||!p.id) return;
-  if(KB_AUTO[p.id]) return;                       // уже загружено или грузится
+  if(KB_AUTO[p.id]) return;
   KB_AUTO[p.id]={_loading:true};
   kbLoadAuto(p.id).then(function(){ if(document.querySelector('#content-ag .kb-grid') && kbCurProj() && kbCurProj().id===p.id) renderKB(); });
 }
@@ -16255,13 +16301,12 @@ async function kbLoadAuto(pid){
       new Promise(function(r){ try{ briefLoad(pid, r); }catch(e){ r(); } })
     ]);
     var mem=res[0], cp=res[1], rp=res[2], ct=res[3], sv=res[4], tsk=res[5], stg=res[6];
-    // профили для контактов
     var ids={}; (mem.data||[]).forEach(function(m){ if(m.member_id) ids[m.member_id]=1; });
     if(p&&p.client_id) ids[p.client_id]=1;
     if(p&&p.lead_id) ids[p.lead_id]=1;
     (p&&Array.isArray(p.leads)?p.leads:[]).forEach(function(x){ if(x) ids[x]=1; });
     var profs={}; var idlist=Object.keys(ids);
-    if(idlistLen(idlist)){ var pf=await SB.from('profiles').select('id,full_name,role,role_title,phone,tg_username,avatar_url').in('id',idlist); (pf.data||[]).forEach(function(x){ profs[x.id]=x; }); }
+    if(idlist.length){ var pf=await SB.from('profiles').select('id,full_name,role,role_title,phone,tg_username,avatar_url').in('id',idlist); (pf.data||[]).forEach(function(x){ profs[x.id]=x; }); }
     var briefs=[]; try{ briefs=(briefDoc(pid).briefs||[]); }catch(e){}
     KB_AUTO[pid]={
       members:(mem.data||[]).map(function(m){ return {role_in_project:m.role_in_project, prof:profs[m.member_id]||null}; }),
@@ -16272,9 +16317,8 @@ async function kbLoadAuto(pid){
     };
   }catch(e){ KB_AUTO[pid]={_error:String((e&&e.message)||e),_loaded:true}; }
 }
-function idlistLen(a){ return a&&a.length; }
 
-/* ── секции ── */
+/* ── ПАСПОРТ ── */
 function _kbSecPassport(p,A){
   var rows=_kbKV('Категория',p.category)+_kbKV('Услуга',p.service)+_kbKV('Тариф',p.tariff)
     +_kbKV('Статус', p.status==='done'?'завершён':p.status==='active'?'активен':(p.status||'—'))
@@ -16293,8 +16337,7 @@ function _kbSecPassport(p,A){
   (A.briefs||[]).forEach(function(b){
     var qs=(b.fields||[]).filter(function(f){ return f.type!=='section'; });
     var qa=qs.map(function(f){
-      var v=b.answers&&b.answers[f.id];
-      var txt=_kbArr(v); if(!txt) return '';
+      var v=b.answers&&b.answers[f.id]; var txt=_kbArr(v); if(!txt) return '';
       var q=f.label||f.q||f.title||f.name||f.question||f.text||'Вопрос';
       return _kbKV(q, txt);
     }).filter(Boolean).join('');
@@ -16302,56 +16345,79 @@ function _kbSecPassport(p,A){
   });
   return kbSec('Паспорт проекта','#37E6C8',(rows||'<div class="kb-empty">Нет данных</div>')+svc+brief);
 }
-function _kbContactRow(prof, sub){
-  if(!prof) return '';
-  var nm=prof.full_name||prof.login||'—';
-  var line=[sub||prof.role_title, prof.phone, prof.tg_username?('@'+String(prof.tg_username).replace(/^@/,'')):''].filter(Boolean).join(' · ');
-  return '<div class="kb-kv"><span class="k">'+escH(String(sub||prof.role_title||'—'))+'</span><span class="v">'+escH(nm)+(line?'  ·  '+escH(line):'')+'</span></div>';
+
+/* ── КОНТАКТЫ ── */
+function _kbInit(nm){ nm=String(nm||'?').trim(); return (nm[0]||'?').toUpperCase(); }
+function _kbContactCard(name,role,phone,tg,col){
+  col=col||'#8A8FFF';
+  var chips=[]; if(phone) chips.push(_kbCopyChip(_KBIC.phone,phone,'#43D88C')); if(tg) chips.push(_kbTgChip(tg));
+  return '<div class="kb-ccard"><div class="kb-ccard-top">'
+    +'<div class="kb-ccard-av" style="background:'+col+'22;color:'+col+'">'+escH(_kbInit(name))+'</div>'
+    +'<div><div class="kb-ccard-nm">'+escH(name||'—')+'</div>'+(role?'<div class="kb-ccard-role">'+escH(role)+'</div>':'')+'</div></div>'
+    +(chips.length?'<div class="kb-chips">'+chips.join('')+'</div>':'')+'</div>';
 }
 function _kbSecContacts(p,A){
-  var body='';
-  if(A.client) body+=_kbContactRow(A.client,'Клиент');
-  if(A.lead)   body+=_kbContactRow(A.lead,'Проект-менеджер');
-  // произвольные контакты проекта (jsonb)
+  var body=''; var cnt=0;
   var pc=p.contacts;
-  if(Array.isArray(pc)){ pc.forEach(function(c){ if(c&&typeof c==='object'){ body+=_kbKV(c.role||c.title||c.label||'Контакт',[c.name,c.phone,c.tg,c.telegram,c.email].filter(Boolean).join(' · ')); } else if(c){ body+=_kbKV('Контакт',String(c)); } }); }
-  else if(pc&&typeof pc==='object'){ Object.keys(pc).forEach(function(k){ var v=pc[k]; if(v!=null&&v!=='') body+=_kbKV(k, (typeof v==='object')?JSON.stringify(v):String(v)); }); }
-  if(A.members&&A.members.length){
-    body+='<div class="kb-sub-h">Команда проекта</div>';
-    A.members.forEach(function(m){ body+=_kbContactRow(m.prof, m.role_in_project||(m.prof&&m.prof.role_title)||'Участник'); });
+  var person=(pc&&typeof pc==='object'&&!Array.isArray(pc))?pc.person:null;
+  if(person&&typeof person==='object'){ body+='<div class="kb-sub-h">Контактное лицо клиента</div>'+_kbContactCard(person.name,person.role||'Клиент',person.phone,person.tg,'#37E6C8'); cnt++; }
+  // каналы клиента
+  var channels=(pc&&typeof pc==='object')?pc.channels:null;
+  if(channels&&typeof channels==='object'){
+    var chChips=Object.keys(channels).map(function(k){ var v=channels[k]; if(!v) return ''; if(Array.isArray(v)){ return v.map(function(u){ return u?_kbLinkChip(k,u):''; }).join(''); } return _kbLinkChip(k,v); }).filter(Boolean).join('');
+    if(chChips) body+='<div class="kb-sub-h">Каналы клиента</div><div class="kb-chips" style="padding:2px 12px 10px">'+chChips+'</div>';
   }
-  var cnt=(A.members?A.members.length:0)+(A.client?1:0);
-  return kbSec('Контакты','#8A8FFF',body,cnt||'');
+  // проект-менеджер
+  if(A.lead){ body+='<div class="kb-sub-h">Проект-менеджер</div>'+_kbContactCard(A.lead.full_name,A.lead.role_title||'Проект-менеджер',A.lead.phone,A.lead.tg_username,'#E3B567'); cnt++; }
+  // команда
+  var mm=(A.members||[]).filter(function(m){ return m.prof; });
+  if(mm.length){ body+='<div class="kb-sub-h">Команда проекта</div>'+mm.map(function(m){ var pr=m.prof; return _kbContactCard(pr.full_name,pr.role_title||m.role_in_project||'Участник',pr.phone,pr.tg_username,'#8A8FFF'); }).join(''); cnt+=mm.length; }
+  // прочие поля contacts (если объект, но не person/channels)
+  if(pc&&typeof pc==='object'&&!Array.isArray(pc)){
+    Object.keys(pc).forEach(function(k){ if(k==='person'||k==='channels') return; var v=pc[k]; if(v==null||v===''||(typeof v==='object'&&!Object.keys(v).length)) return; body+=_kbKV(k, (typeof v==='object')?JSON.stringify(v):String(v)); });
+  }
+  return kbSec('Контакты','#8A8FFF',body||'<div class="kb-empty">Нет контактов</div>',cnt||'');
 }
+
+/* ── TELEGRAM ── */
 function _kbSecTg(p,A){
   var body=_kbKV('Клиентская группа', p.tg_chat_id?('привязана'+(p.tg_linked_at?' · '+_kbFmtD(p.tg_linked_at):'')):'не привязана')
-    +(!p.tg_chat_id&&p.tg_link_code?_kbKV('Код привязки', p.tg_link_code):'');
+    +(!p.tg_chat_id&&p.tg_link_code?('<div class="kb-kv"><span class="k">Код привязки</span><span class="v">'+_kbCopyChip(_KBIC.copy,p.tg_link_code,'var(--accent)')+'</span></div>'):'');
   var st=p.tg_settings;
-  if(st&&typeof st==='object'){
-    var on=Object.keys(st).filter(function(k){ return st[k]!==false; });
-    if(on.length) body+=_kbKV('Уведомления', on.length+' событий включено');
-  }
-  var tgs=[];
-  (A.members||[]).forEach(function(m){ if(m.prof&&m.prof.tg_username) tgs.push((m.prof.full_name||'—')+' — @'+String(m.prof.tg_username).replace(/^@/,'')); });
-  if(A.client&&A.client.tg_username) tgs.unshift('Клиент — @'+String(A.client.tg_username).replace(/^@/,''));
-  if(tgs.length){ body+='<div class="kb-sub-h">Telegram участников</div>'+tgs.map(function(t){ return _kbKV('·',t); }).join(''); }
+  if(st&&typeof st==='object'){ var on=Object.keys(st).filter(function(k){ return st[k]!==false; }); if(on.length) body+=_kbKV('Уведомления', on.length+' событий включено'); }
+  var chips=[]; if(A.client&&A.client.tg_username) chips.push(_kbTgChip(A.client.tg_username));
+  (A.members||[]).forEach(function(m){ if(m.prof&&m.prof.tg_username) chips.push(_kbTgChip(m.prof.tg_username)); });
+  // из contacts.person / channels.telegram
+  try{ if(p.contacts&&p.contacts.person&&p.contacts.person.tg) chips.unshift(_kbTgChip(p.contacts.person.tg)); }catch(e){}
+  if(chips.length) body+='<div class="kb-sub-h">Telegram участников</div><div class="kb-chips" style="padding:2px 12px 11px">'+chips.join('')+'</div>';
   return kbSec('Telegram-группы','#37E6C8',body);
 }
+
+/* ── КОНТЕНТ-ПЛАНЫ ── */
 function _kbSecContent(p,A){
   if(!A.content||!A.content.length) return kbSec('Контент-планы','#43D88C','<div class="kb-empty">Нет контент-планов</div>',0);
-  var body=A.content.map(function(c){
-    var n=''; try{ var d=c.data; if(Array.isArray(d)) n=d.length+' строк'; else if(d&&Array.isArray(d.rows)) n=d.rows.length+' строк'; else if(d&&Array.isArray(d.items)) n=d.items.length+' элементов'; }catch(e){}
-    return '<div class="kb-mi"><div class="mt">Контент-план'+(n?' · '+escH(n):'')+'</div><span class="ty-badge">'+escH(_kbFmtD(c.updated_at))+'</span></div>';
+  var cards=A.content.map(function(c){
+    var sheets=0, cols=0; try{ var d=c.data; if(d&&Array.isArray(d.sheets)){ sheets=d.sheets.length; (d.sheets[0]&&Array.isArray(d.sheets[0].cols))&&(cols=d.sheets[0].cols.length); } else if(Array.isArray(d)) sheets=1; }catch(e){}
+    var meta=(sheets?sheets+' '+_plural(sheets,'лист','листа','листов'):'план')+(cols?' · '+cols+' колонок':'');
+    return '<div class="kb-card" onclick="kbOpenProj(\'content\',event)"><div class="kb-card-t">Контент-план</div><div class="kb-card-m"><span>'+escH(meta)+'</span><span>'+escH(_kbFmtD(c.updated_at))+'</span></div></div>';
   }).join('');
-  return kbSec('Контент-планы','#43D88C',body,A.content.length);
+  return kbSec('Контент-планы','#43D88C','<div class="kb-cards">'+cards+'</div>',A.content.length);
 }
+
+/* ── ОТЧЁТЫ ── */
+var _KB_REPCOL={SMM:'#F0785C',smm:'#F0785C'};
 function _kbSecReports(p,A){
   if(!A.reports||!A.reports.length) return kbSec('Отчёты','#6AA9FF','<div class="kb-empty">Нет отчётов</div>',0);
-  var body=A.reports.slice(0,30).map(function(r){
-    return '<div class="kb-mi"><div class="mt">'+escH(r.title||'Отчёт')+'</div><span class="ty-badge">'+escH((r.kind||'')+(r.published_at?' · '+_kbFmtD(r.published_at):''))+'</span></div>';
+  var cards=A.reports.slice(0,40).map(function(r){
+    var kind=r.kind||'Отчёт'; var col=_KB_REPCOL[kind]||'#6AA9FF';
+    var tab=/smm/i.test(kind)?'smm':'reports';
+    return '<div class="kb-card" onclick="kbOpenProj(\''+tab+'\',event)"><div class="kb-card-t">'+escH(r.title||'Отчёт')+'</div>'
+      +'<div class="kb-card-m"><span class="kb-badge" style="background:'+col+'22;color:'+col+'">'+escH(kind)+'</span><span>'+escH(_kbFmtD(r.published_at))+'</span></div></div>';
   }).join('');
-  return kbSec('Отчёты','#6AA9FF',body,A.reports.length);
+  return kbSec('Отчёты','#6AA9FF','<div class="kb-cards">'+cards+'</div>',A.reports.length);
 }
+
+/* ── ОПЕРАТИВНАЯ ЭФФЕКТИВНОСТЬ ── */
 function _kbSecOps(p,A){
   var tk=A.tasks||[], stg=A.stages||[];
   var tDone=tk.filter(function(t){return t.status==='done';}).length;
@@ -16359,31 +16425,34 @@ function _kbSecOps(p,A){
   var hrs=Math.round(secs/3600);
   var sDone=stg.filter(function(s){return s.status==='done';}).length;
   var tile=function(v,l){ return '<div class="m"><div class="v">'+escH(String(v))+'</div><div class="l">'+escH(l)+'</div></div>'; };
-  var body='<div class="kb-mtile">'
-    +tile(tDone+'/'+tk.length,'Задачи')
-    +tile(sDone+'/'+stg.length,'Этапы')
-    +tile(hrs+' ч','Затрачено')
-    +tile((p.pct||0)+'%','Готовность')
-    +'</div>';
+  var body='<div class="kb-mtile">'+tile(tDone+'/'+tk.length,'Задачи')+tile(sDone+'/'+stg.length,'Этапы')+tile(hrs+' ч','Затрачено')+tile((p.pct||0)+'%','Готовность')+'</div>';
   return kbSec('Оперативная эффективность','#E3B567',body);
 }
-var _KB_SMM_LBL={reach:'Охват',views:'Просмотры',impressions:'Показы',followers:'Подписчики',subs:'Подписчики',likes:'Лайки',comments:'Комментарии',saves:'Сохранения',shares:'Репосты',reposts:'Репосты',er:'ER',err:'ERR',cr:'CR',tr:'TR',clicks:'Клики',leads:'Лиды',posts:'Посты',stories:'Истории',reels:'Reels',engagement:'Вовлечённость'};
+
+/* ── SMM-ЭФФЕКТИВНОСТЬ ── */
+var _KB_SMM_LBL={er:'ER',lr:'LR',sr:'SR',tr:'TR',shr:'SHR',err:'ERR',cr:'CR',followers:'Подписчики',subs:'Подписчики',reach:'Охват',views:'Просмотры',likes:'Лайки',comments:'Комментарии',saves:'Сохранения',shares:'Репосты',reposts:'Репосты',frequency:'Частота',posts_count:'Постов',posts:'Постов',reels:'Reels',gain:'Прирост',impressions:'Показы',engagement:'Вовлечённость',clicks:'Клики',leads:'Лиды'};
+function _kbSmmLbl(k){ var kl=String(k).toLowerCase(); if(_KB_SMM_LBL[kl]) return _KB_SMM_LBL[kl]; return k.length<=4?k.toUpperCase():(k[0].toUpperCase()+k.slice(1)); }
+function _kbMetricsObj(pl){ if(!pl||typeof pl!=='object') return null;
+  if(pl.prev&&typeof pl.prev==='object') return pl.prev;
+  if(pl.metrics&&typeof pl.metrics==='object') return pl.metrics;
+  var o={}; Object.keys(pl).forEach(function(k){ var v=pl[k]; if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(Number(v)))) o[k]=v; }); return Object.keys(o).length?o:null; }
 function _kbSecSmm(p,A){
   var smm=(A.reports||[]).filter(function(r){ return /smm/i.test(String(r.kind||''))||/smm/i.test(String(r.title||'')); });
   if(!smm.length) return kbSec('SMM-эффективность','#F0785C','<div class="kb-empty">Нет SMM-отчётов</div>',0);
-  var last=smm[0]; var pl=last.payload;
-  // ищем метрики: payload.metrics или числовые поля payload
-  var m=(pl&&typeof pl==='object'&&pl.metrics&&typeof pl.metrics==='object')?pl.metrics:pl;
+  var last=smm[0]; var pl=last.payload||{}; var m=_kbMetricsObj(pl); var goals=(pl&&pl.goals&&typeof pl.goals==='object')?pl.goals:null;
   var tiles='';
-  if(m&&typeof m==='object'){
-    var keys=Object.keys(m).filter(function(k){ var v=m[k]; return typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(Number(v))); }).slice(0,8);
-    tiles=keys.map(function(k){ var v=m[k]; var lbl=_KB_SMM_LBL[k.toLowerCase()]||k; return '<div class="m"><div class="v">'+escH(String(v))+'</div><div class="l">'+escH(String(lbl))+'</div></div>'; }).join('');
-  }
+  if(m){ tiles=Object.keys(m).slice(0,10).map(function(k){ var v=m[k];
+    var g=''; if(goals&&goals[k]!=null){ var ok=Number(v)>=Number(goals[k]); g='<div class="g" style="color:'+(ok?'var(--pos)':'var(--warn)')+'">цель '+_kbNum(goals[k])+'</div>'; }
+    return '<div class="m"><div class="v">'+escH(_kbNum(v))+'</div><div class="l">'+escH(_kbSmmLbl(k))+'</div>'+g+'</div>'; }).join(''); }
+  var counts=[]; if(pl&&Array.isArray(pl.posts)) counts.push(pl.posts.length+' '+_plural(pl.posts.length,'пост','поста','постов')); if(pl&&Array.isArray(pl.reels)) counts.push(pl.reels.length+' reels');
   var body=(tiles?'<div class="kb-mtile">'+tiles+'</div>':'')
-    +'<div class="kb-sub-h">SMM-отчёты</div>'
-    +smm.slice(0,12).map(function(r){ return '<div class="kb-mi"><div class="mt">'+escH(r.title||'SMM-отчёт')+'</div><span class="ty-badge">'+escH(_kbFmtD(r.published_at))+'</span></div>'; }).join('');
+    +(counts.length?'<div class="kb-kv"><span class="k">Материалы</span><span class="v">'+escH(counts.join(' · '))+'</span></div>':'')
+    +'<div class="kb-sub-h">SMM-отчёты</div><div class="kb-cards">'
+    +smm.slice(0,12).map(function(r){ return '<div class="kb-card" onclick="kbOpenProj(\'smm\',event)"><div class="kb-card-t">'+escH(r.title||'SMM-отчёт')+'</div><div class="kb-card-m"><span class="kb-badge" style="background:#F0785C22;color:#F0785C">SMM</span><span>'+escH(_kbFmtD(r.published_at))+'</span></div></div>'; }).join('')
+    +'</div>';
   return kbSec('SMM-эффективность','#F0785C',body,smm.length);
 }
+
 function kbAutoBlock(){
   if(!window.LIVE||!window.SB) return '';
   var p=kbCurProj(); if(!p||!p.id) return '';
