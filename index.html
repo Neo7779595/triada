@@ -16302,7 +16302,32 @@ function kbAutoCss(){
     +".kb-refresh.is-busy{opacity:.6;pointer-events:none}"
     +".kb-refresh.is-busy svg{animation:kb-spin 1s linear infinite}"
     +"@keyframes kb-spin{to{transform:rotate(360deg)}}"
-    +".kb-auto-head.kb-auto-bar{display:flex;align-items:center;justify-content:space-between;gap:10px}";
+    +".kb-auto-head.kb-auto-bar{display:flex;align-items:center;justify-content:space-between;gap:10px}"
+    +".kb-tg-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px}"
+    +".kb-tgbtn{display:inline-flex;align-items:center;gap:8px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:8px 12px;color:var(--txt);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;text-decoration:none;transition:all .14s var(--ease-out);min-width:0;max-width:100%}"
+    +".kb-tgbtn:hover{border-color:#37E6C8;background:var(--bg-3);transform:translateY(-1px)}"
+    +".kb-tgbtn .tgi{color:#37E6C8;display:inline-flex;flex:none}"
+    +".kb-tgbtn .tgn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}"
+    +".kb-tgbtn .tga{color:var(--txt-3);display:inline-flex;flex:none}.kb-tgbtn:hover .tga{color:#37E6C8}"
+    +".kb-tg-meta{font-size:11.5px;color:var(--txt-3);font-family:var(--mono)}"
+    +".kb-tg-warn{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--warn);font-family:var(--mono)}"
+    +".kb-evs{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:6px;padding:2px 12px 12px}"
+    +".kb-ev{display:flex;align-items:center;gap:8px;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12.5px;min-width:0}"
+    +".kb-ev .m{width:16px;height:16px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex:none}"
+    +".kb-ev .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+    +".kb-ev.on{border-color:rgba(67,216,140,.26)}.kb-ev.on .m{background:var(--pos-dim);color:var(--pos)}"
+    +".kb-ev.off{opacity:.6}.kb-ev.off .m{background:var(--bg-3);color:var(--txt-3)}.kb-ev.off .t{color:var(--txt-3)}"
+    +".kb-tgp{display:flex;align-items:center;gap:11px;padding:10px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}"
+    +".kb-tgp:last-child{border-bottom:0}"
+    +".kb-tgp-av{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:13px;flex:none}"
+    +".kb-tgp-id{min-width:120px;flex:1}"
+    +".kb-tgp-id .nm{font-weight:600;font-size:13.5px;line-height:1.2;overflow:hidden;text-overflow:ellipsis}"
+    +".kb-tgp-id .rl{font-size:11px;color:var(--txt-3);font-family:var(--mono);margin-top:2px}"
+    +".kb-tgp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}"
+    +".kb-tgp-no{font-size:11.5px;color:var(--txt-3);font-family:var(--mono)}"
+    +".kb-bot{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-family:var(--mono);padding:3px 8px;border-radius:999px;white-space:nowrap;flex:none}"
+    +".kb-bot.on{background:var(--pos-dim);color:var(--pos)}.kb-bot.no{background:var(--bg-3);color:var(--txt-3)}"
+    +".kb-subh-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}";
   document.head.appendChild(s);
 }
 function kbSec(title,color,body,count){
@@ -16357,7 +16382,11 @@ async function kbLoadAuto(pid){
     if(p&&p.lead_id) ids[p.lead_id]=1;
     (p&&Array.isArray(p.leads)?p.leads:[]).forEach(function(x){ if(x) ids[x]=1; });
     var profs={}; var idlist=Object.keys(ids);
-    if(idlist.length){ var pf=await SB.from('profiles').select('id,full_name,role,role_title,phone,tg_username,avatar_url').in('id',idlist); (pf.data||[]).forEach(function(x){ profs[x.id]=x; }); }
+    if(idlist.length){
+      var pf=await SB.from('profiles').select('id,full_name,role,role_title,phone,tg_username,avatar_url,tg_user_id').in('id',idlist);
+      if(pf&&pf.error) pf=await SB.from('profiles').select('id,full_name,role,role_title,phone,tg_username,avatar_url').in('id',idlist);   // колонки tg_user_id нет — мягкий откат
+      (pf.data||[]).forEach(function(x){ profs[x.id]=x; });
+    }
     var briefs=[]; try{ briefs=(briefDoc(pid).briefs||[]); }catch(e){}
     KB_AUTO[pid]={
       members:(mem.data||[]).map(function(m){ return {role_in_project:m.role_in_project, prof:profs[m.member_id]||null}; }),
@@ -16431,17 +16460,101 @@ function _kbSecContacts(p,A){
 }
 
 /* ── TELEGRAM ── */
+/* те же 6 событий, что в модалке проекта (tgOpenModal) — источник истины один */
+var KB_TG_EVENTS=[
+  ['stage_start','Начало этапа'],
+  ['stage_done','Завершение этапа'],
+  ['project_done','Завершение проекта'],
+  ['report_published','Новый отчёт'],
+  ['brief_ready','Бриф готов'],
+  ['content_ready','Контент-план готов']
+];
+/* ссылка на группу: у супергрупп (-100…) есть постоянный вид t.me/c/<id>/1 */
+function _kbTgLink(chatId){
+  var s=String(chatId==null?'':chatId).trim();
+  if(!/^-?\d+$/.test(s)) return '';
+  if(s.indexOf('-100')===0) return 'https://t.me/c/'+s.slice(4)+'/1';
+  return '';                                                    // обычная группа — постоянной ссылки не существует
+}
+function kbOpenTg(ev){
+  if(ev&&ev.stopPropagation) ev.stopPropagation();
+  var p=kbCurProj(); if(!p) return;
+  var i=(typeof PROJECTS!=='undefined'?PROJECTS:[]).findIndex(function(x){return x.id===p.id;});
+  if(i<0) return;
+  try{ openProject(i); setTimeout(function(){ if(typeof tgOpenModal==='function') tgOpenModal(); },120); }catch(e){}
+}
+function _kbBotFlag(pr){ return (pr&&Object.prototype.hasOwnProperty.call(pr,'tg_user_id'))?!!pr.tg_user_id:null; }
+function _kbTgPerson(o){
+  var col=o.color||'#8A8FFF';
+  var chips=[];
+  if(o.tg) chips.push(_kbTgChip(o.tg));
+  if(o.phone) chips.push(_kbCopyChip(_KBIC.phone,o.phone,'#43D88C'));
+  var bot='';
+  if(o.bot===true)  bot='<span class="kb-bot on" title="Подключён к боту — получает уведомления">● бот</span>';
+  if(o.bot===false) bot='<span class="kb-bot no" title="Не подключён к боту — личные уведомления не приходят">○ без бота</span>';
+  return '<div class="kb-tgp">'
+    +'<div class="kb-tgp-av" style="background:'+col+'22;color:'+col+'">'+escH(_kbInit(o.name))+'</div>'
+    +'<div class="kb-tgp-id"><div class="nm">'+escH(o.name||'—')+'</div><div class="rl">'+escH(o.role||'Участник')+'</div></div>'
+    +'<div class="kb-tgp-chips">'+(chips.length?chips.join(''):'<span class="kb-tgp-no">контактов нет</span>')+'</div>'
+    +bot+'</div>';
+}
 function _kbSecTg(p,A){
-  var body=_kbKV('Клиентская группа', p.tg_chat_id?('привязана'+(p.tg_linked_at?' · '+_kbFmtD(p.tg_linked_at):'')):'не привязана')
-    +(!p.tg_chat_id&&p.tg_link_code?('<div class="kb-kv"><span class="k">Код привязки</span><span class="v">'+_kbCopyChip(_KBIC.copy,p.tg_link_code,'var(--accent)')+'</span></div>'):'');
-  var st=p.tg_settings;
-  if(st&&typeof st==='object'){ var on=Object.keys(st).filter(function(k){ return st[k]!==false; }); if(on.length) body+=_kbKV('Уведомления', on.length+' событий включено'); }
-  var chips=[]; if(A.client&&A.client.tg_username) chips.push(_kbTgChip(A.client.tg_username));
-  (A.members||[]).forEach(function(m){ if(m.prof&&m.prof.tg_username) chips.push(_kbTgChip(m.prof.tg_username)); });
-  // из contacts.person / channels.telegram
-  try{ if(p.contacts&&p.contacts.person&&p.contacts.person.tg) chips.unshift(_kbTgChip(p.contacts.person.tg)); }catch(e){}
-  if(chips.length) body+='<div class="kb-sub-h">Telegram участников</div><div class="kb-chips" style="padding:2px 12px 11px">'+chips.join('')+'</div>';
-  return kbSec('Telegram-группы','#37E6C8',body);
+  var linked=!!p.tg_chat_id;
+  var link=linked?_kbTgLink(p.tg_chat_id):'';
+  var title=(p.tg_chat_title&&String(p.tg_chat_title).trim())||('Группа проекта «'+(p.name||'—')+'»');
+  var uname=window.TG_BOT_USERNAME||'';
+  var code=p.tg_link_code||'';
+  var ICO='<span class="tgi">'+_KBIC.tg+'</span>', ARR='<span class="tga">'+_KBIC.ext+'</span>';
+
+  /* 1 · группа — кликабельной кнопкой */
+  var top='<div class="kb-tg-top">';
+  if(linked){
+    top += link
+      ? '<a class="kb-tgbtn" href="'+_kbEscAttr(link)+'" target="_blank" rel="noopener" title="Открыть группу в Telegram">'+ICO+'<span class="tgn">'+escH(title)+'</span>'+ARR+'</a>'
+      : '<button class="kb-tgbtn" onclick="kbOpenTg(event)" title="У обычной группы нет постоянной ссылки — откроются настройки Telegram проекта">'+ICO+'<span class="tgn">'+escH(title)+'</span>'+ARR+'</button>';
+    top += '<span class="kb-tg-meta">привязана'+(p.tg_linked_at?' · '+escH(_kbFmtD(p.tg_linked_at)):'')+'</span>';
+  }else{
+    top += (uname&&code)
+      ? '<a class="kb-tgbtn" href="https://t.me/'+encodeURIComponent(uname)+'?startgroup='+encodeURIComponent(code)+'" target="_blank" rel="noopener" title="Бот добавится в выбранную группу и привяжется сам">'+ICO+'<span class="tgn">Подключить группу клиента</span>'+ARR+'</a>'
+      : '<button class="kb-tgbtn" onclick="kbOpenTg(event)">'+ICO+'<span class="tgn">Подключить группу клиента</span></button>';
+    top += '<span class="kb-tg-warn">не привязана — клиент ничего не получает</span>';
+    if(code) top += _kbCopyChip(_KBIC.copy, code, 'var(--accent)');
+  }
+  top += '</div>';
+
+  /* 2 · уведомления: что включено, а что выключено */
+  var st=(p.tg_settings&&typeof p.tg_settings==='object')?p.tg_settings:{};
+  var onCt=0;
+  var evs=KB_TG_EVENTS.map(function(e){
+    var on=st[e[0]]!==false;                                    // событие включено по умолчанию
+    if(on) onCt++;
+    return '<div class="kb-ev '+(on?'on':'off')+'"><span class="m">'+(on?'✓':'✕')+'</span><span class="t">'+escH(e[1])+'</span></div>';
+  }).join('');
+  var cntCol=!linked?'var(--txt-3)':(onCt?'var(--pos)':'var(--warn)');
+  var evHead='<div class="kb-sub-h kb-subh-row"><span>Уведомления в группе</span>'
+    +'<span style="color:'+cntCol+'">'+onCt+' из '+KB_TG_EVENTS.length+' включено'+(linked?'':' · не отправляются')+'</span></div>';
+
+  /* 3 · участники: имя → роль → контакты */
+  var people=[], seen={};
+  var add=function(o){
+    if(!o||!o.name||!String(o.name).trim()) return;
+    var k=String(o.tg||o.name).toLowerCase().replace(/^@/,'').trim();
+    if(seen[k]) return; seen[k]=1; people.push(o);
+  };
+  try{
+    var pers=(p.contacts&&typeof p.contacts==='object'&&!Array.isArray(p.contacts))?p.contacts.person:null;
+    if(pers&&typeof pers==='object') add({name:pers.name, role:pers.role||'Контактное лицо клиента', tg:pers.tg||'', phone:pers.phone||'', color:'#37E6C8', bot:null});
+  }catch(e){}
+  if(A.client) add({name:A.client.full_name, role:A.client.role_title||'Клиент', tg:A.client.tg_username||'', phone:A.client.phone||'', color:'#37E6C8', bot:_kbBotFlag(A.client)});
+  if(A.lead)   add({name:A.lead.full_name,   role:A.lead.role_title||'Проект-менеджер', tg:A.lead.tg_username||'', phone:A.lead.phone||'', color:'#E3B567', bot:_kbBotFlag(A.lead)});
+  (A.members||[]).forEach(function(m){
+    var pr=m.prof; if(!pr) return;
+    add({name:pr.full_name, role:pr.role_title||m.role_in_project||'Участник команды', tg:pr.tg_username||'', phone:pr.phone||'', color:'#8A8FFF', bot:_kbBotFlag(pr)});
+  });
+  var plHead='<div class="kb-sub-h">Участники</div>';
+  var plBody=people.length?people.map(_kbTgPerson).join(''):'<div class="kb-empty">Участники не указаны</div>';
+
+  return kbSec('Telegram-группы','#37E6C8', top+evHead+'<div class="kb-evs">'+evs+'</div>'+plHead+plBody, people.length||'');
 }
 
 /* ── КОНТЕНТ-ПЛАНЫ ── */
@@ -18845,7 +18958,7 @@ const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.ver
 const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
   logoUrl:p.logo_url||'', cat:p.category||'—', svc:p.service||'SMM', pct:p.pct||0,
   stages:(p.stages_done||0)+' / '+(p.stages_total||6), health:p.health||'В норме',
-  dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]), leads:Array.isArray(p.leads)?p.leads:(typeof p.leads==='string'?(function(){try{return JSON.parse(p.leads)||[];}catch(_){return [];}})():[]) });
+  dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, tg_linked_at:p.tg_linked_at||null, tg_chat_title:p.tg_chat_title||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]), leads:Array.isArray(p.leads)?p.leads:(typeof p.leads==='string'?(function(){try{return JSON.parse(p.leads)||[];}catch(_){return [];}})():[]) });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
   login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, perms:m.permissions||{}, _id:m.id });
