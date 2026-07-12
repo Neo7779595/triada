@@ -5744,7 +5744,7 @@ function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast
   };
   if(document.body)start(); else document.addEventListener('DOMContentLoaded',start);
 })();
-function logout(){ if(window.tLogout)window.tLogout(); document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
+function logout(){ if(window.tLogout)window.tLogout(); try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); KB_Q=''; _kbCatsLoaded=false; }catch(_e){} document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
 
 /* ——— GENERAL CABINET ——— */
@@ -16189,28 +16189,55 @@ function saveEmp(){
 document.getElementById('e-login').addEventListener('input',e=>{document.getElementById('e-email').textContent=(e.target.value||'ivan')+'@detroyd.triada.app';});
 
 /* ——— KNOWLEDGE BASE module ——— */
-let kbProj='Uzbek Doner';
-const KB_PROJECTS=[{name:'Uzbek Doner',logo:'U'},{name:'88888888',logo:'8'},{name:'RESTO',logo:'R'},{name:'Тестовый проект',logo:'Т'}];
+let kbProj='Uzbek Doner';                    /* ключ активного проекта: p.id в live, имя — в демо */
+let KB_Q='';                                 /* строка поиска по списку проектов */
+function kbKeyOf(p){ return String((p&&(p.id!=null?p.id:p.name))||''); }
+const KB_PROJECTS=[{key:'Uzbek Doner',name:'Uzbek Doner',logo:'U'},{key:'88888888',name:'88888888',logo:'8'},{key:'RESTO',name:'RESTO',logo:'R'},{key:'Тестовый проект',name:'Тестовый проект',logo:'Т'}];
 const KB_CATS=['Контент-стратегия','Конкурентный анализ'];
 const KB_CATCOL={'Контент-стратегия':'#F0785C','Конкурентный анализ':'#37E6C8','Анализ конкурентов':'#37E6C8','Аудит профиля':'#8A8FFF','Контент-план':'#43D88C','Прочее':'#E3B567'};
 const KB_TYPES={'Miro':'#F2785C','Google Doc':'#6AA9FF','Google Sheet':'#43D88C','Figma':'#8A8FFF','Notion':'#C9CDD3','Telegram':'#37E6C8','Ссылка':'#E3B567','Другое':'#9AA1AC'};
 const KB_ABBR={'Miro':'Mi','Google Doc':'GD','Google Sheet':'GS','Figma':'Fg','Notion':'Nt','Telegram':'Tg','Ссылка':'Ln','Другое':'··'};
+/* категории БЗ — раньше жили только в памяти и исчезали после перезагрузки */
+function kbCatsKey(){ return 'kb_cats_'+((((window.tMe&&window.tMe())||{}).agency_id)||'x'); }
+let _kbCatsLoaded=false;
+function kbCatsLoad(){ if(_kbCatsLoaded) return; _kbCatsLoaded=true;
+  try{ const a=JSON.parse(localStorage.getItem(kbCatsKey())||'null');
+    if(Array.isArray(a)&&a.length){ KB_CATS.length=0; a.forEach(function(c){ if(typeof c==='string'&&c.trim()&&KB_CATS.indexOf(c)<0) KB_CATS.push(c); }); }
+  }catch(_e){}
+}
+function kbCatsSave(){ try{ localStorage.setItem(kbCatsKey(), JSON.stringify(KB_CATS)); }catch(_e){} }
 const KB_DATA={
   'Uzbek Doner':{'Контент-стратегия':[{t:'Контент-план · июнь',ty:'Google Sheet'},{t:'Tone of voice бренда',ty:'Google Doc'}],'Аудит профиля':[{t:'Аудит Instagram',ty:'Miro'}]},
   'RESTO':{'Анализ конкурентов':[{t:'Карта конкурентов',ty:'Miro'}],'Контент-план':[{t:'Reels-сетка',ty:'Figma'}]},
   '88888888':{},
   'Тестовый проект':{'Контент-стратегия':[{t:'Бренд-гайд',ty:'Figma'}],'Аудит профиля':[{t:'Аудит профиля',ty:'Notion'}],'Анализ конкурентов':[{t:'Бенчмаркинг',ty:'Google Doc'}],'Контент-план':[{t:'План постов',ty:'Google Sheet'}]},
 };
-function kbCount(p){return Object.values(KB_DATA[p]||{}).reduce((s,a)=>s+a.length,0);}
-function setKbProj(p){kbProj=p;renderKB();}
+function kbCount(k){return Object.values(KB_DATA[k]||{}).reduce((s,a)=>s+a.length,0);}
+function setKbProj(k){kbProj=String(k);renderKB();}
+/* поиск по проектам: раньше инпут был без обработчика и просто ничего не делал */
+function kbFilterProjects(q){
+  KB_Q=String(q==null?'':q);
+  const s=KB_Q.trim().toLowerCase();
+  document.querySelectorAll('#content-ag .kb-plist .kb-pi').forEach(function(el){
+    const nm=(el.dataset.nm||'').toLowerCase();
+    el.style.display=(!s||nm.indexOf(s)>=0)?'':'none';
+  });
+  const em=document.getElementById('kb-pempty');
+  if(em){ const any=Array.from(document.querySelectorAll('#content-ag .kb-plist .kb-pi')).some(function(e){return e.style.display!=='none';}); em.style.display=any?'none':''; }
+}
 /* ═══ Авто-сводка проекта в Базе знаний (read-only, из Supabase) ═══ */
 let KB_AUTO = {};                       // кеш по project.id
-function kbCurProj(){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(p){return p.name===kbProj;}) || null; }
+const KB_AUTO_TTL = 60000;              // сводка живёт минуту, дальше — тихое обновление
+const KB_AUTO_ERR_TTL = 15000;          // бэкофф после ошибки, иначе рендер↔запрос зациклятся
+function kbCurProj(){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(p){return kbKeyOf(p)===String(kbProj);}) || null; }
+function kbProjName(){ var p=kbCurProj(); if(p&&p.name) return p.name;
+  var e=KB_PROJECTS.find(function(x){return String(x.key)===String(kbProj);}); return e?e.name:String(kbProj||''); }
+function kbAutoInvalidate(pid){ if(pid==null) KB_AUTO={}; else delete KB_AUTO[pid]; }
 function _kbFmtD(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString('ru-RU'); }catch(e){ return String(iso); } }
 function _kbMoney(n){ if(n==null||n==='') return ''; try{ return Number(n).toLocaleString('ru-RU').replace(/,/g,' ')+' сум'; }catch(e){ return String(n); } }
 function _kbArr(v){ return Array.isArray(v)?v.join(', '):(v==null?'':String(v)); }
-function _kbNum(v){ var n=Number(v); if(!isFinite(n)) return String(v); return (Math.round(n*100)/100).toLocaleString('ru-RU'); }
-function _kbEscAttr(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/[<>]/g,''); }
+function _kbNum(v){ if(v==null||v===''||typeof v==='boolean') return '—'; var n=Number(v); if(!isFinite(n)) return String(v); return (Math.round(n*100)/100).toLocaleString('ru-RU'); }
+function _kbEscAttr(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* копирование в буфер + тост */
 function kbCopy(val,ev){ if(ev){ ev.stopPropagation&&ev.stopPropagation(); } var t=String(val==null?'':val);
@@ -16269,7 +16296,13 @@ function kbAutoCss(){
     +".kb-mtile .m{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:84px;flex:1}"
     +".kb-mtile .m .v{font-family:var(--mono);font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}"
     +".kb-mtile .m .l{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.07em;margin-top:4px}"
-    +".kb-mtile .m .g{font-size:9.5px;font-family:var(--mono);margin-top:3px}";
+    +".kb-mtile .m .g{font-size:9.5px;font-family:var(--mono);margin-top:3px}"
+    +".kb-refresh{display:inline-flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-2);border-radius:999px;padding:4px 11px;font-size:11px;font-family:var(--mono);letter-spacing:.04em;text-transform:none;cursor:pointer;transition:all .14s var(--ease-out)}"
+    +".kb-refresh:hover{border-color:var(--accent-line);color:var(--accent)}"
+    +".kb-refresh.is-busy{opacity:.6;pointer-events:none}"
+    +".kb-refresh.is-busy svg{animation:kb-spin 1s linear infinite}"
+    +"@keyframes kb-spin{to{transform:rotate(360deg)}}"
+    +".kb-auto-head.kb-auto-bar{display:flex;align-items:center;justify-content:space-between;gap:10px}";
   document.head.appendChild(s);
 }
 function kbSec(title,color,body,count){
@@ -16280,27 +16313,45 @@ function kbSec(title,color,body,count){
 }
 function _kbKV(k,v){ if(v==null||v===''||v==='—') return ''; return '<div class="kb-kv"><span class="k">'+escH(String(k))+'</span><span class="v">'+escH(String(v))+'</span></div>'; }
 
-function kbAutoEnsure(){
+function kbAutoEnsure(force){
   if(!window.LIVE||!window.SB) return;
   var p=kbCurProj(); if(!p||!p.id) return;
-  if(KB_AUTO[p.id]) return;
-  KB_AUTO[p.id]={_loading:true};
-  kbLoadAuto(p.id).then(function(){ if(document.querySelector('#content-ag .kb-grid') && kbCurProj() && kbCurProj().id===p.id) renderKB(); });
+  var A=KB_AUTO[p.id];
+  if(A&&A._loading) return;                                     // загрузка уже идёт
+  if(!force&&A&&A._loaded){
+    var age=Date.now()-(A._at||0);
+    if(!A._error&&age<KB_AUTO_TTL) return;                      // кеш ещё свежий
+    if(A._error&&age<KB_AUTO_ERR_TTL) return;                   // ошибка — ждём, не долбим сервер
+  }
+  var keep=(A&&A._loaded&&!A._error)?A:null;                    // фоновое обновление: не гасим готовые данные скелетом
+  KB_AUTO[p.id]=keep?Object.assign({},keep,{_loading:true}):{_loading:true};
+  kbLoadAuto(p.id).then(function(){
+    var c=kbCurProj();
+    if(document.querySelector('#content-ag .kb-grid') && c && c.id===p.id) renderKB();
+  });
+}
+function kbAutoRefresh(){
+  var p=kbCurProj(); if(!p||!p.id) return;
+  delete KB_AUTO[p.id];
+  kbAutoEnsure(true);
+  renderKB();
 }
 async function kbLoadAuto(pid){
   try{
-    var p=kbCurProj();
+    var p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(x){return x.id===pid;})||null;   // именно pid, а не «текущий»: при быстром переключении проектов данные больше не перемешиваются
     var res=await Promise.all([
       SB.from('project_members').select('member_id,role_in_project').eq('project_id',pid),
-      SB.from('content_plans').select('id,data,updated_at').eq('project_id',pid).order('updated_at',{ascending:false}),
-      SB.from('reports').select('id,title,kind,published_at,payload').eq('project_id',pid).order('published_at',{ascending:false}),
+      SB.from('content_plans').select('id,data,updated_at').eq('project_id',pid).order('updated_at',{ascending:false,nullsFirst:false}),
+      SB.from('reports').select('id,title,kind,published_at,payload').eq('project_id',pid).order('published_at',{ascending:false,nullsFirst:false}),
       SB.from('project_contracts').select('start_date,end_date').eq('project_id',pid).maybeSingle(),
       SB.from('project_services').select('service,tariff,mrr,cost,status,start_date,end_date,sort').eq('project_id',pid).order('sort'),
-      SB.from('project_tasks').select('status,time_spent,difficulty').eq('project_id',pid),
+      SB.from('project_tasks').select('status,time_spent,timer_started,difficulty').eq('project_id',pid),
       SB.from('project_stages').select('status').eq('project_id',pid),
       new Promise(function(r){ try{ briefLoad(pid, r); }catch(e){ r(); } })
     ]);
     var mem=res[0], cp=res[1], rp=res[2], ct=res[3], sv=res[4], tsk=res[5], stg=res[6];
+    var firstErr=[mem,cp,rp,sv,tsk,stg].map(function(r){ return r&&r.error; }).filter(Boolean)[0];
+    if(firstErr) throw firstErr;
     var ids={}; (mem.data||[]).forEach(function(m){ if(m.member_id) ids[m.member_id]=1; });
     if(p&&p.client_id) ids[p.client_id]=1;
     if(p&&p.lead_id) ids[p.lead_id]=1;
@@ -16313,9 +16364,9 @@ async function kbLoadAuto(pid){
       client:(p&&p.client_id)?(profs[p.client_id]||null):null,
       lead:(p&&p.lead_id)?(profs[p.lead_id]||null):null,
       content:cp.data||[], reports:rp.data||[], contract:ct.data||null, services:sv.data||[],
-      tasks:tsk.data||[], stages:stg.data||[], briefs:briefs, _loaded:true
+      tasks:tsk.data||[], stages:stg.data||[], briefs:briefs, _loaded:true, _at:Date.now()
     };
-  }catch(e){ KB_AUTO[pid]={_error:String((e&&e.message)||e),_loaded:true}; }
+  }catch(e){ KB_AUTO[pid]={_error:String((e&&e.message)||e),_loaded:true,_at:Date.now()}; }
 }
 
 /* ── ПАСПОРТ ── */
@@ -16432,23 +16483,47 @@ function _kbSecOps(p,A){
 /* ── SMM-ЭФФЕКТИВНОСТЬ ── */
 var _KB_SMM_LBL={er:'ER',lr:'LR',sr:'SR',tr:'TR',shr:'SHR',err:'ERR',cr:'CR',followers:'Подписчики',subs:'Подписчики',reach:'Охват',views:'Просмотры',likes:'Лайки',comments:'Комментарии',saves:'Сохранения',shares:'Репосты',reposts:'Репосты',frequency:'Частота',posts_count:'Постов',posts:'Постов',reels:'Reels',gain:'Прирост',impressions:'Показы',engagement:'Вовлечённость',clicks:'Клики',leads:'Лиды'};
 function _kbSmmLbl(k){ var kl=String(k).toLowerCase(); if(_KB_SMM_LBL[kl]) return _KB_SMM_LBL[kl]; return k.length<=4?k.toUpperCase():(k[0].toUpperCase()+k.slice(1)); }
-function _kbMetricsObj(pl){ if(!pl||typeof pl!=='object') return null;
-  if(pl.prev&&typeof pl.prev==='object') return pl.prev;
-  if(pl.metrics&&typeof pl.metrics==='object') return pl.metrics;
-  var o={}; Object.keys(pl).forEach(function(k){ var v=pl[k]; if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(Number(v)))) o[k]=v; }); return Object.keys(o).length?o:null; }
+function _kbHasVals(o){ return !!o && typeof o==='object' && Object.keys(o).some(function(k){ return o[k]!=null && o[k]!==''; }); }
+function _kbMetricsObj(pl){
+  if(!pl||typeof pl!=='object') return null;
+  if(_kbHasVals(pl.metrics)) return pl.metrics;                 // ← метрики ТЕКУЩЕГО отчёта (раньше первым проверялся payload.prev, и в сводку всегда попадал прошлый период)
+  var o={};                                                     // легаси-отчёты: плоский payload без metrics
+  Object.keys(pl).forEach(function(k){
+    if(k==='metrics'||k==='prev'||k==='goals') return;
+    var v=pl[k];
+    if(typeof v==='number'||(typeof v==='string'&&v!==''&&!isNaN(Number(v)))) o[k]=v;
+  });
+  return Object.keys(o).length?o:null;
+}
+var _KB_SMM_ORDER=['followers','subscribers_current','total_reach','reels_reach','stories_reach','posts_reach','total_views','reels_views','posts_views','stories_views','er','lr','sr','tr','shr','reels_count','posts_count','stories_count','content_total','frequency','ad_creatives'];
 function _kbSecSmm(p,A){
   var smm=(A.reports||[]).filter(function(r){ return /smm/i.test(String(r.kind||''))||/smm/i.test(String(r.title||'')); });
   if(!smm.length) return kbSec('SMM-эффективность','#F0785C','<div class="kb-empty">Нет SMM-отчётов</div>',0);
-  var last=smm[0]; var pl=last.payload||{}; var m=_kbMetricsObj(pl); var goals=(pl&&pl.goals&&typeof pl.goals==='object')?pl.goals:null;
-  var tiles='';
-  if(m){ tiles=Object.keys(m).slice(0,10).map(function(k){ var v=m[k];
-    var g=''; if(goals&&goals[k]!=null){ var ok=Number(v)>=Number(goals[k]); g='<div class="g" style="color:'+(ok?'var(--pos)':'var(--warn)')+'">цель '+_kbNum(goals[k])+'</div>'; }
-    return '<div class="m"><div class="v">'+escH(_kbNum(v))+'</div><div class="l">'+escH(_kbSmmLbl(k))+'</div>'+g+'</div>'; }).join(''); }
-  var counts=[]; if(pl&&Array.isArray(pl.posts)) counts.push(pl.posts.length+' '+_plural(pl.posts.length,'пост','поста','постов')); if(pl&&Array.isArray(pl.reels)) counts.push(pl.reels.length+' reels');
-  var srcDate=last.published_at?_kbFmtD(last.published_at):'';
-  var body=(tiles?'<div class="kb-mtile">'+tiles+'</div>':'')
+  var last=smm[0], pl=last.payload||{};
+  var m=_kbMetricsObj(pl);
+  var prev=(pl&&_kbHasVals(pl.prev))?pl.prev:null;              // prev теперь используется по назначению — как база сравнения
+  var goals=(pl&&_kbHasVals(pl.goals))?pl.goals:null;
+  var keys=m?Object.keys(m).filter(function(k){ return m[k]!=null && m[k]!==''; }):[];
+  keys.sort(function(a,b){ var ia=_KB_SMM_ORDER.indexOf(a), ib=_KB_SMM_ORDER.indexOf(b); if(ia<0)ia=99; if(ib<0)ib=99; return ia-ib||(a<b?-1:1); });
+  var tiles=keys.slice(0,10).map(function(k){
+    var v=m[k], sub='';
+    if(goals && goals[k]!=null && goals[k]!==''){
+      var ok=Number(v)>=Number(goals[k]);
+      sub='<div class="g" style="color:'+(ok?'var(--pos)':'var(--warn)')+'">цель '+escH(_kbNum(goals[k]))+'</div>';
+    } else if(prev && prev[k]!=null && prev[k]!=='' && Number(prev[k])!==0 && isFinite(Number(prev[k])) && isFinite(Number(v))){
+      var d=Number(v)-Number(prev[k]);
+      var pc=Math.round(d/Math.abs(Number(prev[k]))*100);
+      sub='<div class="g" style="color:'+(d>=0?'var(--pos)':'var(--neg)')+'">'+(d>=0?'▲ ':'▼ ')+Math.abs(pc)+'% к прошлому</div>';
+    }
+    return '<div class="m"><div class="v">'+escH(_kbNum(v))+'</div><div class="l">'+escH(_kbSmmLbl(k))+'</div>'+sub+'</div>';
+  }).join('');
+  var counts=[];
+  if(pl&&Array.isArray(pl.reels)&&pl.reels.length) counts.push(pl.reels.length+' reels');
+  if(pl&&Array.isArray(pl.posts)&&pl.posts.length) counts.push(pl.posts.length+' '+_plural(pl.posts.length,'пост','поста','постов'));
+  var per=(pl&&pl.period)?String(pl.period):(last.published_at?_kbFmtD(last.published_at):'');
+  var body=(tiles?'<div class="kb-mtile">'+tiles+'</div>':'<div class="kb-empty">Отчёт создан, но данные ещё не заполнены</div>')
     +(counts.length?'<div class="kb-kv"><span class="k">Материалы</span><span class="v">'+escH(counts.join(' · '))+'</span></div>':'')
-    +(srcDate?'<div class="kb-kv"><span class="k">По отчёту</span><span class="v">'+escH((last.title||'SMM-отчёт')+' · '+srcDate)+'</span></div>':'');
+    +(per?'<div class="kb-kv"><span class="k">По отчёту</span><span class="v">'+escH((last.title||'SMM-отчёт')+' · '+per)+'</span></div>':'');
   return kbSec('SMM-эффективность','#F0785C',body,smm.length);
 }
 
@@ -16456,37 +16531,46 @@ function kbAutoBlock(){
   if(!window.LIVE||!window.SB) return '';
   var p=kbCurProj(); if(!p||!p.id) return '';
   var A=KB_AUTO[p.id];
-  if(!A||A._loading||!A._loaded) return '<div class="kb-auto-head">Авто-сводка проекта</div><div class="kb-cat kb-auto-sec"><div class="kb-items"><div class="kb-empty">Собираем данные проекта…</div></div></div>';
-  if(A._error) return '<div class="kb-auto-head">Авто-сводка проекта</div><div class="kb-cat kb-auto-sec"><div class="kb-items"><div class="kb-empty">Не удалось загрузить данные</div></div></div>';
-  return '<div class="kb-auto-head">Авто-сводка · '+escH(p.name)+'</div>'
+  var head=function(right){ return '<div class="kb-auto-head kb-auto-bar"><span>Авто-сводка · '+escH(p.name||'')+'</span>'+(right||'')+'</div>'; };
+  var btn=function(busy,label){ return '<button class="kb-refresh'+(busy?' is-busy':'')+'" onclick="kbAutoRefresh()" title="Обновить сводку">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 12a9 9 0 11-2.6-6.4"/><path d="M21 3v6h-6"/></svg>'+label+'</button>'; };
+  if(!A||!A._loaded) return head('')+'<div class="kb-cat kb-auto-sec"><div class="kb-items"><div class="kb-empty">Собираем данные проекта…</div></div></div>';
+  if(A._error) return head(btn(false,'Повторить'))
+    +'<div class="kb-cat kb-auto-sec"><div class="kb-items"><div class="kb-empty">Не удалось загрузить данные: '+escH(A._error)+'</div></div></div>';
+  return head(btn(!!A._loading, A._loading?'Обновляем…':'Обновить'))
     +_kbSecPassport(p,A)+_kbSecContacts(p,A)+_kbSecTg(p,A)+_kbSecContent(p,A)+_kbSecReports(p,A)+_kbSecOps(p,A)+_kbSecSmm(p,A);
 }
 
-function renderKB(){ kbAutoCss(); kbAutoEnsure();
+function renderKB(){ kbAutoCss(); kbCatsLoad(); kbAutoEnsure();
   const catIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>';
   const _kbExtra=Object.keys(KB_DATA[kbProj]||{}).filter(c=>!KB_CATS.includes(c)&&((KB_DATA[kbProj]||{})[c]||[]).length);
   const cats=KB_CATS.concat(_kbExtra).map((cat,_ci)=>{
     const items=(KB_DATA[kbProj]||{})[cat]||[], col=KB_CATCOL[cat]||KB_PAL[_ci%KB_PAL.length];
     const itemsHtml=items.length
-      ? items.map((m,mi)=>`<div class="kb-mi" style="cursor:pointer" onclick="kbOpenMat('${cat}',${mi})"><div class="mic" style="background:${KB_TYPES[m.ty]}22;color:${KB_TYPES[m.ty]}">${KB_ABBR[m.ty]}</div><div class="mt">${m.t}</div><span class="ty-badge" style="background:${KB_TYPES[m.ty]}22;color:${KB_TYPES[m.ty]}">${m.ty}</span></div>`).join('')
+      ? items.map((m,mi)=>{ const tc=KB_TYPES[m.ty]||'#9AA1AC', ab=KB_ABBR[m.ty]||'··';
+          return `<div class="kb-mi" style="cursor:pointer" onclick="kbOpenMat('${_kbEscAttr(cat)}',${mi})"><div class="mic" style="background:${tc}22;color:${tc}">${escH(ab)}</div><div class="mt">${escH(m.t)}</div><span class="ty-badge" style="background:${tc}22;color:${tc}">${escH(m.ty||'')}</span></div>`;
+        }).join('')
       : `<div class="kb-empty">Нет материалов</div>`;
     return `<div class="kb-cat">
-      <div class="kb-cat-h"><div class="ic" style="background:${col}22;color:${col}">${catIcon}</div><div><div class="t">${cat}</div><div class="sub">${items.length?items.length+' материалов':'Нет материалов'}</div></div><div class="ct">${items.length}</div></div>
+      <div class="kb-cat-h"><div class="ic" style="background:${col}22;color:${col}">${catIcon}</div><div><div class="t">${escH(cat)}</div><div class="sub">${items.length?items.length+' '+_plural(items.length,'материал','материала','материалов'):'Нет материалов'}</div></div><div class="ct">${items.length}</div></div>
       <div class="kb-items">${itemsHtml}</div></div>`;
   }).join('');
+  const _cnt=kbCount(kbProj);
   document.getElementById('content-ag').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Агентство · Знания</div><h1>База знаний</h1><div class="ph-pulse"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px -1px var(--accent)"></span>${KB_PROJECTS.length} проектов · ${kbCount(kbProj)} материалов · «${kbProj}»</div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · Знания</div><h1>База знаний</h1><div class="ph-pulse"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px -1px var(--accent)"></span>${KB_PROJECTS.length} ${_plural(KB_PROJECTS.length,'проект','проекта','проектов')} · ${_cnt} ${_plural(_cnt,'материал','материала','материалов')} · «${escH(kbProjName())}»</div></div>
     </div>
     <div class="kb-grid tb-proj">
       <div>
-        <div class="kb-stat"><div class="s"><div class="v">${KB_PROJECTS.length}</div><div class="l">Проектов</div></div><div class="s"><div class="v">${kbCount(kbProj)}</div><div class="l">Материалов</div></div></div>
-        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск проекта…"></div>
+        <div class="kb-stat"><div class="s"><div class="v">${KB_PROJECTS.length}</div><div class="l">Проектов</div></div><div class="s"><div class="v">${_cnt}</div><div class="l">Материалов</div></div></div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="kb-psearch" placeholder="Поиск проекта…" value="${escH(KB_Q)}" oninput="kbFilterProjects(this.value)" autocomplete="off"></div>
         <div class="kb-actions"><button class="kb-act ghost" onclick="kbAddCat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Новая категория</button><button class="kb-act primary" onclick="kbAddMat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить материал</button></div>
         <div class="eyebrow" style="margin:16px 4px 0">Активные проекты</div>
-        <div class="kb-plist">${KB_PROJECTS.map(p=>`<div class="kb-pi ${p.name===kbProj?'on':''}" onclick="setKbProj('${p.name}')"><div class="lg">${p.logo}</div><div class="nm">${escH(p.name)}</div><div class="ct">${kbCount(p.name)}</div></div>`).join('')}</div>
+        <div class="kb-plist">${KB_PROJECTS.map(p=>`<div class="kb-pi ${String(p.key)===String(kbProj)?'on':''}" data-nm="${escH(p.name||'')}" onclick="setKbProj('${_kbEscAttr(p.key)}')"><div class="lg">${escH(p.logo||'?')}</div><div class="nm">${escH(p.name||'')}</div><div class="ct">${kbCount(p.key)}</div></div>`).join('')}</div>
+        <div class="kb-empty" id="kb-pempty" style="display:none">Проект не найден</div>
       </div>
       <div>${kbAutoBlock()}<div class="kb-auto-head"${window.LIVE?' style="margin-top:16px"':''}>Материалы</div>${cats}</div>
     </div>`;
+  if(KB_Q) kbFilterProjects(KB_Q);
 }
 
 /* ——— TOOLS module ——— */
@@ -16565,29 +16649,35 @@ function renderTools(){
 /* ——— KB + Tools interactivity ——— */
 const KB_PAL=['#37E6C8','#8A8FFF','#F0785C','#43D88C','#E3B567','#6AA9FF'];
 function kbOpenMat(cat,i){
-  const m=KB_DATA[kbProj][cat][i], c=KB_TYPES[m.ty]||'#9AA1AC';
-  const link=(m.url?(/^https?:/i.test(m.url)?m.url:'https://'+m.url):'').replace(/['"<>]/g,'');
+  const m=((KB_DATA[kbProj]||{})[cat]||[])[i]; if(!m){ toast('Материал не найден'); return; }
+  const c=KB_TYPES[m.ty]||'#9AA1AC';
+  const link=(m.url?(/^https?:/i.test(m.url)?m.url:'https://'+m.url):'').replace(/['"<>\s]/g,'');
   pd2Open(`<div class="modal">
     <div class="modal-h" style="display:flex;gap:13px;align-items:flex-start">
-      <div class="rv-ic" style="background:${c}22;color:${c};font-family:var(--mono);font-weight:700;font-size:16px">${KB_ABBR[m.ty]||'··'}</div>
-      <div style="flex:1"><h3>${m.t}</h3><p>${cat} · ${kbProj}</p></div>
-      <span class="badge" style="background:${c}22;color:${c}">${m.ty}</span>
+      <div class="rv-ic" style="background:${c}22;color:${c};font-family:var(--mono);font-weight:700;font-size:16px">${escH(KB_ABBR[m.ty]||'··')}</div>
+      <div style="flex:1"><h3>${escH(m.t)}</h3><p>${escH(cat)} · ${escH(kbProjName())}</p></div>
+      <span class="badge" style="background:${c}22;color:${c}">${escH(m.ty||'')}</span>
     </div>
     <div class="modal-b"><div class="mat-box">
       <div class="ic" style="background:${c}22;color:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg></div>
       <div class="nm">${link?'Материал доступен по ссылке':'Ссылка не задана'}</div>
-      <div class="meta">${link||'добавьте ссылку при следующем редактировании'}</div>
+      <div class="meta">${link?escH(link):'добавьте ссылку при следующем редактировании'}</div>
     </div></div>
     <div class="modal-f">
-      <button class="btn-ghost" style="color:var(--neg)" onclick="kbDelMat('${cat}',${i})">Удалить</button>
-      ${link?`<button class="btn-ghost" onclick="window.open('${link}','_blank')">Открыть</button>`:''}
+      <button class="btn-ghost" style="color:var(--neg)" onclick="kbDelMat('${_kbEscAttr(cat)}',${i})">Удалить</button>
+      ${link?`<button class="btn-ghost" onclick="kbOpenUrl('${_kbEscAttr(link)}',event)">Открыть</button>`:''}
       <button class="btn-add" onclick="pd2Close()">Закрыть</button>
     </div></div>`);
 }
-function kbDelMat(cat,i){ if(window.LIVE){ const it=KB_DATA[kbProj][cat][i]; window.tKbDel(it&&it._id); pd2Close(); return; } KB_DATA[kbProj][cat].splice(i,1);pd2Close();renderKB();toast('Материал удалён');}
+function kbDelMat(cat,i){
+  const arr=((KB_DATA[kbProj]||{})[cat])||[], it=arr[i];
+  if(window.LIVE){ if(it&&it._id) window.tKbDel(it._id); else toast('Материал не найден'); pd2Close(); return; }
+  if(it) arr.splice(i,1);
+  pd2Close(); renderKB(); toast('Материал удалён');
+}
 function kbAddMat(){
   pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Добавить материал</h3><p>${kbProj} · ссылка на доску или документ</p></div>
+    <div class="modal-h"><h3>Добавить материал</h3><p>${escH(kbProjName())} · ссылка на доску или документ</p></div>
     <div class="modal-b">
       <div class="fld2">
         <div class="fld"><label>Категория</label>${selField('kb-cat', KB_CATS, KB_CATS[0])}</div>
@@ -16614,8 +16704,8 @@ function kbAddCat(){
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="kbSaveCat()">Создать</button></div></div>`);
 }
 function kbSaveCat(){
-  const n=_v('kb-newcat'); if(!n){toast('Введи название категории');return;}
-  if(!KB_CATS.includes(n)){KB_CATS.push(n);KB_CATCOL[n]=KB_PAL[KB_CATS.length%KB_PAL.length];}
+  const n=(_v('kb-newcat')||'').trim(); if(!n){toast('Введи название категории');return;}
+  if(KB_CATS.indexOf(n)<0){ KB_CATS.push(n); KB_CATCOL[n]=KB_PAL[KB_CATS.length%KB_PAL.length]; kbCatsSave(); }
   pd2Close(); renderKB(); toast(`Категория «${n}» создана`);
 }
 function toolOpen(si,ii){const it=TOOLS_DATA[si].items[ii];const u=(/^https?:/i.test(it.url)?it.url:'https://'+it.url).replace(/['"<>]/g,'');window.open(u,'_blank');}
@@ -18856,14 +18946,14 @@ window.tFreezeTrials = async () => {
 window.tLoadKB = async () => {
   if (!SB) return;
   const { data } = await SB.from('kb_materials').select('*');
-  const byId = {}; (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => byId[p.id]=p.name);
   const map = {};
-  (data||[]).forEach(r => { const pn = byId[r.project_id] || '—';
-    (map[pn] = map[pn]||{}); (map[pn][r.category] = map[pn][r.category]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', _id:r.id }); });
+  (data||[]).forEach(r => { const k = String(r.project_id==null?'':r.project_id);      // ключ — id проекта, а не имя: проекты-тёзки больше не сливают материалы
+    if (!k) return;
+    (map[k] = map[k]||{}); (map[k][r.category] = map[k][r.category]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', _id:r.id }); });
   if (typeof KB_DATA !== 'undefined'){ Object.keys(KB_DATA).forEach(k => delete KB_DATA[k]); Object.assign(KB_DATA, map); }
   if (typeof KB_PROJECTS !== 'undefined'){ KB_PROJECTS.length = 0;
-    (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => KB_PROJECTS.push({ name:p.name, logo:p.logo||(p.name[0]||'?').toUpperCase() })); }
-  try { if (typeof kbProj !== 'undefined' && KB_PROJECTS[0] && !KB_PROJECTS.some(p => p.name===kbProj)) kbProj = KB_PROJECTS[0].name; } catch(e){}
+    (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => KB_PROJECTS.push({ key:kbKeyOf(p), name:p.name, logo:p.logo||((p.name&&p.name[0])||'?').toUpperCase() })); }
+  try { if (typeof kbProj !== 'undefined' && KB_PROJECTS[0] && !KB_PROJECTS.some(p => String(p.key)===String(kbProj))) kbProj = KB_PROJECTS[0].key; } catch(e){}
 };
 window.tLoadTools = async () => {
   if (!SB) return;
@@ -23596,7 +23686,7 @@ function refreshActive(){
 }
 let _rtT;
 function onRt(){ if (window._localTaskWriteTs && (Date.now()-window._localTaskWriteTs)<4000){ clearTimeout(_rtT); _rtT=setTimeout(onRt,1500); return; }   // идёт локальный буст правок задач — это эхо наших изменений; не перезагружаем (без шторма и гонок), синхронизируемся после паузы
-  clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ await window.tLoadAll(ME.role); refreshActive(); if (window._pdProj && document.getElementById('ov-proj').classList.contains('on')){ await _pwReload(window._pdProj); } } }, 350); }
+  clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); }catch(_e){} await window.tLoadAll(ME.role); refreshActive(); if (window._pdProj && document.getElementById('ov-proj').classList.contains('on')){ await _pwReload(window._pdProj); } } }, 350); }
 /* ---- realtime брифа: мгновенная доставка правок агентства клиенту ---- */
 function briefApplyRemote(pid){
   if(window.CLP && window.CLP.id===pid){
@@ -23627,6 +23717,7 @@ async function _rtWorkSync(){
       if(typeof clNav==='function') clNav(_cn?_cn.dataset.cm:'overview');
       return;
     }
+    try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); }catch(_e){}   // сводка БЗ больше не «замерзает» на старых данных
     const jobs=[ window.tLoadProjectAggregates() ];                                     // прогресс/просрочки на карточках проектов
     const _ovOpen = window._pdProj && document.getElementById('ov-proj').classList.contains('on');
     if (_ovOpen) jobs.push(_pwReload(window._pdProj));                                  // открытый проект — свежие задачи/этапы (сам перерисует канбан)
@@ -23645,6 +23736,7 @@ async function _rtWorkSync(){
     else if(m==='cycles'&&typeof renderCycles==='function') renderCycles();
     else if(m==='team'&&typeof renderTeam==='function') renderTeam();
     else if(m==='finance'&&typeof renderFinance==='function') renderFinance();
+    else if(m==='kb'&&typeof renderKB==='function') renderKB();
   }catch(e){ console.warn('rt-work', e); }
 }
 function onRtWork(){
@@ -23809,8 +23901,10 @@ window.tUpdateMember = async (id, perms, contact={}) => {
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tKbAdd = async (cat, title, ty, url) => {
-  try { const proj=(PROJECTS||[]).find(p => p.name===kbProj); if (!proj){ toast('Сначала выбери проект'); return; }
+  try { const proj=(typeof kbCurProj==='function')?kbCurProj():null;
+    if (!proj || !proj.id){ toast('Сначала выбери проект'); return; }
     await SB.from('kb_materials').insert({ agency_id: ME&&ME.agency_id, project_id: proj.id, category:cat, title, kind:ty, url:url||null });
+    if (typeof kbAutoInvalidate==='function') kbAutoInvalidate(proj.id);
     toast('Материал добавлен'); await window.tLoadKB(); renderKB();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
