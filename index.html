@@ -5584,6 +5584,7 @@ button:active{transform:translateY(.5px) scale(.99)}
 <div class="toast" id="toast"><span class="ti">⟐</span><span id="toast-msg"></span></div>
 
 <script>
+window.escH=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
 /* ============================================================
    TRIADA · единый SPA. Шаг 1: вход + генеральный кабинет.
    Данные сейчас засеяны в памяти (полная интерактивность).
@@ -5815,8 +5816,8 @@ function renderAnalytics(){
     <table><thead><tr><th style="width:42px">#</th><th>Агентство</th><th>Ниша</th><th>Тариф</th><th>MRR</th><th>Проекты</th><th>Доля</th></tr></thead>
     <tbody>${leaders.map((a,i)=>`<tr>
       <td><div class="lead-rank ${i<3?'top':''}">${i+1}</div></td>
-      <td><div class="ag-name"><span class="ag-dot" style="background:${a.accent}"></span><div><div class="nm">${a.name}</div><div class="sl" style="font-family:var(--font)">${a.slug}.triada.app</div></div></div></td>
-      <td style="color:var(--txt-3)">${a.vertical}</td>
+      <td><div class="ag-name"><span class="ag-dot" style="background:${a.accent}"></span><div><div class="nm">${escH(a.name)}</div><div class="sl" style="font-family:var(--font)">${escH(a.slug)}.triada.app</div></div></div></td>
+      <td style="color:var(--txt-3)">${escH(a.vertical)}</td>
       <td><span class="badge b-mut" style="text-transform:uppercase;font-size:11.5px">${a.plan}</span></td>
       <td class="num">${a.mrr?M(a.mrr)+' сум':'—'}</td>
       <td class="num">${a.projects}</td>
@@ -5971,7 +5972,7 @@ function renderTariffs(){
   </div>
   <div class="price-grid">${PLANS.map((p,i)=>`<div class="price-card ${p.pop?'pop':''}">
     ${p.pop?'<span class="pop-rib">Популярный</span>':''}
-    <div class="pl-name">${p.name}</div>
+    <div class="pl-name">${escH(p.name)}</div>
     <div class="pl-price">${tariffPriceFmt(p.price)}</div>
     <div class="pl-per">${p.per}</div>
     <div class="pl-meta"><span class="d"></span>${cnt[p.key]||0} ${cnt[p.key]===1?'агентство':'агентств'} на тарифе</div>
@@ -6122,8 +6123,8 @@ function renderGeneral(){
         <tbody>
           ${AGENCIES.map(a=>`
             <tr onclick="openDrawer('${a.id}')">
-              <td><div class="ag-name"><span class="ag-dot" style="background:${a.accent}"></span><div><div class="nm">${a.name}</div><div class="sl">${a.slug}.triada.app</div></div></div></td>
-              <td style="font-family:var(--font);color:var(--txt-2);text-align:right">${a.vertical}</td>
+              <td><div class="ag-name"><span class="ag-dot" style="background:${a.accent}"></span><div><div class="nm">${escH(a.name)}</div><div class="sl">${escH(a.slug)}.triada.app</div></div></div></td>
+              <td style="font-family:var(--font);color:var(--txt-2);text-align:right">${escH(a.vertical)}</td>
               <td><span class="plan">${a.plan}</span></td>
               <td style="text-align:right">${statusBadge(a.status)}</td>
               <td>${a.employees}</td>
@@ -6147,7 +6148,7 @@ function drawCharts(){
   const max=Math.max(...AGENCIES.map(a=>a.projects),1);
   document.getElementById('cAg').innerHTML=`<div style="padding:18px;display:flex;flex-direction:column;gap:14px;justify-content:center;height:100%">${
     AGENCIES.map(a=>`<div style="display:flex;align-items:center;gap:12px">
-      <div style="width:92px;flex:0 0 auto;font-size:13.5px;color:var(--txt-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.name}</div>
+      <div style="width:92px;flex:0 0 auto;font-size:13.5px;color:var(--txt-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(a.name)}</div>
       <div style="flex:1;height:10px;background:var(--bg-3);border-radius:5px;overflow:hidden"><div class="bf" style="width:${Math.round(a.projects/max*100)}%;height:100%;background:${a.accent};border-radius:5px"></div></div>
       <div class="num" style="width:26px;flex:0 0 auto;font-size:14px;color:var(--txt)">${a.projects}</div>
     </div>`).join('')}</div>`;
@@ -6232,7 +6233,7 @@ function openDrawer(id){
   document.getElementById('drawer').innerHTML=`
     <div class="dr-h">
       <div class="dr-av" style="background:${a.accent}">${logoFill(a.logoUrl,a.name[0])}</div>
-      <div><div style="font-weight:700;font-size:18px">${a.name}</div><div style="font-family:var(--mono);font-size:12.5px;color:var(--txt-3);margin-top:3px">${a.slug}.triada.app</div>
+      <div><div style="font-weight:700;font-size:18px">${escH(a.name)}</div><div style="font-family:var(--mono);font-size:12.5px;color:var(--txt-3);margin-top:3px">${escH(a.slug)}.triada.app</div>
       <div style="margin-top:9px;display:flex;gap:8px;align-items:center">${statusBadge(a.status)}<span class="plan" style="text-transform:none">${(window.planLabel?planLabel(a):a.plan)}</span></div></div>
       <button class="x" onclick="closeDrawer()">×</button>
     </div>
@@ -6244,7 +6245,7 @@ function openDrawer(id){
         <div class="st"><div class="v">${a.clients}</div><div class="l">Клиенты</div></div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:14px"><span style="color:var(--txt-2)">MRR</span><span class="num" style="color:var(--txt)">${a.mrr?money(a.mrr):'—'}</span></div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:14px"><span style="color:var(--txt-2)">Ниша</span><span>${a.vertical}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:14px"><span style="color:var(--txt-2)">Ниша</span><span>${escH(a.vertical)}</span></div>
       <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:14px"><span style="color:var(--txt-2)">Последняя активность</span><span style="color:var(--txt-3)" class="num">${a.active}</span></div>
     </div>
     <div class="dr-sec">
@@ -6488,7 +6489,7 @@ function myProfileOpen(){
           </label>
         </div>
         <div class="pm2-id-tx">
-          <div class="pm2-id-nm">${me.full_name||'—'}</div>
+          <div class="pm2-id-nm">${escH(me.full_name||'—')}</div>
           <div class="pm2-id-rl">${role}${me.dept?(' · '+me.dept):''}</div>
         </div>
       </div>
@@ -6536,8 +6537,8 @@ function _agSetTopBtn(m){
 function projNote(i){
   const p=PROJECTS[i];
   pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Заметка · ${p.name}</h3><p>Внутренняя заметка по проекту</p></div>
-    <div class="modal-b"><div class="fld"><label>Текст</label><textarea id="pj-note" placeholder="Контекст, договорённости, риски…">${p.note||''}</textarea></div></div>
+    <div class="modal-h"><h3>Заметка · ${escH(p.name)}</h3><p>Внутренняя заметка по проекту</p></div>
+    <div class="modal-b"><div class="fld"><label>Текст</label><textarea id="pj-note" placeholder="Контекст, договорённости, риски…">${escH(p.note||'')}</textarea></div></div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pjSaveNote(${i})">Сохранить</button></div></div>`);
 }
 function pjSaveNote(i){ const p=PROJECTS[i]; if(window.LIVE&&window.tProjectUpdate) return window.tProjectUpdate(p.id,{note:_v('pj-note')}); p.note=_v('pj-note');pd2Close();toast('Заметка сохранена'); }
@@ -6550,7 +6551,7 @@ function projSettings(i){
   const tariffs=_tagList('tariff',['Platinum','Gold','Silver'],p.tariff||'');
   const leadOpts=[['','— не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name+(m.role?(' · '+m.role):'')]));
   pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Настройки · ${p.name}</h3><p>Карточка проекта · теги, тариф, ответственный</p></div>
+    <div class="modal-h"><h3>Настройки · ${escH(p.name)}</h3><p>Карточка проекта · теги, тариф, ответственный</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pj-name" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('pj-logo', p.logoUrl, (p.logo||'?'))}</div>
@@ -6629,7 +6630,7 @@ function pjDoReactivate(){
 }
 function pjDeleteProject(i){ const p=PROJECTS[i];
   if(!agIsPM()){ toast('Удаление проектов доступно только PM'); return; }
-  pd2Open(`<div class="modal"><div class="modal-h"><h3>Удалить проект?</h3><p>${p.name} · вместе с этапами, задачами, отчётами</p></div>
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Удалить проект?</h3><p>${escH(p.name)} · вместе с этапами, задачами, отчётами</p></div>
     <div class="modal-b"><div style="font-size:14px;color:var(--txt-2);line-height:1.55">Действие необратимо: удалятся все этапы, задачи, отчёты и история проекта. Клиентский аккаунт сохранится.</div></div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" style="background:var(--neg);color:#fff" onclick="${window.LIVE?`window.tProjectDelete('${p.id}')`:`pd2Close()`}">Удалить</button></div></div>`);
 }
@@ -7667,7 +7668,7 @@ const _projCard=(p)=>{
   const _paceW=p.status==='done'?100:((p._overdueN||0)>0?28:(risk.lvl==='warn'?64:100));
   let L=p._lead; if(!L && p.lead_id){ const _x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===p.lead_id); if(_x) L={name:_x.name,color:_x.color||'var(--accent)',avatar:_x.avatar||null}; }
   const leadHTML = L
-    ? `<span class="pt-lead-av" style="background:${L.color}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?')[0]||'?').toUpperCase()}</span><span class="pt-lead-txt"><span class="pt-lead-nm">${L.name}</span><span class="pt-lead-r">ответственный</span></span>`
+    ? `<span class="pt-lead-av" style="background:${L.color}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?')[0]||'?').toUpperCase()}</span><span class="pt-lead-txt"><span class="pt-lead-nm">${escH(L.name)}</span><span class="pt-lead-r">ответственный</span></span>`
     : `<span class="pt-lead-av pt-lead-none">?</span><span class="pt-lead-txt"><span class="pt-lead-nm" style="color:var(--txt-3)">не назначен</span></span>`;
   const _tk=p._taskAgg||{done:0,total:0}; const _sD=pp.done,_sT=pp.total,_tD=_tk.done,_tT=_tk.total;
   const _countsHTML='<div class="pt-counts">'
@@ -7679,7 +7680,7 @@ const _projCard=(p)=>{
   const _depts=[...new Set(_TM.map(t=>{const m=_tgL.find(x=>String(x._id)===String(t._id));return (m&&m.dept)?m.dept:null;}).filter(Boolean))];
   const _teamChip=_depts.length?_depts.join(' · '):(_TM.length?(_TM.length+' '+_plural(_TM.length,'участник','участника','участников')):'');
   const _teamBlock=_TM.length?`<div class="pjh-row"><div class="pjh-k">Команда</div><div class="pjh-v"><div class="pjh-avs">${_TM.slice(0,4).map((t,i)=>`<span class="pjh-av" style="background:${t.color||'var(--accent)'};z-index:${4-i}">${t.avatar?`<img src="${String(t.avatar).replace(/"/g,'')}" alt="">`:((t.name||'?').trim()[0]||'?').toUpperCase()}</span>`).join('')}${_TM.length>4?`<span class="pjh-av pjh-av-more">+${_TM.length-4}</span>`:''}</div>${_teamChip?`<span class="pjh-chip">${_teamChip}</span>`:''}</div></div>`:'';
-  const _pmBlock=L?`<div class="pjh-row"><div class="pjh-k">Проект-менеджер</div><div class="pjh-pm"><span class="pjh-pmav" style="background:${L.color||'var(--accent)'}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?').trim()[0]||'?').toUpperCase()}</span><span class="pjh-pmnm"><b>${L.name||'—'}</b><span>ответственный</span></span></div></div>`:`<div class="pjh-row"><div class="pjh-k">Проект-менеджер</div><div class="pjh-pm"><span class="pjh-pmav" style="background:var(--bg-3);color:var(--txt-3)">?</span><span class="pjh-pmnm"><b style="color:var(--txt-3)">не назначен</b></span></div></div>`;
+  const _pmBlock=L?`<div class="pjh-row"><div class="pjh-k">Проект-менеджер</div><div class="pjh-pm"><span class="pjh-pmav" style="background:${L.color||'var(--accent)'}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?').trim()[0]||'?').toUpperCase()}</span><span class="pjh-pmnm"><b>${escH(L.name||'—')}</b><span>ответственный</span></span></div></div>`:`<div class="pjh-row"><div class="pjh-k">Проект-менеджер</div><div class="pjh-pm"><span class="pjh-pmav" style="background:var(--bg-3);color:var(--txt-3)">?</span><span class="pjh-pmnm"><b style="color:var(--txt-3)">не назначен</b></span></div></div>`;
   const _MM=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
   let _ctHTML='<div class="pjh-ct"><div class="pjh-ctb"><span class="k">Срок контракта</span><span class="v" style="color:var(--txt-3);font-weight:600">не задан</span></div></div>';
   if(p._contract&&p._contract.end){
@@ -7712,12 +7713,12 @@ const _projCard=(p)=>{
         </div>
         <div class="pjh-meta">
           <div class="pjh-head">
-            <button class="pjh-name" onclick="event.stopPropagation();openProject(${idx})"><span class="pjh-name-t">${p.name}</span><span class="pjh-dot" style="background:${risk.color};box-shadow:0 0 8px -1px ${risk.color}" title="${risk.label}"></span></button>
+            <button class="pjh-name" onclick="event.stopPropagation();openProject(${idx})"><span class="pjh-name-t">${escH(p.name)}</span><span class="pjh-dot" style="background:${risk.color};box-shadow:0 0 8px -1px ${risk.color}" title="${risk.label}"></span></button>
             ${agCanEditProject(p)?`<button class="pjh-set" title="Настройки проекта" onclick="event.stopPropagation();projSettings(${idx})">${_setSVG}</button>`:''}
           </div>
           <div class="pjh-mgrid">
             <div class="pjh-mblk"><div class="mk">Профиль проекта</div><div class="mcls"><div class="mr"><span class="ml">Услуга</span><span class="mv ac">${p.svc||'—'}</span></div><div class="mr"><span class="ml">Категория</span><span class="mv">${(p.cat&&p.cat!=='—')?p.cat:'—'}</span></div><div class="mr"><span class="ml">Тариф</span><span class="mv">${(tar.name&&tar.name!=='—')?tar.name:'—'}</span></div></div></div>
-            <div class="pjh-mblk"><div class="mk">Ответственный</div>${L?`<div class="pjh-person"><span class="pav" style="background:${L.color||'var(--accent)'}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?').trim()[0]||'?').toUpperCase()}</span><div class="pnm"><b>${L.name||'—'}</b><span>проект-менеджер</span></div></div>`:`<div class="pjh-person none"><span class="pav q">?</span><div class="pnm"><b>Не назначен</b><span>ответственный</span></div></div>`}</div>
+            <div class="pjh-mblk"><div class="mk">Ответственный</div>${L?`<div class="pjh-person"><span class="pav" style="background:${L.color||'var(--accent)'}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?').trim()[0]||'?').toUpperCase()}</span><div class="pnm"><b>${escH(L.name||'—')}</b><span>проект-менеджер</span></div></div>`:`<div class="pjh-person none"><span class="pav q">?</span><div class="pnm"><b>Не назначен</b><span>ответственный</span></div></div>`}</div>
             <div class="pjh-mblk"><div class="mk">Команда</div>${_TM.length?`<div class="pjh-teamx"><div class="pjh-avs">${_TM.slice(0,4).map((t,i)=>`<span class="pjh-av" style="background:${t.color||'var(--accent)'};z-index:${4-i}">${t.avatar?`<img src="${String(t.avatar).replace(/"/g,'')}" alt="">`:((t.name||'?').trim()[0]||'?').toUpperCase()}</span>`).join('')}${_TM.length>4?`<span class="pjh-av pjh-av-more">+${_TM.length-4}</span>`:''}</div>${_teamChip?`<span class="pjh-teamx-n">${_teamChip}</span>`:''}</div>`:`<div class="pjh-teamx none"><span class="pjh-teamx-n">Без команды</span></div>`}</div>
           </div>
         </div>
@@ -8302,7 +8303,7 @@ async function pdNewTask(st){
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе модалка открывается мгновенно, данные освежаются в фоне
   const stages=(p._stages||[]).filter(s=>s.status!=='done');
   if(!stages.length){
-    pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
+    pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${escH(p.name)} · Операционка</p></div>
       <div class="modal-b"><div class="modph" style="padding:26px 0"><h3>Нет активных этапов</h3><p>Задачи создаются только в незавершённых этапах. Добавь или активируй этап во вкладке «Этапы».</p></div></div>
       <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div></div>`);
     return;
@@ -8312,7 +8313,7 @@ async function pdNewTask(st){
   const _defSt=(stages.find(s=>s.status==='active')||stages[0]).id;
   window._pdSub=[];
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
-  pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${p.name} · Операционка</p></div>
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${escH(p.name)} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
       <div class="fld"><label>Этап <span style="color:var(--neg)">*</span></label>${selField('pd2-stg', stArr, _defSt)}</div>
@@ -8364,7 +8365,7 @@ async function pdTaskEdit(id){
   const _stLbl2=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
   let stArr=(p._stages||[]).map(s=>[s.id,_stLbl2(s)]);
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
-  pd2Open(`<div class="modal"><div class="modal-h"><h3>Редактировать задачу</h3><p>${p.name} · Операционка</p></div>
+  pd2Open(`<div class="modal"><div class="modal-h"><h3>Редактировать задачу</h3><p>${escH(p.name)} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" value="${_attr(t.title)}" placeholder="напр. Смонтировать ролик"></div>
       <div class="fld"><label>Этап</label>${selField('pd2-stg', stArr, t.stage_id||'')}</div>
@@ -8542,12 +8543,12 @@ function renderPd(){
           const mat=s.material_url?`<a class="pd-mat" href="${(s.material_url||'').replace(/"/g,'&quot;')}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg>Открыть материал</a>`:'';
           let tasksHtml='';
           if(s.status==='active'&&tk.length){
-            tasksHtml=`<div class="pd-tasks">`+tk.map(t=>{ const td=t.status==='done'; const chk=td?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''; return `<div class="pd-task"><span class="pd-cbx ${td?'':'empty'}">${chk}</span><span class="pd-tnm ${td?'done':''}">${t.title||'Задача'}</span><span class="pd-tmr">${t.timer_started?'в работе':pkFmtDur(_taskElapsed(t))}</span></div>`; }).join('')+`</div>`;
+            tasksHtml=`<div class="pd-tasks">`+tk.map(t=>{ const td=t.status==='done'; const chk=td?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''; return `<div class="pd-task"><span class="pd-cbx ${td?'':'empty'}">${chk}</span><span class="pd-tnm ${td?'done':''}">${escH(t.title||'Задача')}</span><span class="pd-tmr">${t.timer_started?'в работе':pkFmtDur(_taskElapsed(t))}</span></div>`; }).join('')+`</div>`;
           }
           return `<div class="pd-st ${s.status}" data-stid="${s.id}">
             <div class="pd-rail"><div class="pd-node">${node}</div></div>
             <div class="pd-body">
-              <div class="pd-brow"><span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></span><div class="pd-st-nm">${s.name}</div>${dd}<div class="pd-st-status">${s.status==='active'?'● '+status:status}</div>${p.status!=='done'?`<button class="pd-edit" onclick="event.stopPropagation();pdEditStage('${s.id}')">Изменить</button>`:''}</div>
+              <div class="pd-brow"><span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></span><div class="pd-st-nm">${escH(s.name)}</div>${dd}<div class="pd-st-status">${s.status==='active'?'● '+status:status}</div>${p.status!=='done'?`<button class="pd-edit" onclick="event.stopPropagation();pdEditStage('${s.id}')">Изменить</button>`:''}</div>
               <div class="pd-subrow">${tcount}${mat}</div>
               ${tasksHtml}
             </div></div>`;
@@ -11649,13 +11650,13 @@ function pdEditStage(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ 
   const seg=[['done','Завершён','var(--pos)'],['active','В работе','var(--accent)'],['wait','Ожидает','var(--warn)']]
     .map(([k,l,c])=>`<button class="${k===s.status?'on':''}" data-st="${k}" onclick="pd2SetStatus('${k}')"><span class="d" style="background:${c}"></span>${l}</button>`).join('');
   pd2Open(`<div class="modal">
-    <div class="modal-h"><h3>Этап · ${s.name}</h3><p>Статус, срок и материалы этапа</p></div>
+    <div class="modal-h"><h3>Этап · ${escH(s.name)}</h3><p>Статус, срок и материалы этапа</p></div>
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" value="${(s.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Статус этапа</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-date', s.due_date||'')}${timeField('pd2-time', s.due_time||'')}</div></div>
       <div class="fld"><label>Ссылка на материал</label><input id="pd2-link" value="${(s.link||'').replace(/"/g,'&quot;')}" placeholder="https://… (Drive, Figma, Notion)"></div>
-      <div class="fld"><label>Комментарий</label><textarea id="pd2-note" placeholder="Заметка по этапу…">${s.note||''}</textarea></div>
+      <div class="fld"><label>Комментарий</label><textarea id="pd2-note" placeholder="Заметка по этапу…">${escH(s.note||'')}</textarea></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" style="margin-right:auto;color:var(--neg)" onclick="pdStageDel('${s.id}')">Удалить</button><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveStage('${s.id}')">Сохранить</button></div>
   </div>`);
@@ -14204,7 +14205,7 @@ function renderOverview(){
           return `<tr onclick="ovOpen('${p.id}')">
             <td><div class="ag-name" style="gap:12px">
               <div class="ov-avw"><div class="ov-av">${logoFill(p.logoUrl,p.logo)}</div><span class="ov-st" style="background:${dot}"></span></div>
-              <div style="min-width:0"><div class="nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${p.name}</div>${p.svc?`<div class="sl" style="color:var(--accent)">${p.svc}</div>`:''}</div>
+              <div style="min-width:0"><div class="nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${escH(p.name)}</div>${p.svc?`<div class="sl" style="color:var(--accent)">${p.svc}</div>`:''}</div>
             </div></td>
             <td style="text-align:right">${p.cat&&p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:'<span style="color:var(--txt-3)">—</span>'}</td>
             <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span class="num">${prog}%</span><div style="width:72px;height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden"><i style="display:block;width:${prog}%;height:100%;background:${prog>=100?'var(--pos)':'var(--accent)'};border-radius:3px"></i></div></div></td>
@@ -14230,7 +14231,7 @@ function renderOverview(){
       <div class="card">
         <div class="card-h"><div class="t">Загрузка по этапам <span class="c">по всем проектам</span></div></div>
         <div class="card-body rd-scroll">${O.stageLoad.length?O.stageLoad.map(s=>`<div class="ld-row">
-          <div class="ld-name">${s.name}</div>
+          <div class="ld-name">${escH(s.name)}</div>
           <div class="ld-bar"><i style="width:${s.total?Math.round(s.done/s.total*100):0}%"></i></div>
           <div class="ld-ct">${s.done}/${s.total}</div>
         </div>`).join(''):'<div class="empty-mini">Нет этапов</div>'}</div>
@@ -14456,7 +14457,7 @@ function renderCycles(){
       <table class="ctbl">
         <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th>Доля</th><th>% возвратов</th><th>Простой</th></tr></thead>
         <tbody>${C.stages.map((s,i)=>`<tr style="animation-delay:${i*45}ms">
-          <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${s.name}${s.lowSample?' <span style="color:var(--warn);font-size:11.5px;font-family:var(--mono)">мало данных</span>':''}</td>
+          <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${escH(s.name)}${s.lowSample?' <span style="color:var(--warn);font-size:11.5px;font-family:var(--mono)">мало данных</span>':''}</td>
           <td class="num">${s.n}</td>
           <td class="num" style="color:var(--accent)">${_cycDur(s.p50Ms)}</td>
           <td class="num" style="color:var(--violet)">${s.p90Ms!=null?_cycDur(s.p90Ms):'—'}</td>
@@ -14742,7 +14743,7 @@ function pfRender(_opts){
   pd2Open(`<div class="modal" style="max-width:560px">
     <div class="modal-h" style="display:flex;align-items:center;gap:12px">
       <div class="ov-av" style="width:40px;height:40px;border-radius:10px">${logoFill(PFIN.logoUrl,PFIN.logo)}</div>
-      <div style="flex:1"><h3 style="margin:0">Финансы проекта</h3><p style="margin:2px 0 0;text-transform:uppercase;letter-spacing:.04em">${PFIN.name}</p></div>
+      <div style="flex:1"><h3 style="margin:0">Финансы проекта</h3><p style="margin:2px 0 0;text-transform:uppercase;letter-spacing:.04em">${escH(PFIN.name)}</p></div>
       <button class="btn-ghost pf-cat-btn" onclick="openFinCatalog()" title="Настроить роли и категории"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Справочники</button>
     </div>
     <div class="modal-b" style="max-height:64vh;overflow:auto">
@@ -14936,7 +14937,7 @@ function finBreakdown(title, total, items){
     const mh = s.margin>=50?'hi':s.margin>=25?'mid':'lo';
     return `<div class="brk">
       <div class="tip"><div class="tr"><span>Доход</span><b>${money(s.amount)}</b></div><div class="tr"><span>Доля</span><b>${s.pct}%</b></div><div class="tr"><span>Маржа</span><b class="${mh}">${s.margin}%</b></div><div class="tr"><span>Проектов</span><b>${s.count}</b></div></div>
-      <div class="brk-top"><span class="brk-dot" style="background:${s.color}"></span><span class="brk-nm">${s.name}</span><span class="brk-pct" style="color:${s.color}">${s.pct}%</span></div>
+      <div class="brk-top"><span class="brk-dot" style="background:${s.color}"></span><span class="brk-nm">${escH(s.name)}</span><span class="brk-pct" style="color:${s.color}">${s.pct}%</span></div>
       <div class="brk-bar"><i style="--w:${Math.max(2,s.pct)}%;background:linear-gradient(90deg,${s.color},color-mix(in srgb,${s.color} 68%,#fff))"></i></div>
       <div class="brk-foot"><span class="mtag ${mh}">маржа ${s.margin}%</span><span class="brk-cnt">${money(s.amount)} · ${s.count} ${_plural(s.count,'проект','проекта','проектов')}</span></div>
     </div>`;
@@ -15098,7 +15099,7 @@ function renderFinance(){
       const splitBar = '<div class="pdist-split"><div class="pdist-split-bar">'
         + split.map(s=>`<i style="flex:${s.pct||0};background:${s.color}"></i>`).join('')
         + '</div><div class="pdist-split-lg">'
-        + split.map(s=>`<span><i style="background:${s.color}"></i>${s.name||'—'} · ${s.pct}%</span>`).join('')
+        + split.map(s=>`<span><i style="background:${s.color}"></i>${escH(s.name||'—')} · ${s.pct}%</span>`).join('')
         + '</div></div>';
       const _amts = split.map(s=>Math.round(distBase*(s.pct||0)/100));
       const _rem = distBase - _amts.reduce((a,b)=>a+b,0);
@@ -15107,7 +15108,7 @@ function renderFinance(){
           const ini=((s.name||'?').trim()[0]||'?').toUpperCase();
           return `<div class="pdist-card" style="--c:${s.color};--c-soft:${s.color}1f;--c-line:${s.color}66">`
             +`<div class="pdist-top"><span class="pdist-av">${logoFill(s.avatar,ini)}</span>`
-            +`<div class="pdist-id"><div class="pdist-nm">${s.name||'Без имени'}</div><div class="pdist-role">${s.role||'Партнёр'}</div></div>`
+            +`<div class="pdist-id"><div class="pdist-nm">${escH(s.name||'Без имени')}</div><div class="pdist-role">${s.role||'Партнёр'}</div></div>`
             +`<span class="pdist-pct">${s.pct}%</span></div>`
             +`<div class="pdist-amt">+${money(amt)}</div>`
             +`<div class="pdist-cap eyebrow">Доля чистой прибыли</div>`
@@ -15269,7 +15270,7 @@ function renderFinance(){
             <div class="pl-head">
               <div class="pl-id">
                 <div class="pl-av">${logoFill(p.logoUrl,p.logo)}</div>
-                <div style="min-width:0"><div class="pl-nm">${p.name}</div><div class="pl-meta">${p.cat&&p.cat!=='—'?`<span class="pl-sector">${p.cat}</span>`:''}${badge}</div></div>
+                <div style="min-width:0"><div class="pl-nm">${escH(p.name)}</div><div class="pl-meta">${p.cat&&p.cat!=='—'?`<span class="pl-sector">${p.cat}</span>`:''}${badge}</div></div>
               </div>
               <button class="pl-gear" onclick="openProjFinance('${p.id}')" title="Редактировать финансы проекта"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
             </div>
@@ -15296,10 +15297,10 @@ function renderFinance(){
         ${(()=>{
           const bd=F.breakdown||[], maxCost=bd.length?bd[0].amount:1;
           const RAMP=['#6C7488','#5F6678','#545B6C','#4B5162','#424857','#3A3F4C']; const sh=i=>RAMP[Math.min(i,RAMP.length-1)];
-          const segs=bd.map((x,i)=>`<div class="alloc-seg" title="${x.name}: ${x.pct}%" style="width:${F.totalMrr>0?(x.amount/F.totalMrr*100).toFixed(2):0}%;background:${sh(i)}"></div>`).join('')
+          const segs=bd.map((x,i)=>`<div class="alloc-seg" title="${escH(x.name)}: ${x.pct}%" style="width:${F.totalMrr>0?(x.amount/F.totalMrr*100).toFixed(2):0}%;background:${sh(i)}"></div>`).join('')
             + (F.profit>0?`<div class="alloc-seg" title="Прибыль: ${F.marginPct}%" style="width:${Math.max(0,F.marginPct).toFixed(2)}%;background:linear-gradient(90deg,#43D88C,#37E6C8)"></div>`:'');
           const rows=bd.length?bd.map((x,i)=>{const clk=x.projects&&x.projects.length;return `<div class="cost-row${i===0?' top':''}${clk?' clickable':''}"${clk?` onclick="openCostDrill(${i})" onkeydown="if(event.key==='Enter')openCostDrill(${i})" tabindex="0" role="button"`:''}>
-              <span class="cost-name"><span class="wf-dot" style="background:${sh(i)}"></span>${x.name} <span class="tagx" style="font-size:11px;padding:1px 6px">${x.label}</span>${i===0?'<span class="cost-flag">съедает больше всего</span>':''}${clk?'<span class="cost-go" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>':''}</span>
+              <span class="cost-name"><span class="wf-dot" style="background:${sh(i)}"></span>${escH(x.name)} <span class="tagx" style="font-size:11px;padding:1px 6px">${x.label}</span>${i===0?'<span class="cost-flag">съедает больше всего</span>':''}${clk?'<span class="cost-go" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>':''}</span>
               <div class="cost-bar"><i style="width:${maxCost>0?(x.amount/maxCost*100).toFixed(1):0}%;background:${sh(i)}"></i></div>
               <span class="cost-val"><span class="cost-pct">${x.pct}<span class="u">%</span></span><span class="cost-amt">${money(x.amount)}</span></span>
             </div>`;}).join(''):'<div style="font-size:14px;color:var(--txt-3);padding:6px 2px">Статьи расходов ещё не заданы — откройте ⚙ на проекте.</div>';
@@ -15655,11 +15656,11 @@ function renderTeam(){
         <th>#</th><th>Сотрудник</th><th>TPI</th><th>Профиль · O·S·Q·R</th><th>Выработка</th><th>Медиана цикла</th><th>Возвраты</th><th class="col-spark">Динамика</th><th class="col-arch">Тип</th>
       </tr></thead><tbody>
       ${rows.length?rows.map(r=>{const m=r.m,g=_gradeOf(r.tpi),st=actColor(m._lastDays),low=r.n<3;
-        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${m.name||'—'}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div></div></div>`;
+        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div></div></div>`;
         if(low){
           const need=Math.max(0,3-r.n);
           const hint=`<div class="ti-hint">${need>0?`ещё ${need} ${_taskWord(need)} до оценки`:'оценка формируется'}</div>`;
-          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${m.name||'—'}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div>${hint}</div></div>`;
+          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div>${hint}</div></div>`;
           return `<tr class="ti-low" ${agIsOwner()?`onclick="openEmpEdit(${r._i})" style="cursor:pointer"`:'style="cursor:default"'}>
         <td><span class="ti-rank idle">–</span></td>
         <td>${idCellLow}</td>
@@ -15708,7 +15709,7 @@ function renderTeam(){
           <tbody>${sorted.length?sorted.map(e=>{const w=e._wait||0,a=e._active||0,r=e._review||0,d=e._done||0,t=w+a+r+d,tt=t||1;
             const dist=[[w,'var(--warn)'],[a,'var(--accent)'],[r,'var(--violet)'],[d,'var(--pos)']].map(([v,c])=>v>0?`<i style="width:${(v/tt*100).toFixed(1)}%;background:${c}"></i>`:'').join('');
             return `<tr class="wlx-click" onclick="openEmpStats('${e._id}')" onkeydown="if(event.key==='Enter')openEmpStats('${e._id}')" tabindex="0" role="button">
-              <td><div class="wlx-id"><span class="wlx-av" style="background:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span><div><div class="nm">${e.name}</div><div class="sl">${t} ${_plural(t,'задача','задачи','задач')}</div></div></div></td>
+              <td><div class="wlx-id"><span class="wlx-av" style="background:${e.color||'var(--accent)'}">${logoFill(e.avatar,((e.name||'?')[0]||'?').toUpperCase())}</span><div><div class="nm">${escH(e.name)}</div><div class="sl">${t} ${_plural(t,'задача','задачи','задач')}</div></div></div></td>
               <td><div class="wlx-dist">${dist||'<i style="width:100%;background:var(--bg-3)"></i>'}</div></td>
               <td>${cell(w,'var(--warn-dim)','var(--warn)')}</td>
               <td>${cell(a,'var(--accent-dim)','var(--accent)')}</td>
@@ -15755,7 +15756,7 @@ function renderTeam(){
       return `<div class="tcx-card dept-clic" onclick="openTeamCompose('${_attr(d.name)}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')openTeamCompose('${_attr(d.name)}')">
         <div class="tcx-h">
           ${_tcxMono(d.name,opsC,opsG.bg,((d.name||'?').trim()[0]||'?').toUpperCase())}
-          <div class="tcx-tt"><div class="tcx-nm">${d.name}</div><div class="tcx-sub">${d.emps.length} ${_plural(d.emps.length,'сотрудник','сотрудника','сотрудников')} · ${_periodLbl()}</div></div>
+          <div class="tcx-tt"><div class="tcx-nm">${escH(d.name)}</div><div class="tcx-sub">${d.emps.length} ${_plural(d.emps.length,'сотрудник','сотрудника','сотрудников')} · ${_periodLbl()}</div></div>
           <div class="tcx-right"><div class="tcx-avs">${avs}</div>${badge}</div>
         </div>
         <div class="tcx-axg">${opsMod}${smmMod}</div>
@@ -15889,7 +15890,7 @@ function teamAddToTeam(id){
   e.dept=_tcDept;
   if(window.LIVE && window.tSetMemberDept){ window.tSetMemberDept(id,_tcDept); }
   _tcRefresh(); renderTeam();
-  toast(`${e.name} добавлен в команду «${_tcDept}»`);
+  toast(`${escH(e.name)} добавлен в команду «${_tcDept}»`);
 }
 function teamRemoveFromTeam(id){
   if(!agIsOwner()){ toast('Управление командой доступно только владельцу'); return; }
@@ -15897,7 +15898,7 @@ function teamRemoveFromTeam(id){
   e.dept='Без команды';
   if(window.LIVE && window.tSetMemberDept){ window.tSetMemberDept(id,'Без команды'); }
   _tcRefresh(); renderTeam();
-  toast(`${e.name} убран из команды`);
+  toast(`${escH(e.name)} убран из команды`);
 }
 function openEmpInTeam(dept){
   pd2Close();
@@ -16222,7 +16223,7 @@ function renderKB(){
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск проекта…"></div>
         <div class="kb-actions"><button class="kb-act ghost" onclick="kbAddCat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Новая категория</button><button class="kb-act primary" onclick="kbAddMat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить материал</button></div>
         <div class="eyebrow" style="margin:16px 4px 0">Активные проекты</div>
-        <div class="kb-plist">${KB_PROJECTS.map(p=>`<div class="kb-pi ${p.name===kbProj?'on':''}" onclick="setKbProj('${p.name}')"><div class="lg">${p.logo}</div><div class="nm">${p.name}</div><div class="ct">${kbCount(p.name)}</div></div>`).join('')}</div>
+        <div class="kb-plist">${KB_PROJECTS.map(p=>`<div class="kb-pi ${p.name===kbProj?'on':''}" onclick="setKbProj('${p.name}')"><div class="lg">${p.logo}</div><div class="nm">${escH(p.name)}</div><div class="ct">${kbCount(p.name)}</div></div>`).join('')}</div>
       </div>
       <div>${cats}</div>
     </div>`;
@@ -17275,7 +17276,7 @@ window.ccOpen = id => { if(typeof openDrawer==='function') openDrawer(id); };
 window.ccEdit = id => { if(typeof openAgency==='function') openAgency(id); };
 window.ccFreeze = async id => {
   const a = A_().find(x=>String(x.id)===String(id)); if(!a) return;
-  if(!confirm(`Заморозить «${a.name}»? Доступ прекратится, выручка перестанет учитываться.`)) return;
+  if(!confirm(`Заморозить «${escH(a.name)}»? Доступ прекратится, выручка перестанет учитываться.`)) return;
   if(window.tUpdateAgency) await window.tUpdateAgency(id, {status:'suspended'});
   ccRefresh();
 };
@@ -17287,7 +17288,7 @@ window.ccActivate = async id => {
 window.ccUpgrade = async (id, key) => {
   const a = A_().find(x=>String(x.id)===String(id)); if(!a) return;
   const t = T_().find(x=>x.key===key); if(!t) return;
-  if(!confirm(`Перевести «${a.name}» на тариф «${t.name}»?`)) return;
+  if(!confirm(`Перевести «${escH(a.name)}» на тариф «${escH(t.name)}»?`)) return;
   if(window.tUpdateAgency) await window.tUpdateAgency(id, {plan:key});
   ccRefresh();
 };
@@ -20726,7 +20727,7 @@ window._kpiRenderPeriodBar = () => {
   }
   const statusL = { active:'активный', planning:'планирование', closed:'закрыт' }[cur.status] || cur.status;
   const dc = { active:'var(--pos)', planning:'var(--violet)', closed:'var(--txt-3)' }[cur.status] || 'var(--txt-3)';
-  const opts = st.periods.map(p => [p.id, `${p.name} · ${{active:'активный',planning:'план.',closed:'закрыт'}[p.status]||p.status}`]);
+  const opts = st.periods.map(p => [p.id, `${escH(p.name)} · ${{active:'активный',planning:'план.',closed:'закрыт'}[p.status]||p.status}`]);
   opts.push(['__new', '+ Новый период (текущий месяц)']);
   const ddHTML = _ddSel('kpi-period-sel', opts, cur.id, (v) => {
     if (v === '__new') return kpiCreateDefaultPeriod();
@@ -21176,11 +21177,11 @@ window._kpiRenderRMP = (period) => {
           <div class="kpi-risk">
             <div class="kpi-risk-t">
               <span class="kpi-risk-sev" style="background:${sc}22;color:${sc};border:1px solid ${sc}44">${sl}</span>
-              <div class="kpi-risk-title">${r.title||'Без названия'}</div>
+              <div class="kpi-risk-title">${escH(r.title||'Без названия')}</div>
               <span class="kpi-risk-st" style="color:${tc}">● ${tl}</span>
               ${canEdit?`<div class="kpi-risk-act"><span class="kpi-help" style="cursor:pointer" title="Открыть меню" onclick="kpiRiskMenu('${r.id}',event)">⋯</span></div>`:''}
             </div>
-            ${r.description?`<div class="kpi-risk-desc">${r.description}</div>`:''}
+            ${r.description?`<div class="kpi-risk-desc">${escH(r.description)}</div>`:''}
             ${r.mitigation?`<div class="kpi-risk-mit"><b>План:</b> ${r.mitigation}</div>`:''}
             <div class="kpi-risk-meta">
               ${r.due_date?`<span>до <b>${r.due_date}</b></span>`:''}
@@ -21226,7 +21227,7 @@ window.kpiRiskMenu = async (riskId, e) => {
   e && e.stopPropagation && e.stopPropagation();
   const period = _kpiState.periods.find(p=>p.id===_kpiState.periodId); if(!period) return;
   const r = (_kpiState.risks[period.id]||[]).find(x=>x.id===riskId); if(!r) return;
-  const action = prompt(`Что сделать с риском «${r.title}»?\n\n1. mark_progress — взять в работу\n2. mark_mitigated — закрыть как снятый\n3. mark_accepted — принять как есть\n4. reopen — вернуть в открытые\n5. delete — удалить\n\nВведите номер или slug:`);
+  const action = prompt(`Что сделать с риском «${escH(r.title)}»?\n\n1. mark_progress — взять в работу\n2. mark_mitigated — закрыть как снятый\n3. mark_accepted — принять как есть\n4. reopen — вернуть в открытые\n5. delete — удалить\n\nВведите номер или slug:`);
   if (!action) return;
   const map = { '1':'in_progress', '2':'mitigated', '3':'accepted', '4':'open',
     mark_progress:'in_progress', mark_mitigated:'mitigated', mark_accepted:'accepted', reopen:'open' };
@@ -21849,7 +21850,7 @@ window._kpiRowAvHTML = (r) => {
 window._kpiRowNameHTML = (r) => `
   <div class="kpi-nameC">
     ${_kpiRowAvHTML(r)}
-    <div><div class="kpi-nm">${r.name}</div><div class="kpi-nsub">${r.subtitle}</div></div>
+    <div><div class="kpi-nm">${escH(r.name)}</div><div class="kpi-nsub">${r.subtitle}</div></div>
   </div>`;
 
 /* ═══ ПЕРЕОПРЕДЕЛЁННЫЙ COMPUTE BASELINES: обходит rows scope, зовёт kpiComputeAll ═══ */
@@ -22221,11 +22222,11 @@ window._kpiRenderRMP = (period) => {
           <div class="kpi-risk">
             <div class="kpi-risk-t">
               <span class="kpi-risk-sev" style="background:${sc}22;color:${sc};border:1px solid ${sc}44">${sl}</span>
-              <div class="kpi-risk-title">${r.title||'Без названия'}</div>
+              <div class="kpi-risk-title">${escH(r.title||'Без названия')}</div>
               <span class="kpi-risk-st" style="color:${tc}">● ${tl}</span>
               ${canEdit?`<div class="kpi-risk-act"><span class="kpi-help" style="cursor:pointer" title="Меню" onclick="kpiRiskMenu('${r.id}',event)">⋯</span></div>`:''}
             </div>
-            ${r.description?`<div class="kpi-risk-desc">${r.description}</div>`:''}
+            ${r.description?`<div class="kpi-risk-desc">${escH(r.description)}</div>`:''}
             ${r.mitigation?`<div class="kpi-risk-mit"><b>План:</b> ${r.mitigation}</div>`:''}
             <div class="kpi-risk-meta">
               ${r.due_date?`<span>до <b>${r.due_date}</b></span>`:''}
@@ -22416,13 +22417,13 @@ window.kpiScanAlerts = async (period) => {
         const cur = (currents[rk]||{})[k];
         const tgt = _kpiGetTgt(period.id, scope, r.id, k) || {};
         if (cur == null && M.sample_min > 0){
-          await kpiRaiseAlert({ kind:'no_data', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'info', message:`Нет данных для «${M.label}» (${r.name})`, data:{ period_id: period.id }});
+          await kpiRaiseAlert({ kind:'no_data', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'info', message:`Нет данных для «${M.label}» (${escH(r.name)})`, data:{ period_id: period.id }});
           raised++; continue;
         }
         if (cur != null && tgt.minimum != null){
           const belowMin = M.dir === 'up' ? cur < tgt.minimum : cur > tgt.minimum;
           if (belowMin){
-            await kpiRaiseAlert({ kind:'below_minimum', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'critical', message:`«${M.label}» ниже минимума у ${r.name}: ${_kpiFmt(k, cur)} (мин. ${_kpiFmt(k, tgt.minimum)})`, data:{ period_id: period.id }});
+            await kpiRaiseAlert({ kind:'below_minimum', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'critical', message:`«${M.label}» ниже минимума у ${escH(r.name)}: ${_kpiFmt(k, cur)} (мин. ${_kpiFmt(k, tgt.minimum)})`, data:{ period_id: period.id }});
             raised++;
           }
         }
@@ -22433,7 +22434,7 @@ window.kpiScanAlerts = async (period) => {
             const currentDelta = cur - base;
             const progress = totalDelta === 0 ? 100 : 100*currentDelta/totalDelta;
             if (pct > 20 && progress < pct - 20){
-              await kpiRaiseAlert({ kind:'behind_pace', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'warning', message:`«${M.label}» отстаёт у ${r.name}: ${Math.round(progress)}% при ${Math.round(pct)}%`, data:{ period_id: period.id }});
+              await kpiRaiseAlert({ kind:'behind_pace', scope_kind:scope, scope_id:r.id, metric_key:k, severity:'warning', message:`«${M.label}» отстаёт у ${escH(r.name)}: ${Math.round(progress)}% при ${Math.round(pct)}%`, data:{ period_id: period.id }});
               raised++;
             }
           }
@@ -22539,7 +22540,7 @@ window._kpiSetRenderPeriods = async () => {
             const [sl, sc] = statLabel[p.status] || ['—','var(--txt-3)'];
             return `
               <tr>
-                <td style="font-weight:600">${p.name}</td>
+                <td style="font-weight:600">${escH(p.name)}</td>
                 <td><span class="kpi-tag">${{week:'нед.',month:'мес.',quarter:'квартал',custom:'своё'}[p.kind]||p.kind}</span></td>
                 <td class="num">${p.start_date}</td>
                 <td class="num">${p.end_date}</td>
@@ -24165,7 +24166,7 @@ window._kpi3UpdatePaSub = () => {
   const rows = _kpiScopeRows(cat);
   if (_kpi3.selectedRowId) {
     const r = rows.find(x => x.id === _kpi3.selectedRowId);
-    paSub.textContent = r ? `Метрики за 30 дней · ${r.name}${r.subtitle ? ' · ' + r.subtitle : ''}` : 'Метрики за 30 дней';
+    paSub.textContent = r ? `Метрики за 30 дней · ${escH(r.name)}${r.subtitle ? ' · ' + r.subtitle : ''}` : 'Метрики за 30 дней';
   } else {
     paSub.textContent = `Агрегированные метрики за 30 дней · все ${rows.length} ${_kpi3CatLabel(cat)}`;
   }
