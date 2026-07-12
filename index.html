@@ -7155,7 +7155,16 @@ function ddToggle(k){
 }
 // Хук: когда _closePops убирает .open с .dd — вернуть меню в родителя
 /* _closePops уже вызывает _ddPortalRelease напрямую */
-window.addEventListener('scroll',function(e){ if(!document.querySelector('.dd.open')) return; var t=e.target; if(t&&t.closest&&(t.closest('.dd-menu')||t.closest('.dd.open'))) return; _closePops(); },true);
+window.addEventListener('scroll',function(e){
+  if(!document.querySelector('.dd.open')) return;
+  var t=e.target; if(!t||!t.closest) return;
+  // Не закрываем: клик внутри самого dropdown / открытого dd
+  if(t.closest('.dd-menu')||t.closest('.dd.open')) return;
+  // Не закрываем: скролл внутри модалок и оверлеев — dropdown портирован в body,
+  // визуально висит абсолютно, скролл модалки его не сдвигает. Пусть остаётся.
+  if(t.closest && (t.closest('.pd2')||t.closest('.modal')||t.closest('.ov')||t.closest('.modal-b'))) return;
+  _closePops();
+},true);
 window.addEventListener('resize',function(){ if(document.querySelector('.dd.open')) _closePops(); });
 (function(){
   function _watch(id){
@@ -7167,23 +7176,13 @@ window.addEventListener('resize',function(){ if(document.querySelector('.dd.open
   function _watchDeep(id){
     var el=document.getElementById(id); if(!el) return;
     new MutationObserver(function(muts){
-      // Игнорируем мутации связанные с открытием/закрытием самих dropdowns.
-      // Иначе dropdown, открытый ВНУТРИ модалки, тут же закрывается своей же
-      // мутацией (portalization / add class).
-      var fromDD = false;
-      for (var i = 0; i < muts.length; i++) {
-        var m = muts[i];
-        var t = m.target;
-        if (t && t.closest && (t.closest('.dd') || t.closest('.cdd') || t.closest('.dd-menu') || t.closest('.cdd-menu'))) { fromDD = true; break; }
-        // Проверим добавленные/удалённые ноды тоже
-        if (m.addedNodes) for (var j = 0; j < m.addedNodes.length; j++) {
-          var n = m.addedNodes[j];
-          if (n && n.classList && (n.classList.contains('dd-menu') || n.classList.contains('cdd-menu') || n.classList.contains('dd-portal'))) { fromDD = true; break; }
-        }
-        if (fromDD) break;
-      }
-      if (fromDD) return;
-      if(document.querySelector('.dd-menu.dd-portal')||document.querySelector('.dd.open')) _closePops();
+      // Если открыт dropdown или portal-menu — НЕ закрываем через observer.
+      // Пользователь сам закроет либо выбрав опцию, либо кликом вне.
+      // Иначе рендер контента внутри модалки (например смена Этапа после выбора
+      // Проекта) убивает уже открытый .dd, и он «моргает и исчезает».
+      if (document.querySelector('.dd-menu.dd-portal') || document.querySelector('.dd.open') || document.querySelector('.cdd.open')) return;
+      // При отсутствии открытых поповеров — не за чем и закрывать.
+      // Оставляем listener для будущих проверок (например reflow-очистки portal-siротки).
     }).observe(el,{childList:true,subtree:true});
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ _watch('content-ag'); _watch('content-cl'); _watchDeep('ov-proj'); _watchDeep('ov-pd2'); });
