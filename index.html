@@ -18014,17 +18014,24 @@ window.kpiMetric = (key) => KPI_METRICS[key] || null;
 
 /* Нормализация значения в 0-100 с учётом направления и baseline/target (или scale) */
 window.kpiNormalize = (metricKey, value, baseline, target) => {
-  const m = KPI_METRICS[metricKey]; if(!m || value==null) return null;
-  // Для 'up':  lo=baseline/soft (нижняя «плохо»),   hi=target/hard (верхняя «отлично»).
-  //           pct = 100*(value - lo)/(hi - lo). Value=hi → 100, value=lo → 0.
-  // Для 'down': soft — «хорошее» малое значение, hard — «плохое» большое (в конфиге soft<hard).
-  //           pct = 100*(hi - value)/(hi - lo). Value=lo(soft) → 100, value=hi(hard) → 0.
-  const lo = baseline!=null ? baseline : m.scale.soft;
-  const hi = target!=null   ? target   : m.scale.hard;
-  if (lo === hi) return value >= hi ? 100 : 0;
-  let pct = (m.dir === 'up')
-    ? 100*(value - lo)/(hi - lo)
-    : 100*(hi - value)/(hi - lo);
+  const m = KPI_METRICS[metricKey]; if(!m || value==null || Number.isNaN(+value)) return null;
+  // Единая логика для user-заданных baseline/target И для scale{soft,hard}:
+  //   dir='up':   baseline (плохое, малое) → 0, target (хорошее, большое) → 100
+  //   dir='down': baseline (плохое, большое) → 0, target (хорошее, малое) → 100
+  // scale.soft/hard используются как дефолт если user не задал границы.
+  let b, t;
+  if (baseline!=null && target!=null) {
+    b = +baseline; t = +target;
+  } else {
+    // scale.soft/hard для dir='up': soft — low bar (baseline), hard — top (target)
+    //                    dir='down': soft — good small (target), hard — bad big (baseline)
+    if (m.dir === 'up') { b = m.scale.soft; t = m.scale.hard; }
+    else                { b = m.scale.hard; t = m.scale.soft; }
+  }
+  if (b === t) return value >= t ? 100 : 0;
+  let pct;
+  if (m.dir === 'up') pct = 100 * (value - b) / (t - b);
+  else                pct = 100 * (b - value) / (b - t);
   return Math.max(0, Math.min(100, Math.round(pct)));
 };
 
@@ -18238,9 +18245,12 @@ window._kpiStddev = (arr) => {
 
 /* уверенность результата по правилу sample_size vs sample_min */
 window._kpiConfidence = (metricKey, sampleSize) => {
-  const m = KPI_METRICS[metricKey]; if(!m) return null;
+  const m = KPI_METRICS[metricKey];
   if (!sampleSize) return null;
-  return sampleSize >= (m.sample_min || 0) ? 'ok' : 'low';
+  // composite/legacy метрики (smm_score, smm_growth, smm_discipline, cycle_time, throughput_w и т.п.)
+  // могут не быть в KPI_METRICS напрямую — используем sane defaults.
+  const sampleMin = m ? (m.sample_min || 0) : 1;
+  return sampleSize >= sampleMin ? 'ok' : 'low';
 };
 
 /* Кэш raw-выборки на 2 минуты */
@@ -18294,17 +18304,21 @@ window._kpiFilterByScope = async (raw, scopeKind, scopeId) => {
   }
   if (scopeKind === 'member'){
     const uid = scopeId;
+    // ВАЖНО: taskHist ТОЛЬКО по СВОИМ задачам (assignee_id=uid).
+    // changed_by=uid включал бы задачи, статус которых поменял этот сотрудник
+    // (например лид переместил чужую задачу в done) — они посчитались бы в его выработке.
     return {
       tasks: raw.tasks.filter(t => t.assignee_id === uid),
-      taskHist: raw.taskHist.filter(h => h.changed_by === uid || (raw.byTask[h.task_id]||{}).assignee_id === uid),
+      taskHist: raw.taskHist.filter(h => (raw.byTask[h.task_id]||{}).assignee_id === uid),
       stageHist: raw.stageHist.filter(h => h.changed_by === uid),
     };
   }
   if (scopeKind === 'team'){
     const midSet = new Set(await _kpiTeamMembers(scopeId, raw.toISO));
+    // Аналогично member: только задачи членов команды по assignee_id.
     return {
       tasks: raw.tasks.filter(t => midSet.has(t.assignee_id)),
-      taskHist: raw.taskHist.filter(h => midSet.has(h.changed_by) || midSet.has((raw.byTask[h.task_id]||{}).assignee_id)),
+      taskHist: raw.taskHist.filter(h => midSet.has((raw.byTask[h.task_id]||{}).assignee_id)),
       stageHist: raw.stageHist.filter(h => midSet.has(h.changed_by)),
     };
   }
@@ -18524,16 +18538,28 @@ window.kpiComputeSmmReach = async (scopeKind, scopeId, fromISO, toISO) => {
 window.kpiComputeSmmGrowth = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(scopeKind, scopeId);
+  // Проверка семантики полей по реальному payload SMM:
+  //   metrics.subscribers_current = 480000  (актуальное общее число)
+  //   metrics.followers = 358               (прирост за отчётный период)
+  //   metrics.followers_prev = 358          (= прирост prev-отчёта, НЕ старт)
+  //   payload.prev.followers = 358          (= прирост prev-отчёта, НЕ старт)
+  // Единственная надёжная формула для startCount ПЕРВОГО отчёта:
+  //   start = subscribers_current − followers (текущее − прирост = было в начале периода)
   let totalStart = 0, totalEnd = 0, n = 0;
+  const num = (x) => { const v = +x; return Number.isFinite(v) ? v : null; };
   pids.forEach(pid => {
     const rs = (raw.byProj[pid] || []).slice().sort((a,b) => a.at < b.at ? -1 : 1);
     if (!rs.length) return;
     const first = rs[0], last = rs[rs.length-1];
-    const s = +first.m.followers ?? +first.prev.followers;
-    const e = +last.m.followers  ?? +last.m.subscribers_current;
-    if (s>0 && e>0){ totalStart += s; totalEnd += e; n++; }
+    // start первого отчёта: current − gain
+    const curFirst = num(first.m.subscribers_current);
+    const gainFirst = num(first.m.followers) || 0;
+    const start = curFirst != null ? curFirst - gainFirst : null;
+    // end последнего отчёта: subscribers_current
+    const end = num(last.m.subscribers_current);
+    if (start != null && start > 0 && end != null && end > 0) { totalStart += start; totalEnd += end; n++; }
   });
-  const val = totalStart>0 ? Math.round(1000*(totalEnd-totalStart)/totalStart)/10 : null;
+  const val = totalStart > 0 ? Math.round(1000 * (totalEnd - totalStart) / totalStart) / 10 : null;
   return { value: val, sample_size: n, confidence: _kpiConfidence('smm_growth', n) };
 };
 
@@ -18571,7 +18597,7 @@ window.kpiComputeSmmScore = async (scopeKind, scopeId, fromISO, toISO) => {
   parts.forEach(p => { acc += (W[p.k]/sumW) * kpiNormalize(p.k, p.v); });
   const val = Math.round(acc);
   const n = er.sample_size + rc.sample_size + gr.sample_size + ds.sample_size;
-  return { value: val, sample_size: n, confidence: _kpiConfidence('smm_score', Math.min(er.sample_size, 2)), meta:{er,rc,gr,ds,parts} };
+  return { value: val, sample_size: n, confidence: _kpiConfidence('smm_score', Math.max(er.sample_size||0, rc.sample_size||0)), meta:{er,rc,gr,ds,parts} };
 };
 
 /* ── Новые SMM: Views / Growth abs / Followers / LR / CR / SHR / SR ── */
@@ -21216,7 +21242,7 @@ window.kpiComputeSmmScore = async (scopeKind, scopeId, fromISO, toISO) => {
   parts.forEach(p => { acc += (W[p.k]/sumW) * kpiNormalize(p.k, p.v); });
   const val = Math.round(acc);
   const n = er.sample_size + rc.sample_size + gr.sample_size + ds.sample_size;
-  return { value: val, sample_size: n, confidence: _kpiConfidence('smm_score', Math.min(er.sample_size, 2)), meta:{ er, rc, gr, ds, parts, weights:wCfg } };
+  return { value: val, sample_size: n, confidence: _kpiConfidence('smm_score', Math.max(er.sample_size||0, rc.sample_size||0)), meta:{ er, rc, gr, ds, parts, weights:wCfg } };
 };
 
 /* ── 2. Badge алертов в сайдбаре — рядом с пунктом KPI ── */
@@ -23647,8 +23673,11 @@ window._kpi3FillStats = async () => {
       const sampleMin = m.sample_min || 0;
       let conf = 1;
       if (sampleMin > 0 && sampleSize != null) {
-        conf = Math.max(0.2, Math.min(1, sampleSize / sampleMin));
+        // Линейная шкала [0..1] — при sample=0 метрика не учитывается (conf=0).
+        // При sample>=sample_min conf=1 (полный вес). Промежуточные — пропорционально.
+        conf = Math.max(0, Math.min(1, sampleSize / sampleMin));
       }
+      if (conf === 0) return; // не учитываем метрику без данных
       const w = (m.weight || 10) * conf;
       sum += norm * w;
       totalW += w;
