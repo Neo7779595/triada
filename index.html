@@ -5744,7 +5744,7 @@ function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast
   };
   if(document.body)start(); else document.addEventListener('DOMContentLoaded',start);
 })();
-function logout(){ if(window.tLogout)window.tLogout(); try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); KB_Q=''; _kbCatsLoaded=false; if(typeof smmLbReset==='function') smmLbReset(); }catch(_e){} document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
+function logout(){ if(window.tLogout)window.tLogout(); try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); KB_Q=''; _kbCatsLoaded=false; _kbPeriodLoaded=false; KB_PERIOD={mode:'all',v:''}; KB_ARCH_OPEN=false; if(typeof smmLbReset==='function') smmLbReset(); }catch(_e){} document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
 
 /* ——— GENERAL CABINET ——— */
@@ -7120,7 +7120,7 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
     +opts.map(o=>`<button class="dd-opt ${curVal===o[0]?'on':''}" onclick="_closePops();${setter}('${_ddEsc(o[0])}');setTimeout(_closePops,0)">${_ddH(o[1])}${ck}</button>`).join('')
     +`</div></div>`;
 }
-function _closePops(){ if(typeof _ddPortalRelease==='function'){ try{ _ddPortalRelease(); }catch(_){} } document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
+function _closePops(){ if(typeof _ddPortalRelease==='function'){ try{ _ddPortalRelease(); }catch(_){} } document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); document.querySelectorAll('.kbp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
 function _ddPortalRelease(){ document.querySelectorAll('.dd-menu.dd-portal').forEach(function(m){ var home=m.__ddHome; if(home && home.parentNode && document.body.contains(home)){ home.parentNode.insertBefore(m,home); home.parentNode.removeChild(home); m.__ddHome=null; m.classList.remove('dd-portal'); m.style.left=''; m.style.top=''; m.style.minWidth=''; } else { if(m.parentNode) m.parentNode.removeChild(m); } }); document.querySelectorAll('.dd.open').forEach(function(el){ el.classList.remove('open'); }); }
 function ddToggle(k){
   const el=document.getElementById('dd-'+k);if(!el)return;
@@ -16258,7 +16258,10 @@ const KB_MONTHS=['январь','февраль','март','апрель','ма
 let KB_PERIOD={mode:'all', v:''};
 let KB_ARCH_OPEN=false;
 function _kbPerKey(){ return 'kb_period_'+((((window.tMe&&window.tMe())||{}).agency_id)||'x'); }
+let _kbPeriodLoaded=false;
 function kbPeriodLoad(){
+  if(_kbPeriodLoaded) return;              // грузим один раз: иначе каждый renderKB затирал состояние в памяти
+  _kbPeriodLoaded=true;
   try{ const r=JSON.parse(localStorage.getItem(_kbPerKey())||'null');
     if(r&&(r.mode==='all'||r.mode==='month'||r.mode==='day')) KB_PERIOD={mode:r.mode, v:String(r.v||'')};
   }catch(_e){}
@@ -16308,6 +16311,77 @@ function _kbView(A){
     _full:A
   });
 }
+/* ═══ Стеклянный пикер периода (месяц / день) — вместо нативного инпута,
+       который открывал светлое системное меню и выбивался из тёмной темы ═══ */
+const KB_MON_SHORT=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const KB_DOW=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+let _kbPick={y:0,m:0};
+function _kbPad(n){ return String(n).padStart(2,'0'); }
+function _kbToday(){ const d=new Date(); return d.getFullYear()+'-'+_kbPad(d.getMonth()+1)+'-'+_kbPad(d.getDate()); }
+function kbPickOpen(ev){
+  if(ev&&ev.stopPropagation) ev.stopPropagation();
+  const wrap=document.getElementById('kb-pickw'); if(!wrap) return;
+  const already=wrap.querySelector('.kbp-pop');
+  _closePops();
+  if(already) return;                                     // повторный клик — просто закрыть
+  const v=String(KB_PERIOD.v||'');
+  const now=new Date();
+  const y=Number(v.slice(0,4))||now.getFullYear();
+  const m=(Number(v.slice(5,7))||now.getMonth()+1)-1;
+  _kbPick={y:y, m:m};
+  const pop=document.createElement('div');
+  pop.className='kbp-pop';
+  pop.addEventListener('click',function(e){ e.stopPropagation(); });
+  pop.innerHTML=_kbPickGrid();
+  wrap.appendChild(pop);
+}
+function _kbPickRepaint(){ const pop=document.querySelector('#kb-pickw .kbp-pop'); if(pop) pop.innerHTML=_kbPickGrid(); }
+function kbPickNav(d){                                    // год в режиме месяца, месяц — в режиме дня
+  if(KB_PERIOD.mode==='month'){ _kbPick.y+=d; }
+  else { let m=_kbPick.m+d, y=_kbPick.y; if(m<0){m=11;y--;} if(m>11){m=0;y++;} _kbPick={y:y,m:m}; }
+  _kbPickRepaint();
+}
+function kbPickApply(v){ _closePops(); kbSetPeriodVal(v); }
+function _kbPickGrid(){
+  const nav='<div class="kbp-h">'
+    +'<button class="kbp-nav" onclick="kbPickNav(-1)" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 18l-6-6 6-6"/></svg></button>'
+    +'<div class="kbp-t">'+(KB_PERIOD.mode==='month'?_kbPick.y:(KB_MONTHS[_kbPick.m]+' '+_kbPick.y))+'</div>'
+    +'<button class="kbp-nav" onclick="kbPickNav(1)" aria-label="Вперёд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg></button>'
+  +'</div>';
+  const t=_kbToday(), tY=Number(t.slice(0,4)), tM=Number(t.slice(5,7))-1;
+
+  if(KB_PERIOD.mode==='month'){
+    let cells='';
+    for(let i=0;i<12;i++){
+      const iso=_kbPick.y+'-'+_kbPad(i+1);
+      const cls=[iso===KB_PERIOD.v?'sel':'', (_kbPick.y===tY&&i===tM)?'now':''].filter(Boolean).join(' ');
+      cells+='<button class="'+cls+'" onclick="kbPickApply(\''+iso+'\')">'+KB_MON_SHORT[i]+'</button>';
+    }
+    return nav+'<div class="kbp-mgrid">'+cells+'</div>'
+      +'<div class="kbp-f"><button onclick="kbPickApply(\''+t.slice(0,7)+'\')">Текущий месяц</button>'
+      +'<button class="clr" onclick="kbSetPeriod(\'all\')">Сбросить</button></div>';
+  }
+
+  const y=_kbPick.y, m=_kbPick.m;
+  let start=new Date(y,m,1).getDay(); start=(start===0?6:start-1);
+  const dim=new Date(y,m+1,0).getDate(), prevDim=new Date(y,m,0).getDate();
+  let cells='';
+  for(let i=0;i<start;i++) cells+='<button class="oth" disabled>'+(prevDim-start+1+i)+'</button>';
+  for(let d=1;d<=dim;d++){
+    const iso=y+'-'+_kbPad(m+1)+'-'+_kbPad(d);
+    const cls=[iso===KB_PERIOD.v?'sel':'', iso===t?'now':''].filter(Boolean).join(' ');
+    cells+='<button class="'+cls+'" onclick="kbPickApply(\''+iso+'\')">'+d+'</button>';
+  }
+  const trail=(7-((start+dim)%7))%7;
+  for(let i=1;i<=trail;i++) cells+='<button class="oth" disabled>'+i+'</button>';
+  return nav
+    +'<div class="kbp-dow">'+KB_DOW.map(function(d){return '<span>'+d+'</span>';}).join('')+'</div>'
+    +'<div class="kbp-dgrid">'+cells+'</div>'
+    +'<div class="kbp-f"><button onclick="kbPickApply(\''+t+'\')">Сегодня</button>'
+    +'<button class="clr" onclick="kbSetPeriod(\'all\')">Сбросить</button></div>';
+}
+document.addEventListener('click',function(e){ if(!e.target.closest('#kb-pickw')) document.querySelectorAll('.kbp-pop').forEach(function(p){ p.remove(); }); });
+
 function kbArchToggle(ev){ if(ev&&ev.stopPropagation) ev.stopPropagation(); KB_ARCH_OPEN=!KB_ARCH_OPEN; renderKB(); }
 function kbNavTo(id,ev){
   if(ev&&ev.stopPropagation) ev.stopPropagation();
@@ -16505,7 +16579,34 @@ function kbAutoCss(){
     +".kb-seg button:hover{color:var(--txt-2)}"
     +".kb-seg button.on{background:var(--bg-3);color:var(--accent)}"
     +".kb-per-pick{display:inline-flex;align-items:center;gap:2px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:9px;padding:2px}"
-    +".kb-per-pick input{background:none;border:0;color:var(--txt);font-family:var(--mono);font-size:12px;padding:4px 6px;outline:none;color-scheme:dark;cursor:pointer}"
+    +".kb-per-pick{position:relative}"
+    +".kb-per-trg{display:inline-flex;align-items:center;gap:7px;background:none;border:0;color:var(--txt);font-family:var(--mono);font-size:12px;padding:5px 9px;border-radius:7px;cursor:pointer;text-transform:capitalize;transition:all .14s var(--ease-out)}"
+    +".kb-per-trg svg{color:var(--txt-3);flex:none;transition:color .14s var(--ease-out)}"
+    +".kb-per-trg:hover{background:var(--bg-3)}.kb-per-trg:hover svg{color:var(--accent)}"
+    +".kbp-pop{position:absolute;top:calc(100% + 9px);left:50%;transform:translateX(-50%);z-index:95;width:268px;padding:13px;border-radius:16px;"
+      +"background:linear-gradient(180deg,rgba(28,33,42,.86),rgba(15,17,22,.92));backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);"
+      +"border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 60px -12px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06);animation:kbp-in .16s var(--ease-out)}"
+    +"@keyframes kbp-in{from{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}"
+    +".kbp-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}"
+    +".kbp-t{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:capitalize}"
+    +".kbp-nav{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:var(--txt-2);width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .14s var(--ease-out)}"
+    +".kbp-nav:hover{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}"
+    +".kbp-mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}"
+    +".kbp-mgrid button{background:rgba(255,255,255,.04);border:1px solid transparent;color:var(--txt-2);font-family:var(--mono);font-size:12px;padding:9px 0;border-radius:9px;cursor:pointer;transition:all .13s var(--ease-out)}"
+    +".kbp-mgrid button:hover{background:rgba(255,255,255,.09);color:var(--txt)}"
+    +".kbp-mgrid button.now{box-shadow:inset 0 0 0 1px var(--accent-line)}"
+    +".kbp-mgrid button.sel{background:var(--accent);color:#06231e;font-weight:700;box-shadow:0 4px 14px -4px var(--accent)}"
+    +".kbp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px}"
+    +".kbp-dow span{text-align:center;font-size:9.5px;font-family:var(--mono);letter-spacing:.06em;color:var(--txt-3);text-transform:uppercase;padding:3px 0}"
+    +".kbp-dgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}"
+    +".kbp-dgrid button{aspect-ratio:1;background:transparent;border:1px solid transparent;color:var(--txt-2);font-family:var(--mono);font-size:12px;border-radius:8px;cursor:pointer;transition:all .12s var(--ease-out)}"
+    +".kbp-dgrid button:hover:not(:disabled){background:rgba(255,255,255,.09);color:var(--txt)}"
+    +".kbp-dgrid button.oth{color:var(--txt-3);opacity:.32;cursor:default}"
+    +".kbp-dgrid button.now{box-shadow:inset 0 0 0 1px var(--accent-line)}"
+    +".kbp-dgrid button.sel{background:var(--accent);color:#06231e;font-weight:700;box-shadow:0 4px 14px -4px var(--accent)}"
+    +".kbp-f{display:flex;justify-content:space-between;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}"
+    +".kbp-f button{background:none;border:0;color:var(--txt-2);font-family:var(--mono);font-size:11.5px;cursor:pointer;padding:4px 7px;border-radius:6px;transition:color .14s var(--ease-out)}"
+    +".kbp-f button:hover{color:var(--accent)}.kbp-f .clr:hover{color:var(--neg)}"
     +".kb-per-nav{background:none;border:0;color:var(--txt-3);display:inline-flex;padding:5px 6px;border-radius:6px;cursor:pointer;transform:rotate(90deg)}"
     +".kb-per-nav.up{transform:rotate(-90deg)}"
     +".kb-per-nav:hover{color:var(--accent);background:var(--bg-3)}"
@@ -17065,14 +17166,12 @@ function _kbPeriodBar(){
   var seg=function(m,l){ return '<button class="'+(KB_PERIOD.mode===m?'on':'')+'" onclick="kbSetPeriod(\''+m+'\')">'+l+'</button>'; };
   var h='<div class="kb-per"><div class="kb-seg">'+seg('all','Всё время')+seg('month','Месяц')+seg('day','День')+'</div>';
   if(_kbPerOn()){
-    h+='<div class="kb-per-pick">'
-      +'<button class="kb-per-nav" onclick="kbPeriodShift(-1)" title="Предыдущий">'+_KBIC.chev+'</button>'
-      +(KB_PERIOD.mode==='month'
-        ? '<input type="month" value="'+_kbEscAttr(KB_PERIOD.v)+'" onchange="kbSetPeriodVal(this.value)">'
-        : '<input type="date" value="'+_kbEscAttr(KB_PERIOD.v)+'" onchange="kbSetPeriodVal(this.value)">')
-      +'<button class="kb-per-nav up" onclick="kbPeriodShift(1)" title="Следующий">'+_KBIC.chev+'</button>'
+    var cal='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 9.5h18"/></svg>';
+    h+='<div class="kb-per-pick" id="kb-pickw">'
+      +'<button class="kb-per-nav" onclick="kbPeriodShift(-1)" title="Предыдущий период">'+_KBIC.chev+'</button>'
+      +'<button class="kb-per-trg" onclick="kbPickOpen(event)" title="Выбрать период">'+cal+'<span>'+escH(_kbPerLabel())+'</span></button>'
+      +'<button class="kb-per-nav up" onclick="kbPeriodShift(1)" title="Следующий период">'+_KBIC.chev+'</button>'
       +'</div>'
-      +'<span class="kb-per-cur">'+escH(_kbPerLabel())+'</span>'
       +'<button class="kb-per-x" onclick="kbSetPeriod(\'all\')" title="Сбросить фильтр">Сбросить</button>';
   }else{
     h+='<span class="kb-per-note">фильтр по датам: отчёты, контент-планы, задачи, SMM</span>';
