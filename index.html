@@ -5212,6 +5212,36 @@ button:active{transform:translateY(.5px) scale(.99)}
   #ag-uchip.plan-warn::after,#ag-uchip.plan-over::after{animation:none;opacity:.85}
 }
 @media(max-width:480px){.modal.glass{border-radius:16px}.pm2{padding:22px 18px 18px}}
+
+/* ——— горячие клавиши: палитра перехода и шпаргалка ——— */
+.hk-ov{position:fixed;inset:0;z-index:120;display:none;align-items:flex-start;justify-content:center;padding:12vh 20px 20px;background:rgba(5,6,8,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.hk-ov.on{display:flex;animation:hk-fade .14s var(--ease-out)}
+@keyframes hk-fade{from{opacity:0}to{opacity:1}}
+.hk-box{width:100%;border-radius:18px;padding:18px;background:linear-gradient(180deg,rgba(28,33,42,.88),rgba(15,17,22,.94));backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);border:1px solid rgba(255,255,255,.1);box-shadow:0 32px 80px -16px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.06);animation:hk-in .17s var(--ease-out)}
+@keyframes hk-in{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:none}}
+.hk-box-go{max-width:460px}
+.hk-box-help{max-width:820px}
+.hk-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.hk-h b{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.hk-h span{font-family:var(--mono);font-size:11px;color:var(--txt-3)}
+.hk-list{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto}
+.hk-i{display:flex;align-items:center;gap:11px;width:100%;background:rgba(255,255,255,.03);border:1px solid transparent;border-radius:11px;padding:9px 11px;cursor:pointer;transition:all .12s var(--ease-out);text-align:left}
+.hk-i:hover{background:rgba(255,255,255,.08);border-color:var(--accent-line)}
+.hk-i .lg{width:26px;height:26px;border-radius:8px;background:var(--bg-3);color:var(--txt-2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:700;flex:none}
+.hk-i .nm{flex:1;font-size:13.5px;color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hk-i em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--txt-3);background:var(--bg-3);border-radius:999px;padding:2px 8px;flex:none}
+.hk-e{padding:18px;text-align:center;color:var(--txt-3);font-family:var(--mono);font-size:12px}
+.hk-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:18px}
+.hk-c{min-width:0}
+.hk-ct{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:9px}
+.hk-r{display:flex;align-items:center;gap:10px;padding:5px 0;min-width:0}
+.hk-r .k{display:flex;align-items:center;gap:3px;flex:none}
+.hk-r .k i{font-style:normal;font-size:10px;color:var(--txt-3);margin:0 2px;font-family:var(--mono)}
+.hk-r .l{font-size:13px;color:var(--txt-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hk-ov kbd,.hk-ct kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--txt);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+.hk-i kbd{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent);flex:none}
+.hk-f{margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);font-family:var(--mono);font-size:10.5px;color:var(--txt-3)}
+@media(max-width:640px){.hk-ov{padding:8vh 12px 12px}.hk-cols{grid-template-columns:1fr}}
 </style>
 <style id="gen-glass">
 /* ═══════════ ГЕНЕРАЛЬНЫЙ КАБИНЕТ · СТЕКЛЯННЫЙ РЕДИЗАЙН (scoped #app) ═══════════ */
@@ -19295,6 +19325,309 @@ async function badge(){
 
 addNav();
 })();
+
+
+
+/* ═══════════════════════════ ГОРЯЧИЕ КЛАВИШИ ═══════════════════════════
+   Принципы:
+   · одно нажатие = одно действие; переход к проекту — G + клавиша проекта
+   · читаем e.code (физическую клавишу), а не e.key — иначе на русской и
+     узбекской раскладках всё ломается: «н» вместо «n», «х» вместо «[»
+   · внутри модалки проекта одиночные буквы молчат: там свои обработчики
+     (контент-план, канбан). Работают только [ ] ? Esc и Mod-комбо
+   · Mac и Windows: ⌘[ / ⌘] против Alt+← / Alt+→, плюс общие [ и ]
+   ══════════════════════════════════════════════════════════════════════ */
+const HK_MAC=/Mac|iPod|iPhone|iPad/i.test((navigator.platform||'')+' '+(navigator.userAgent||''));
+const HK_MODK=HK_MAC?'⌘':'Ctrl';
+
+/* ── 1. история навигации ─────────────────────────────────────────────── */
+let HK_HIST=[], HK_IDX=-1, HK_LOCK=0;
+function _hkEq(a,b){ return !!a&&!!b&&a.k===b.k&&String(a.cab||'')===String(b.cab||'')
+  &&String(a.m||'')===String(b.m||'')&&String(a.id||'')===String(b.id||'')&&String(a.tab||'')===String(b.tab||''); }
+function hkPush(st){
+  if(HK_LOCK||!st) return;
+  if(_hkEq(HK_HIST[HK_IDX],st)) return;                 // тот же экран — не засоряем историю
+  HK_HIST=HK_HIST.slice(0,HK_IDX+1);
+  HK_HIST.push(st);
+  if(HK_HIST.length>80) HK_HIST.shift();
+  HK_IDX=HK_HIST.length-1;
+}
+function hkCab(){
+  var a=document.getElementById('app-ag'); if(a&&a.classList.contains('on')) return 'ag';
+  var c=document.getElementById('app-cl'); if(c&&c.classList.contains('on')) return 'cl';
+  var g=document.getElementById('app');    if(g&&g.classList.contains('on')) return 'gen';
+  return null;                                          // экран логина — не мешаем
+}
+function _hkProjOpen(){ var e=document.getElementById('ov-proj'); return !!(e&&e.classList.contains('on')); }
+function _hkCurMod(){
+  var cab=hkCab(); if(!cab) return null;
+  var sel=cab==='ag'?'#app-ag .nav-i.on':cab==='cl'?'#app-cl .nav-i.on':'#app .nav-i.on';
+  var n=document.querySelector(sel); if(!n) return null;
+  return cab==='ag'?n.dataset.m:(cab==='cl'?n.dataset.cm:n.dataset.gm);
+}
+function hkNav(cab,m){
+  if(!m) return;
+  if(cab==='ag'&&typeof agNav==='function') agNav(m);
+  else if(cab==='gen'&&typeof genNav==='function') genNav(m);
+  else if(cab==='cl'&&typeof clNav==='function') clNav(m);
+}
+function hkApply(st){
+  HK_LOCK++;
+  try{
+    if(st.k==='mod'){
+      if(_hkProjOpen()&&typeof closeProject==='function') closeProject();
+      hkNav(st.cab,st.m);
+    }else if(st.k==='proj'){
+      var P=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+      var i=P.findIndex(function(p){ return String(p.id)===String(st.id); });
+      if(i<0){ toast('Проект больше недоступен'); return; }
+      if(!_hkProjOpen()||String(window._pdProj)!==String(st.id)) openProject(i);
+      if(st.tab&&typeof pdTab==='function') pdTab(st.tab);
+    }
+  }catch(e){ console.warn('[hk]',e); }
+  finally{ setTimeout(function(){ HK_LOCK=Math.max(0,HK_LOCK-1); },0); }
+}
+function hkBack(){ if(HK_IDX<=0){ toast('Это начало истории'); return; } HK_IDX--; hkApply(HK_HIST[HK_IDX]); }
+function hkFwd(){ if(HK_IDX>=HK_HIST.length-1){ toast('Вперёд некуда'); return; } HK_IDX++; hkApply(HK_HIST[HK_IDX]); }
+function hkReset(){ HK_HIST=[]; HK_IDX=-1; HK_LOCK=0; HK_PK={}; _hkPkLoaded=false; hkGoClose(); hkHelpClose(); }
+
+/* перехватываем штатную навигацию, чтобы она сама писалась в историю */
+(function _hkHooks(){
+  var wrap=function(name,after){
+    var orig=window[name];
+    if(typeof orig!=='function') return;
+    window[name]=function(){
+      var r=orig.apply(this,arguments);
+      try{ after.apply(null,arguments); }catch(e){}
+      return r;
+    };
+  };
+  wrap('agNav',  function(m){ hkPush({k:'mod',cab:'ag', m:m}); });
+  wrap('genNav', function(m){ hkPush({k:'mod',cab:'gen',m:m}); });
+  wrap('clNav',  function(m){ hkPush({k:'mod',cab:'cl', m:m}); });
+  wrap('openProject', function(i){
+    var p=(typeof PROJECTS!=='undefined'?PROJECTS:[])[i];
+    if(p) hkPush({k:'proj', id:p.id, tab:(typeof pdTabCur!=='undefined'?pdTabCur:'stages')});
+  });
+  wrap('pdTab', function(t){ if(window._pdProj) hkPush({k:'proj', id:window._pdProj, tab:t}); });
+  wrap('closeProject', function(){ var m=_hkCurMod(); if(m) hkPush({k:'mod',cab:hkCab(),m:m}); });
+  wrap('renderProjects', function(){ hkSyncKeys(); });
+  wrap('logout', function(){ hkReset(); });
+})();
+
+/* ── 2. персональная клавиша проекта ──────────────────────────────────── */
+const HK_TR={'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'c','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya','ў':'u','қ':'q','ғ':'g','ҳ':'h','ʼ':''};
+const HK_ALPHA='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+let HK_PK={}, _hkPkLoaded=false;
+function hkTranslit(s){
+  return String(s||'').toLowerCase().split('').map(function(c){ return HK_TR[c]!==undefined?HK_TR[c]:c; }).join('');
+}
+function _hkPkKey(){ return 'hk_pkeys_'+((((window.tMe&&window.tMe())||{}).agency_id)||'x'); }
+function hkPkLoad(){
+  if(_hkPkLoaded) return; _hkPkLoaded=true;
+  try{ var r=JSON.parse(localStorage.getItem(_hkPkKey())||'null'); if(r&&typeof r==='object'&&!Array.isArray(r)) HK_PK=r; }catch(e){}
+}
+function hkPkSave(){ try{ localStorage.setItem(_hkPkKey(), JSON.stringify(HK_PK)); }catch(e){} }
+/* Клавиша выдаётся один раз и держится за проектом навсегда: сначала пробуем
+   буквы из его названия (Uzbek Doner → U), потом любую свободную. */
+function hkSyncKeys(){
+  hkPkLoad();
+  var P=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  if(!P.length) return;
+  var ids={}; P.forEach(function(p){ ids[String(p.id)]=1; });
+  Object.keys(HK_PK).forEach(function(id){ if(!ids[id]) delete HK_PK[id]; });   // проект удалён — клавиша освободилась
+  var used={}; Object.keys(HK_PK).forEach(function(id){ used[HK_PK[id]]=1; });
+  var changed=false;
+  P.forEach(function(p){
+    var id=String(p.id); if(HK_PK[id]) return;
+    var base=hkTranslit(p.name).toUpperCase().replace(/[^A-Z0-9]/g,'');
+    var key='';
+    for(var i=0;i<base.length;i++){ if(!used[base[i]]){ key=base[i]; break; } }
+    if(!key) for(var j=0;j<HK_ALPHA.length;j++){ if(!used[HK_ALPHA[j]]){ key=HK_ALPHA[j]; break; } }
+    if(key){ HK_PK[id]=key; used[key]=1; changed=true; }
+  });
+  if(changed) hkPkSave();
+}
+function hkProjKey(id){ hkPkLoad(); return HK_PK[String(id)]||''; }
+
+/* ── 3. палитра перехода (G) ──────────────────────────────────────────── */
+let _hkG=false, _hkGT=null;
+function hkGoOpen(){
+  if(hkCab()!=='ag'){ toast('Проекты — в кабинете агентства'); return; }
+  hkSyncKeys();
+  var P=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  if(!P.length){ toast('Проектов пока нет'); return; }
+  _hkG=true;
+  clearTimeout(_hkGT); _hkGT=setTimeout(hkGoClose, 5000);       // передумал — само закроется
+  var el=document.getElementById('hk-go');
+  if(!el){ el=document.createElement('div'); el.id='hk-go'; el.className='hk-ov'; document.body.appendChild(el);
+    el.addEventListener('click', function(ev){ if(ev.target===el) hkGoClose(); }); }
+  var rows=P.map(function(p){
+    var k=hkProjKey(p.id); if(!k) return '';
+    return '<button class="hk-i" onclick="hkGoPick(\''+_kbEscAttr(p.id)+'\')">'
+      +'<kbd>'+escH(k)+'</kbd>'
+      +'<span class="lg">'+escH(p.logo||'?')+'</span>'
+      +'<span class="nm">'+escH(p.name||'')+'</span>'
+      +(p.status==='done'?'<em>в архиве</em>':'')+'</button>';
+  }).join('');
+  el.innerHTML='<div class="hk-box hk-box-go"><div class="hk-h"><b>Переход к проекту</b><span>нажми клавишу проекта · Esc — отмена</span></div>'
+    +'<div class="hk-list">'+(rows||'<div class="hk-e">Не осталось свободных клавиш</div>')+'</div></div>';
+  el.classList.add('on');
+}
+function hkGoClose(){ _hkG=false; clearTimeout(_hkGT); var el=document.getElementById('hk-go'); if(el) el.classList.remove('on'); }
+function hkGoPick(id){
+  hkGoClose();
+  var P=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  var i=P.findIndex(function(p){ return String(p.id)===String(id); });
+  if(i<0){ toast('Проект не найден'); return; }
+  openProject(i);
+}
+
+/* ── 4. шпаргалка (?) ─────────────────────────────────────────────────── */
+function hkHelpClose(){ var el=document.getElementById('hk-help'); if(el) el.classList.remove('on'); }
+function hkHelpToggle(){
+  var el=document.getElementById('hk-help');
+  if(el&&el.classList.contains('on')){ hkHelpClose(); return; }
+  hkSyncKeys();
+  if(!el){ el=document.createElement('div'); el.id='hk-help'; el.className='hk-ov'; document.body.appendChild(el);
+    el.addEventListener('click', function(ev){ if(ev.target===el) hkHelpClose(); }); }
+  var K=function(k){ return '<kbd>'+escH(k)+'</kbd>'; };
+  var row=function(keys,label){ return '<div class="hk-r"><span class="k">'+keys+'</span><span class="l">'+escH(label)+'</span></div>'; };
+  var back = HK_MAC ? (K('[')+'<i>или</i>'+K('⌘')+K('[')) : (K('[')+'<i>или</i>'+K('Alt')+K('←'));
+  var fwd  = HK_MAC ? (K(']')+'<i>или</i>'+K('⌘')+K(']')) : (K(']')+'<i>или</i>'+K('Alt')+K('→'));
+  var P=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(function(p){ return hkProjKey(p.id); });
+  var projs=P.length
+    ? '<div class="hk-c"><div class="hk-ct">Проекты · '+K('G')+' затем клавиша</div>'
+        +P.map(function(p){ return row(K(hkProjKey(p.id)), p.name||''); }).join('')+'</div>'
+    : '';
+  var cab=hkCab();
+  var navSel=cab==='ag'?'#app-ag .nav-i':cab==='cl'?'#app-cl .nav-i':'#app .nav-i';
+  var navs=Array.from(document.querySelectorAll(navSel)).map(function(n,i){
+    return row(K(i===9?'0':String(i+1)), (n.textContent||'').trim());
+  }).slice(0,10).join('');
+  el.innerHTML='<div class="hk-box hk-box-help">'
+    +'<div class="hk-h"><b>Горячие клавиши</b><span>'+(HK_MAC?'macOS':'Windows')+' · Esc — закрыть</span></div>'
+    +'<div class="hk-cols">'
+      +'<div class="hk-c"><div class="hk-ct">Навигация</div>'
+        +row(back,'Назад')+row(fwd,'Вперёд')
+        +row(K('G'),'Перейти к проекту')
+        +row(K('Esc'),'Закрыть окно')
+      +'</div>'
+      +'<div class="hk-c"><div class="hk-ct">Действия</div>'
+        +row(K('/')+'<i>или</i>'+K(HK_MODK)+K('K'),'Глобальный поиск')
+        +row(K('N'),'Новая задача')
+        +row(K('P'),'Новый проект')
+        +row(K('?'),'Эта шпаргалка')
+      +'</div>'
+      +(navs?'<div class="hk-c"><div class="hk-ct">Разделы</div>'+navs+'</div>':'')
+      +projs
+    +'</div>'
+    +'<div class="hk-f">Клавиши читаются по физической позиции — работают и на русской раскладке</div>'
+  +'</div>';
+  el.classList.add('on');
+}
+
+/* ── 5. действия ──────────────────────────────────────────────────────── */
+function hkSearch(){
+  if(typeof cmdkOpen!=='function') return;
+  if(typeof cmdkCab==='function'&&!cmdkCab()){ toast('Поиск здесь недоступен'); return; }
+  cmdkOpen();
+}
+function hkNewTask(){
+  if(hkCab()!=='ag'){ toast('Задачи — в кабинете агентства'); return; }
+  if(typeof quickTaskOpen==='function') quickTaskOpen();
+}
+function hkNewProject(){
+  if(hkCab()!=='ag'){ toast('Проекты — в кабинете агентства'); return; }
+  if(typeof openNewProject==='function') openNewProject();
+}
+function hkModule(d){
+  var cab=hkCab(); if(!cab) return;
+  var sel=cab==='ag'?'#app-ag .nav-i':cab==='cl'?'#app-cl .nav-i':'#app .nav-i';
+  var items=Array.from(document.querySelectorAll(sel));
+  var idx=(d==='0')?9:(Number(d)-1);
+  var n=items[idx];
+  if(!n){ toast('Раздела '+d+' нет'); return; }
+  if(_hkProjOpen()&&typeof closeProject==='function') closeProject();
+  n.click();
+}
+
+/* ── 6. разбор клавиши: физическая позиция, а не символ ────────────────── */
+function _hkCode(e){
+  var c=e.code||'';
+  if(/^Key[A-Z]$/.test(c)) return c.slice(3);
+  if(/^Digit[0-9]$/.test(c)) return c.slice(5);
+  if(c==='BracketLeft') return '[';
+  if(c==='BracketRight') return ']';
+  if(c==='Slash') return '/';
+  var k=e.key||'';                                       // фолбэк, если code не пришёл
+  if(/^[a-zA-Z]$/.test(k)) return k.toUpperCase();
+  if(/^[0-9]$/.test(k)) return k;
+  if(k==='['||k===']'||k==='/') return k;
+  return '';
+}
+function _hkTyping(e){
+  var t=e.target; if(!t) return false;
+  if(t.isContentEditable) return true;
+  var tag=(t.tagName||'').toLowerCase();
+  return tag==='input'||tag==='textarea'||tag==='select';
+}
+function _hkModalOpen(){
+  return ['cmdk','ov-pd2','ov-proj','ov-emp','ov-agency','ov-estats','ov-drill'].some(function(id){
+    var e=document.getElementById(id); return !!(e&&e.classList.contains('on'));
+  });
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.defaultPrevented) return;
+  if(!hkCab()) return;                                   // логин — руки прочь
+  var code=_hkCode(e);
+
+  /* назад / вперёд — работают даже в полях ввода */
+  var back = (HK_MAC && e.metaKey && !e.shiftKey && code==='[') || (!HK_MAC && e.altKey && e.key==='ArrowLeft');
+  var fwd  = (HK_MAC && e.metaKey && !e.shiftKey && code===']') || (!HK_MAC && e.altKey && e.key==='ArrowRight');
+  if(back){ e.preventDefault(); hkBack(); return; }
+  if(fwd){ e.preventDefault(); hkFwd(); return; }
+
+  if(_hkTyping(e)) return;                               // печатает — молчим
+  if(e.ctrlKey||e.metaKey) return;                       // Mod-комбо не наши (⌘K живёт отдельно)
+
+  /* режим G: следующая клавиша — выбор проекта */
+  if(_hkG){
+    e.preventDefault();
+    if(e.key==='Escape'){ hkGoClose(); return; }
+    var hit=Object.keys(HK_PK).filter(function(id){ return HK_PK[id]===code; })[0];
+    if(hit) hkGoPick(hit);
+    else { hkGoClose(); if(code) toast('На клавише «'+code+'» проекта нет'); }
+    return;
+  }
+
+  if(e.key==='?'||(code==='/'&&e.shiftKey)){ e.preventDefault(); hkHelpToggle(); return; }
+  if(e.key==='Escape'){ hkHelpClose(); return; }         // Esc отдаём дальше — общий обработчик закроет своё
+  if(e.shiftKey||e.altKey) return;
+
+  if(code==='['){ e.preventDefault(); hkBack(); return; }
+  if(code===']'){ e.preventDefault(); hkFwd(); return; }
+
+  if(_hkModalOpen()) return;                             // в модалках свои клавиши (контент-план, канбан)
+
+  if(code==='/'||code==='S'){ e.preventDefault(); hkSearch(); return; }
+  if(code==='N'){ e.preventDefault(); hkNewTask(); return; }
+  if(code==='P'){ e.preventDefault(); hkNewProject(); return; }
+  if(code==='G'){ e.preventDefault(); hkGoOpen(); return; }
+  if(/^[0-9]$/.test(code)){ e.preventDefault(); hkModule(code); return; }
+});
+
+/* подсказка о существовании клавиш — один раз на устройство */
+(function _hkHint(){
+  setTimeout(function(){
+    if(!hkCab()) return;
+    try{ if(localStorage.getItem('hk_hint_v1')) return; localStorage.setItem('hk_hint_v1','1'); }catch(e){ return; }
+    if(typeof toast==='function') toast('Нажми ? — все горячие клавиши');
+  }, 6000);
+})();
+window.hkBack=hkBack; window.hkFwd=hkFwd; window.hkGoOpen=hkGoOpen; window.hkGoPick=hkGoPick;
+window.hkHelpToggle=hkHelpToggle; window.hkSyncKeys=hkSyncKeys; window.hkProjKey=hkProjKey;
 
 </script>
 <script type="module">
