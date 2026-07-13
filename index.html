@@ -16247,6 +16247,9 @@ function kbCurProj(){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(fu
 function kbProjName(){ var p=kbCurProj(); if(p&&p.name) return p.name;
   var e=KB_PROJECTS.find(function(x){return String(x.key)===String(kbProj);}); return e?e.name:String(kbProj||''); }
 function kbAutoInvalidate(pid){ if(pid==null) KB_AUTO={}; else delete KB_AUTO[pid]; }
+let KB_BRIEF_OPEN={};                   // какие брифы развёрнуты целиком
+const KB_BRIEF_HEAD=6;                  // сколько ответов показываем в свёрнутом виде
+function kbBriefToggle(k,ev){ if(ev&&ev.stopPropagation) ev.stopPropagation(); KB_BRIEF_OPEN[k]=!KB_BRIEF_OPEN[k]; renderKB(); }
 function _kbFmtD(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleDateString('ru-RU'); }catch(e){ return String(iso); } }
 function _kbMoney(n){ if(n==null||n==='') return ''; try{ return Number(n).toLocaleString('ru-RU').replace(/,/g,' ')+' сум'; }catch(e){ return String(n); } }
 function _kbArr(v){ return Array.isArray(v)?v.join(', '):(v==null?'':String(v)); }
@@ -16274,6 +16277,8 @@ var _KB_CHAN={instagram:'Instagram',youtube:'YouTube',telegram:'Telegram',tiktok
 var _KB_CHANCOL={instagram:'#E1306C',youtube:'#FF0000',telegram:'#37E6C8',tiktok:'#8A8FFF',facebook:'#6AA9FF',website:'#43D88C',site:'#43D88C',vk:'#6AA9FF',threads:'#9AA1AC'};
 
 /* чипы */
+_KBIC.note='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
+_KBIC.chev='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M6 9l6 6 6-6"/></svg>';
 function _kbCopyChip(icon,text,color){ if(text==null||text==='') return ''; var c=color||'var(--txt-2)'; var e=_kbEscAttr(text);
   return '<span class="kb-chip" onclick="kbCopy(\''+e+'\',event)" title="Скопировать"><span class="ci" style="color:'+c+'">'+icon+'</span>'+escH(String(text))+'<span class="cc">'+_KBIC.copy+'</span></span>'; }
 function _kbTgChip(tg){ if(!tg) return ''; var uname=String(tg).replace(/^@/,'').replace(/^https?:\/\/(t\.me|telegram\.me)\//i,''); var disp='@'+uname.replace(/^\+/,'').replace(/[^A-Za-z0-9_+].*$/,'')||('@'+uname);
@@ -16375,7 +16380,57 @@ function kbAutoCss(){
     +".kb-smm-bar{height:3px;border-radius:2px;background:var(--bg-3);overflow:hidden;margin-top:1px}"
     +".kb-smm-bar i{display:block;height:100%;border-radius:2px}"
     +".kb-smm-share{font-size:10px;font-family:var(--mono);color:var(--txt-3)}"
-    +"@media (max-width:900px){.kb-smm-hero{grid-template-columns:1fr}}";
+    +"@media (max-width:900px){.kb-smm-hero{grid-template-columns:1fr}}"
+    +".kb-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:1px;background:var(--line);border-radius:12px;overflow:hidden;margin:12px}"
+    +".kb-fact{background:var(--bg-2);padding:12px 14px;min-width:0;display:flex;flex-direction:column;gap:4px}"
+    +".kb-fact .l{font-size:9.5px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+    +".kb-fact .v{font-size:15px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+    +".kb-fact .v em{font-style:normal;font-size:.7em;font-weight:600;opacity:.5}"
+    +".kb-fact .s{font-size:10.5px;font-family:var(--mono);color:var(--txt-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+    +".kb-dot{width:6px;height:6px;border-radius:50%;flex:none;display:inline-block}"
+    +".kb-f-bar{height:3px;border-radius:2px;background:var(--bg-3);overflow:hidden;margin:2px 0 1px}"
+    +".kb-f-bar i{display:block;height:100%;background:var(--accent);border-radius:2px}"
+    +".kb-ct{margin:0 12px 12px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}"
+    +".kb-ct-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}"
+    +".kb-ct-top .k{font-size:9.5px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--txt-3)}"
+    +".kb-ct-top .d{font-family:var(--mono);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}"
+    +".kb-ct-top .n{margin-left:auto;font-family:var(--mono);font-size:11.5px;white-space:nowrap}"
+    +".kb-ct-bar{height:4px;border-radius:3px;background:var(--bg-3);overflow:hidden;margin-top:9px}"
+    +".kb-ct-bar i{display:block;height:100%;border-radius:3px}"
+    +".kb-ct-sub{font-size:10px;font-family:var(--mono);color:var(--txt-3);margin-top:5px}"
+    +".kb-note{display:flex;gap:9px;margin:0 12px 12px;background:var(--bg-2);border:1px solid var(--line);border-left:2px solid var(--warn);border-radius:0 10px 10px 0;padding:10px 12px}"
+    +".kb-note .ic{color:var(--warn);flex:none;display:inline-flex;padding-top:1px}"
+    +".kb-note .tx{font-size:13px;color:var(--txt-2);line-height:1.5;min-width:0;word-break:break-word}"
+    +".kb-pass-meta{padding:0 12px 12px;font-size:10.5px;font-family:var(--mono);color:var(--txt-3)}"
+    +".kb-svcs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;padding:2px 12px 12px}"
+    +".kb-svc{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-width:0;display:flex;flex-direction:column;gap:5px}"
+    +".kb-svc.on{border-color:rgba(67,216,140,.24)}"
+    +".kb-svc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}"
+    +".kb-svc-h .nm{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+    +".kb-svc-h .st{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;flex:none}"
+    +".kb-svc-v{font-family:var(--mono);font-size:17px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+    +".kb-svc-s{font-size:10.5px;font-family:var(--mono);color:var(--txt-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+    +".kb-b-meta{font-family:var(--mono);font-size:11px;color:var(--txt-3);white-space:nowrap}.kb-b-meta b{color:var(--txt);font-weight:600}"
+    +".kb-b-bar{height:3px;border-radius:2px;background:var(--bg-3);overflow:hidden;margin:0 12px 10px}"
+    +".kb-b-bar i{display:block;height:100%;background:var(--accent);border-radius:2px}"
+    +".kb-bg-t{font-size:10px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);padding:6px 12px 4px}"
+    +".kb-bgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;padding:2px 12px 10px}"
+    +".kb-bq{background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;display:flex;flex-direction:column;gap:6px}"
+    +".kb-bq-q{font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);line-height:1.35}"
+    +".kb-bq-a{min-width:0}"
+    +".kb-bq-v{font-size:13.5px;color:var(--txt);line-height:1.5;word-break:break-word;display:block}"
+    +".kb-bq-long{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}"
+    +".kb-bq-chips{display:flex;flex-wrap:wrap;gap:5px}"
+    +".kb-tag{background:var(--bg-3);border:1px solid var(--line-2);border-radius:6px;padding:3px 8px;font-size:11.5px;color:var(--txt-2)}"
+    +".kb-scale{display:flex;align-items:center;gap:7px;flex-wrap:wrap}"
+    +".kb-scale b{font-family:var(--mono);font-size:16px;font-weight:700}"
+    +".kb-scale .mx{font-family:var(--mono);font-size:11px;color:var(--txt-3)}"
+    +".kb-scale .dd{display:flex;gap:3px}"
+    +".kb-scale .dd i{width:6px;height:6px;border-radius:50%;background:var(--bg-3);display:block}"
+    +".kb-scale .dd i.on{background:var(--accent)}"
+    +".kb-more{display:flex;align-items:center;justify-content:center;gap:7px;width:calc(100% - 24px);margin:0 12px 12px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:9px;padding:8px;color:var(--txt-2);font-family:var(--mono);font-size:11.5px;cursor:pointer;transition:all .14s var(--ease-out)}"
+    +".kb-more:hover{border-color:var(--accent-line);color:var(--accent)}"
+    +".kb-more .ic{display:inline-flex;transition:transform .18s var(--ease-out)}.kb-more .ic.up{transform:rotate(180deg)}";
   document.head.appendChild(s);
 }
 function kbSec(title,color,body,count){
@@ -16447,31 +16502,134 @@ async function kbLoadAuto(pid){
 }
 
 /* ── ПАСПОРТ ── */
+/* Ключи берём из mapProject: cat / svc / stages / createdAt.
+   Раньше тут стояли p.category, p.service, p.stages_total, p.created_at —
+   таких полей у смапленного проекта нет, поэтому четыре строки паспорта просто не рисовались. */
+function _kbFact(label,val,color,sub){
+  if(val==null||val==='') return '';
+  return '<div class="kb-fact"><div class="l">'+escH(label)+'</div>'
+    +'<div class="v"'+(color?' style="color:'+color+'"':'')+'>'+escH(String(val))+'</div>'
+    +(sub?'<div class="s">'+escH(sub)+'</div>':'')+'</div>';
+}
+function _kbStatus(s){
+  if(!s) return '';                       // статуса нет — не рисуем пустую плитку с прочерком
+  var M={active:['активен','var(--pos)'],done:['завершён','var(--txt-2)'],pause:['на паузе','var(--warn)'],archived:['в архиве','var(--txt-3)']};
+  var e=M[s]||[s,'var(--txt-2)'];
+  return '<div class="kb-fact"><div class="l">Статус</div><div class="v" style="color:'+e[1]+'"><i class="kb-dot" style="background:'+e[1]+'"></i>'+escH(e[0])+'</div></div>';
+}
+/* полоса срока договора: сколько прошло и сколько осталось */
+function _kbContractBar(c){
+  if(!c||(!c.start_date&&!c.end_date)) return '';
+  var s=c.start_date?new Date(c.start_date).getTime():null;
+  var e=c.end_date?new Date(c.end_date).getTime():null;
+  var now=Date.now(), pct=null, left=null, col='var(--pos)', note='';
+  if(e!=null){
+    left=Math.ceil((e-now)/86400000);
+    if(left<0){ col='var(--neg)'; note='договор истёк '+Math.abs(left)+' '+_plural(Math.abs(left),'день','дня','дней')+' назад'; }
+    else if(left<=30){ col='var(--warn)'; note='осталось '+left+' '+_plural(left,'день','дня','дней'); }
+    else { note='осталось '+left+' '+_plural(left,'день','дня','дней'); }
+  }
+  if(s!=null&&e!=null&&e>s) pct=Math.max(0,Math.min(100,Math.round((now-s)/(e-s)*100)));
+  return '<div class="kb-ct">'
+    +'<div class="kb-ct-top"><span class="k">Договор</span>'
+      +'<span class="d">'+escH(_kbFmtD(c.start_date))+' — '+escH(_kbFmtD(c.end_date))+'</span>'
+      +(note?'<span class="n" style="color:'+col+'">'+escH(note)+'</span>':'')+'</div>'
+    +(pct!=null?'<div class="kb-ct-bar"><i style="width:'+pct+'%;background:'+col+'"></i></div><div class="kb-ct-sub">'+pct+'% срока пройдено</div>':'')
+    +'</div>';
+}
+/* ── бриф: значение по типу поля ── */
+function _kbBriefVal(f,v){
+  var t=f.type||'short';
+  if(v==null||v===''||(Array.isArray(v)&&!v.length)) return '';
+  if(t==='file'){
+    if(v&&typeof v==='object'&&v.url) return '<a class="kb-chip" href="'+_kbEscAttr(v.url)+'" target="_blank" rel="noopener"><span class="ci" style="color:#6AA9FF">'+_KBIC.ext+'</span>'+escH(v.name||'Файл')+'</a>';
+    return '<span class="kb-bq-v">'+escH(_kbArr(v))+'</span>';
+  }
+  if(t==='url'){ var u=String(v); return '<a class="kb-chip" href="'+_kbEscAttr(/^https?:/i.test(u)?u:'https://'+u)+'" target="_blank" rel="noopener"><span class="ci" style="color:#6AA9FF">'+_KBIC.ext+'</span>'+escH(u)+'</a>'; }
+  if(t==='phone') return _kbCopyChip(_KBIC.phone,String(v),'#43D88C');
+  if(t==='email') return _kbCopyChip(_KBIC.copy,String(v),'#8A8FFF');
+  if(t==='scale'){
+    var sc=f.scale||{min:1,max:5}, mn=Number(sc.min||1), mx=Number(sc.max||5), cur=Number(v), dots='';
+    for(var i=mn;i<=mx&&i<mn+12;i++) dots+='<i class="'+(i<=cur?'on':'')+'"></i>';
+    return '<span class="kb-scale"><b>'+escH(String(v))+'</b><span class="mx">/ '+mx+'</span><span class="dd">'+dots+'</span></span>';
+  }
+  if(Array.isArray(v)) return '<span class="kb-bq-chips">'+v.map(function(x){ return '<span class="kb-tag">'+escH(String(x))+'</span>'; }).join('')+'</span>';
+  if(typeof v==='object') return '<span class="kb-bq-chips">'+Object.keys(v).map(function(k){ return '<span class="kb-tag">'+escH(k)+' → '+escH(_kbArr(v[k]))+'</span>'; }).join('')+'</span>';
+  if(t==='checks'||t==='select'||t==='radio') return '<span class="kb-bq-chips"><span class="kb-tag">'+escH(String(v))+'</span></span>';
+  var cls=(t==='long')?'kb-bq-v kb-bq-long':'kb-bq-v';
+  return '<span class="'+cls+'">'+escH(String(v))+'</span>';
+}
+function _kbBriefBlock(b,bi){
+  var fields=(b.fields||[]), ans=b.answers||{};
+  var filled=function(f){ var v=ans[f.id]; if(v==null||v==='') return false; if(Array.isArray(v)) return !!v.length; if(typeof v==='object') return !!Object.keys(v).length; return String(v).trim()!==''; };
+  var qs=fields.filter(function(f){ return f.type!=='section'; });
+  var got=qs.filter(filled);
+  if(!got.length) return '';
+  var key=String(b.id||b.name||bi);
+  var open=!!KB_BRIEF_OPEN[key];
+  var limit=open?1e9:KB_BRIEF_HEAD;
+
+  /* режем по разделам, но общий лимит ответов сквозной */
+  var shown=0, groups=[], cur={title:'',items:[]};
+  fields.forEach(function(f){
+    if(f.type==='section'){ if(cur.items.length) groups.push(cur); cur={title:(f.label||''),items:[]}; return; }
+    if(!filled(f)) return;
+    if(shown>=limit) return;
+    shown++;
+    var q=f.label||f.q||f.title||f.name||f.question||'Вопрос';
+    cur.items.push('<div class="kb-bq"><div class="kb-bq-q">'+escH(q)+'</div><div class="kb-bq-a">'+_kbBriefVal(f,ans[f.id])+'</div></div>');
+  });
+  if(cur.items.length) groups.push(cur);
+
+  var body=groups.map(function(g){
+    return (g.title?'<div class="kb-bg-t">'+escH(g.title)+'</div>':'')+'<div class="kb-bgrid">'+g.items.join('')+'</div>';
+  }).join('');
+
+  var pct=qs.length?Math.round(got.length/qs.length*100):0;
+  var head='<div class="kb-sub-h kb-subh-row"><span>Бриф · '+escH(b.name||'Бриф')+'</span>'
+    +'<span class="kb-b-meta">заполнено <b>'+got.length+'</b> из '+qs.length+'</span></div>'
+    +'<div class="kb-b-bar"><i style="width:'+pct+'%"></i></div>';
+
+  var more=(got.length>KB_BRIEF_HEAD)
+    ? '<button class="kb-more" onclick="kbBriefToggle(\''+_kbEscAttr(key)+'\',event)">'
+        +(open?'Свернуть':'Показать все '+got.length+' '+_plural(got.length,'ответ','ответа','ответов'))
+        +'<span class="ic'+(open?' up':'')+'">'+_KBIC.chev+'</span></button>'
+    : '';
+  return head+body+more;
+}
 function _kbSecPassport(p,A){
-  var rows=_kbKV('Категория',p.category)+_kbKV('Услуга',p.service)+_kbKV('Тариф',p.tariff)
-    +_kbKV('Статус', p.status==='done'?'завершён':p.status==='active'?'активен':(p.status||'—'))
-    +(p.stages_total?_kbKV('Прогресс',(p.pct||0)+'% · '+(p.stages_done||0)+'/'+p.stages_total+' этапов'):'')
-    +(A.contract?_kbKV('Договор',_kbFmtD(A.contract.start_date)+' — '+_kbFmtD(A.contract.end_date)):'')
-    +_kbKV('Создан',_kbFmtD(p.created_at))
-    +_kbKV('Заметка',p.note);
+  var facts=_kbFact('Услуга',p.svc)+_kbFact('Категория',(p.cat&&p.cat!=='—')?p.cat:'')+_kbFact('Тариф',p.tariff,'var(--accent)')+_kbStatus(p.status);
+  var st=String(p.stages||''), sp=st.split('/'), sDone=(sp[0]||'').trim(), sTot=(sp[1]||'').trim();
+  if(sTot) facts+='<div class="kb-fact"><div class="l">Прогресс</div><div class="v">'+(p.pct||0)+'<em>%</em></div>'
+    +'<div class="kb-f-bar"><i style="width:'+Math.max(0,Math.min(100,p.pct||0))+'%"></i></div>'
+    +'<div class="s">'+escH(sDone+' из '+sTot+' '+_plural(Number(sTot)||0,'этап','этапа','этапов'))+'</div></div>';
+  if(_kbHas(p.mrr)&&Number(p.mrr)>0) facts+=_kbFact('MRR',_kbMoney(p.mrr),'var(--pos)','в месяц');
+  var head=facts?'<div class="kb-facts">'+facts+'</div>':'';
+
+  var ct=_kbContractBar(A.contract);
+  var note=p.note?'<div class="kb-note"><span class="ic">'+_KBIC.note+'</span><span class="tx">'+escH(p.note)+'</span></div>':'';
+  var created=p.createdAt?'<div class="kb-pass-meta">Проект создан '+escH(_kbFmtD(p.createdAt))+'</div>':'';
+
   var svc='';
   if(A.services&&A.services.length){
-    svc='<div class="kb-sub-h">Услуги по договору</div>'+A.services.map(function(s){
-      var meta=[s.tariff,_kbMoney(s.mrr)].filter(Boolean).join(' · ');
-      return '<div class="kb-mi"><div class="mt">'+escH(s.service||'—')+(meta?' — '+escH(meta):'')+'</div><span class="ty-badge">'+escH(s.status||'')+'</span></div>';
-    }).join('');
+    var sum=A.services.reduce(function(t,s){ return t+(Number(s.mrr)||0); },0);
+    svc='<div class="kb-sub-h kb-subh-row"><span>Услуги по договору</span>'
+      +(sum>0?'<span class="kb-b-meta"><b>'+escH(_kbMoney(sum))+'</b> / мес</span>':'')+'</div>'
+      +'<div class="kb-svcs">'+A.services.map(function(s){
+        var on=String(s.status||'').toLowerCase()==='active';
+        var per=[s.start_date,s.end_date].filter(Boolean).map(_kbFmtD).join(' — ');
+        return '<div class="kb-svc'+(on?' on':'')+'">'
+          +'<div class="kb-svc-h"><span class="nm">'+escH(s.service||'—')+'</span>'
+            +'<span class="st" style="color:'+(on?'var(--pos)':'var(--txt-3)')+'"><i class="kb-dot" style="background:'+(on?'var(--pos)':'var(--txt-3)')+'"></i>'+escH(s.status||'—')+'</span></div>'
+          +'<div class="kb-svc-v">'+escH(_kbMoney(s.mrr))+'</div>'
+          +'<div class="kb-svc-s">'+escH([s.tariff,per].filter(Boolean).join(' · ')||'тариф не указан')+'</div>'
+        +'</div>';
+      }).join('')+'</div>';
   }
-  var brief='';
-  (A.briefs||[]).forEach(function(b){
-    var qs=(b.fields||[]).filter(function(f){ return f.type!=='section'; });
-    var qa=qs.map(function(f){
-      var v=b.answers&&b.answers[f.id]; var txt=_kbArr(v); if(!txt) return '';
-      var q=f.label||f.q||f.title||f.name||f.question||f.text||'Вопрос';
-      return _kbKV(q, txt);
-    }).filter(Boolean).join('');
-    if(qa) brief+='<div class="kb-sub-h">Бриф · '+escH(b.name||'Бриф')+'</div>'+qa;
-  });
-  return kbSec('Паспорт проекта','#37E6C8',(rows||'<div class="kb-empty">Нет данных</div>')+svc+brief);
+
+  var brief=(A.briefs||[]).map(_kbBriefBlock).filter(Boolean).join('');
+  var body=head+ct+note+svc+brief+created;
+  return kbSec('Паспорт проекта','#37E6C8', body||'<div class="kb-empty">Нет данных</div>');
 }
 
 /* ── КОНТАКТЫ ── */
