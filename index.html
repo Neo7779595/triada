@@ -5367,6 +5367,32 @@ button:active{transform:translateY(.5px) scale(.99)}
   70%{box-shadow:0 0 0 2px var(--accent-line),0 0 18px 2px rgba(55,230,200,.12)}
   100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent}
 }
+
+/* ——— кастомные выпадающие списки ——— */
+select.ddx-native{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;border:0!important;opacity:0!important;pointer-events:none!important;clip:rect(0 0 0 0);overflow:hidden;white-space:nowrap}
+.ddx-btn{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;font-family:inherit;text-align:left;cursor:pointer;min-width:0}
+.ddx-btn .ddx-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ddx-btn .ddx-chev{display:inline-flex;flex:none;opacity:.6;transition:transform .18s var(--ease-out)}
+.ddx-btn.on .ddx-chev{transform:rotate(180deg);opacity:1}
+.ddx-btn.on{border-color:var(--accent-line)!important;color:var(--accent)}
+.ddx-btn.ph .ddx-lbl{color:var(--txt-3)}
+.ddx-btn:disabled{opacity:.45;cursor:default}
+.ddx-menu{position:fixed;z-index:130;max-width:min(340px,92vw);padding:6px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(28,33,42,.9),rgba(15,17,22,.95));
+  backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);
+  border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 60px -14px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.06);
+  animation:ddx-in .14s var(--ease-out)}
+@keyframes ddx-in{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.ddx-q{display:flex;align-items:center;gap:7px;padding:6px 9px;margin-bottom:4px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:var(--txt-3)}
+.ddx-q input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--txt);font-family:inherit;font-size:12.5px}
+.ddx-list{max-height:min(300px,52vh);overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.ddx-o{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:0;border-radius:9px;padding:8px 10px;cursor:pointer;text-align:left;color:var(--txt-2);font-family:inherit;font-size:13px;transition:background .1s var(--ease-out)}
+.ddx-o .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ddx-o .c{display:inline-flex;flex:none;color:var(--accent)}
+.ddx-o:hover,.ddx-o.cur{background:rgba(255,255,255,.07);color:var(--txt)}
+.ddx-o.on{color:var(--accent);background:var(--accent-dim)}
+.ddx-o.dis{opacity:.4;cursor:default}
+.ddx-e{padding:16px;text-align:center;color:var(--txt-3);font-family:var(--mono);font-size:11.5px}
 </style>
 <style id="gen-glass">
 /* ═══════════ ГЕНЕРАЛЬНЫЙ КАБИНЕТ · СТЕКЛЯННЫЙ РЕДИЗАЙН (scoped #app) ═══════════ */
@@ -7275,7 +7301,7 @@ function _dd(key,label,valLabel,opts,curVal,setter,right){
     +opts.map(o=>`<button class="dd-opt ${curVal===o[0]?'on':''}" onclick="_closePops();${setter}('${_ddEsc(o[0])}');setTimeout(_closePops,0)">${_ddH(o[1])}${ck}</button>`).join('')
     +`</div></div>`;
 }
-function _closePops(){ if(typeof _ddPortalRelease==='function'){ try{ _ddPortalRelease(); }catch(_){} } document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); document.querySelectorAll('.kbp-pop').forEach(p=>p.remove()); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
+function _closePops(){ if(typeof _ddPortalRelease==='function'){ try{ _ddPortalRelease(); }catch(_){} } document.querySelectorAll('.dd.open').forEach(d=>d.classList.remove('open')); document.querySelectorAll('.dp-pop').forEach(p=>p.remove()); document.querySelectorAll('.kbp-pop').forEach(p=>p.remove()); if(typeof ddxClose==='function') ddxClose(); if(typeof _dr!=='undefined'&&_dr){ _dr.anchor=null; _dr.hover=null; } }
 function _ddPortalRelease(){ document.querySelectorAll('.dd-menu.dd-portal').forEach(function(m){ var home=m.__ddHome; if(home && home.parentNode && document.body.contains(home)){ home.parentNode.insertBefore(m,home); home.parentNode.removeChild(home); m.__ddHome=null; m.classList.remove('dd-portal'); m.style.left=''; m.style.top=''; m.style.minWidth=''; } else { if(m.parentNode) m.parentNode.removeChild(m); } }); document.querySelectorAll('.dd.open').forEach(function(el){ el.classList.remove('open'); }); }
 function ddToggle(k){
   const el=document.getElementById('dd-'+k);if(!el)return;
@@ -20369,6 +20395,7 @@ function ntfRender(){
     +'</div>'
     +(chips?'<div class="ntf-chips">'+chips+'</div>':'')
     +'<div class="ntf-list">'+body+'</div>'));
+  if(typeof ddxScanAll==='function') ddxScanAll(el);      // сразу подменяем select, чтобы нативный не мелькал
   const q=document.getElementById('ntf-q');
   if(q&&NTF_F.q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
 }
@@ -20445,6 +20472,163 @@ setInterval(ntfBoot, 600);   // подписка поднимается почт
 window.ntfToggle=ntfToggle; window.ntfOpen=ntfOpen; window.ntfClose=ntfClose; window.ntfScan=ntfScan;
 window.ntfGoto=ntfGoto; window.ntfMarkAll=ntfMarkAll; window.ntfReset=ntfReset;
 window.ntfPlay=ntfPlay; window.ntfSndMute=ntfSndMute; window.ntfView=ntfView; window.ntfHighlight=ntfHighlight;
+
+
+
+/* ═══════════════════ КАСТОМНЫЕ ВЫПАДАЮЩИЕ СПИСКИ ═══════════════════
+   Попап нативного <select> нельзя застилить ни в одном браузере — он
+   рисуется операционной системой. Поэтому: сам <select> ОСТАЁТСЯ в DOM
+   как источник истины (его читают .value, querySelector, form-логика),
+   но визуально прячется, а рядом встаёт своя кнопка со стеклянным меню.
+   Выбор пункта пишет значение в select и шлёт ему честный change —
+   поэтому все существующие onchange="foo(this.value)" работают как были.
+   ══════════════════════════════════════════════════════════════════ */
+let _ddxOpen=null, _ddxIdx=-1, _ddxQ='';
+const _DDX_CHEV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M6 9l6 6 6-6"/></svg>';
+
+function ddxUpgrade(sel){
+  if(!sel||sel.__ddx||sel.multiple||sel.size>1) return;
+  sel.__ddx=1;
+  sel.classList.add('ddx-native');
+  const btn=document.createElement('button');
+  btn.type='button';
+  btn.className='ddx-btn '+String(sel.className||'').replace('ddx-native','').trim();
+  btn.innerHTML='<span class="ddx-lbl"></span><span class="ddx-chev">'+_DDX_CHEV+'</span>';
+  if(sel.disabled) btn.disabled=true;
+  if(sel.title) btn.title=sel.title;
+  sel.insertAdjacentElement('afterend', btn);
+  sel.__btn=btn; btn.__sel=sel;
+  btn.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); ddxToggle(sel); });
+  btn.addEventListener('keydown', function(e){
+    if(e.key==='ArrowDown'||e.key==='Enter'||e.key===' '){ e.preventDefault(); ddxToggle(sel); }
+  });
+  sel.addEventListener('change', function(){ ddxSync(sel); });
+  ddxSync(sel);
+}
+function ddxSync(sel){
+  const b=sel.__btn; if(!b) return;
+  const o=sel.options[sel.selectedIndex];
+  const l=b.querySelector('.ddx-lbl');
+  if(l) l.textContent=(o?o.textContent:'').trim()||'Выбрать';
+  b.disabled=!!sel.disabled;
+  b.classList.toggle('ph', !o||!String(o.value||'').length);       // «плейсхолдерное» значение — приглушаем
+}
+function ddxScanAll(root){
+  try{ (root||document).querySelectorAll('select:not(.ddx-native)').forEach(ddxUpgrade); }catch(e){}
+}
+function ddxClose(){
+  if(!_ddxOpen) return;
+  const m=document.getElementById('ddx-menu'); if(m) m.remove();
+  if(_ddxOpen.__btn) _ddxOpen.__btn.classList.remove('on');
+  _ddxOpen=null; _ddxIdx=-1; _ddxQ='';
+}
+function ddxToggle(sel){ if(_ddxOpen===sel){ ddxClose(); return; } ddxOpen(sel); }
+function ddxOpen(sel){
+  ddxClose();
+  if(typeof _closePops==='function'){ try{ _closePops(); }catch(e){} }
+  if(sel.disabled||!sel.options.length) return;
+  _ddxOpen=sel; _ddxIdx=sel.selectedIndex; _ddxQ='';
+  sel.__btn.classList.add('on');
+  const m=document.createElement('div');
+  m.id='ddx-menu'; m.className='ddx-menu';
+  m.addEventListener('click', function(e){ e.stopPropagation(); });
+  document.body.appendChild(m);
+  ddxPaint();
+  ddxPlace();
+  const q=m.querySelector('.ddx-q input'); if(q) q.focus();
+}
+function ddxPaint(){
+  const m=document.getElementById('ddx-menu'); if(!m||!_ddxOpen) return;
+  const sel=_ddxOpen;
+  const opts=Array.from(sel.options);
+  const many=opts.length>8;                                        // длинный список — даём поиск
+  const q=_ddxQ.trim().toLowerCase();
+  const rows=opts.map(function(o,i){ return {o:o,i:i}; })
+    .filter(function(r){ return !q || (r.o.textContent||'').toLowerCase().indexOf(q)>=0; });
+  const ck='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M20 6L9 17l-5-5"/></svg>';
+  m.innerHTML=(many?'<div class="ddx-q"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск…" value="'+_ddxEsc(_ddxQ)+'" autocomplete="off"></div>':'')
+    +'<div class="ddx-list">'+(rows.length?rows.map(function(r){
+      return '<button type="button" class="ddx-o'+(r.i===sel.selectedIndex?' on':'')+(r.i===_ddxIdx?' cur':'')+(r.o.disabled?' dis':'')+'" data-i="'+r.i+'">'
+        +'<span class="l">'+_ddxEsc((r.o.textContent||'').trim())+'</span>'
+        +'<span class="c">'+(r.i===sel.selectedIndex?ck:'')+'</span></button>';
+    }).join(''):'<div class="ddx-e">Ничего не найдено</div>')+'</div>';
+  m.querySelectorAll('.ddx-o').forEach(function(b){
+    b.addEventListener('mouseenter', function(){ _ddxIdx=Number(b.dataset.i); });
+    b.addEventListener('click', function(e){ e.stopPropagation(); ddxPick(Number(b.dataset.i)); });
+  });
+  const inp=m.querySelector('.ddx-q input');
+  if(inp) inp.addEventListener('input', function(){ _ddxQ=inp.value; ddxPaint(); ddxPlace(); const j=m.querySelector('.ddx-q input'); if(j){ j.focus(); j.setSelectionRange(j.value.length,j.value.length); } });
+  const cur=m.querySelector('.ddx-o.on')||m.querySelector('.ddx-o.cur');
+  if(cur&&cur.scrollIntoView) try{ cur.scrollIntoView({block:'nearest'}); }catch(e){}
+}
+function _ddxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function ddxPlace(){
+  const m=document.getElementById('ddx-menu'); if(!m||!_ddxOpen) return;
+  const b=_ddxOpen.__btn.getBoundingClientRect();
+  const w=Math.max(b.width, 190);
+  const h=m.offsetHeight||220;
+  let top=b.bottom+6, left=b.left;
+  if(top+h>window.innerHeight-10) top=Math.max(10, b.top-h-6);      // не хватает места снизу — открываемся вверх
+  if(left+w>window.innerWidth-10) left=Math.max(10, window.innerWidth-w-10);
+  m.style.minWidth=w+'px';
+  m.style.top=Math.round(top)+'px';
+  m.style.left=Math.round(left)+'px';
+}
+function ddxPick(i){
+  const sel=_ddxOpen; if(!sel) return;
+  const o=sel.options[i]; if(!o||o.disabled) return;
+  const changed=(sel.selectedIndex!==i);
+  sel.selectedIndex=i;
+  ddxSync(sel);
+  ddxClose();
+  if(changed){                                                     // честные события — inline onchange сработает как раньше
+    try{ sel.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){}
+    try{ sel.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){}
+  }
+}
+function _ddxMove(d){
+  const sel=_ddxOpen; if(!sel) return;
+  const n=sel.options.length;
+  let i=_ddxIdx;
+  for(let k=0;k<n;k++){
+    i=(i+d+n)%n;
+    if(!sel.options[i].disabled) break;
+  }
+  _ddxIdx=i; ddxPaint();
+}
+document.addEventListener('click', function(){ ddxClose(); });
+document.addEventListener('keydown', function(e){
+  if(!_ddxOpen) return;
+  if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); const b=_ddxOpen.__btn; ddxClose(); if(b) b.focus(); return; }
+  if(e.key==='ArrowDown'){ e.preventDefault(); _ddxMove(1); return; }
+  if(e.key==='ArrowUp'){ e.preventDefault(); _ddxMove(-1); return; }
+  if(e.key==='Home'){ e.preventDefault(); _ddxIdx=0; ddxPaint(); return; }
+  if(e.key==='End'){ e.preventDefault(); _ddxIdx=_ddxOpen.options.length-1; ddxPaint(); return; }
+  if(e.key==='Enter'){ e.preventDefault(); if(_ddxIdx>=0) ddxPick(_ddxIdx); return; }
+}, true);
+window.addEventListener('resize', ddxClose);
+window.addEventListener('scroll', function(){ if(_ddxOpen) ddxClose(); }, true);
+
+/* приложение постоянно перерисовывает куски через innerHTML — ловим новые select */
+(function _ddxWatch(){
+  let t=null;
+  const kick=function(){ clearTimeout(t); t=setTimeout(function(){ ddxScanAll(); }, 60); };
+  if(typeof MutationObserver!=='undefined'){
+    new MutationObserver(function(muts){
+      for(let i=0;i<muts.length;i++){
+        const a=muts[i].addedNodes;
+        for(let j=0;j<a.length;j++){
+          const n=a[j];
+          if(n.nodeType!==1) continue;
+          if(n.tagName==='SELECT'||(n.querySelector&&n.querySelector('select'))){ kick(); return; }
+        }
+      }
+    }).observe(document.documentElement,{childList:true,subtree:true});
+  }
+  if(document.readyState!=='loading') ddxScanAll();
+  else document.addEventListener('DOMContentLoaded', function(){ ddxScanAll(); });
+})();
+window.ddxScanAll=ddxScanAll; window.ddxClose=ddxClose; window.ddxUpgrade=ddxUpgrade;
 
 </script>
 <script type="module">
