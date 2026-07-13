@@ -5358,6 +5358,15 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ntf-test{width:100%;margin-top:14px;background:var(--accent-dim);border:1px solid var(--accent-line);color:var(--accent);border-radius:10px;padding:10px;font-family:var(--mono);font-size:12px;cursor:pointer;transition:all .14s var(--ease-out)}
 .ntf-test:hover{background:var(--accent);color:#06231e}
 .ntf-note{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--txt-3);line-height:1.6}
+
+/* подсветка объекта, к которому привело уведомление */
+.ntf-flash{animation:ntf-fl 2.6s cubic-bezier(.22,1,.36,1);position:relative;z-index:2}
+@keyframes ntf-fl{
+  0%{box-shadow:0 0 0 0 var(--accent),0 0 0 0 rgba(55,230,200,.55);border-color:var(--accent)}
+  12%{box-shadow:0 0 0 2px var(--accent),0 0 28px 6px rgba(55,230,200,.35);border-color:var(--accent)}
+  70%{box-shadow:0 0 0 2px var(--accent-line),0 0 18px 2px rgba(55,230,200,.12)}
+  100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent}
+}
 </style>
 <style id="gen-glass">
 /* ═══════════ ГЕНЕРАЛЬНЫЙ КАБИНЕТ · СТЕКЛЯННЫЙ РЕДИЗАЙН (scoped #app) ═══════════ */
@@ -13477,7 +13486,7 @@ function smmReportCardHTML(x,p){
   const title=(p&&p.name)?p.name:(r.title||'SMM-отчёт');
   const period=x.s.period?`<span class="smm-rep-perlbl">${_ddH(x.s.period)}</span>`:'';
   const dateSvg='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
-  return `<div class="smm-rep-card" onclick="openReportProj(${x.i})"><div class="smm-rep-top"><div class="smm-rep-left">${avatar}<div class="smm-rep-info"><div class="smm-rep-name">${_ddH(title)}</div><div class="smm-rep-per"><span class="smm-rep-badge">SMM</span>${period}</div><div class="smm-rep-date">${dateSvg}${_dDateFull(r.published_at)}</div></div></div><div class="smm-rep-right"><button class="smm-rep-copy" title="Дублировать" onclick="event.stopPropagation();pdReportCopy(${x.i})"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button><button class="smm-rep-open" onclick="event.stopPropagation();openReportProj(${x.i})">Открыть <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></button><button class="smm-rep-del" title="Удалить" onclick="event.stopPropagation();pdReportDel('${r.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button></div></div>${strip}</div>`;
+  return `<div class="smm-rep-card" data-rpid="${_ddA(String(r.id||''))}" onclick="openReportProj(${x.i})"><div class="smm-rep-top"><div class="smm-rep-left">${avatar}<div class="smm-rep-info"><div class="smm-rep-name">${_ddH(title)}</div><div class="smm-rep-per"><span class="smm-rep-badge">SMM</span>${period}</div><div class="smm-rep-date">${dateSvg}${_dDateFull(r.published_at)}</div></div></div><div class="smm-rep-right"><button class="smm-rep-copy" title="Дублировать" onclick="event.stopPropagation();pdReportCopy(${x.i})"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button><button class="smm-rep-open" onclick="event.stopPropagation();openReportProj(${x.i})">Открыть <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></button><button class="smm-rep-del" title="Удалить" onclick="event.stopPropagation();pdReportDel('${r.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button></div></div>${strip}</div>`;
 }
 function pdReportCopy(idx){ const r=(PROJECTS[pdIdx]._reports||[])[idx]; if(!r) return; const payload=JSON.parse(JSON.stringify(r.payload||{})); if(window.tReportAdd) window.tReportAdd(PROJECTS[pdIdx].id,{title:(r.title||'SMM-отчёт')+' · копия',kind:r.kind||'SMM',payload}); else toast('Нужен бэкенд'); }
 function smmSection01HTML(){
@@ -19859,7 +19868,11 @@ function ntfView(v){ NTF_VIEW=v; ntfRender(); }
 let NTF_F={tab:'all', kinds:{}, proj:'', unread:false, q:''};
 const NTF_MAX=400;
 const _ntfTitles={};                     // кеш названий задач: task_history их не присылает
+const _ntfAssign={};                     // кеш ответственных
 let _ntfStatus={};                       // зеркало статусов — чтобы не слать «выполнена» дважды
+/* Вкладки карточки проекта называются так (PD_TABS), а не как мне вздумалось:
+   stages · kanban · deadlines · content · smm · history */
+const NTF_TAB={task:'kanban', stage:'stages', report:'smm', contract:'stages', project:'stages', content:'content', brief:'stages'};
 
 const NTF_KIND={
   task:    {l:'Задачи',   c:'#37E6C8', i:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>'},
@@ -19908,6 +19921,7 @@ function ntfAdd(e, silent){
     ntfSound(e);
     if(e.sev==='crit'){ if(typeof toast==='function') toast(e.title); ntfPush(e); }
   }
+  if(e._rt) _ntfRescan();                                  // данные изменились → сигналы могли устареть
 }
 function ntfBadge(){
   const b=document.getElementById('ntf-bell'); if(!b) return;
@@ -19961,23 +19975,46 @@ function ntfSubscribe(){
       .on('postgres_changes',{event:'*',     schema:'public',table:'project_stages'},_ntfStageRt)
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'kb_materials'},  _ntfKbRt)
       .on('postgres_changes',{event:'*',     schema:'public',table:'project_briefs'},_ntfBriefRt)
+      .on('postgres_changes',{event:'*',     schema:'public',table:'project_contracts'},_ntfRescan)   // договор поменяли — пересчитать сразу
       .subscribe();
   }catch(e){ console.warn('[ntf] realtime', e); window._ntfRt=false; }
 }
 function _ntfPName(pid){ const p=_ntfProj(pid); return p?p.name:'проект'; }
+/* «Создал: Иван · Ответственный: Лола» — обе роли сразу, без гадания */
+function _ntfPeople(createdBy, assignee){
+  const a=[];
+  if(createdBy) a.push('Создал: '+_ntfWho(createdBy));
+  a.push(assignee?('Ответственный: '+_ntfWho(assignee)):'Ответственный не назначен');
+  return a.join(' · ');
+}
 function _ntfTaskNew(pl){
   const r=pl&&pl.new; if(!r||!r.id) return;
   _ntfTitles[r.id]=r.title||'';
+  _ntfAssign[r.id]=r.assignee_id||null;
   _ntfStatus[r.id]=r.status||'';
   ntfAdd({ id:'t.new.'+r.id, ts:Date.now(), src:'live', kind:'task', sev:'info',
     title:'Новая задача «'+(r.title||'без названия')+'»',
-    body:(r.assignee_id?('исполнитель: '+_ntfWho(r.assignee_id)):'исполнитель не назначен'),
-    projId:r.project_id, proj:_ntfPName(r.project_id), tab:'tasks' });
+    body:_ntfPeople(r.created_by, r.assignee_id),
+    actor:r.created_by||null, ent:r.id,
+    projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.task, _rt:1 });
 }
+/* project_tasks.UPDATE публикуется точно, а task_history — только если таблицу
+   добавили в publication. Поэтому статус ловим из UPDATE (мгновенно, но без автора),
+   а task_history, когда придёт, ДОПОЛНЯЕТ ту же запись именем — id у них общий. */
 function _ntfTaskUpd(pl){
   const r=pl&&pl.new; if(!r||!r.id) return;
   if(r.title) _ntfTitles[r.id]=r.title;
-  _ntfStatus[r.id]=r.status||'';                    // историю статуса ведёт task_history, здесь только кеш
+  if('assignee_id' in r) _ntfAssign[r.id]=r.assignee_id||null;
+  const prev=_ntfStatus[r.id];
+  _ntfStatus[r.id]=r.status||'';
+  if(prev===undefined||prev===r.status) return;              // статус не менялся
+  const id='t.st.'+r.id+'.'+(r.status||'');
+  const has=NTF.find(function(x){ return x.id===id; });
+  if(has&&has.actor) return;                                 // автора уже знаем из task_history — не затираем
+  ntfAdd({ id:id, ts:Date.now(), src:'live', kind:'task', sev:'info',
+    title:'«'+(r.title||_ntfTitles[r.id]||'Задача')+'» — '+(_NTF_ST[r.status]||('переведена в «'+(r.status||'?')+'»')),
+    body:_ntfPeople(r.created_by, r.assignee_id!==undefined?r.assignee_id:_ntfAssign[r.id]),
+    ent:r.id, projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.task, _rt:1 });
 }
 function _ntfTaskHist(pl){
   const r=pl&&pl.new; if(!r||!r.task_id) return;
@@ -19985,38 +20022,43 @@ function _ntfTaskHist(pl){
   const verb=_NTF_ST[r.new_status]||('переведена в «'+(r.new_status||'?')+'»');
   const ttl=_ntfTitles[r.task_id]||'Задача';
   const ts=r.created_at?new Date(r.created_at).getTime():Date.now();
-  ntfAdd({ id:'t.h.'+r.task_id+'.'+(r.new_status||'')+'.'+Math.floor(ts/1000), ts:ts, src:'live',
-    kind:'task', sev:(r.new_status==='done'?'info':'info'),
+  const asg=_ntfAssign[r.task_id];
+  const who=_ntfWho(r.changed_by);
+  const parts=[who+' → '+verb.replace(/^[а-яё]/, function(c){ return c; })];
+  ntfAdd({ id:'t.st.'+r.task_id+'.'+(r.new_status||''), ts:ts, src:'live', kind:'task', sev:'info',
     title:'«'+ttl+'» — '+verb,
-    body:_ntfWho(r.changed_by), actor:r.changed_by,
-    projId:r.project_id, proj:_ntfPName(r.project_id), tab:'tasks' });
+    body:who+(asg&&String(asg)!==String(r.changed_by)?(' · Ответственный: '+_ntfWho(asg)):(asg?' · он же ответственный':'')),
+    actor:r.changed_by, ent:r.task_id,
+    projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.task, _rt:1 });
 }
 function _ntfProjectRt(pl){
   const r=pl&&pl.new; if(!r||!r.id) return;
   if(pl.eventType==='INSERT'){
     ntfAdd({ id:'p.new.'+r.id, ts:Date.now(), src:'live', kind:'project', sev:'info',
       title:'Создан проект «'+(r.name||'без названия')+'»',
-      body:[r.category,r.service,r.tariff].filter(Boolean).join(' · ')||'новый проект в работе',
-      projId:r.id, proj:r.name||'', tab:'stages' });
+      body:(r.created_by?('Создал: '+_ntfWho(r.created_by)+' · '):'')+([r.category,r.service,r.tariff].filter(Boolean).join(' · ')||'новый проект'),
+      actor:r.created_by||null, projId:r.id, proj:r.name||'', tab:NTF_TAB.project, _rt:1 });
     return;
   }
   if(r.status==='done'){
     ntfAdd({ id:'p.done.'+r.id, ts:Date.now(), src:'live', kind:'project', sev:'info',
       title:'Проект «'+(r.name||'')+'» завершён',
-      body:'переведён в архив', projId:r.id, proj:r.name||'', tab:'stages' });
+      body:'переведён в архив', projId:r.id, proj:r.name||'', tab:NTF_TAB.project, _rt:1 });
   }
 }
 function _ntfReportRt(pl){
   const r=pl&&pl.new; if(!r||!r.id) return;
   ntfAdd({ id:'r.new.'+r.id, ts:Date.now(), src:'live', kind:'report', sev:'info',
     title:'Отчёт «'+(r.title||'без названия')+'»',
-    body:(r.kind||'отчёт')+' опубликован', projId:r.project_id, proj:_ntfPName(r.project_id), tab:'smm' });
+    body:(r.kind||'отчёт')+' опубликован', ent:r.id,
+    projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.report, _rt:1 });
 }
 function _ntfStageRt(pl){
   const r=pl&&pl.new; if(!r||!r.id||r.status!=='done') return;
   ntfAdd({ id:'s.done.'+r.id, ts:Date.now(), src:'live', kind:'stage', sev:'info',
     title:'Этап «'+(r.name||'')+'» завершён',
-    body:_ntfPName(r.project_id), projId:r.project_id, proj:_ntfPName(r.project_id), tab:'stages' });
+    body:_ntfPName(r.project_id), ent:r.id,
+    projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.stage, _rt:1 });
 }
 function _ntfKbRt(pl){
   const r=pl&&pl.new; if(!r||!r.id) return;
@@ -20028,11 +20070,14 @@ function _ntfBriefRt(pl){
   const r=pl&&pl.new; if(!r||!r.project_id) return;
   ntfAdd({ id:'b.'+r.project_id+'.'+Math.floor(Date.now()/60000), ts:Date.now(), src:'live', kind:'brief', sev:'info',
     title:'Клиент заполняет бриф', body:_ntfPName(r.project_id),
-    projId:r.project_id, proj:_ntfPName(r.project_id), tab:'brief' });
+    projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.brief, _rt:1 });
 }
 
 /* ── 2. РАДАР СИГНАЛОВ: не события, а текущее состояние ───────────── */
-let _ntfScanT=null;
+let _ntfScanT=null, _ntfReT=null;
+/* радар не ждёт своих пяти минут: любое релевантное событие пересчитывает
+   сигналы почти сразу (debounce 800 мс, чтобы пачка правок дала один скан) */
+function _ntfRescan(){ clearTimeout(_ntfReT); _ntfReT=setTimeout(function(){ ntfScan(); }, 800); }
 async function ntfScan(){
   if(!window.SB||!window.LIVE) return;
   const P=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
@@ -20047,7 +20092,7 @@ async function ntfScan(){
       SB.from('reports').select('project_id,published_at').in('project_id',pids).order('published_at',{ascending:false,nullsFirst:false})
     ]);
     const ct=res[0].data||[], tk=res[1].data||[], rp=res[2].data||[];
-    tk.forEach(function(t){ if(t.title) _ntfTitles[t.id]=t.title; });        // кеш названий для ленты
+    tk.forEach(function(t){ if(t.title) _ntfTitles[t.id]=t.title; _ntfAssign[t.id]=t.assignee_id||null; });   // кеш для ленты
 
     const _prevSig={}; NTF.forEach(function(e){ if(e.src==='signal') _prevSig[e.id]=1; });
     NTF=NTF.filter(function(e){ return e.src!=='signal'; });                 // сигналы всегда пересобираются
@@ -20061,9 +20106,9 @@ async function ntfScan(){
       const p=_ntfProj(c.project_id); if(!p||!c.end_date) return;
       const e=D(c.end_date); if(!e) return;
       const n=days(e);
-      if(n<0)       sig.push({id:'sig.ct.'+p.id, sev:'crit', kind:'contract', title:'Договор истёк '+Math.abs(n)+' '+_plural(Math.abs(n),'день','дня','дней')+' назад', body:'продлите или закройте проект', projId:p.id, proj:p.name, tab:'stages', ts:Date.now()});
-      else if(n<=7) sig.push({id:'sig.ct.'+p.id, sev:'crit', kind:'contract', title:'Договор истекает через '+n+' '+_plural(n,'день','дня','дней'), body:'до '+_kbFmtD(c.end_date), projId:p.id, proj:p.name, tab:'stages', ts:Date.now()});
-      else if(n<=30)sig.push({id:'sig.ct.'+p.id, sev:'warn', kind:'contract', title:'Договор истекает через '+n+' '+_plural(n,'день','дня','дней'), body:'до '+_kbFmtD(c.end_date), projId:p.id, proj:p.name, tab:'stages', ts:Date.now()});
+      if(n<0)       sig.push({id:'sig.ct.'+p.id, sev:'crit', kind:'contract', title:'Договор истёк '+Math.abs(n)+' '+_plural(Math.abs(n),'день','дня','дней')+' назад', body:'продлите или закройте проект', projId:p.id, proj:p.name, tab:NTF_TAB.contract, ts:Date.now()});
+      else if(n<=7) sig.push({id:'sig.ct.'+p.id, sev:'crit', kind:'contract', title:'Договор истекает через '+n+' '+_plural(n,'день','дня','дней'), body:'до '+_kbFmtD(c.end_date), projId:p.id, proj:p.name, tab:NTF_TAB.contract, ts:Date.now()});
+      else if(n<=30)sig.push({id:'sig.ct.'+p.id, sev:'warn', kind:'contract', title:'Договор истекает через '+n+' '+_plural(n,'день','дня','дней'), body:'до '+_kbFmtD(c.end_date), projId:p.id, proj:p.name, tab:NTF_TAB.contract, ts:Date.now()});
     });
 
     /* просроченные задачи и дедлайны на носу — сворачиваем по проекту */
@@ -20080,12 +20125,14 @@ async function ntfScan(){
       const b=byP[pid];
       if(b.over.length) sig.push({id:'sig.ov.'+pid, sev:'crit', kind:'task',
         title:b.over.length+' '+_plural(b.over.length,'просроченная задача','просроченные задачи','просроченных задач'),
-        body:b.over.slice(0,3).map(function(t){return '«'+(t.title||'—')+'»';}).join(', ')+(b.over.length>3?' и ещё '+(b.over.length-3):''),
-        projId:pid, proj:p.name, tab:'tasks', ts:Date.now()});
+        body:b.over.slice(0,3).map(function(t){return '«'+(t.title||'—')+'» ('+(t.assignee_id?_ntfWho(t.assignee_id):'без ответственного')+')';}).join(', ')+(b.over.length>3?' и ещё '+(b.over.length-3):''),
+        ents:b.over.map(function(t){return t.id;}),
+        projId:pid, proj:p.name, tab:NTF_TAB.task, ts:Date.now()});
       if(b.soon.length) sig.push({id:'sig.sn.'+pid, sev:'warn', kind:'task',
         title:b.soon.length+' '+_plural(b.soon.length,'задача','задачи','задач')+' с дедлайном сегодня-завтра',
-        body:b.soon.slice(0,3).map(function(t){return '«'+(t.title||'—')+'»';}).join(', '),
-        projId:pid, proj:p.name, tab:'tasks', ts:Date.now()});
+        body:b.soon.slice(0,3).map(function(t){return '«'+(t.title||'—')+'» ('+(t.assignee_id?_ntfWho(t.assignee_id):'без ответственного')+')';}).join(', '),
+        ents:b.soon.map(function(t){return t.id;}),
+        projId:pid, proj:p.name, tab:NTF_TAB.task, ts:Date.now()});
     });
 
     /* отчётность */
@@ -20093,14 +20140,14 @@ async function ntfScan(){
     rp.forEach(function(r){ if(!lastRep[r.project_id]&&r.published_at) lastRep[r.project_id]=r.published_at; });
     live.forEach(function(p){
       const last=lastRep[p.id];
-      if(!last){ sig.push({id:'sig.rp.'+p.id, sev:'warn', kind:'report', title:'Ни одного отчёта', body:'клиент не видел результатов', projId:p.id, proj:p.name, tab:'smm', ts:Date.now()}); return; }
+      if(!last){ sig.push({id:'sig.rp.'+p.id, sev:'warn', kind:'report', title:'Ни одного отчёта', body:'клиент не видел результатов', projId:p.id, proj:p.name, tab:NTF_TAB.report, ts:Date.now()}); return; }
       const n=Math.round((today-D(last))/86400000);
-      if(n>35) sig.push({id:'sig.rp.'+p.id, sev:'warn', kind:'report', title:'Отчёта нет уже '+n+' '+_plural(n,'день','дня','дней'), body:'последний — '+_kbFmtD(last), projId:p.id, proj:p.name, tab:'smm', ts:Date.now()});
+      if(n>35) sig.push({id:'sig.rp.'+p.id, sev:'warn', kind:'report', title:'Отчёта нет уже '+n+' '+_plural(n,'день','дня','дней'), body:'последний — '+_kbFmtD(last), projId:p.id, proj:p.name, tab:NTF_TAB.report, ts:Date.now()});
     });
 
     /* клиент вне связи */
     live.forEach(function(p){
-      if(!p.tg_chat_id) sig.push({id:'sig.tg.'+p.id, sev:'info', kind:'project', title:'Telegram-группа не привязана', body:'клиент не получает уведомлений', projId:p.id, proj:p.name, tab:'stages', ts:Date.now()});
+      if(!p.tg_chat_id) sig.push({id:'sig.tg.'+p.id, sev:'info', kind:'project', title:'Telegram-группа не привязана', body:'клиент не получает уведомлений', projId:p.id, proj:p.name, tab:NTF_TAB.project, ts:Date.now()});
     });
 
     sig.forEach(function(s){ s.src='signal'; NTF.push(s); });
@@ -20184,15 +20231,46 @@ function ntfClose(){
 }
 function ntfMarkAll(){ NTF.forEach(function(e){ NTF_READ[e.id]=1; }); ntfSave(); ntfBadge(); ntfRender(); }
 function ntfRead(id){ NTF_READ[id]=1; ntfSave(); ntfBadge(); }
+/* селектор объекта в DOM: у карточек задач, этапов и отчётов есть якоря */
+const NTF_SEL={
+  task:  function(id){ return '.pk-card[data-tkid="'+id+'"]'; },
+  stage: function(id){ return '.pd-st[data-stid="'+id+'"]'; },
+  report:function(id){ return '.smm-rep-card[data-rpid="'+id+'"]'; }
+};
+/* вкладка рендерится асинхронно — ждём появления элемента, но не вечно */
+function ntfHighlight(sel, tries){
+  tries=(tries==null?26:tries);
+  const els=document.querySelectorAll(sel);
+  if(!els.length){ if(tries>0) setTimeout(function(){ ntfHighlight(sel, tries-1); }, 110); return; }
+  els.forEach(function(el,i){
+    if(i===0){ try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(_e){ try{ el.scrollIntoView(); }catch(__e){} } }
+    el.classList.add('ntf-flash');
+    setTimeout(function(){ el.classList.remove('ntf-flash'); }, 2600);
+  });
+}
 function ntfGoto(id){
   const e=NTF.find(function(x){ return x.id===id; }); if(!e) return;
   ntfRead(id);
+  if(e.kind==='kb'){                                            // материалы живут в отдельном модуле
+    ntfClose();
+    if(typeof agNav==='function') agNav('kb');
+    if(e.projId&&typeof setKbProj==='function') setTimeout(function(){ try{ setKbProj(e.projId); }catch(_e){} }, 80);
+    return;
+  }
   if(!e.projId){ ntfRender(); return; }
   const i=(typeof PROJECTS!=='undefined'?PROJECTS:[]).findIndex(function(p){ return String(p.id)===String(e.projId); });
   if(i<0){ toast('Проект недоступен'); return; }
   ntfClose();
   if(typeof openProject==='function') openProject(i);
-  if(e.tab&&typeof pdTab==='function') setTimeout(function(){ try{ pdTab(e.tab); }catch(_e){} }, 60);
+  const tab=e.tab||NTF_TAB[e.kind];
+  if(tab&&typeof pdTab==='function') setTimeout(function(){ try{ pdTab(tab); }catch(_e){} }, 60);
+  /* подсвечиваем сам объект: задачу, этап, отчёт — все, если их несколько */
+  const mk=NTF_SEL[e.kind];
+  const ids=(e.ents&&e.ents.length)?e.ents:(e.ent?[e.ent]:[]);
+  if(mk&&ids.length){
+    const sel=ids.map(function(x){ return mk(String(x).replace(/"/g,'')); }).join(',');
+    setTimeout(function(){ ntfHighlight(sel); }, 140);
+  }
 }
 function ntfTab(t){ NTF_F.tab=t; ntfRender(); }
 function ntfKind(k){ NTF_F.kinds[k]=!NTF_F.kinds[k]; ntfRender(); }
@@ -20363,10 +20441,10 @@ function ntfBoot(){
   clearInterval(_ntfScanT);
   _ntfScanT=setInterval(ntfScan, 300000);                 // радар пересчитывается раз в 5 минут
 }
-setInterval(ntfBoot, 1500);
+setInterval(ntfBoot, 600);   // подписка поднимается почти сразу после входа
 window.ntfToggle=ntfToggle; window.ntfOpen=ntfOpen; window.ntfClose=ntfClose; window.ntfScan=ntfScan;
 window.ntfGoto=ntfGoto; window.ntfMarkAll=ntfMarkAll; window.ntfReset=ntfReset;
-window.ntfPlay=ntfPlay; window.ntfSndMute=ntfSndMute; window.ntfView=ntfView;
+window.ntfPlay=ntfPlay; window.ntfSndMute=ntfSndMute; window.ntfView=ntfView; window.ntfHighlight=ntfHighlight;
 
 </script>
 <script type="module">
@@ -20940,8 +21018,13 @@ window.tTaskAdd = async (projectId,row) => {
     if (rc.error) { error = rc.error; data = null; }
     else { data = Array.isArray(rc.data) ? rc.data[0] : rc.data; error = null; }
   } else {
-    const r1 = await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
+    const _cb=(window.ME&&ME.id)?{created_by:ME.id}:{};                                  // кто создал задачу
+    const r1 = await SB.from('project_tasks').insert({project_id:projectId,...row,..._cb}).select('*').single();
     error = r1.error; data = r1.data;
+    if(error && /created_by/i.test(error.message||'')){                                  // колонки ещё нет — не ломаемся
+      const rcb = await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
+      error = rcb.error; data = rcb.data;
+    }
     if(error && /review_|difficulty|priority/.test(error.message||'')){
       const {review_started,review_spent,difficulty,priority,...row2}=row||{};
       const r2=await SB.from('project_tasks').insert({project_id:projectId,...row2}).select('*').single(); error=r2.error; data=r2.data;
