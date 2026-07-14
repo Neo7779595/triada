@@ -19925,15 +19925,26 @@ function _ntfBell(ctx,f,at,dur,amp,glide,bellness){
     o.start(at); o.stop(at+decay+0.05);
   });
 }
-function ntfPlay(key, vol){
-  const t=NTF_TONES[key]; if(!t) return;
-  const ctx=_ntfCtx(); if(!ctx) return;
-  const v=Math.max(0, Math.min(1, vol!=null?vol:NTF_SND.vol));
-  if(!v) return;
+function _ntfSchedule(t, ctx, v){
   const t0=ctx.currentTime+0.012;
   t.notes.forEach(function(n){
     _ntfBell(ctx, n[0], t0+n[1], n[2], v*0.3*(n[3]==null?1:n[3]), n[4]||0, t.bell==null?1:t.bell);
   });
+}
+function ntfPlay(key, vol){
+  const t=NTF_TONES[key]; if(!t) return;
+  const ctx=_ntfCtx(); if(!ctx){ console.warn('[ntf] нет Web Audio'); return; }
+  const v=Math.max(0, Math.min(1, vol!=null?vol:NTF_SND.vol));
+  if(!v) return;
+  /* Браузер держит контекст в suspended до жеста пользователя. Если запланировать
+     ноты «до» resume — они просто не прозвучат. Поэтому ждём резюма и только потом
+     планируем. Это и была причина, по которой звук молчал. */
+  if(ctx.state==='suspended'){
+    ctx.resume().then(function(){ try{ _ntfSchedule(t, ctx, v); }catch(e){} })
+                .catch(function(e){ console.warn('[ntf] звук заблокирован браузером', e); });
+    return;
+  }
+  _ntfSchedule(t, ctx, v);
 }
 /* Три независимых рубильника: общий, «только критичные», по блокам. */
 function ntfSound(e){
@@ -20123,7 +20134,21 @@ function _ntfTaskUpd(pl){
     ent:r.id, projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.task, _rt:1 });
 }
 function _ntfTaskHist(pl){
+  _ntfTick(pl);
   const r=pl&&pl.new; if(!r||!r.task_id||r.old_status===r.new_status) return;
+  /* Первая запись в task_history — это создание задачи (old_status пуст).
+     Раньше она читалась как «переход в wait» → «возвращена в очередь».
+     Событие о создании и так придёт из project_tasks — здесь молчим. */
+  if(r.old_status==null||r.old_status===''){
+    if(_ntfTitles[r.task_id]===undefined && r.project_id){   // задачи в кеше нет — событие о создании потерялось, покажем хотя бы факт
+      ntfAdd({ id:'t.new.'+r.task_id, ts:(r.created_at?new Date(r.created_at).getTime():Date.now()), src:'live', kind:'task', sev:'info',
+        title:'Новая задача', obj:'Задача',
+        roles:[{k:'Создал', v:_ntfWho(r.changed_by)}],
+        actor:r.changed_by||null, ent:r.task_id,
+        projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.task, _rt:1 });
+    }
+    return;
+  }
   const ts=r.created_at?new Date(r.created_at).getTime():Date.now();
   const asg=_ntfAssign[r.task_id];
   ntfAdd({ id:'t.st.'+r.task_id+'.'+(r.new_status||''), ts:ts, src:'live', kind:'task', sev:'info',
@@ -20135,7 +20160,9 @@ function _ntfTaskHist(pl){
 }
 /* ЭТАПЫ: stage_history знает и старый статус, и новый, и кто менял */
 function _ntfStageHist(pl){
+  _ntfTick(pl);
   const r=pl&&pl.new; if(!r||!r.stage_id||r.old_status===r.new_status) return;
+  if(r.old_status==null||r.old_status==='') return;            // создание этапа — не «смена статуса»
   const ts=r.created_at?new Date(r.created_at).getTime():Date.now();
   const from=_NTF_SST[r.old_status]||r.old_status||'—';
   const to=_NTF_SST[r.new_status]||r.new_status||'—';
@@ -20403,7 +20430,12 @@ window.ntfDiag=function(){
   console.info('[ntf] опрос: с', _ntfSince, '| каждые 20 с');
   console.info('[ntf] в ленте: активность', live, '· сигналов', sig);
   console.info('[ntf] проектов в scope:', (typeof PROJECTS!=='undefined'?PROJECTS:[]).length);
-  return {rt:window.__ntfRtStatus, rtEvents:_ntfRtSeen, since:_ntfSince, live:live, signals:sig};
+  const off=Object.keys(NTF_SND.kinds||{}).filter(function(k){ return NTF_SND.kinds[k]===false; });
+  console.info('[ntf] звук:', NTF_SND.on?'включён':'ВЫКЛЮЧЕН', '· громкость', Math.round(NTF_SND.vol*100)+'%',
+    '· мелодия', NTF_SND.tone, '· только критичные:', !!NTF_SND.critOnly, off.length?('· выключены блоки: '+off.join(', ')):'');
+  console.info('[ntf] AudioContext:', _ntfAC?_ntfAC.state:'не создан', '(suspended = браузер ждёт клика)');
+  return {rt:window.__ntfRtStatus, rtEvents:_ntfRtSeen, since:_ntfSince, live:live, signals:sig,
+          sound:{on:NTF_SND.on, vol:NTF_SND.vol, tone:NTF_SND.tone, critOnly:!!NTF_SND.critOnly, mutedKinds:off, ctx:_ntfAC?_ntfAC.state:null}};
 };
 
 /* ─── ФИЛЬТРАЦИЯ ───────────────────────────────────────────────── */
@@ -28842,8 +28874,8 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-14.04-activity-poll';
-try{ console.info('%cDETROYD build 2026-07-14.04-activity-poll','color:#37E6C8;font-weight:700'); }catch(e){}
+window.__BUILD='2026-07-14.05-sound-and-created';
+try{ console.info('%cDETROYD build 2026-07-14.05-sound-and-created','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
 </body>
