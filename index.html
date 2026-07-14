@@ -5279,11 +5279,13 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ntf-tab b{font-size:9.5px;font-weight:700;background:rgba(255,255,255,.08);border-radius:5px;padding:1px 5px;color:var(--txt-3)}
 .ntf-tab.on b{background:var(--accent-dim);color:var(--accent)}
 .ntf-tab b.hot{background:var(--neg);color:#fff}
-.ntf-f{display:grid;grid-template-columns:1fr 116px 92px;gap:7px;padding:12px 18px 8px}
-.ntf-srch{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:7px 11px;color:var(--txt-3);min-width:0}
+/* три равные ячейки, одинаковая высота, одинаковый радиус */
+.ntf-f{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 18px 8px}
+.ntf-f>*{height:38px;box-sizing:border-box;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-family:var(--mono);font-size:11.5px;min-width:0}
+.ntf-srch{display:flex;align-items:center;gap:8px;padding:0 11px;color:var(--txt-3)}
 .ntf-srch input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--txt);font-family:inherit;font-size:12.5px}
-.ntf-sel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--txt-2);border-radius:10px;padding:7px 10px;font-family:var(--mono);font-size:11px;cursor:pointer;outline:none;width:100%}
-.ntf-tg{display:inline-flex;align-items:center;justify-content:center;gap:5px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--txt-3);border-radius:10px;padding:7px 8px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s var(--ease-out)}
+.ntf-sel{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 11px;color:var(--txt-2);cursor:pointer;outline:none;width:100%}
+.ntf-tg{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;color:var(--txt-3);cursor:pointer;transition:all .15s var(--ease-out)}
 .ntf-tg:hover{color:var(--txt-2)}
 .ntf-tg.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--accent)}
 .ntf-chips{display:flex;gap:5px;flex-wrap:wrap;padding:2px 18px 10px}
@@ -5309,9 +5311,15 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ntf-c .o{font-size:14px;font-weight:600;color:var(--txt);line-height:1.3;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ntf-c .d{font-size:12px;color:var(--txt-2);line-height:1.4}
 .ntf-c .rl{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
-.ntf-c .rl .r{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:3px 7px;font-size:11.5px;color:var(--txt);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ntf-c .rl .r i{font-style:normal;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3);flex:none}
-.ntf-c .rl .r.m{color:var(--txt-3)}
+.ntf-c .rl .r{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);border-radius:7px;padding:3px 7px;font-size:11.5px;color:var(--txt);max-width:100%;min-width:0}
+.ntf-c .rl .r i{font-style:normal;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3);flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ntf-c .rl .r b{font-weight:600;color:var(--txt);flex:none;white-space:nowrap}   /* имя не обрезаем никогда */
+.ntf-c .rl .r.m b{color:var(--txt-3);font-weight:500}
+/* длинная роль (название задачи + ответственный) — отдельной строкой */
+.ntf-c .rl .r.lg{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;padding:5px 9px}
+.ntf-c .rl .r.lg .tt{font-family:var(--font);font-size:12px;text-transform:none;letter-spacing:0;color:var(--txt);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ntf-c .rl .r.lg .pp{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--txt-2);flex:none;white-space:nowrap}
+.ntf-c .rl .r.lg .pp.m{color:var(--txt-3);font-weight:400}
 .ntf-c .rl .r.more{color:var(--txt-3);font-family:var(--mono);font-size:10px}
 .ntf-c .mt{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:2px}
 .ntf-c .mt i{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--txt-3)}
@@ -6554,6 +6562,14 @@ function agCanEdit(m){
   if(!me || me.role!=='member') return true;          // владелец/админ редактируют всё
   const p=me.permissions||{};
   return !!(p[m]&&p[m].edit);
+}
+/* Сервер (RPC create_project_task) пускает по permissions.projects.edit.
+   Клиент обязан проверять ТО ЖЕ САМОЕ — иначе кнопка есть, а действие падает. */
+function agCanEditTasks(){
+  try{ return (typeof agCanEdit==='function') ? agCanEdit('projects') : true; }catch(e){ return true; }
+}
+function agNoEditToast(){
+  toast('Нет прав на изменение задач. Попросите владельца включить «Проекты → Редактирование» в настройках команды');
 }
 function agCanEditProject(p){
   if(agIsOwner()) return true;
@@ -8441,6 +8457,7 @@ function _qtEisenPick(id,k){
 function _eisenEmoji(k){ const f=QT_EISEN.find(x=>x[0]===k); return f?f[2]:''; }
 function _eisenTitle(k){ const f=QT_EISEN.find(x=>x[0]===k); return f?f[1]+' · '+f[4]:''; }
 async function quickTaskOpen(){
+  if(!agCanEditTasks()){ agNoEditToast(); return; }
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
   window._qtSub=[];
@@ -8772,7 +8789,7 @@ function renderPd(){
   } else if(pdTabCur==='kanban'){
     if(p._tasks===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка задач…</div>'; }
     else {
-      const T=p._tasks, _ro=p.status==='done', byst=st=>T.filter(t=>t.status===st&&_pkMatch(t));
+      const T=p._tasks, _ro=(p.status==='done')||!agCanEditTasks(), byst=st=>T.filter(t=>t.status===st&&_pkMatch(t));   // нет прав → доска только для чтения, а не мёртвые кнопки
       const col=(st,label,color,emptyMsg,emptyIc)=>{
         const _all=byst(st), _total=_all.length, _isDone=st==='done', _collapsed=_isDone&&PK_DONE==='hidden';
         let arr=_all;
@@ -20008,7 +20025,8 @@ function _ntfProj(id){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(f
 function _ntfPName(pid){ const p=_ntfProj(pid); return p?p.name:'проект'; }
 function _ntfWho(id){
   if(!id) return '';
-  if(window.ME && String(window.ME.id)===String(id)) return 'Вы';
+  const me=(window.ME)||((window.tMe&&window.tMe())||null);          // ME недоступна из этого скрипта напрямую
+  if(me && String(me.id)===String(id)) return 'Вы';
   const m=(typeof TEAM!=='undefined'?TEAM:[]).find(function(x){ return String(x._id)===String(id); });
   return m?m.name:'Сотрудник';
 }
@@ -20276,7 +20294,7 @@ async function ntfScan(){
     Object.keys(byP).forEach(function(pid){
       const p=_ntfProj(pid); if(!p) return;
       const b=byP[pid];
-      const list=function(arr){ return arr.slice(0,4).map(function(t){ return {k:(t.title||'—'), v:(t.assignee_id?_ntfWho(t.assignee_id):'без ответственного'), muted:!t.assignee_id}; }); };
+      const list=function(arr){ return arr.slice(0,4).map(function(t){ return {k:(t.title||'—'), v:(t.assignee_id?_ntfWho(t.assignee_id):'без ответственного'), muted:!t.assignee_id, long:1}; }); };
       if(b.over.length) sig.push({id:'sig.ov.'+pid, sev:'crit', kind:'task', ts:Date.now(),
         title:b.over.length+' '+_plural(b.over.length,'просроченная задача','просроченные задачи','просроченных задач'),
         obj:p.name, roles:list(b.over), more:(b.over.length>4?b.over.length-4:0),
@@ -20542,7 +20560,9 @@ function ntfRender(){
             +(e.obj?'<span class="o">'+escH(e.obj)+'</span>':'')
             +(e.body?'<span class="d">'+escH(e.body)+'</span>':'')
             +(roles.length?'<span class="rl">'+roles.map(function(r){
-                return '<span class="r'+(r.muted?' m':'')+'"><i>'+escH(r.k)+'</i>'+escH(r.v)+'</span>'; }).join('')
+                return r.long
+                  ? '<span class="r lg"><i class="tt">'+escH(r.k)+'</i><b class="pp'+(r.muted?' m':'')+'">'+escH(r.v)+'</b></span>'
+                  : '<span class="r'+(r.muted?' m':'')+'"><i>'+escH(r.k)+'</i><b>'+escH(r.v)+'</b></span>'; }).join('')
               +((e.roles.length>2&&!open)?'<span class="r more">+'+(e.roles.length-2)+'</span>':'')
               +(e.more?'<span class="r more">+'+e.more+' ещё</span>':'')+'</span>':'')
             +'<span class="mt">'+(e.proj?'<i class="pj">'+escH(e.proj)+'</i>':'')+'<i>'+escH(_ntfAgo(e.ts))+'</i>'
@@ -21350,15 +21370,26 @@ window.tTaskAdd = async (projectId,row) => {
   try {
   // Определяем: если пользователь не agency_owner — прямой INSERT почти всегда упадёт RLS.
   // Идём сразу через RPC (не засоряем консоль 403 ошибками).
-  const _skipDirect = (window.ME && ME.role && ME.role !== 'agency_owner' && ME.role !== 'superadmin');
+  const _skipDirect = !!(ME && ME.role && ME.role !== 'agency_owner' && ME.role !== 'superadmin');   // ME — module-scope, window.ME тут был undefined
   let data, error;
   if (_skipDirect) {
-    const payload = Object.assign({project_id:projectId}, row);
+    const payload = Object.assign({project_id:projectId, created_by:(ME&&ME.id)||null}, row);
     const rc = await SB.rpc('create_project_task', { payload });
-    if (rc.error) { error = rc.error; data = null; }
+    if (rc.error) {
+      const _m=String(rc.error.message||'');
+      if(/no_edit_permission|permission|denied/i.test(_m)){
+        throw new Error('Нет прав на создание задач. Попросите владельца включить «Проекты → Редактирование» в настройках команды');
+      }
+      if(/created_by/i.test(_m)){                                    // RPC не знает про created_by — шлём без него
+        const p2 = Object.assign({project_id:projectId}, row);
+        const rc2 = await SB.rpc('create_project_task', { payload:p2 });
+        if (rc2.error) { error = rc2.error; data = null; }
+        else { data = Array.isArray(rc2.data) ? rc2.data[0] : rc2.data; error = null; }
+      } else { error = rc.error; data = null; }
+    }
     else { data = Array.isArray(rc.data) ? rc.data[0] : rc.data; error = null; }
   } else {
-    const _cb=(window.ME&&ME.id)?{created_by:ME.id}:{};                                  // кто создал задачу
+    const _cb=(ME&&ME.id)?{created_by:ME.id}:{};                                          // кто создал задачу
     const r1 = await SB.from('project_tasks').insert({project_id:projectId,...row,..._cb}).select('*').single();
     error = r1.error; data = r1.data;
     if(error && /created_by/i.test(error.message||'')){                                  // колонки ещё нет — не ломаемся
@@ -21378,7 +21409,11 @@ window.tTaskAdd = async (projectId,row) => {
     const payload = Object.assign({project_id:projectId}, row);
     const r3 = await SB.rpc('create_project_task', { payload });
     if (r3.error) {
-      throw new Error('Не удалось создать задачу: '+ (r3.error.message||'нет прав'));
+      const _m=String(r3.error.message||'');
+      if(/no_edit_permission|permission|denied/i.test(_m)){
+        throw new Error('Нет прав на создание задач. Попросите владельца включить «Проекты → Редактирование» в настройках команды');
+      }
+      throw new Error('Не удалось создать задачу: '+(_m||'нет прав'));
     }
     data = Array.isArray(r3.data) ? r3.data[0] : r3.data;
     error = null;
@@ -25951,6 +25986,9 @@ async function routeByProfile(userArg){
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
   ME = data || { role:'member' };
+  window.ME = ME;                    // ME — module-scope let, на window её не было: из-за этого
+                                     // _skipDirect всегда был false (лишний 403 у сотрудников),
+                                     // а created_by у задач не записывался вообще.
   try{ if(ME&&ME.id) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){}                      // отметка активности через безопасную RPC (только своя строка, только last_seen_at)
   if(!window._hbOn){ window._hbOn=true; setInterval(()=>{ try{ if(ME&&ME.id&&SB) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){} }, 120000); }
   const _jobs=[ window.tLoadAll(ME.role, {fast:true}) ];                              // ядро данных — параллельно с инфо агентства
@@ -25982,7 +26020,8 @@ window.tLogin = async () => {
     _btnBack();
   }catch(e){ toast('Вход не удался: '+(e.message||e)); _btnBack(); }
 };
-window.tLogout = async () => { if (SB) await SB.auth.signOut(); };
+window.tLogout = async () => {
+  try{ window.ME = null; }catch(_e){} if (SB) await SB.auth.signOut(); };
 
 window.tProvisionAgency = async (a) => {
   try { await SB.functions.invoke('provision-agency', { body:{
