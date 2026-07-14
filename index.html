@@ -19975,7 +19975,7 @@ function ntfSndKind(k){ NTF_SND.kinds[k]=(NTF_SND.kinds[k]===false); ntfSndSave(
 function ntfSndVol(v){ NTF_SND.vol=Math.max(0,Math.min(1,Number(v)/100)); ntfSndSave(); ntfPlay(NTF_SND.tone); }
 function ntfSndMute(){ NTF_SND.on=!NTF_SND.on; ntfSndSave(); if(NTF_SND.on) ntfPlay(NTF_SND.tone); ntfRender(); }
 function ntfSndTest(){ if(!NTF_SND.on){ toast('Звук выключен'); return; } ntfPlay(NTF_SND.tone); }
-function ntfView(v){ NTF_VIEW=v; ntfRender(); }
+function ntfView(v){ NTF_VIEW=v; ntfRender(); _ntfScrollTop(); }        // смена вида — логично показать с начала
 
 /* ─── ТИПЫ СОБЫТИЙ ──────────────────────────────────────────────── */
 const NTF_KIND={
@@ -20498,7 +20498,10 @@ function ntfClose(){
 function ntfMarkAll(){ NTF.forEach(function(e){ NTF_READ[e.id]=1; }); ntfSave(); ntfBadge(); ntfRender(); }
 function ntfRead(id){ NTF_READ[id]=1; ntfSave(); ntfBadge(); }
 function ntfExp(id,ev){ if(ev&&ev.stopPropagation) ev.stopPropagation(); NTF_EXP[id]=!NTF_EXP[id]; ntfRead(id); ntfRender(); }
-function ntfTab(t){ NTF_F.tab=t; ntfRender(); }
+function _ntfScrollTop(){ const el=document.getElementById('ntf-panel'); if(!el) return;
+  ['.ntf-set','.ntf-list'].forEach(function(s){ const n=el.querySelector(s); if(n) n.scrollTop=0; });
+}
+function ntfTab(t){ NTF_F.tab=t; ntfRender(); _ntfScrollTop(); }          // смена вкладки — тоже
 function ntfKind(k){ NTF_F.kinds[k]=!NTF_F.kinds[k]; ntfRender(); }
 function ntfQ(v){ NTF_F.q=String(v||''); ntfRender(); }
 function ntfProjF(v){ NTF_F.proj=String(v||''); ntfRender(); }
@@ -20581,8 +20584,20 @@ function _ntfSpark(){
     return '<div class="s'+(i===6?' now':'')+'" title="'+x.n+'"><i style="height:'+h+'px"></i><span>'+W[x.d.getDay()]+'</span></div>';
   }).join('');
 }
+/* Любой тумблер вызывает ntfRender(), а он перестраивает панель целиком через
+   innerHTML — прокручиваемый контейнер создаётся заново и скролл улетает наверх.
+   Поэтому запоминаем позицию до перерисовки и возвращаем после. */
+function _ntfScrollSave(el){
+  const s={};
+  ['.ntf-set','.ntf-list'].forEach(function(sel){ const n=el.querySelector(sel); if(n) s[sel]=n.scrollTop; });
+  return s;
+}
+function _ntfScrollRestore(el, s){
+  Object.keys(s).forEach(function(sel){ const n=el.querySelector(sel); if(n) n.scrollTop=s[sel]; });
+}
 function ntfRender(){
   const el=document.getElementById('ntf-panel'); if(!el) return;
+  const _sc=_ntfScrollSave(el);
   const un=ntfUnread();
   const sigN=NTF.filter(function(e){ return e.src==='signal'; }).length;
   const liveN=NTF.filter(function(e){ return e.src==='live'; }).length;
@@ -20611,7 +20626,7 @@ function ntfRender(){
     +'</div>'
   +'</header>';
 
-  if(NTF_VIEW==='set'){ el.innerHTML=head+_ntfSettings(); return; }
+  if(NTF_VIEW==='set'){ el.innerHTML=head+_ntfSettings(); _ntfScrollRestore(el,_sc); return; }
 
   const stat=function(v,l,c,cls){ return '<div class="ntf-st'+(cls||'')+'"><b style="color:'+c+'">'+v+'</b><span>'+l+'</span></div>'; };
   const digest='<div class="ntf-dg">'
@@ -20690,6 +20705,7 @@ function ntfRender(){
     +(chips?'<div class="ntf-chips">'+chips+'</div>':'')
     +'<div class="ntf-list">'+body+'</div>'
     +(un?'<footer class="ntf-ft"><button onclick="ntfMarkAll()">Отметить всё прочитанным</button></footer>':'');
+  _ntfScrollRestore(el,_sc);
   if(typeof ddxScanAll==='function') ddxScanAll(el);
   const q=document.getElementById('ntf-q');
   if(q&&NTF_F.q){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); }
@@ -28875,8 +28891,8 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-14.05-sound-and-created';
-try{ console.info('%cDETROYD build 2026-07-14.05-sound-and-created','color:#37E6C8;font-weight:700'); }catch(e){}
+window.__BUILD='2026-07-14.06-scroll-keep';
+try{ console.info('%cDETROYD build 2026-07-14.06-scroll-keep','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
 </body>
