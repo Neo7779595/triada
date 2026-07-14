@@ -13144,13 +13144,17 @@ const _SMM_LB_ERR_TTL=15000;
 function _smmIds(){ return ((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]).map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }
 function _smmLbStale(){ const s=_smmIds(); return !!s && s!==_smmLbSig && !(_smmLbErrAt && Date.now()-_smmLbErrAt<_SMM_LB_ERR_TTL); }
 function smmLbReset(){ _smmLbAll=null; _smmLbData=null; _smmLbPeriods=[]; _smmLbSig=''; _smmLbErrAt=0; _smmLbLoading=false; }
+/* total_* — то, что реально ввели в отчёте. Раньше охват считался как
+   reels + stories, посты терялись. Сумма — только фолбэк для старых отчётов. */
+const _lbSum=(m,keys)=>{ let s=0,any=false; keys.forEach(k=>{ const v=Number(m[k]); if(isFinite(v)&&v){ s+=v; any=true; } }); return any?s:null; };
 const SMM_LB_METRICS=[
   {k:'er',l:'ER',pct:true,get:m=>m.er},
   {k:'lr',l:'LR',pct:true,get:m=>m.lr},
   {k:'tr',l:'C/R',pct:true,get:m=>m.tr},
   {k:'shr',l:'SH/R',pct:true,get:m=>m.shr},
   {k:'sr',l:'SR',pct:true,get:m=>m.sr},
-  {k:'reach',l:'Охват',pct:false,get:m=>{const v=(m.reels_reach||0)+(m.stories_reach||0);return v||null;}},
+  {k:'reach',l:'Охват',pct:false,get:m=>{ const t=Number(m.total_reach); if(isFinite(t)&&t) return t; return _lbSum(m,['reels_reach','stories_reach','posts_reach']); }},
+  {k:'views',l:'Просмотры',pct:false,get:m=>{ const t=Number(m.total_views); if(isFinite(t)&&t) return t; return _lbSum(m,['reels_views','stories_views','posts_views']); }},
   {k:'followers',l:'Прирост',pct:false,get:m=>m.followers}
 ];
 async function smmLoadLb(){
@@ -13205,7 +13209,7 @@ function lbPaint(){
 }
 function lbControlsHTML(){
   const M=SMM_LB_METRICS, cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
-  const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват Reels + Stories',followers:'Прирост подписчиков'};
+  const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват',views:'Просмотры',followers:'Прирост подписчиков'};
   const nfK=v=>{ v=Math.round(Number(v)||0); return String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' '); };
   const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
   const I_SEARCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>';
@@ -13270,8 +13274,8 @@ function renderLeaderboard(){
 /* Упрощённый SMM-рейтинг в стиле операционной вкладки (сводка + метрики + плоский список) */
 function renderSmmLbSimple(){
   const M=SMM_LB_METRICS;
-  const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват Reels + Stories',followers:'Прирост подписчиков'};
-  const SHORT={er:'ER',lr:'Лайки',tr:'Комменты',shr:'Репосты',sr:'Сохран.',reach:'Охват',followers:'Подписчики'};
+  const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват',views:'Просмотры',followers:'Прирост подписчиков'};
+  const SHORT={er:'ER',lr:'Лайки',tr:'Комменты',shr:'Репосты',sr:'Сохранения',reach:'Охват',views:'Просмотры',followers:'Подписчики'};
   const cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
   const nfK=v=>{ v=Math.round(Number(v)||0); return String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' '); };
   const fmtV=(v,mc)=>{ mc=mc||cfg; if(v==null)return '—'; return mc.pct?(+v).toFixed(2).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)); };
@@ -13301,7 +13305,9 @@ function renderSmmLbSimple(){
   const med=sv.length%2?sv[(sv.length-1)/2]:(sv[sv.length/2-1]+sv[sv.length/2])/2;
   const belowAvg=vals.filter(v=>v<avg).length;
   const leader=rows[0], last=rows[rows.length-1];
-  const secM=['er','reach','followers'].map(k=>M.find(x=>x.k===k)).filter(Boolean);
+  /* Боковые колонки: всегда три, и НЕ дублируют выбранную метрику —
+     раньше при выборе «Охват» он выводился и главной колонкой, и боковой. */
+  const secM=['er','reach','views','followers','sr','lr'].filter(k=>k!==cfg.k).map(k=>M.find(x=>x.k===k)).filter(Boolean).slice(0,3);
   const strip='<div class="px-ov lb-ops-strip">'
     +'<div class="px-ov-cell"><div class="px-ov-l">Медиана · '+esc(NAMES[cfg.k])+'</div><div class="px-ov-v">'+fmtV(med).replace('%','<small>%</small>')+'</div><div class="px-ov-ctx">среднее '+fmtV(avg)+'</div></div>'
     +'<div class="px-ov-cell"><div class="px-ov-l">Лидер</div><div class="px-ov-v" style="font-size:19px;color:var(--pos)">'+esc(leader.proj.name)+'</div><div class="px-ov-ctx">'+fmtV(leader.val)+'</div></div>'
@@ -13371,7 +13377,7 @@ function renderOpsLb(){
     score:{l:'Общий балл',desc:'скорость + пунктуальность + прогресс',get:r=>r.score,disp:r=>r.score!=null?r.score:'—',asc:false,bar:r=>r.score,hi:true},
     throughput:{l:'Выработка',desc:'закрыто этапов и задач за всё время',get:r=>r.closes,disp:r=>r.closes,asc:false,bar:r=>r.closes},
     progress:{l:'Прогресс',desc:'готовность по этапам',get:r=>r.pct,disp:r=>r.pct+'%',asc:false,bar:r=>r.pct},
-    overdue:{l:'Просрочено',desc:'меньше задач с истёкшим сроком — выше в списке',get:r=>r.overdue,disp:r=>r.overdue,asc:true,bar:r=>r.open>0?Math.round(100*r.overdue/r.open):0,neg:true}
+    overdue:{l:'Просрочено',desc:'больше задач с истёкшим сроком — выше в списке',get:r=>r.overdue,disp:r=>r.overdue,asc:false,bar:r=>r.open>0?Math.round(100*r.overdue/r.open):0,neg:true}
   };
   const sort=MET[_opsSort]?_opsSort:'speed'; const cfg=MET[sort];
   let rows=O.rows.slice(); const gv=r=>{ const v=cfg.get(r); return v==null?(cfg.asc?Infinity:-1):v; };
@@ -13418,7 +13424,7 @@ function renderOpsLb(){
 
 function smmRenderLb(){
   const M=SMM_LB_METRICS, cfg=M.find(x=>x.k===_smmLbMetric)||M[0];
-  const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват Reels + Stories',followers:'Прирост подписчиков'};
+  const NAMES={er:'Вовлечённость',lr:'Лайки',tr:'Комментарии',shr:'Репосты',sr:'Сохранения',reach:'Охват',views:'Просмотры',followers:'Прирост подписчиков'};
   const nfK=v=>{ v=Math.round(Number(v)||0); return String(v).replace(/\B(?=(\d{3})+(?!\d))/g,' '); };
   const fmtV=(v,mc)=>{ mc=mc||cfg; return mc.pct?(+v).toFixed(2).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)); };
   const fmtCell=(v,mc)=> v==null?'—':(mc.pct?(+v).toFixed(1).replace('.',',')+'%':(mc.k==='followers'?((v>0?'+':'')+nfK(v)):nfK(v)));
@@ -28891,8 +28897,8 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-14.06-scroll-keep';
-try{ console.info('%cDETROYD build 2026-07-14.06-scroll-keep','color:#37E6C8;font-weight:700'); }catch(e){}
+window.__BUILD='2026-07-15.01-lb-views';
+try{ console.info('%cDETROYD build 2026-07-15.01-lb-views','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
 </body>
