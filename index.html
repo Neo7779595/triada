@@ -6563,11 +6563,18 @@ function agCanEdit(m){
   const p=me.permissions||{};
   return !!(p[m]&&p[m].edit);
 }
-/* Сервер (RPC create_project_task) пускает по permissions.projects.edit.
-   Клиент обязан проверять ТО ЖЕ САМОЕ — иначе кнопка есть, а действие падает. */
-function agCanEditTasks(){
-  try{ return (typeof agCanEdit==='function') ? agCanEdit('projects') : true; }catch(e){ return true; }
+/* Права на задачи проверяет сервер (RPC). Клиентская копия permissions грузится
+   при входе и может устареть — например, владелец выдал права уже после логина.
+   Поэтому НЕ гадаем: доска активна по умолчанию, и запирается только после того,
+   как сервер реально ответил «нет прав». Ложных запретов быть не может. */
+let AG_TASKS_DENIED=false;
+function agCanEditTasks(){ return !AG_TASKS_DENIED; }
+function agDenyTasks(){                                  // сервер отказал — запираем доску до перезахода
+  if(AG_TASKS_DENIED) return;
+  AG_TASKS_DENIED=true;
+  try{ if(typeof _pkRerender==='function') _pkRerender(); }catch(e){}
 }
+window.agDenyTasks=agDenyTasks;
 function agNoEditToast(){
   toast('Нет прав на изменение задач. Попросите владельца включить «Проекты → Редактирование» в настройках команды');
 }
@@ -8457,7 +8464,7 @@ function _qtEisenPick(id,k){
 function _eisenEmoji(k){ const f=QT_EISEN.find(x=>x[0]===k); return f?f[2]:''; }
 function _eisenTitle(k){ const f=QT_EISEN.find(x=>x[0]===k); return f?f[1]+' · '+f[4]:''; }
 async function quickTaskOpen(){
-  if(!agCanEditTasks()){ agNoEditToast(); return; }
+  if(AG_TASKS_DENIED){ agNoEditToast(); return; }
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
   window._qtSub=[];
@@ -21401,6 +21408,7 @@ window.tTaskAdd = async (projectId,row) => {
     if (rc.error) {
       const _m=String(rc.error.message||'');
       if(/no_edit_permission|permission|denied/i.test(_m)){
+        if(typeof agDenyTasks==='function') agDenyTasks();          // сервер сказал «нет» — только теперь гасим кнопки
         throw new Error('Нет прав на создание задач. Попросите владельца включить «Проекты → Редактирование» в настройках команды');
       }
       if(/created_by/i.test(_m)){                                    // RPC не знает про created_by — шлём без него
@@ -21436,6 +21444,7 @@ window.tTaskAdd = async (projectId,row) => {
     if (r3.error) {
       const _m=String(r3.error.message||'');
       if(/no_edit_permission|permission|denied/i.test(_m)){
+        if(typeof agDenyTasks==='function') agDenyTasks();          // сервер сказал «нет» — только теперь гасим кнопки
         throw new Error('Нет прав на создание задач. Попросите владельца включить «Проекты → Редактирование» в настройках команды');
       }
       throw new Error('Не удалось создать задачу: '+(_m||'нет прав'));
