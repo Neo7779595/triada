@@ -20002,10 +20002,12 @@ function ntfSave(){
     localStorage.setItem(_ntfK('seen'), String(NTF_SEEN));
   }catch(e){}
 }
-function ntfReset(){ NTF=[]; NTF_READ={}; NTF_SEEN=0; _ntfStatus={}; NTF_OPEN=false; NTF_VIEW='list'; NTF_EXP={}; _ntfFirstScan=true; _ntfKpiCache=null; ntfClose(); }
+function ntfReset(){ NTF=[]; NTF_READ={}; NTF_SEEN=0; _ntfStatus={}; NTF_OPEN=false; NTF_VIEW='list'; NTF_EXP={}; _ntfFirstScan=true; _ntfKpiCache=null; _ntfSince=null; _ntfRtSeen=0; clearInterval(_ntfPollT); ntfClose(); }
 function ntfUnread(){ return NTF.filter(function(e){ return !NTF_READ[e.id]; }).length; }
+let _ntfSilent=false;                       // массовая подгрузка — без звука и тостов
 function ntfAdd(e, silent){
   if(!e||!e.id) return;
+  if(_ntfSilent) silent=true;
   const i=NTF.findIndex(function(x){ return x.id===e.id; });
   if(i>=0){ const wasRead=NTF_READ[e.id]; NTF[i]=Object.assign({}, NTF[i], e); if(wasRead) NTF_READ[e.id]=1; }
   else { NTF.unshift(e); }
@@ -20062,9 +20064,10 @@ function _ntfRoles(createdBy, assignee){
 }
 
 /* ─── ЖИВАЯ ЛЕНТА ───────────────────────────────────────────────── */
+let _ntfSubscribed=false;
 function ntfSubscribe(){
-  if(window._ntfRt||!window.SB) return;
-  window._ntfRt=true;
+  if(_ntfSubscribed||!window.SB) return;
+  _ntfSubscribed=true;
   try{
     SB.channel('triada-ntf')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'project_tasks'},     _ntfTaskNew)
@@ -20080,13 +20083,23 @@ function ntfSubscribe(){
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'kb_materials'},      _ntfKbRt)
       .on('postgres_changes',{event:'*',     schema:'public',table:'project_contracts'}, _ntfRescan)
       .on('postgres_changes',{event:'*',     schema:'public',table:'kpi_targets'},       _ntfRescan)
-      .subscribe();
-  }catch(e){ console.warn('[ntf] realtime', e); window._ntfRt=false; }
+      .subscribe(function(status, err){
+        window.__ntfRtStatus=status;
+        console.info('[ntf] realtime:', status, err||'');
+        /* SUBSCRIBED ещё не значит «события идут»: если таблицы не добавлены в
+           publication supabase_realtime, канал жив, но молчит. Поэтому опрос
+           работает всегда — он и есть гарантия доставки. */
+      });
+  }catch(e){ console.warn('[ntf] realtime', e); _ntfSubscribed=false; window.__ntfRtStatus='ERROR'; }
 }
+function _ntfTick(pl){ if(pl&&pl.eventType) _ntfRtSeen++; }             // событие пришло по realtime, а не опросом
+                                                                        // (имя НЕ _ntfRt: так называется флаг window._ntfRt —
+                                                                        //  объявление функции перезаписывало его и убивало подписку)
 function _ntfTaskNew(pl){
+  _ntfTick(pl);
   const r=pl&&pl.new; if(!r||!r.id) return;
   _ntfTitles[r.id]=r.title||''; _ntfAssign[r.id]=r.assignee_id||null; _ntfStatus[r.id]=r.status||'';
-  ntfAdd({ id:'t.new.'+r.id, ts:Date.now(), src:'live', kind:'task', sev:'info',
+  ntfAdd({ id:'t.new.'+r.id, ts:(r.created_at?new Date(r.created_at).getTime():Date.now()), src:'live', kind:'task', sev:'info',
     title:'Новая задача', obj:r.title||'без названия',
     roles:_ntfRoles(r.created_by, r.assignee_id), actor:r.created_by||null, ent:r.id,
     projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.task, _rt:1 });
@@ -20159,7 +20172,7 @@ function _ntfProjectRt(pl){
 }
 function _ntfReportRt(pl){
   const r=pl&&pl.new; if(!r||!r.id) return;
-  ntfAdd({ id:'r.new.'+r.id, ts:Date.now(), src:'live', kind:'report', sev:'info',
+  ntfAdd({ id:'r.new.'+r.id, ts:(r.published_at?new Date(r.published_at).getTime():Date.now()), src:'live', kind:'report', sev:'info',
     title:'Отчёт опубликован', obj:r.title||'без названия',
     roles:[{k:'Тип', v:r.kind||'отчёт'}], ent:r.id,
     projId:r.project_id, proj:_ntfPName(r.project_id), tab:NTF_TAB.report, _rt:1 });
@@ -20338,6 +20351,61 @@ async function ntfScan(){
   }catch(e){ console.warn('[ntf] scan', e); }
 }
 
+/* ─── ОПРОС: доставка событий, не зависящая от realtime ───────────────
+   Realtime может молчать (таблица не в publication, канал упал, сеть).
+   Опрос читает те же таблицы по метке времени и прогоняет строки через
+   ТЕ ЖЕ обработчики. Id у событий стабильные, поэтому даже если realtime
+   и опрос принесут одно и то же — в ленте будет одна запись. */
+let _ntfSince=null, _ntfPollT=null, _ntfPolling=false, _ntfRtSeen=0;
+function _ntfSinceLoad(){
+  try{ _ntfSince=localStorage.getItem(_ntfK('since'))||null; }catch(e){}
+  if(!_ntfSince) _ntfSince=new Date(Date.now()-6*3600000).toISOString();   // первый запуск — последние 6 часов
+}
+async function ntfPoll(force){
+  if(!window.SB||!window.LIVE||_ntfPolling) return;
+  if(!force && typeof document!=='undefined' && document.hidden) return;   // вкладка в фоне — не дёргаем сервер
+  const P=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const pids=P.map(function(p){ return p.id; }).filter(Boolean);
+  if(!pids.length) return;
+  if(!_ntfSince) _ntfSinceLoad();
+  _ntfPolling=true;
+  const since=_ntfSince, nowIso=new Date().toISOString();
+  const safe=async function(q){ try{ const r=await q; return (r&&!r.error&&r.data)?r.data:[]; }catch(e){ return []; } };
+  try{
+    const res=await Promise.all([
+      safe(SB.from('project_tasks').select('id,title,project_id,status,assignee_id,created_by,created_at').in('project_id',pids).gt('created_at',since).order('created_at')),
+      safe(SB.from('task_history').select('task_id,project_id,changed_by,old_status,new_status,created_at').in('project_id',pids).gt('created_at',since).order('created_at')),
+      safe(SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at').in('project_id',pids).gt('created_at',since).order('created_at')),
+      safe(SB.from('reports').select('id,title,kind,project_id,published_at').in('project_id',pids).gt('published_at',since).order('published_at')),
+      safe(SB.from('content_shares').select('project_id,sheet_id,name,shared_by,shared_at').in('project_id',pids).gt('shared_at',since).order('shared_at')),
+      safe(SB.from('project_briefs').select('project_id,fields,answers,updated_at').in('project_id',pids).gt('updated_at',since).order('updated_at'))
+    ]);
+    const first=(_ntfRtSeen===0 && NTF.filter(function(e){return e.src==='live';}).length===0);
+    if(first) _ntfSilent=true;                                              // первая пачка — тихо
+    res[0].forEach(function(r){ _ntfTitles[r.id]=r.title||''; _ntfAssign[r.id]=r.assignee_id||null; _ntfStatus[r.id]=r.status||''; _ntfTaskNew({new:r}); });
+    res[1].forEach(function(r){ _ntfTaskHist({new:r}); });
+    res[2].forEach(function(r){ _ntfStageHist({new:r}); });
+    res[3].forEach(function(r){ _ntfReportRt({new:r}); });
+    res[4].forEach(function(r){ _ntfShareRt({new:r}); });
+    res[5].forEach(function(r){ _ntfBriefRt({new:r}); });
+    _ntfSilent=false;
+    _ntfSince=new Date(Date.parse(nowIso)-3000).toISOString();     // нахлёст 3 с: строку, созданную в ту же секунду,
+    try{ localStorage.setItem(_ntfK('since'), _ntfSince); }catch(e){}   // не потеряем — дубли отсекаются по id
+  }catch(e){ console.warn('[ntf] poll', e); }
+  _ntfPolling=false;
+}
+/* что происходит с доставкой — одной командой в консоли */
+window.ntfDiag=function(){
+  const live=NTF.filter(function(e){ return e.src==='live'; }).length;
+  const sig=NTF.filter(function(e){ return e.src==='signal'; }).length;
+  console.info('[ntf] realtime status:', window.__ntfRtStatus||'не подписан');
+  console.info('[ntf] событий из realtime:', _ntfRtSeen);
+  console.info('[ntf] опрос: с', _ntfSince, '| каждые 20 с');
+  console.info('[ntf] в ленте: активность', live, '· сигналов', sig);
+  console.info('[ntf] проектов в scope:', (typeof PROJECTS!=='undefined'?PROJECTS:[]).length);
+  return {rt:window.__ntfRtStatus, rtEvents:_ntfRtSeen, since:_ntfSince, live:live, signals:sig};
+};
+
 /* ─── ФИЛЬТРАЦИЯ ───────────────────────────────────────────────── */
 function ntfList(){
   const q=NTF_F.q.trim().toLowerCase();
@@ -20385,7 +20453,7 @@ function ntfOpen(){
   ntfMount(); NTF_OPEN=true;
   document.getElementById('ntf-panel').classList.add('on');
   document.getElementById('ntf-scrim').classList.add('on');
-  ntfRender(); ntfScan();
+  ntfRender(); ntfScan(); ntfPoll(true);                       // открыли панель — сразу подтягиваем свежее
 }
 function ntfClose(){
   NTF_OPEN=false;
@@ -20646,14 +20714,17 @@ function ntfBoot(){
   const cab=(typeof hkCab==='function')?hkCab():null;
   if(cab!=='ag'||!window.SB||!window.LIVE) return;
   window._ntfBooted=true;
-  ntfLoad(); ntfSndLoad(); ntfMount(); ntfBadge(); ntfSubscribe(); ntfScan();
-  clearInterval(_ntfScanT);
-  _ntfScanT=setInterval(ntfScan, 300000);
+  ntfLoad(); ntfSndLoad(); _ntfSinceLoad(); ntfMount(); ntfBadge(); ntfSubscribe();
+  ntfScan(); ntfPoll(true);
+  clearInterval(_ntfScanT); clearInterval(_ntfPollT);
+  _ntfScanT=setInterval(ntfScan, 300000);                    // радар сигналов — раз в 5 минут
+  _ntfPollT=setInterval(ntfPoll, 20000);                     // лента активности — раз в 20 секунд
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) ntfPoll(true); });
 }
 setInterval(ntfBoot, 600);
 window.ntfToggle=ntfToggle; window.ntfOpen=ntfOpen; window.ntfClose=ntfClose; window.ntfScan=ntfScan;
 window.ntfGoto=ntfGoto; window.ntfMarkAll=ntfMarkAll; window.ntfReset=ntfReset; window.ntfExp=ntfExp;
-window.ntfPlay=ntfPlay; window.ntfSndMute=ntfSndMute; window.ntfView=ntfView; window.ntfHighlight=ntfHighlight;
+window.ntfPlay=ntfPlay; window.ntfSndMute=ntfSndMute; window.ntfView=ntfView; window.ntfHighlight=ntfHighlight; window.ntfPoll=ntfPoll;
 
 
 
@@ -28771,8 +28842,8 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-14.03-tasks-unlocked';
-try{ console.info('%cDETROYD build 2026-07-14.03-tasks-unlocked','color:#37E6C8;font-weight:700'); }catch(e){}
+window.__BUILD='2026-07-14.04-activity-poll';
+try{ console.info('%cDETROYD build 2026-07-14.04-activity-poll','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
 </body>
