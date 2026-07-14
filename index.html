@@ -21357,6 +21357,29 @@ window.tStageSeed = async (projectId,names) => { const rows=names.map((n,i)=>({p
   toast('Этапы созданы'); if(!_had) await _pwReload(projectId); return true; } catch(e){
     if(_had){ _tmps.forEach(t=>{ const _i=_p._stages.indexOf(t); if(_i>=0)_p._stages.splice(_i,1); }); _pkRerender(); }   // откат
     toast('Ошибка: '+(e.message||e)); return false; } };
+/* Единая точка записи в project_tasks.
+   RLS пускает напрямую только владельца, поэтому по умолчанию идём через
+   SECURITY DEFINER RPC (как уже делают tTaskMove/tTaskDel). Прямой путь
+   остаётся фолбэком — на случай, если RPC в базе ещё нет. */
+let _tskDirect = null;                     // null — не знаем, false — RLS отказала, true — можно напрямую
+function _tskRlsDenied(e){
+  const m=String((e&&(e.message||e.code))||'');
+  return /row-level security|violates row-level|permission denied|403|forbidden|42501/i.test(m);
+}
+function _tskNoRpc(e){
+  const m=String((e&&(e.message||e.code))||'');
+  return /could not find the function|does not exist|42883|PGRST202/i.test(m);
+}
+window.tTaskPatch = async (id, patch) => {
+  const rc = await SB.rpc('update_project_task', { task_id: id, patch });
+  if (!rc.error) return;
+  if (_tskNoRpc(rc.error)) {                                   // RPC нет в базе — старый путь
+    const { error } = await SB.from('project_tasks').update(patch).eq('id', id);
+    if (error) throw error;
+    return;
+  }
+  throw new Error(rc.error.message || 'Не удалось изменить задачу');
+};
 window.tTaskAdd = async (projectId,row) => {
   if(row && String(row.stage_id||'').indexOf('tmp_')===0){ toast('Секунду — этап ещё сохраняется, попробуйте снова'); return; }
   const _now=new Date().toISOString();
@@ -21370,7 +21393,7 @@ window.tTaskAdd = async (projectId,row) => {
   try {
   // Определяем: если пользователь не agency_owner — прямой INSERT почти всегда упадёт RLS.
   // Идём сразу через RPC (не засоряем консоль 403 ошибками).
-  const _skipDirect = !!(ME && ME.role && ME.role !== 'agency_owner' && ME.role !== 'superadmin');   // ME — module-scope, window.ME тут был undefined
+  const _skipDirect = (_tskDirect===false) || !!(ME && ME.role && ME.role !== 'agency_owner' && ME.role !== 'superadmin');   // один раз получили 403 — больше не стучимся
   let data, error;
   if (_skipDirect) {
     const payload = Object.assign({project_id:projectId, created_by:(ME&&ME.id)||null}, row);
@@ -21392,6 +21415,8 @@ window.tTaskAdd = async (projectId,row) => {
     const _cb=(ME&&ME.id)?{created_by:ME.id}:{};                                          // кто создал задачу
     const r1 = await SB.from('project_tasks').insert({project_id:projectId,...row,..._cb}).select('*').single();
     error = r1.error; data = r1.data;
+    if(!error) _tskDirect=true;
+    else if(_tskRlsDenied(error)) _tskDirect=false;             // запоминаем: следующая задача пойдёт сразу через RPC
     if(error && /created_by/i.test(error.message||'')){                                  // колонки ещё нет — не ломаемся
       const rcb = await SB.from('project_tasks').insert({project_id:projectId,...row}).select('*').single();
       error = rcb.error; data = rcb.data;
@@ -21503,10 +21528,13 @@ window.tTaskUpdate = async (id,patch) => { if(String(id).indexOf('tmp_')===0){ t
   const _bak=_tu?Object.assign({},_tu):null;
   if(_tu){ Object.assign(_tu,patch); _tu._mvTs=Date.now(); window._localTaskWriteTs=Date.now();               // правки видны мгновенно
     if(typeof pd2Close==='function')pd2Close(); _pkRerender(); }
-  let {error}=await SB.from('project_tasks').update(patch).eq('id',id);
-  if(error && /difficulty|priority/.test(error.message||'')){                          // новых колонок нет — повторяем без них, локальные значения уже применены
-    const {difficulty,priority,...p2}=patch||{};
-    const r2=await SB.from('project_tasks').update(p2).eq('id',id); error=r2.error;
+  let error=null;
+  try{ await window.tTaskPatch(id, patch); }                                            // через RPC — работает для всех ролей
+  catch(e1){
+    if(/difficulty|priority/.test(String(e1&&e1.message||''))){                         // новых колонок нет — повторяем без них
+      const {difficulty,priority,...p2}=patch||{};
+      try{ await window.tTaskPatch(id, p2); }catch(e2){ error=e2; }
+    } else error=e1;
   }
   if(error){ if(_tu&&_bak){ Object.assign(_tu,_bak); _pkRerender(); } throw error; }                          // откат при ошибке
   if(patch.assignee_id && patch.assignee_id!==_oldAsg) tgStaffNotify(patch.assignee_id,'new_task',{by:_tgBy(), title:(patch.title||(_tu&&_tu.title)||'Задача'), due:patch.due_date, due_time:(patch.due_time!==undefined?patch.due_time:(_tu&&_tu.due_time)), project_name:(_pu&&_pu.name)||'', project_id:curProjId(), link:location.origin+'/?p='+curProjId()});
@@ -21520,11 +21548,11 @@ function _logWork(o){
 }
 window.tTimerPause = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); try { const _wst=(t&&t.timer_started)||null; const _wsecLog=_wst?Math.max(0,Math.round((Date.now()-new Date(_wst).getTime())/1000)):0; let spent=(t&&t.time_spent)||0; if(_wst) spent+=_wsecLog;
   if(t){ t.time_spent=spent; t.timer_started=null; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }  // мгновенная пауза
-  const {error}=await SB.from('project_tasks').update({time_spent:spent,timer_started:null}).eq('id',id); if(error)throw error;
+  await window.tTaskPatch(id, {time_spent:spent, timer_started:null});                 // пауза таймера — через RPC, иначе у сотрудника RLS-отказ
   if(t && _wsecLog>0) _logWork({project_id:t.project_id,task_id:t.id,member_id:t.assignee_id,started_at:_wst,sec:_wsecLog});
   if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); } } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
 window.tTimerResume = async (id) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); try { const now=new Date().toISOString(); if(t){ t.timer_started=now; t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); _pkRerender(); }  // мгновенное продолжение
-  const {error}=await SB.from('project_tasks').update({timer_started:now}).eq('id',id); if(error)throw error;
+  await window.tTaskPatch(id, {timer_started:now});                                    // старт таймера — через RPC
   if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); } } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); } };
 
 window.tLoadTags = async () => {
