@@ -6968,7 +6968,7 @@ function segmSyncAll(){ try{ document.querySelectorAll('.segm').forEach(function
 /* ===== редактор услуг проекта (много услуг + тарифов на проект) ===== */
 window.NP_SVCS=[];
 function _svcMoney(n){ return (Number(n)||0).toLocaleString('ru-RU'); }
-function svcTariffPrice(name){ const t=(window.TARIFF_TPL||[]).find(x=>x.name===name); return t?(Number(t.price)||0):null; }
+function svcTariffPrice(service,name){ const t=(window.TARIFF_TPL||[]).find(x=>x.name===name && String(x.service||'')===String(service||'')); return t?(Number(t.price)||0):null; }
 function svcReset(arr){ window.NP_SVCS=(Array.isArray(arr)&&arr.length?arr:[{service:'',tariff:'',mrr:0,cost:0}]).map(s=>({service:s.service||'',tariff:s.tariff||'',mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})); svcRender(); }
 function svcEditorHTML(showCost){
   window.NP_SVC_SHOWCOST=(showCost!==false); const sc=window.NP_SVC_SHOWCOST;
@@ -7017,7 +7017,7 @@ function svcRender(){ const box=document.getElementById('svc-list'); if(!box)ret
   const so=(window._svcOpts&&window._svcOpts.svcs)||['SMM'], to=(window._svcOpts&&window._svcOpts.tfList)||[];
   box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
     +svcSelHTML(i,'service',so,s.service,'— услуга —')
-    +svcSelHTML(i,'tariff',to,s.tariff,'— выбрать —')
+    +svcSelHTML(i,'tariff',(typeof tariffsForSvc==='function'?tariffsForSvc(s.service).map(t=>t.name):to),s.tariff,'— выбрать —')
     +'<div class="svc-i svc-num svc-ro" title="Доход из тарифа">'+(s.mrr?_svcMoney(s.mrr):'0')+'</div>'
     +'<button type="button" class="svc-del" title="Убрать услугу" onclick="svcDel('+i+')"'+(a.length<=1?' style="opacity:.4"':'')+'>✕</button>'
     +'</div>').join(''); svcRenderTot(); }
@@ -7032,7 +7032,7 @@ function svcSelPick(i,f,v){ document.querySelectorAll('.svc-sel.open').forEach(x
 if(!window._svcSelBound){ window._svcSelBound=1; document.addEventListener('mousedown',function(ev){ const t=ev.target; if(!(t&&t.closest&&t.closest('.svc-sel'))){ document.querySelectorAll('.svc-sel.open').forEach(x=>x.classList.remove('open')); } }); }
 function svcAdd(){ (window.NP_SVCS=window.NP_SVCS||[]).push({service:'',tariff:'',mrr:0,cost:0,status:'active'}); svcRender(); }
 function svcDel(i){ const a=window.NP_SVCS||[]; if(a.length<=1){ a[0]={service:'',tariff:'',mrr:0,cost:0,status:'active'}; } else { a.splice(i,1); } svcRender(); }
-function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(v); a[i].mrr=(pr!=null?pr:0); svcRender(); return; } if(f==='service'){ if(i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function') npStagesReload(); svcRender(); } }
+function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(a[i].service,v); a[i].mrr=(pr!=null?pr:0); if(i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function') npStagesReload(); svcRender(); return; } if(f==='service'){ const _valid=(typeof tariffsForSvc==='function'?tariffsForSvc(v).map(t=>t.name):[]); if(a[i].tariff && _valid.indexOf(a[i].tariff)<0){ a[i].tariff=''; a[i].mrr=0; } if(i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function') npStagesReload(); svcRender(); } }
 function svcRenderTot(){ const el=document.getElementById('svc-tot'); if(!el)return; const sc=window.NP_SVC_SHOWCOST!==false; let inc=0,cst=0; (window.NP_SVCS||[]).forEach(s=>{inc+=Number(s.mrr)||0;cst+=Number(s.cost)||0;}); const mrg=inc>0?Math.round(100*(inc-cst)/inc):0; el.innerHTML='<span class="inc">Доход: <b>'+_svcMoney(inc)+'</b></span>'+(sc?('<span class="cst">Расход: <b>'+_svcMoney(cst)+'</b></span><span class="mrg">Маржа: <b>'+mrg+'%</b></span>'):''); if(window.PFIN && document.getElementById('pf-pl')){ window.PFIN.mrr=inc; if(typeof pfRecalc==='function')pfRecalc(); } }
 function svcCollect(){ return (window.NP_SVCS||[]).map(s=>({service:(s.service||'').trim(),tariff:(s.tariff||'').trim()||null,mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})).filter(s=>s.service||s.mrr||s.cost); }
 function svcPrimary(list){ const a=(list||svcCollect()).slice().sort((x,y)=>(y.mrr||0)-(x.mrr||0)); return a[0]||{service:'',tariff:null}; }
@@ -7092,14 +7092,14 @@ function npSaveProject(){
   const selStages=(typeof npSelectedStages==='function'?npSelectedStages():[]);
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():[]);
   const selContract={start:(_v('np-cstart')||null), end:(_v('np-cend')||null)};
-  const totN=stageSetFor(svc).length;
+  const totN=stageSetFor(svc,tariff).length;
   if(window.LIVE){ const clog=_v('np-clogin'); if(!clog||!_v('np-cpass')){toast('Задай логин и пароль клиента');return;} window.tProvisionClient({login:clog,pass:_v('np-cpass'),full_name:name,slug:((window.tMe&&window.tMe())||{}).agencySlug||'',stages:selStages,team:selTeam,contract:selContract,project:{name,logo_url:_v('np-logo'),category:_v('np-cat')||'—',service:svc,tariff,lead_id:lead,mrr:income,cost:tot.cost,services:svcsArr}}); pd2Close(); return; }
   PROJECTS.push({name,logo:name[0].toUpperCase(),cat:_v('np-cat')||'—',svc,tariff,lead_id:lead,mrr:income,cost:tot.cost,_svcs:svcsArr,pct:0,stages:'0 / '+(selStages.length||totN),health:'В норме',dyn:'— 0 / 7д',status:'active',logoUrl:_v('np-logo')});
   pd2Close(); agFilter='active'; renderProjects(); toast(`Проект «${name}» создан`);
 }
 
 /* ——— custom stages in create modal (путь A: добавить / переименовать / удалить / порядок) ——— */
-function npStagesReload(){ const svc=((window.NP_SVCS&&window.NP_SVCS[0]&&window.NP_SVCS[0].service)||_v('np-svc')||'SMM'); window.NP_STAGES=stageSetFor(svc).map(n=>({name:n})); npRenderStages(); }
+function npStagesReload(){ const s0=(window.NP_SVCS&&window.NP_SVCS[0])||{}; const svc=(s0.service||_v('np-svc')||'SMM'); const tf=(s0.tariff||''); window.NP_STAGES=stageSetFor(svc,tf).map(n=>({name:n})); npRenderStages(); }
 function npRenderStages(){
   const box=document.getElementById('np-stages'); if(!box) return;
   const sv=p=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">'+p+'</svg>';
@@ -7276,7 +7276,7 @@ function cmRenew(){ const pid=window._cmPid; if(!pid)return; const ns=_v('cm-cst
 /* ——— archive of past cycles (Фаза 5.3) ——— */
 /* ——— editable stage templates (Фаза 7A) ——— */
 function tplServices(){ const active=(typeof _tagList==='function')?_tagList('service',['SMM','PROD','DESIGN'],''):['SMM','PROD','DESIGN']; const saved=Object.keys(window.STAGE_TPL||{}); return [...new Set([...active,...saved])]; }
-function tplLoadWork(svc){ const t=window.STAGE_TPL&&window.STAGE_TPL[svc]; window.TPL_WORK=(Array.isArray(t)&&t.length)?t.slice():((PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).slice()); }
+function tplLoadWork(svc){ const t=stageTplRaw(svc,''); window.TPL_WORK=(Array.isArray(t)&&t.length)?t.slice():((PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM).slice()); }
 function openTplModal(){
   const ov=document.getElementById('ov-tpl'); if(!ov) return;
   window.TPL_SVC=window.TPL_SVC||'SMM'; if(tplServices().indexOf(window.TPL_SVC)<0) window.TPL_SVC='SMM';
@@ -7303,7 +7303,7 @@ function tplAdd(){ const inp=document.getElementById('tpl-new'); if(!inp) return
 function tplRemove(i){ if(!window.TPL_WORK) return; window.TPL_WORK.splice(i,1); tplRenderList(); }
 function tplMove(i,d){ const a=window.TPL_WORK; if(!a) return; const j=i+d; if(j<0||j>=a.length) return; const t=a[i]; a[i]=a[j]; a[j]=t; tplRenderList(); }
 function tplReset(){ window.TPL_WORK=(PD_STAGE_SETS[window.TPL_SVC]||PD_STAGE_SETS.SMM).slice(); tplRenderList(); }
-function tplSave(){ const svc=window.TPL_SVC; const clean=(window.TPL_WORK||[]).map(x=>(x||'').trim()).filter(Boolean); if(!clean.length){ toast('В шаблоне нет этапов'); return; } if(window.LIVE && window.tSaveStageTemplate){ window.tSaveStageTemplate(svc,clean); } else { window.STAGE_TPL=window.STAGE_TPL||{}; window.STAGE_TPL[svc]=clean; toast('Шаблон сохранён'); tplRenderSvcs(); } }
+function tplSave(){ const svc=window.TPL_SVC; const clean=(window.TPL_WORK||[]).map(x=>(x||'').trim()).filter(Boolean); if(!clean.length){ toast('В шаблоне нет этапов'); return; } if(window.LIVE && window.tSaveStageTemplate){ window.tSaveStageTemplate(svc,clean,''); } else { window.STAGE_TPL=window.STAGE_TPL||{}; (window.STAGE_TPL[svc]=window.STAGE_TPL[svc]||{})['']=clean; toast('Шаблон сохранён'); tplRenderSvcs(); } }
 
 function openCyclesModal(pid){
   const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===pid); if(!p) return;
@@ -8090,7 +8090,10 @@ const PD_STAGE_SETS={
   DESIGN:['Бриф','Мудборд','Концепт','Финальный дизайн'],
 };
 window.STAGE_TPL = window.STAGE_TPL || {};
-function stageSetFor(svc){ const t=window.STAGE_TPL&&window.STAGE_TPL[svc]; if(Array.isArray(t)&&t.length) return t; return PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM; }
+function stageTplRaw(svc,tariff){ const s=window.STAGE_TPL&&window.STAGE_TPL[svc]; const t=(s&&typeof s==='object')?s[tariff||'']:null; return Array.isArray(t)?t.slice():[]; }
+function stageTplGet(svc,tariff){ const s=window.STAGE_TPL&&window.STAGE_TPL[svc]; if(!s||typeof s!=='object') return null; const t=s[tariff||'']; if(Array.isArray(t)&&t.length) return t; const b=s['']; if(Array.isArray(b)&&b.length) return b; return null; }
+function stageSetFor(svc,tariff){ const t=stageTplGet(svc,tariff); if(Array.isArray(t)&&t.length) return t; return PD_STAGE_SETS[svc]||PD_STAGE_SETS.SMM; }
+function tariffsForSvc(svc){ return (window.TARIFF_TPL||[]).filter(t=>String(t.service||'')===String(svc||'')); }
 const PD_PEOPLE=[{n:'Абдурауф',c:'#37E6C8'},{n:'Шожахон',c:'#8A8FFF'},{n:'Шербек',c:'#E3B567'},{n:'Нур-Ислам',c:'#F0785C'}];
 const PD_ST_IC=['<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>','<path d="M12 2l2.4 6.9H22l-5.8 4.3 2.2 6.8L12 16l-6.4 4 2.2-6.8L2 8.9h7.6z"/>','<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/>','<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>','<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/>','<path d="M3 11l18-5v12L3 13zM11 18v3"/>','<path d="M4 4h16v12H4z"/><path d="M8 20h8"/>','<path d="M20 6L9 17l-5-5"/>','<path d="M12 20h9M3 20l9-16 9 16"/>'];
 const PD_TABS=[
@@ -8434,7 +8437,7 @@ function pdAddStage(){ if(!agIsPM()){ toast('Управление проекта
   const S=PROJECTS[pdIdx]._stages||[]; const idx=S.length?Math.max(...S.map(s=>s.idx||0))+1:0;
   if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,due_time:_v('pd2-time')||null,idx}); }
 function pdStageDel(id){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } if(window.tStageDel) window.tStageDel(id); }
-function pdSeedStages(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const names=stageSetFor(PROJECTS[pdIdx].svc); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
+function pdSeedStages(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const names=stageSetFor(PROJECTS[pdIdx].svc, PROJECTS[pdIdx].tariff); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
 let pdNewSt='wait';
 /* ═══════ Быстрое добавление задачи из шапки ═══════ */
 const QT_DIFF=[['easy','Лёгкая','var(--pos)'],['medium','Средняя','var(--warn)'],['hard','Сложная','var(--neg)']];
@@ -16183,7 +16186,7 @@ function openEmpInTeam(dept){
 }
 
 /* ════════════════ НАСТРОЙКИ ШАБЛОНОВ (категории · услуги+этапы · тарифы+цены) ════════════════ */
-let _stplTab='category', _stplSvc=null, _stplStages=[], _stplTariffEdit=null;
+let _stplTab='category', _stplSvc=null, _stplTariff='', _stplStages=[], _stplTariffEdit=null;
 function _stplUsedCat(name){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>(p.cat||'')===name).length; }
 function _stplUsedSvc(name){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>(p.svc||'')===name).length; }
 function _stplUsedTariff(name){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>(p.tariff||'')===name).length; }
@@ -16191,9 +16194,21 @@ function _fmtMoney(n){ n=Number(n)||0; return n>=1e6?(n/1e6).toFixed(n%1e6?1:0)+
 
 function openTemplatesSettings(){
   if(!agIsOwner()){ toast('Настройки шаблонов доступны только владельцу'); return; }
-  _stplTab='category'; _stplSvc=null; _stplTariffEdit=null;
+  _stplTab='category'; _stplSvc=null; _stplTariff=''; _stplTariffEdit=null;
   pd2Open(`<div class="modal stpl-modal">
-    <div class="modal-h"><h3>Настройки шаблонов</h3><p>Категории, услуги с этапами и тарифы — всё, что доступно при создании проекта</p></div>
+    <style>
+.stpl-tf-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+.stpl-tf-tab{position:relative;padding:6px 12px;border:1px solid var(--line-2);border-radius:var(--r-full);background:var(--bg-2);color:var(--txt-2);font:inherit;font-size:12.5px;cursor:pointer;transition:.14s;display:inline-flex;align-items:center;gap:6px}
+.stpl-tf-tab:hover{border-color:var(--txt-3);color:var(--txt)}
+.stpl-tf-tab.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
+.stpl-tf-tab .stpl-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block}
+.stpl-tgrp-h{display:flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin:14px 2px 7px}
+.stpl-tgrp-h .cnt{background:var(--bg-3);border-radius:20px;padding:1px 8px;color:var(--txt-2)}
+.stpl-cx{font-size:11px;color:var(--warn);background:var(--warn-dim);border-radius:20px;padding:2px 8px;margin-left:6px}
+.stpl-tsel{width:100%;background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt);padding:9px 10px;font:inherit;font-size:14px;outline:none;cursor:pointer}
+.stpl-tsel:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+    </style>
+    <div class="modal-h"><h3>Настройки шаблонов</h3><p>Категории, услуги с тарифами и этапами — всё, что доступно при создании проекта</p></div>
     <div class="stpl-tabs">
       <button class="stpl-tab" data-t="category" onclick="stplTab('category')">Категории</button>
       <button class="stpl-tab" data-t="service" onclick="stplTab('service')">Услуги и этапы</button>
@@ -16237,8 +16252,17 @@ function stplCatDel(name){ const u=_stplUsedCat(name);
 function _stplSvcBody(){
   const svcs=(typeof tplServices==='function')?tplServices():_tagList('service',['SMM','PROD','DESIGN'],'');
   if(_stplSvc && svcs.indexOf(_stplSvc)<0) _stplSvc=null;
-  if(!_stplSvc && svcs.length){ _stplSvc=svcs[0]; _stplStages=(stageSetFor(_stplSvc)||[]).slice(); }
+  if(typeof _stplTariff==='undefined') _stplTariff='';
+  if(!_stplSvc && svcs.length){ _stplSvc=svcs[0]; _stplTariff=''; _stplStages=(stageSetFor(_stplSvc,'')||[]).slice(); }
   const stages=_stplStages;
+  const tfs=(typeof tariffsForSvc==='function')?tariffsForSvc(_stplSvc):[];
+  const _own=(tf)=>{ const s=window.STAGE_TPL&&window.STAGE_TPL[_stplSvc]; return !!(s&&Array.isArray(s[tf])&&s[tf].length); };
+  const tfChips=_stplSvc?('<div class="stpl-tf-tabs">'
+    +'<button type="button" class="stpl-tf-tab '+(_stplTariff===''?'on':'')+'" onclick="stplPickTariff(\'\')">Базовые этапы'+(_own('')?'<span class="stpl-dot" title="свои этапы"></span>':'')+'</button>'
+    +tfs.map(t=>'<button type="button" class="stpl-tf-tab '+(_stplTariff===t.name?'on':'')+'" onclick="stplPickTariff(\''+_ddEsc(t.name)+'\')">'+_ddH(t.name)+(_own(t.name)?'<span class="stpl-dot" title="свои этапы"></span>':'')+'</button>').join('')
+    +'</div>'):'';
+  const _title=_stplTariff?('Этапы тарифа «'+_ddH(_stplTariff)+'»'):('Базовые этапы услуги «'+_ddH(_stplSvc||'')+'»');
+  const _hint=_stplTariff?'Свои этапы этого тарифа. Оставьте пустыми — подставятся базовые этапы услуги.':'Подставляются для тарифов без своих этапов и для услуг без тарифов.';
   return `<div class="stpl-two">
     <div class="stpl-col-l">
       <div class="stpl-col-h"><span>Услуги</span><span class="cnt" style="background:var(--bg-3);border-radius:20px;padding:2px 9px;color:var(--txt-2);letter-spacing:0">${svcs.length}</span></div>
@@ -16255,14 +16279,16 @@ function _stplSvcBody(){
       }).join(''):'<div class="tc-empty">Услуг пока нет</div>'}</div>
     </div>
     <div class="stpl-col-r">
-      ${_stplSvc?`<div class="stpl-stages-h">Этапы услуги «${_ddH(_stplSvc)}»</div>
-        <div class="stpl-stages" id="stpl-stages">${stages.map((st,i)=>`<div class="stpl-stage"><span class="stpl-stnum">${i+1}</span><input value="${_attr(st)}" oninput="_stplStages[${i}]=this.value" placeholder="Название этапа"><button class="stpl-del" onclick="stplStageDel(${i})" title="Удалить этап"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('')||'<div class="tc-empty">Этапов нет — добавьте</div>'}</div>
+      ${_stplSvc?`${tfChips}<div class="stpl-stages-h">${_title}</div>
+        <div class="stpl-hint" style="margin:-2px 0 8px">${_hint}</div>
+        <div class="stpl-stages" id="stpl-stages">${stages.map((st,i)=>`<div class="stpl-stage"><span class="stpl-stnum">${i+1}</span><input value="${_attr(st)}" oninput="_stplStages[${i}]=this.value" placeholder="Название этапа"><button class="stpl-del" onclick="stplStageDel(${i})" title="Удалить этап"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('')||('<div class="tc-empty">Этапов нет — добавьте'+(_stplTariff?' (или оставьте пусто — будут базовые)':'')+'</div>')}</div>
         <div class="stpl-stage-acts"><button class="btn-ghost sm" onclick="stplStageAdd()">+ Добавить этап</button><button class="btn-add sm2" onclick="stplStagesSave()">Сохранить этапы</button></div>`
-      :'<div class="tc-empty" style="margin-top:34px">Выберите услугу слева,<br>чтобы настроить её этапы</div>'}
+      :'<div class="tc-empty" style="margin-top:34px">Выберите услугу слева,<br>чтобы настроить её этапы и тарифы</div>'}
     </div>
   </div>`;
 }
-function stplPickSvc(s){ _stplSvc=s; _stplStages=(stageSetFor(s)||[]).slice(); _stplRefresh(); }
+function stplPickSvc(s){ _stplSvc=s; _stplTariff=''; _stplStages=(stageSetFor(s,'')||[]).slice(); _stplRefresh(); }
+function stplPickTariff(t){ _stplTariff=t||''; _stplStages=_stplTariff?stageTplRaw(_stplSvc,_stplTariff):(stageSetFor(_stplSvc,'')||[]).slice(); _stplRefresh(); }
 function stplSvcAdd(){ const v=(document.getElementById('stpl-svc-new').value||'').trim(); if(!v){toast('Введите название');return;}
   if(window.LIVE && window.tTagAdd){ window.tTagAdd('service',v).then(()=>{ _stplSvc=v; _stplStages=[]; _stplRefresh(); }); } else { PROJECT_TAGS.service=[...new Set([...(PROJECT_TAGS.service||[]),v])]; _stplSvc=v; _stplStages=[]; _stplRefresh(); }
   toast('Услуга добавлена');
@@ -16274,54 +16300,72 @@ function stplSvcDel(name){ const u=_stplUsedSvc(name);
 }
 function stplStageAdd(){ _stplStages.push(''); _stplRefresh(); setTimeout(()=>{ const inp=document.querySelectorAll('#stpl-stages input'); if(inp.length)inp[inp.length-1].focus(); },20); }
 function stplStageDel(i){ _stplStages.splice(i,1); _stplRefresh(); }
-function stplStagesSave(){ const clean=_stplStages.map(x=>(x||'').trim()).filter(Boolean); if(!clean.length){toast('Добавьте хотя бы один этап');return;}
+function stplStagesSave(){ const clean=_stplStages.map(x=>(x||'').trim()).filter(Boolean);
+  if(!clean.length && !_stplTariff){ toast('Добавьте хотя бы один этап'); return; }
   _stplStages=clean;
-  if(window.LIVE && window.tSaveStageTemplate){ window.tSaveStageTemplate(_stplSvc,clean); } else { window.STAGE_TPL=window.STAGE_TPL||{}; window.STAGE_TPL[_stplSvc]=clean; toast('Этапы сохранены'); }
+  if(window.LIVE && window.tSaveStageTemplate){ window.tSaveStageTemplate(_stplSvc,clean,_stplTariff); } else { window.STAGE_TPL=window.STAGE_TPL||{}; (window.STAGE_TPL[_stplSvc]=window.STAGE_TPL[_stplSvc]||{})[_stplTariff||'']=clean; toast('Этапы сохранены'); }
   _stplRefresh();
 }
 
 /* ── ТАРИФЫ + ЦЕНЫ ── */
 function _stplTariffBody(){
   const list=(window.TARIFF_TPL||[]);
+  const svcs=(typeof tplServices==='function')?tplServices():_tagList('service',['SMM','PROD','DESIGN'],'');
   if(_stplTariffEdit!==null){
-    const t=_stplTariffEdit==='new'?{name:'',price:'',per:'сум / мес'}:list[_stplTariffEdit]||{name:'',price:'',per:'сум / мес'};
+    const t=_stplTariffEdit==='new'?{service:(_stplSvc||svcs[0]||''),name:'',price:'',per:'сум / мес',complexity:''}:list[_stplTariffEdit]||{service:'',name:'',price:'',per:'сум / мес',complexity:''};
+    const svcOpts=svcs.map(s=>'<option value="'+_attr(s)+'"'+(String(t.service||'')===String(s)?' selected':'')+'>'+_attr(s)+'</option>').join('');
+    const cxOpts=['','Низкая','Средняя','Высокая'].map(c=>'<option value="'+_attr(c)+'"'+(String(t.complexity||'')===String(c)?' selected':'')+'>'+(c||'— не указана —')+'</option>').join('');
     return `<div class="stpl-sec-h"><span>${_stplTariffEdit==='new'?'Новый тариф':'Изменить тариф'}</span></div>
       <div class="stpl-tform">
+      <div class="fld"><label>Услуга</label><select id="stpl-t-svc" class="stpl-tsel">${svcOpts||'<option value="">— нет услуг —</option>'}</select></div>
       <div class="fld"><label>Название тарифа</label><input id="stpl-t-name" value="${_attr(t.name||'')}" placeholder="напр. Platinum"></div>
       <div class="fld2">
         <div class="fld"><label>Цена</label><input id="stpl-t-price" type="number" value="${t.price||''}" placeholder="0"></div>
         <div class="fld"><label>Период</label><input id="stpl-t-per" value="${_attr(t.per||'сум / мес')}" placeholder="сум / мес"></div>
       </div>
+      <div class="fld"><label>Сложность работы</label><select id="stpl-t-cx" class="stpl-tsel">${cxOpts}</select></div>
       <div class="stpl-tform-acts"><button class="btn-ghost" onclick="stplTariffCancel()">Отмена</button><button class="btn-add" onclick="stplTariffSave()">Сохранить тариф</button></div>
     </div>`;
   }
+  const groups={}; list.forEach((t,i)=>{ const k=t.service||''; (groups[k]=groups[k]||[]).push({t:t,i:i}); });
+  const order=svcs.concat(Object.keys(groups).filter(k=>svcs.indexOf(k)<0));
+  const seen={}; let body='';
+  order.forEach(function(svc){ if(seen[svc])return; seen[svc]=1; const g=groups[svc]; if(!g||!g.length)return;
+    body+='<div class="stpl-tgrp-h">'+(svc?_ddH(svc):'<span style="color:var(--warn)">Без услуги</span>')+'<span class="cnt">'+g.length+'</span></div>';
+    body+='<div class="stpl-list">'+g.map(function(o){ const t=o.t, i=o.i, u=_stplUsedTariff(t.name);
+      return '<div class="stpl-item tar"><div class="stpl-tar-id"><span class="stpl-nm">'+_ddH(t.name)+'</span>'+(t.complexity?'<span class="stpl-cx">'+_ddH(t.complexity)+'</span>':'')+(u?'<span class="stpl-use">'+u+' '+_plural(u,'проект','проекта','проектов')+'</span>':'')+'</div>'
+        +'<div class="stpl-tar-price"><span class="stpl-price">'+((t.price==null||t.price===''||isNaN(+t.price))?'—':Number(t.price).toLocaleString('ru-RU'))+'</span><span class="stpl-per">'+_ddH(t.per||'сум / мес')+'</span></div>'
+        +'<div class="stpl-tar-acts">'
+        +'<button class="stpl-edit" onclick="stplTariffEdit('+i+')" title="Изменить"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
+        +'<button class="stpl-del" onclick="stplTariffDel(\''+_ddEsc(t.service||'')+'\',\''+_ddEsc(t.name)+'\')" title="Удалить"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>';
+    }).join('')+'</div>';
+  });
+  if(!list.length) body='<div class="tc-empty">Тарифов пока нет — добавьте первый</div>';
   return `<div class="stpl-sec-h"><span>Тарифы и цены</span><span class="cnt">${list.length}</span></div>
-    <div class="stpl-hint">При создании проекта выбор тарифа автоматически подставит его цену в доход проекта.</div>
-    <div class="stpl-list">${list.length?list.map((t,i)=>{ const u=_stplUsedTariff(t.name);
-      return `<div class="stpl-item tar"><div class="stpl-tar-id"><span class="stpl-nm">${_ddH(t.name)}</span>${u?`<span class="stpl-use">${u} ${_plural(u,'проект','проекта','проектов')}</span>`:''}</div>
-        <div class="stpl-tar-price"><span class="stpl-price">${(t.price==null||t.price===''||isNaN(+t.price))?'—':Number(t.price).toLocaleString('ru-RU')}</span><span class="stpl-per">${_ddH(t.per||'сум / мес')}</span></div>
-        <div class="stpl-tar-acts">
-        <button class="stpl-edit" onclick="stplTariffEdit(${i})" title="Изменить"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="stpl-del" onclick="stplTariffDel('${_attr(t.name)}')" title="Удалить"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>`;
-    }).join(''):'<div class="tc-empty">Тарифов пока нет — добавьте первый</div>'}</div>
-    <button class="btn-add" style="width:100%;justify-content:center" onclick="stplTariffEdit('new')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить тариф</button>`;
+    <div class="stpl-hint">Тариф принадлежит услуге. При создании проекта выбор тарифа подставит его цену в доход и его этапы.</div>
+    ${body}
+    <button class="btn-add" style="width:100%;justify-content:center;margin-top:10px" onclick="stplTariffEdit('new')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить тариф</button>`;
 }
 function stplTariffEdit(i){ _stplTariffEdit=i; _stplRefresh(); }
 function stplTariffCancel(){ _stplTariffEdit=null; _stplRefresh(); }
 function stplTariffSave(){
+  const service=(document.getElementById('stpl-t-svc')?document.getElementById('stpl-t-svc').value:'')||'';
   const name=(document.getElementById('stpl-t-name').value||'').trim();
   const price=document.getElementById('stpl-t-price').value;
   const per=(document.getElementById('stpl-t-per').value||'сум / мес').trim();
+  const complexity=(document.getElementById('stpl-t-cx')?document.getElementById('stpl-t-cx').value:'')||'';
   if(!name){toast('Введите название тарифа');return;}
+  if(!service){toast('Выберите услугу для тарифа');return;}
   const list=(window.TARIFF_TPL||[]);
-  const oldName=(_stplTariffEdit!=='new' && list[_stplTariffEdit])?list[_stplTariffEdit].name:null;
-  if(window.LIVE && window.tTariffSave){ window.tTariffSave(name,price,per,oldName).then(()=>{ _stplTariffEdit=null; _stplRefresh(); }); }
-  else { window.TARIFF_TPL=window.TARIFF_TPL||[]; if(oldName){ const idx=window.TARIFF_TPL.findIndex(x=>x.name===oldName); if(idx>=0)window.TARIFF_TPL.splice(idx,1); } window.TARIFF_TPL.push({name,price:Number(price)||0,per}); _stplTariffEdit=null; _stplRefresh(); toast('Тариф сохранён'); }
+  const old=(_stplTariffEdit!=='new' && list[_stplTariffEdit])?list[_stplTariffEdit]:null;
+  const oldName=old?old.name:null, oldService=old?(old.service||''):null;
+  if(window.LIVE && window.tTariffSave){ window.tTariffSave(service,name,price,per,complexity,oldService,oldName).then(()=>{ _stplTariffEdit=null; _stplRefresh(); }); }
+  else { window.TARIFF_TPL=window.TARIFF_TPL||[]; if(old){ const idx=window.TARIFF_TPL.indexOf(old); if(idx>=0)window.TARIFF_TPL.splice(idx,1); } window.TARIFF_TPL.push({service,name,price:Number(price)||0,per,complexity}); _stplTariffEdit=null; _stplRefresh(); toast('Тариф сохранён'); }
 }
-function stplTariffDel(name){ const u=_stplUsedTariff(name);
+function stplTariffDel(service,name){ const u=_stplUsedTariff(name);
   if(u && window._stplConfirm!==name){ window._stplConfirm=name; toast(`«${name}» используется в ${u} ${_plural(u,'проекте','проектах','проектах')}. Нажмите ещё раз для удаления`); setTimeout(()=>{window._stplConfirm=null;},3500); return; }
   window._stplConfirm=null;
-  if(window.LIVE && window.tTariffDel){ window.tTariffDel(name).then(()=>_stplRefresh()); } else { window.TARIFF_TPL=(window.TARIFF_TPL||[]).filter(x=>x.name!==name); _stplRefresh(); }
+  if(window.LIVE && window.tTariffDel){ window.tTariffDel(service,name).then(()=>_stplRefresh()); } else { window.TARIFF_TPL=(window.TARIFF_TPL||[]).filter(x=>!(x.name===name && String(x.service||'')===String(service||''))); _stplRefresh(); }
 }
 
 /* employee creation with permission grid + login */
@@ -21429,10 +21473,11 @@ window.tProjectRenew = async (pid, ns, ne) => { try {
   await SB.from('projects').update({status:'active', closed_at:null}).eq('id',pid);
   if(typeof cmClose==='function')cmClose(); toast('Новый цикл запущен · прошлый в архиве'); await window.tLoadAll(ME.role);
 } catch(e){ toast('Ошибка продления: '+(e.message||e)); } };
-window.tSaveStageTemplate = async (service, stages) => { try {
+window.tSaveStageTemplate = async (service, stages, tariff) => { try {
   const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
-  const {error}=await SB.from('stage_templates').upsert({agency_id:me.agency_id, service:service, stages:stages, updated_at:new Date().toISOString()}, {onConflict:'agency_id,service'}); if(error)throw error;
-  window.STAGE_TPL=window.STAGE_TPL||{}; window.STAGE_TPL[service]=stages;
+  tariff=tariff||'';
+  const {error}=await SB.from('stage_templates').upsert({agency_id:me.agency_id, service:service, tariff:tariff, stages:stages, updated_at:new Date().toISOString()}, {onConflict:'agency_id,service,tariff'}); if(error)throw error;
+  window.STAGE_TPL=window.STAGE_TPL||{}; (window.STAGE_TPL[service]=window.STAGE_TPL[service]||{})[tariff]=stages;
   toast('Шаблон сохранён'); if(typeof tplRenderSvcs==='function') tplRenderSvcs();
 } catch(e){ toast('Ошибка: '+(e.message||e)); } };
 window.tStageSave = async (id,patch) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — этап ещё сохраняется'); return; } try {
@@ -21712,29 +21757,30 @@ window.tTagDel = async (kind,name) => { try {
 window.TARIFF_TPL = window.TARIFF_TPL || [];
 window.tLoadTariffTpl = async () => {
   try {
-    const { data, error } = await SB.from('tariff_templates').select('name,price,per,sort').order('sort').order('name');
+    const { data, error } = await SB.from('tariff_templates').select('service,name,price,per,sort,complexity').order('service').order('sort').order('name');
     if (error) return; // таблицы ещё нет — молча
-    window.TARIFF_TPL = (data||[]).map(r=>({name:r.name, price:Number(r.price)||0, per:r.per||'сум / мес'}));
+    window.TARIFF_TPL = (data||[]).map(r=>({service:r.service||'', name:r.name, price:Number(r.price)||0, per:r.per||'сум / мес', complexity:r.complexity||''}));
   } catch(_){}
 };
-window.tTariffSave = async (name, price, per, oldName) => {
+window.tTariffSave = async (service, name, price, per, complexity, oldService, oldName) => {
   try {
     name=(name||'').trim(); if(!name){ toast('Введи название тарифа'); return; }
+    service=(service||'').trim();
     const agency_id = ME && ME.agency_id;
-    if (oldName && oldName!==name){
-      await SB.from('tariff_templates').delete().eq('agency_id',agency_id).eq('name',oldName);
+    if ((oldName && oldName!==name) || (oldService!=null && oldService!==service)){
+      await SB.from('tariff_templates').delete().eq('agency_id',agency_id).eq('service',oldService||'').eq('name',oldName||name);
     }
     const { error } = await SB.from('tariff_templates')
-      .upsert({ agency_id, name, price:Number(price)||0, per:per||'сум / мес' }, { onConflict:'agency_id,name' });
+      .upsert({ agency_id, service, name, price:Number(price)||0, per:per||'сум / мес', complexity:complexity||null }, { onConflict:'agency_id,service,name' });
     if (error) throw error;
     await window.tLoadTariffTpl();
     if(typeof _stplRefresh==='function') _stplRefresh();
     toast('Тариф сохранён');
   } catch(e){ toast('Ошибка тарифа: '+(e.message||e)); }
 };
-window.tTariffDel = async (name) => {
+window.tTariffDel = async (service, name) => {
   try {
-    const { error } = await SB.from('tariff_templates').delete().eq('agency_id', ME&&ME.agency_id).eq('name',name);
+    const { error } = await SB.from('tariff_templates').delete().eq('agency_id', ME&&ME.agency_id).eq('service',service||'').eq('name',name);
     if (error) throw error;
     await window.tLoadTariffTpl();
     if(typeof _stplRefresh==='function') _stplRefresh();
@@ -26035,7 +26081,7 @@ window.tLoadAll = async (role, opts) => {
     const [pr, tm, tpl] = await Promise.all([
       SB.from('projects').select('*').order('created_at'),
       SB.from('profiles').select('*').eq('role','member').order('created_at'),
-      SB.from('stage_templates').select('service,stages') ]);
+      SB.from('stage_templates').select('service,tariff,stages') ]);
     { // слияние по id: сохраняем загруженные _tasks/_stages/_reports/_cp и identity объектов —
       // иначе каждая фоновая перезагрузка «ослепляла» открытый канбан (карточки переставали двигаться)
       const _prev={}; PROJECTS.forEach(p=>{ if(p&&p.id!=null) _prev[p.id]=p; });
@@ -26045,7 +26091,7 @@ window.tLoadAll = async (role, opts) => {
       if (typeof pdIdx!=='undefined' && window._pdProj){ const _i=PROJECTS.findIndex(x=>x.id===window._pdProj); if(_i>=0) pdIdx=_i; }   // открытая модалка смотрит на тот же проект
     }
     TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
-    window.STAGE_TPL = {}; ((tpl&&tpl.data)||[]).forEach(r=>{ if(Array.isArray(r.stages)) window.STAGE_TPL[r.service]=r.stages.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()); });
+    window.STAGE_TPL = {}; ((tpl&&tpl.data)||[]).forEach(r=>{ if(Array.isArray(r.stages)){ const _st=r.stages.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()); (window.STAGE_TPL[r.service]=window.STAGE_TPL[r.service]||{})[r.tariff||'']=_st; } });
     // загрузчики независимы — параллельно вместо 10 последовательных сетевых раундов (в разы быстрее)
     const _wave2=()=>Promise.all([ window.tLoadKB(), window.tLoadTools(), window.tLoadDeadlines(), window.tLoadProjectAggregates(), window.tLoadOverview(), window.tLoadCycles(), window.tLoadTeam(), window.tLoadFinance(), window.tLoadTags(), window.tLoadTariffTpl() ]);
     if(_fast){                                                                        // кабинет открывается сейчас; аналитика/финансы/дедлайны догружаются в фоне
