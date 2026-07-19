@@ -5435,6 +5435,10 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
 .search:focus-within{border-radius:9px}
 .tools-search:focus-within{background:var(--bg-2)}
 .search input:focus,.ti-search input:focus,.tools-search input:focus,.pdl-search input:focus,.cyc-search-wrap input:focus{outline:none !important;box-shadow:none !important}
+.cp-search:focus-within{outline:2px solid var(--accent);outline-offset:2px;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim);background:var(--bg-2)}
+.cp-search input:focus{outline:none !important;box-shadow:none !important}
+#ov-pd2 .modal.stpl-modal{max-height:calc(100vh - 90px);display:flex;flex-direction:column}
+#ov-pd2 .modal.stpl-modal #stpl-body{flex:1 1 auto;min-height:0;max-height:none}
 </style>
 <style id="gen-glass">
 /* ═══════════ ГЕНЕРАЛЬНЫЙ КАБИНЕТ · СТЕКЛЯННЫЙ РЕДИЗАЙН (scoped #app) ═══════════ */
@@ -16208,9 +16212,15 @@ function openTemplatesSettings(){
 .stpl-tf-tab:hover{border-color:var(--txt-3);color:var(--txt)}
 .stpl-tf-tab.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 .stpl-tf-tab .stpl-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block}
-.stpl-tgrp-h{display:flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin:14px 2px 7px}
+.stpl-tgrp-h{display:flex;align-items:center;gap:8px;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin:18px 2px 9px}
+.stpl-tgrp-h .svc{color:var(--txt-2)}
+.stpl-tgrp-h.none .svc{color:var(--warn)}
 .stpl-tgrp-h .cnt{background:var(--bg-3);border-radius:20px;padding:1px 8px;color:var(--txt-2)}
-.stpl-cx{font-size:11px;color:var(--warn);background:var(--warn-dim);border-radius:20px;padding:2px 8px;margin-left:6px}
+.stpl-item.tar .stpl-tar-id{align-items:flex-start}
+.stpl-tar-meta{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:1px}
+.stpl-svc-chip{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:20px;padding:2px 10px;white-space:nowrap}
+.stpl-svc-chip.none{color:var(--warn);background:var(--warn-dim);border-color:transparent}
+.stpl-cx{display:inline-block;width:auto;font-size:11px;color:var(--warn);background:var(--warn-dim);border-radius:20px;padding:2px 10px;margin:0;white-space:nowrap}
 .stpl-tsel{width:100%;background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt);padding:9px 10px;font:inherit;font-size:14px;outline:none;cursor:pointer}
 .stpl-tsel:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
     </style>
@@ -16351,9 +16361,9 @@ function _stplTariffBody(){
   const order=svcs.concat(Object.keys(groups).filter(k=>svcs.indexOf(k)<0));
   const seen={}; let body='';
   order.forEach(function(svc){ if(seen[svc])return; seen[svc]=1; const g=groups[svc]; if(!g||!g.length)return;
-    body+='<div class="stpl-tgrp-h">'+(svc?_ddH(svc):'<span style="color:var(--warn)">Без услуги</span>')+'<span class="cnt">'+g.length+'</span></div>';
+    body+='<div class="stpl-tgrp-h'+(svc?'':' none')+'"><span class="svc">'+(svc?_ddH(svc):'Без услуги')+'</span><span class="cnt">'+g.length+'</span></div>';
     body+='<div class="stpl-list">'+g.map(function(o){ const t=o.t, i=o.i, u=_stplUsedTariff(t.name);
-      return '<div class="stpl-item tar"><div class="stpl-tar-id"><span class="stpl-nm">'+_ddH(t.name)+'</span>'+(t.complexity?'<span class="stpl-cx">'+_ddH(t.complexity)+'</span>':'')+(u?'<span class="stpl-use">'+u+' '+_plural(u,'проект','проекта','проектов')+'</span>':'')+'</div>'
+      return '<div class="stpl-item tar"><div class="stpl-tar-id"><span class="stpl-nm">'+_ddH(t.name)+'</span><div class="stpl-tar-meta"><span class="stpl-svc-chip'+(t.service?'':' none')+'">'+(t.service?_ddH(t.service):'Без услуги')+'</span>'+(t.complexity?'<span class="stpl-cx">Сложность: '+_ddH(t.complexity)+'</span>':'')+(u?'<span class="stpl-use">'+u+' '+_plural(u,'проект','проекта','проектов')+'</span>':'')+'</div></div>'
         +'<div class="stpl-tar-price"><span class="stpl-price">'+((t.price==null||t.price===''||isNaN(+t.price))?'—':Number(t.price).toLocaleString('ru-RU'))+'</span><span class="stpl-per">'+_ddH(t.per||'сум / мес')+'</span></div>'
         +'<div class="stpl-tar-acts">'
         +'<button class="stpl-edit" onclick="stplTariffEdit('+i+')" title="Изменить"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
