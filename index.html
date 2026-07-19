@@ -16239,13 +16239,17 @@ function _stplCatBody(){
     }).join(''):'<div class="tc-empty">Категорий пока нет — добавьте первую</div>'}</div>`;
 }
 function stplCatAdd(){ const v=(document.getElementById('stpl-cat-new').value||'').trim(); if(!v){toast('Введите название');return;}
-  if(window.LIVE && window.tTagAdd){ window.tTagAdd('category',v).then(()=>_stplRefresh()); } else { PROJECT_TAGS.category=[...new Set([...(PROJECT_TAGS.category||[]),v])]; _stplRefresh(); }
-  toast('Категория добавлена');
+  if(typeof PROJECT_TAGS!=='undefined') PROJECT_TAGS.category=[...new Set([...(PROJECT_TAGS.category||[]),v])];
+  const _in=document.getElementById('stpl-cat-new'); if(_in)_in.value='';
+  _stplRefresh(); toast('Категория добавлена');
+  if(window.LIVE && window.tTagAdd){ Promise.resolve(window.tTagAdd('category',v)).catch(()=>{}); }
 }
 function stplCatDel(name){ const u=_stplUsedCat(name);
-  if(u && !window._stplConfirm){ window._stplConfirm=name; toast(`«${name}» используется в ${u} ${_plural(u,'проекте','проектах','проектах')}. Нажмите ещё раз для удаления`); setTimeout(()=>{window._stplConfirm=null;},3500); return; }
+  if(u && window._stplConfirm!==name){ window._stplConfirm=name; toast(`«${name}» используется в ${u} ${_plural(u,'проекте','проектах','проектах')}. Нажмите ещё раз для удаления`); setTimeout(()=>{window._stplConfirm=null;},3500); return; }
   window._stplConfirm=null;
-  if(window.LIVE && window.tTagDel){ window.tTagDel('category',name).then(()=>_stplRefresh()); } else { PROJECT_TAGS.category=(PROJECT_TAGS.category||[]).filter(x=>x!==name); _stplRefresh(); }
+  if(typeof PROJECT_TAGS!=='undefined') PROJECT_TAGS.category=(PROJECT_TAGS.category||[]).filter(x=>x!==name);
+  _stplRefresh(); toast('Категория удалена');
+  if(window.LIVE && SB){ Promise.resolve(SB.from('project_tags').delete().eq('agency_id',ME&&ME.agency_id).eq('kind','category').eq('name',name).then(r=>{ if(r&&r.error) throw r.error; return window.tLoadTags&&window.tLoadTags(); })).catch(e=>{ toast('Не удалось удалить на сервере: '+(e.message||e)); if(window.tLoadTags) window.tLoadTags().then(_stplRefresh); }); }
 }
 
 /* ── УСЛУГИ + ЭТАПЫ ── */
@@ -16290,13 +16294,22 @@ function _stplSvcBody(){
 function stplPickSvc(s){ _stplSvc=s; _stplTariff=''; _stplStages=(stageSetFor(s,'')||[]).slice(); _stplRefresh(); }
 function stplPickTariff(t){ _stplTariff=t||''; _stplStages=_stplTariff?stageTplRaw(_stplSvc,_stplTariff):(stageSetFor(_stplSvc,'')||[]).slice(); _stplRefresh(); }
 function stplSvcAdd(){ const v=(document.getElementById('stpl-svc-new').value||'').trim(); if(!v){toast('Введите название');return;}
-  if(window.LIVE && window.tTagAdd){ window.tTagAdd('service',v).then(()=>{ _stplSvc=v; _stplStages=[]; _stplRefresh(); }); } else { PROJECT_TAGS.service=[...new Set([...(PROJECT_TAGS.service||[]),v])]; _stplSvc=v; _stplStages=[]; _stplRefresh(); }
-  toast('Услуга добавлена');
+  if(typeof PROJECT_TAGS!=='undefined') PROJECT_TAGS.service=[...new Set([...(PROJECT_TAGS.service||[]),v])];
+  const _in=document.getElementById('stpl-svc-new'); if(_in)_in.value='';
+  _stplSvc=v; _stplTariff=''; _stplStages=[];
+  _stplRefresh(); toast('Услуга добавлена');
+  if(window.LIVE && window.tTagAdd){ Promise.resolve(window.tTagAdd('service',v)).catch(()=>{}); }
 }
 function stplSvcDel(name){ const u=_stplUsedSvc(name);
   if(u && window._stplConfirm!==name){ window._stplConfirm=name; toast(`«${name}» используется в ${u} ${_plural(u,'проекте','проектах','проектах')}. Нажмите ещё раз для удаления`); setTimeout(()=>{window._stplConfirm=null;},3500); return; }
   window._stplConfirm=null;
-  if(window.LIVE && window.tTagDel){ window.tTagDel('service',name).then(()=>{ if(_stplSvc===name)_stplSvc=null; _stplRefresh(); }); } else { PROJECT_TAGS.service=(PROJECT_TAGS.service||[]).filter(x=>x!==name); if(_stplSvc===name)_stplSvc=null; _stplRefresh(); }
+  // мгновенно убираем услугу из всех источников списка (теги + шаблоны этапов + тарифы)
+  if(window.STAGE_TPL) delete window.STAGE_TPL[name];
+  window.TARIFF_TPL=(window.TARIFF_TPL||[]).filter(t=>String(t.service||'')!==String(name||''));
+  if(typeof PROJECT_TAGS!=='undefined') PROJECT_TAGS.service=(PROJECT_TAGS.service||[]).filter(x=>x!==name);
+  if(_stplSvc===name){ _stplSvc=null; _stplTariff=''; }
+  _stplRefresh(); toast('Услуга удалена');
+  if(window.LIVE && window.tServiceDelete){ Promise.resolve(window.tServiceDelete(name)).catch(e=>{ toast('Не удалось удалить на сервере: '+(e.message||e)); Promise.all([window.tLoadTags&&window.tLoadTags(), window.tLoadTariffTpl&&window.tLoadTariffTpl()]).then(_stplRefresh); }); }
 }
 function stplStageAdd(){ _stplStages.push(''); _stplRefresh(); setTimeout(()=>{ const inp=document.querySelectorAll('#stpl-stages input'); if(inp.length)inp[inp.length-1].focus(); },20); }
 function stplStageDel(i){ _stplStages.splice(i,1); _stplRefresh(); }
@@ -16365,7 +16378,9 @@ function stplTariffSave(){
 function stplTariffDel(service,name){ const u=_stplUsedTariff(name);
   if(u && window._stplConfirm!==name){ window._stplConfirm=name; toast(`«${name}» используется в ${u} ${_plural(u,'проекте','проектах','проектах')}. Нажмите ещё раз для удаления`); setTimeout(()=>{window._stplConfirm=null;},3500); return; }
   window._stplConfirm=null;
-  if(window.LIVE && window.tTariffDel){ window.tTariffDel(service,name).then(()=>_stplRefresh()); } else { window.TARIFF_TPL=(window.TARIFF_TPL||[]).filter(x=>!(x.name===name && String(x.service||'')===String(service||''))); _stplRefresh(); }
+  window.TARIFF_TPL=(window.TARIFF_TPL||[]).filter(x=>!(x.name===name && String(x.service||'')===String(service||'')));
+  _stplRefresh(); toast('Тариф удалён');
+  if(window.LIVE && SB){ Promise.resolve(SB.from('tariff_templates').delete().eq('agency_id',ME&&ME.agency_id).eq('service',service||'').eq('name',name).then(r=>{ if(r&&r.error) throw r.error; return window.tLoadTariffTpl&&window.tLoadTariffTpl(); })).catch(e=>{ toast('Не удалось удалить на сервере: '+(e.message||e)); if(window.tLoadTariffTpl) window.tLoadTariffTpl().then(_stplRefresh); }); }
 }
 
 /* employee creation with permission grid + login */
@@ -21786,6 +21801,13 @@ window.tTariffDel = async (service, name) => {
     if(typeof _stplRefresh==='function') _stplRefresh();
     toast('Тариф удалён');
   } catch(e){ toast('Ошибка: '+(e.message||e)); }
+};
+window.tServiceDelete = async (service) => {
+  const agency_id = ME && ME.agency_id;
+  const r1=await SB.from('stage_templates').delete().eq('agency_id',agency_id).eq('service',service); if(r1.error) throw r1.error;
+  const r2=await SB.from('tariff_templates').delete().eq('agency_id',agency_id).eq('service',service); if(r2.error) throw r2.error;
+  const r3=await SB.from('project_tags').delete().eq('agency_id',agency_id).eq('kind','service').eq('name',service); if(r3.error) throw r3.error;
+  if(window.tLoadTags) await window.tLoadTags();
 };
 window.tUploadLogo = async (file, inputId, letter) => {
   try {
