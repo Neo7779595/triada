@@ -7108,7 +7108,7 @@ function npRenderStages(){
   box.innerHTML=arr.map((s,i)=>(
     '<div class="np-st">'
     +'<span class="np-st-num">'+(i+1)+'</span>'
-    +'<input class="np-st-i" value="'+_attr(s.name)+'" placeholder="Название этапа" oninput="npStageRename('+i+',this.value)">'
+    +'<input class="np-st-i" value="'+_attr(s.name)+'" placeholder="Название этапа" oninput="npStageRename('+i+',this.value)" onkeydown="npStageKey(event,'+i+')">'
     +'<button type="button" class="np-st-btn" title="Выше" onclick="npStageMove('+i+',-1)"'+(i===0?' disabled style="opacity:.35"':'')+'>'+sv(up)+'</button>'
     +'<button type="button" class="np-st-btn" title="Ниже" onclick="npStageMove('+i+',1)"'+(i===last?' disabled style="opacity:.35"':'')+'>'+sv(dn)+'</button>'
     +'<button type="button" class="np-st-btn del" title="Удалить" onclick="npStageRemove('+i+')">'+sv(rm)+'</button>'
@@ -7122,6 +7122,7 @@ function npStageRename(i,val){ if(window.NP_STAGES&&window.NP_STAGES[i]) window.
 function npStageMove(i,dir){ const a=window.NP_STAGES; if(!a) return; const j=i+dir; if(j<0||j>=a.length) return; const t=a[i]; a[i]=a[j]; a[j]=t; npRenderStages(); }
 function npStageRemove(i){ const a=window.NP_STAGES; if(!a) return; a.splice(i,1); npRenderStages(); }
 function npStageAdd(){ const inp=document.getElementById('np-st-new'); if(!inp) return; const v=(inp.value||'').trim(); if(!v){ inp.focus(); return; } (window.NP_STAGES=window.NP_STAGES||[]).push({name:v}); npRenderStages(); setTimeout(()=>{const n=document.getElementById('np-st-new'); if(n)n.focus();},10); }
+function npStageKey(e,i){ if(e.key!=='Enter' && e.keyCode!==13) return; e.preventDefault(); const inps=document.querySelectorAll('#np-stages .np-st-i'); if(i<inps.length-1){ const el=inps[i+1]; el.focus(); try{el.setSelectionRange(el.value.length,el.value.length);}catch(_){} } else { const n=document.getElementById('np-st-new'); if(n)n.focus(); } }
 function npStageHint(){ const h=document.getElementById('np-st-hint'); if(!h) return; const n=npSelectedStages().length; h.textContent=n?('Этапов в проекте: '+n):'Этапов нет — проект создастся без этапов'; }
 function npSelectedStages(){ return (window.NP_STAGES||[]).map(s=>(s.name||'').trim()).filter(Boolean); }
 window.npReseedLast=async()=>{ const p=window._npPendingSeed; if(!p){toast('Нет ожидающего засева');return;} const ok=await window.tStageSeed(p.id,p.names); if(ok){ window._npPendingSeed=null; } };
@@ -16285,7 +16286,7 @@ function _stplSvcBody(){
     <div class="stpl-col-r">
       ${_stplSvc?`${tfChips}<div class="stpl-stages-h">${_title}</div>
         <div class="stpl-hint" style="margin:-2px 0 8px">${_hint}</div>
-        <div class="stpl-stages" id="stpl-stages">${stages.map((st,i)=>`<div class="stpl-stage"><span class="stpl-stnum">${i+1}</span><input value="${_attr(st)}" oninput="_stplStages[${i}]=this.value" placeholder="Название этапа"><button class="stpl-del" onclick="stplStageDel(${i})" title="Удалить этап"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('')||('<div class="tc-empty">Этапов нет — добавьте'+(_stplTariff?' (или оставьте пусто — будут базовые)':'')+'</div>')}</div>
+        <div class="stpl-stages" id="stpl-stages">${stages.map((st,i)=>`<div class="stpl-stage"><span class="stpl-stnum">${i+1}</span><input value="${_attr(st)}" oninput="_stplStages[${i}]=this.value" onkeydown="stplStageKey(event,${i})" placeholder="Название этапа"><button class="stpl-del" onclick="stplStageDel(${i})" title="Удалить этап"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('')||('<div class="tc-empty">Этапов нет — добавьте'+(_stplTariff?' (или оставьте пусто — будут базовые)':'')+'</div>')}</div>
         <div class="stpl-stage-acts"><button class="btn-ghost sm" onclick="stplStageAdd()">+ Добавить этап</button><button class="btn-add sm2" onclick="stplStagesSave()">Сохранить этапы</button></div>`
       :'<div class="tc-empty" style="margin-top:34px">Выберите услугу слева,<br>чтобы настроить её этапы и тарифы</div>'}
     </div>
@@ -16312,6 +16313,7 @@ function stplSvcDel(name){ const u=_stplUsedSvc(name);
   if(window.LIVE && window.tServiceDelete){ Promise.resolve(window.tServiceDelete(name)).catch(e=>{ toast('Не удалось удалить на сервере: '+(e.message||e)); Promise.all([window.tLoadTags&&window.tLoadTags(), window.tLoadTariffTpl&&window.tLoadTariffTpl()]).then(_stplRefresh); }); }
 }
 function stplStageAdd(){ _stplStages.push(''); _stplRefresh(); setTimeout(()=>{ const inp=document.querySelectorAll('#stpl-stages input'); if(inp.length)inp[inp.length-1].focus(); },20); }
+function stplStageKey(e,i){ if(e.key!=='Enter' && e.keyCode!==13) return; e.preventDefault(); const inps=document.querySelectorAll('#stpl-stages input'); if(i<inps.length-1){ const el=inps[i+1]; el.focus(); try{el.setSelectionRange(el.value.length,el.value.length);}catch(_){} } else { stplStageAdd(); } }
 function stplStageDel(i){ _stplStages.splice(i,1); _stplRefresh(); }
 function stplStagesSave(){ const clean=_stplStages.map(x=>(x||'').trim()).filter(Boolean);
   if(!clean.length && !_stplTariff){ toast('Добавьте хотя бы один этап'); return; }
