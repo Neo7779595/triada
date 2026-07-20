@@ -8492,7 +8492,7 @@ window._tgDeepLink=_tgDeepLink;
 function openProject(i){
   pdIdx=i;pdTabCur='stages';
   window._pdLastTab=null; window._pdLastProj=null;   // первая отрисовка модалки — с анимацией входа
-  const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id;
+  const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id; p._stReloaded=0;   // сбрасываем одноразовый авто-повтор загрузки этапов
   document.getElementById('pd-logo').innerHTML=logoFill(p.logoUrl,p.logo);
   document.getElementById('pd-name').textContent=p.name;
   document.getElementById('pd-desc').textContent=p.cat&&p.cat!=='—'?p.cat:'Нет описания';
@@ -8882,7 +8882,15 @@ function _pdDeadlinesHTML(p){
 function renderPd(){
   const p=PROJECTS[pdIdx], d=p._d; let h='';
   if(pdTabCur==='stages'){
-    if(p._stages===undefined){ h='<div class="pk-empty" style="padding:48px 0">Загрузка этапов…</div>'; }
+    const _expTot=(function(){ const m=/(\d+)\s*\/\s*(\d+)/.exec(String(p.stages||'')); return m?parseInt(m[2],10):0; })();
+    const _stStale=(p._stages!==undefined && p._stages.length===0 && _expTot>0 && !p._stReloaded && !!window.tLoadProjectWork);
+    if(p._stages===undefined || _stStale){
+      h='<div class="pk-empty" style="padding:48px 0">Загрузка этапов…</div>';
+      if(_stStale){                                             // карточка знает: этапов 0/N (N>0), а деталь пришла пустой → баг «этапы пропали», освежаем один раз
+        p._stReloaded=1;
+        window.tLoadProjectWork(p.id).then(function(){ if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id) renderPd(); });
+      }
+    }
     else {
       const S=p._stages;
       const total=S.length, done=S.filter(s=>s.status==='done').length, work=S.filter(s=>s.status==='active').length, wait=total-done-work;
@@ -21822,7 +21830,8 @@ window.tLoadProjectWork = async (projectId) => {
     SB.from('reports').select('*').eq('project_id',projectId).order('published_at',{ascending:false}),
     SB.from('stage_history').select('stage_name,old_status,new_status,created_at,changed_by').eq('project_id',projectId).order('created_at',{ascending:false}).limit(40),
     SB.from('project_cycles').select('id,cycle_no,period_start,period_end,snapshot,archived_at').eq('project_id',projectId).order('cycle_no',{ascending:false}) ]);
-  { const _prevSt=p._stages||[]; p._stages = st.data||[];
+  { if(st.error) console.warn('[stages] load error:', st.error.message||st.error);               // ошибку не глотаем — чтобы «пусто из-за сбоя» не выглядело как «этапов нет»
+    const _prevSt=p._stages||[]; p._stages = st.data||[];
     _prevSt.forEach(x=>{ if(x&&String(x.id).indexOf('tmp_')===0) p._stages.push(x); }); }        // не теряем этапы, ждущие подтверждения сервера
   p._cycles = cy.data||[];
   { // защита от гонки: недавние оптимистичные изменения таймеров не перетираем устаревшими данными из БД
