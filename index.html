@@ -5344,6 +5344,12 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ntf-c.s-crit{border-left:2px solid var(--neg)}
 .ntf-c.s-warn{border-left:2px solid var(--warn)}
 .ntf-c.op{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
+.ntf-c{position:relative}
+.ntf-c-act{position:absolute;top:8px;right:8px;display:flex;gap:4px;opacity:0;transform:translateX(4px);transition:opacity .15s var(--ease-out),transform .15s var(--ease-out);z-index:3}
+.ntf-c:hover .ntf-c-act,.ntf-c-act:focus-within{opacity:1;transform:none}
+.ntf-c-act button{width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(16,20,27,.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s;padding:0}
+.ntf-c-act button:hover{color:var(--txt);border-color:var(--accent-line);background:var(--bg-2)}
+.ntf-sp.none{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;color:var(--txt-3);letter-spacing:.05em;opacity:.55;text-transform:uppercase}
 .ntf-c-main{display:flex;align-items:flex-start;gap:11px;width:100%;background:none;border:0;padding:12px;cursor:pointer;text-align:left}
 .ntf-c .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
 .ntf-c .bd{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
@@ -20095,6 +20101,7 @@ window.hkHelpToggle=hkHelpToggle; window.hkSyncKeys=hkSyncKeys; window.hkProjKey
    ════════════════════════════════════════════════════════════════ */
 let NTF=[], NTF_READ={}, NTF_SEEN=0, NTF_OPEN=false, NTF_VIEW='list';
 let NTF_EXP={};                          // раскрытые карточки (KPI и прочие «толстые» события)
+let NTF_SNOOZE={};                       // отложенные/скрытые сигналы: id -> до какого ts прятать
 
 /* ─── ЗВУК ───────────────────────────────────────────────────────────
    Не пищалки на голом осцилляторе, а колокольный синтез: основной тон
@@ -20238,8 +20245,13 @@ function ntfSave(){
     localStorage.setItem(_ntfK('seen'), String(NTF_SEEN));
   }catch(e){}
 }
-function ntfReset(){ NTF=[]; NTF_READ={}; NTF_SEEN=0; _ntfStatus={}; NTF_OPEN=false; NTF_VIEW='list'; NTF_EXP={}; _ntfFirstScan=true; _ntfKpiCache=null; _ntfSince=null; _ntfRtSeen=0; clearInterval(_ntfPollT); ntfClose(); }
-function ntfUnread(){ return NTF.filter(function(e){ return !NTF_READ[e.id]; }).length; }
+function ntfReset(){ NTF=[]; NTF_READ={}; NTF_SEEN=0; _ntfStatus={}; NTF_OPEN=false; NTF_VIEW='list'; NTF_EXP={}; _ntfFirstScan=true; _ntfKpiCache=null; _ntfSince=null; _ntfRtSeen=0; NTF_SNOOZE={}; clearInterval(_ntfPollT); ntfClose(); }
+function _ntfSnoozeLoad(){ try{ const s=JSON.parse(localStorage.getItem(_ntfK('snooze'))||'{}'); const now=Date.now(); NTF_SNOOZE={}; if(s&&typeof s==='object') Object.keys(s).forEach(function(k){ if(s[k]>now) NTF_SNOOZE[k]=s[k]; }); }catch(e){} }
+function _ntfSnoozeSave(){ try{ localStorage.setItem(_ntfK('snooze'), JSON.stringify(NTF_SNOOZE)); }catch(e){} }
+function _ntfSnoozed(e){ return !!(e && e.src==='signal' && NTF_SNOOZE[e.id] && Date.now()<NTF_SNOOZE[e.id]); }
+function ntfSnooze(id, ms, ev){ if(ev&&ev.stopPropagation) ev.stopPropagation(); NTF_SNOOZE[id]=Date.now()+ms; _ntfSnoozeSave(); ntfBadge(); if(NTF_OPEN) ntfRender(); if(typeof toast==='function'){ const d=Math.round(ms/86400000); toast(d>=1?('Отложено на '+d+' '+_plural(d,'день','дня','дней')):'Отложено на час'); } }
+function ntfHide(id, ev){ if(ev&&ev.stopPropagation) ev.stopPropagation(); NTF_SNOOZE[id]=Date.now()+30*86400000; _ntfSnoozeSave(); ntfBadge(); if(NTF_OPEN) ntfRender(); if(typeof toast==='function') toast('Скрыто · вернётся, если ситуация изменится'); }
+function ntfUnread(){ const now=Date.now(); return NTF.filter(function(e){ return !NTF_READ[e.id] && !(e.src==='signal'&&NTF_SNOOZE[e.id]&&now<NTF_SNOOZE[e.id]); }).length; }
 let _ntfSilent=false;                       // массовая подгрузка — без звука и тостов
 function ntfAdd(e, silent){
   if(!e||!e.id) return;
@@ -20549,7 +20561,7 @@ async function ntfScan(){
       const p=_ntfProj(c.project_id); if(!p||!c.end_date) return;
       const e=D(c.end_date); if(!e) return;
       const n=days(e);
-      const base={id:'sig.ct.'+p.id, kind:'contract', projId:p.id, proj:p.name, tab:NTF_TAB.contract, ts:Date.now(), obj:p.name};
+      const base={id:'sig.ct.'+p.id, kind:'contract', projId:p.id, proj:p.name, tab:NTF_TAB.contract, ts:Date.now(), obj:p.name, _urg:n};
       if(n<0)        sig.push(Object.assign({sev:'crit', title:'Договор истёк '+Math.abs(n)+' '+_plural(Math.abs(n),'день','дня','дней')+' назад', body:'продлите или закройте проект', roles:[{k:'Дата окончания', v:_kbFmtD(c.end_date)}]}, base));
       else if(n<=7)  sig.push(Object.assign({sev:'crit', title:'Договор истекает через '+n+' '+_plural(n,'день','дня','дней'), body:'пора продлевать', roles:[{k:'Дата окончания', v:_kbFmtD(c.end_date)}]}, base));
       else if(n<=30) sig.push(Object.assign({sev:'warn', title:'Договор истекает через '+n+' '+_plural(n,'день','дня','дней'), body:'', roles:[{k:'Дата окончания', v:_kbFmtD(c.end_date)}]}, base));
@@ -20667,7 +20679,8 @@ window.ntfDiag=function(){
 function ntfList(){
   const q=NTF_F.q.trim().toLowerCase();
   const kk=Object.keys(NTF_F.kinds).filter(function(k){ return NTF_F.kinds[k]; });
-  return NTF.filter(function(e){
+  const out=NTF.filter(function(e){
+    if(_ntfSnoozed(e)) return false;                                   // отложенные/скрытые сигналы прячем
     if(NTF_F.tab==='sig'  && e.src!=='signal') return false;
     if(NTF_F.tab==='live' && e.src==='signal') return false;
     if(kk.length && kk.indexOf(e.kind)<0) return false;
@@ -20676,6 +20689,14 @@ function ntfList(){
     if(q && ((e.title||'')+' '+(e.obj||'')+' '+(e.body||'')+' '+(e.proj||'')).toLowerCase().indexOf(q)<0) return false;
     return true;
   });
+  const R={crit:0,warn:1,info:2};
+  out.sort(function(a,b){
+    const sa=a.src==='signal', sb=b.src==='signal';
+    if(sa!==sb) return sa?-1:1;                                        // сигналы-проблемы всегда выше ленты
+    if(sa){ const ra=(R[a.sev]==null?3:R[a.sev]), rb=(R[b.sev]==null?3:R[b.sev]); if(ra!==rb) return ra-rb; return (a._urg==null?999:a._urg)-(b._urg==null?999:b._urg); }
+    return (b.ts||0)-(a.ts||0);                                        // лента — по времени
+  });
+  return out;
 }
 function ntfCollapse(list){
   const out=[];
@@ -20727,7 +20748,7 @@ function _ntfScrollTop(){ const el=document.getElementById('ntf-panel'); if(!el)
 }
 function ntfTab(t){ NTF_F.tab=t; ntfRender(); _ntfScrollTop(); }          // смена вкладки — тоже
 function ntfKind(k){ NTF_F.kinds[k]=!NTF_F.kinds[k]; ntfRender(); }
-function ntfQ(v){ NTF_F.q=String(v||''); ntfRender(); }
+function ntfQ(v){ NTF_F.q=String(v||''); clearTimeout(window._ntfQT); window._ntfQT=setTimeout(function(){ if(NTF_OPEN) ntfRender(); }, 170); }
 function ntfProjF(v){ NTF_F.proj=String(v||''); ntfRender(); }
 function ntfUnreadF(){ NTF_F.unread=!NTF_F.unread; ntfRender(); }
 function ntfClearF(){ NTF_F={tab:NTF_F.tab, kinds:{}, proj:'', unread:false, q:''}; ntfRender(); }
@@ -20825,9 +20846,9 @@ function ntfRender(){
   const un=ntfUnread();
   const sigN=NTF.filter(function(e){ return e.src==='signal'; }).length;
   const liveN=NTF.filter(function(e){ return e.src==='live'; }).length;
-  const critN=NTF.filter(function(e){ return e.sev==='crit'&&!NTF_READ[e.id]; }).length;
-  const warnN=NTF.filter(function(e){ return e.sev==='warn'&&!NTF_READ[e.id]; }).length;
-  const week=NTF.filter(function(e){ return e.src==='live'&&Date.now()-e.ts<7*86400000; }).length;
+  const critN=NTF.filter(function(e){ return e.sev==='crit'&&!NTF_READ[e.id]&&!_ntfSnoozed(e); }).length;
+  const warnN=NTF.filter(function(e){ return e.sev==='warn'&&!NTF_READ[e.id]&&!_ntfSnoozed(e); }).length;
+  const infoN=NTF.filter(function(e){ return (e.sev==='info'||!e.sev)&&!NTF_READ[e.id]&&!_ntfSnoozed(e); }).length;
   const perm=(typeof Notification!=='undefined')?Notification.permission:'unsupported';
 
   const ico=function(on,act,fn,title,svg){
@@ -20856,8 +20877,8 @@ function ntfRender(){
   const digest='<div class="ntf-dg">'
     +stat(critN,'критично','var(--neg)',(critN?' hot':''))
     +stat(warnN,'внимание','var(--warn)','')
-    +stat(week,'за неделю','var(--txt)','')
-    +'<div class="ntf-sp">'+_ntfSpark()+'</div>'
+    +stat(infoN,'к сведению','var(--txt)','')
+    +(liveN?('<div class="ntf-sp" title="Активность за 7 дней">'+_ntfSpark()+'</div>'):'<div class="ntf-sp none">нет активности</div>')
   +'</div>';
 
   const tab=function(k,l,n,hot){ return '<button class="ntf-tab'+(NTF_F.tab===k?' on':'')+'" onclick="ntfTab(\''+k+'\')">'+l+'<b'+(hot?' class="hot"':'')+'>'+n+'</b></button>'; };
@@ -20917,6 +20938,10 @@ function ntfRender(){
           +'</span>'
           +(rd?'':'<span class="dot" style="background:'+sv.c+'"></span>')
         +'</button>'
+        +(e.src==='signal'?'<div class="ntf-c-act">'
+          +'<button title="Отложить на день" onclick="ntfSnooze(\''+_kbEscAttr(e.id)+'\','+86400000+',event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.4M8.5 2.5L5 5.5M15.5 2.5L19 5.5"/></svg></button>'
+          +'<button title="Скрыть · вернётся при изменении" onclick="ntfHide(\''+_kbEscAttr(e.id)+'\',event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg></button>'
+        +'</div>':'')
         +(rich?('<button class="ntf-c-x" onclick="ntfExp(\''+_kbEscAttr(e.id)+'\',event)">'
             +(open?'Свернуть':'Показать все '+e.kpi.length+' '+_plural(e.kpi.length,'показатель','показателя','показателей'))
             +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="12" height="12" class="'+(open?'up':'')+'"><path d="M6 9l6 6 6-6"/></svg></button>'
@@ -20987,7 +21012,7 @@ function ntfBoot(){
   const cab=(typeof hkCab==='function')?hkCab():null;
   if(cab!=='ag'||!window.SB||!window.LIVE) return;
   window._ntfBooted=true;
-  ntfLoad(); ntfSndLoad(); _ntfSinceLoad(); ntfMount(); ntfBadge(); ntfSubscribe();
+  ntfLoad(); ntfSndLoad(); _ntfSnoozeLoad(); _ntfSinceLoad(); ntfMount(); ntfBadge(); ntfSubscribe();
   ntfScan(); ntfPoll(true);
   clearInterval(_ntfScanT); clearInterval(_ntfPollT);
   _ntfScanT=setInterval(ntfScan, 300000);                    // радар сигналов — раз в 5 минут
@@ -20998,6 +21023,7 @@ setInterval(ntfBoot, 600);
 window.ntfToggle=ntfToggle; window.ntfOpen=ntfOpen; window.ntfClose=ntfClose; window.ntfScan=ntfScan;
 window.ntfGoto=ntfGoto; window.ntfMarkAll=ntfMarkAll; window.ntfReset=ntfReset; window.ntfExp=ntfExp;
 window.ntfPlay=ntfPlay; window.ntfSndMute=ntfSndMute; window.ntfView=ntfView; window.ntfHighlight=ntfHighlight; window.ntfPoll=ntfPoll;
+window.ntfSnooze=ntfSnooze; window.ntfHide=ntfHide;
 
 
 
