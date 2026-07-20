@@ -16217,7 +16217,7 @@ function openTemplatesSettings(){
   pd2Open(`<div class="modal stpl-modal">
     <style>
 .stpl-tf-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
-.stpl-tf-tab{position:relative;padding:6px 12px;border:1px solid var(--line-2);border-radius:var(--r-full);background:var(--bg-2);color:var(--txt-2);font:inherit;font-size:12.5px;cursor:pointer;transition:.14s;display:inline-flex;align-items:center;gap:6px}
+.stpl-tf-tab{position:relative;padding:7px 13px;border:1px solid var(--line-2);border-radius:10px;background:var(--bg-2);color:var(--txt-2);font:inherit;font-size:12.5px;cursor:pointer;transition:.14s;display:inline-flex;align-items:center;gap:6px}
 .stpl-tf-tab:hover{border-color:var(--txt-3);color:var(--txt)}
 .stpl-tf-tab.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 .stpl-tf-tab .stpl-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block}
@@ -16227,11 +16227,23 @@ function openTemplatesSettings(){
 .stpl-tgrp-h .cnt{background:var(--bg-3);border-radius:20px;padding:1px 8px;color:var(--txt-2)}
 .stpl-item.tar .stpl-tar-id{align-items:flex-start}
 .stpl-tar-meta{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:1px}
-.stpl-svc-chip{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:20px;padding:2px 10px;white-space:nowrap}
+.stpl-svc-chip{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:8px;padding:2px 10px;white-space:nowrap}
 .stpl-svc-chip.none{color:var(--warn);background:var(--warn-dim);border-color:transparent}
-.stpl-cx{display:inline-block;width:auto;font-size:11px;color:var(--warn);background:var(--warn-dim);border-radius:20px;padding:2px 10px;margin:0;white-space:nowrap}
+.stpl-cx{display:inline-block;width:auto;font-size:11px;color:var(--warn);background:var(--warn-dim);border-radius:8px;padding:2px 10px;margin:0;white-space:nowrap}
 .stpl-tsel{width:100%;background:var(--bg-1);border:1px solid var(--line-2);border-radius:8px;color:var(--txt);padding:9px 10px;font:inherit;font-size:14px;outline:none;cursor:pointer}
 .stpl-tsel:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.stpl-svc-swatch{width:12px;height:12px;border-radius:4px;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3)}
+.stpl-svc-row.on::before{background:var(--svc,var(--accent))}
+.stpl-colorbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:11px 13px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px}
+.stpl-colorbar-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--txt-3);font-weight:600}
+.stpl-swatches{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.stpl-sw{width:23px;height:23px;border-radius:7px;border:0;cursor:pointer;padding:0;position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);transition:transform .12s}
+.stpl-sw:hover{transform:scale(1.12)}
+.stpl-sw.on{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 0 0 2px var(--bg-2),0 0 0 4px var(--txt)}
+.stpl-sw-custom{display:inline-flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+.stpl-sw-custom svg{width:12px;height:12px;color:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.55));pointer-events:none}
+.stpl-sw-custom input{position:absolute;inset:-6px;opacity:0;cursor:pointer;padding:0;border:0}
+.stpl-gdot{width:9px;height:9px;border-radius:3px;display:inline-block;flex:none}
     </style>
     <div class="modal-h"><h3>Настройки шаблонов</h3><p>Категории, услуги с тарифами и этапами — всё, что доступно при создании проекта</p></div>
     <div class="stpl-tabs">
@@ -16277,6 +16289,19 @@ function stplCatDel(name){ const u=_stplUsedCat(name);
   if(window.LIVE && SB){ Promise.resolve(SB.from('project_tags').delete().eq('agency_id',ME&&ME.agency_id).eq('kind','category').eq('name',name).then(r=>{ if(r&&r.error) throw r.error; return window.tLoadTags&&window.tLoadTags(); })).catch(e=>{ toast('Не удалось удалить на сервере: '+(e.message||e)); if(window.tLoadTags) window.tLoadTags().then(_stplRefresh); }); }
 }
 
+/* ── Цвета услуг ── */
+const STPL_PALETTE=['#37E6C8','#8A8FFF','#E3B567','#F0785C','#43D88C','#5AA9FF','#F075B5','#B6E35F','#C792EA','#4FD1C5'];
+window.SVC_COLORS=window.SVC_COLORS||{};
+function _hexA(hex,a){ hex=String(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); const n=parseInt(hex,16); if(hex.length!==6||isNaN(n))return 'rgba(55,230,200,'+a+')'; return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+function _svcHash(name){ let h=0; const s=String(name||''); for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0; return h; }
+function svcColor(name){ const c=window.SVC_COLORS&&window.SVC_COLORS[name]; if(c)return c; return STPL_PALETTE[_svcHash(name)%STPL_PALETTE.length]; }
+function _svcChipStyle(name){ const c=svcColor(name); return 'color:'+c+';background:'+_hexA(c,.15)+';border-color:'+_hexA(c,.42); }
+function stplSetSvcColor(name,color){ if(!name)return; window.SVC_COLORS=window.SVC_COLORS||{}; window.SVC_COLORS[name]=color; _stplRefresh(); if(window.LIVE && window.tServiceSetColor){ Promise.resolve(window.tServiceSetColor(name,color)).catch(function(e){ toast('Цвет не сохранён: '+(e.message||e)); }); } }
+function _stplColorBar(name){ const cur=svcColor(name).toLowerCase();
+  const sws=STPL_PALETTE.map(function(c){ return '<button type="button" class="stpl-sw'+(c.toLowerCase()===cur?' on':'')+'" style="background:'+c+'" onclick="stplSetSvcColor(\''+_ddEsc(name)+'\',\''+c+'\')" title="'+c+'"></button>'; }).join('');
+  const custom='<label class="stpl-sw stpl-sw-custom" style="background:'+svcColor(name)+'" title="Свой цвет"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><input type="color" value="'+svcColor(name)+'" oninput="stplSetSvcColor(\''+_ddEsc(name)+'\',this.value)"></label>';
+  return '<div class="stpl-colorbar"><span class="stpl-colorbar-l">Цвет услуги</span><div class="stpl-swatches">'+sws+custom+'</div></div>';
+}
 /* ── УСЛУГИ + ЭТАПЫ ── */
 function _stplSvcBody(){
   const svcs=(typeof tplServices==='function')?tplServices():_tagList('service',['SMM','PROD','DESIGN'],'');
@@ -16286,9 +16311,12 @@ function _stplSvcBody(){
   const stages=_stplStages;
   const tfs=(typeof tariffsForSvc==='function')?tariffsForSvc(_stplSvc):[];
   const _own=(tf)=>{ const s=window.STAGE_TPL&&window.STAGE_TPL[_stplSvc]; return !!(s&&Array.isArray(s[tf])&&s[tf].length); };
+  const _sc=_stplSvc?svcColor(_stplSvc):'var(--accent)';
+  const _tfStyle=(act)=>act?(' style="background:'+_hexA(_sc,.16)+';border-color:'+_hexA(_sc,.5)+';color:'+_sc+'"'):'';
+  const _tfDot='<span class="stpl-dot" title="свои этапы" style="background:'+_sc+';box-shadow:0 0 8px -1px '+_sc+'"></span>';
   const tfChips=_stplSvc?('<div class="stpl-tf-tabs">'
-    +'<button type="button" class="stpl-tf-tab '+(_stplTariff===''?'on':'')+'" onclick="stplPickTariff(\'\')">Базовые этапы'+(_own('')?'<span class="stpl-dot" title="свои этапы"></span>':'')+'</button>'
-    +tfs.map(t=>'<button type="button" class="stpl-tf-tab '+(_stplTariff===t.name?'on':'')+'" onclick="stplPickTariff(\''+_ddEsc(t.name)+'\')">'+_ddH(t.name)+(_own(t.name)?'<span class="stpl-dot" title="свои этапы"></span>':'')+'</button>').join('')
+    +'<button type="button" class="stpl-tf-tab '+(_stplTariff===''?'on':'')+'"'+_tfStyle(_stplTariff==='')+' onclick="stplPickTariff(\'\')">Базовые этапы'+(_own('')?_tfDot:'')+'</button>'
+    +tfs.map(t=>'<button type="button" class="stpl-tf-tab '+(_stplTariff===t.name?'on':'')+'"'+_tfStyle(_stplTariff===t.name)+' onclick="stplPickTariff(\''+_ddEsc(t.name)+'\')">'+_ddH(t.name)+(_own(t.name)?_tfDot:'')+'</button>').join('')
     +'</div>'):'';
   const _title=_stplTariff?('Этапы тарифа «'+_ddH(_stplTariff)+'»'):('Базовые этапы услуги «'+_ddH(_stplSvc||'')+'»');
   const _hint=_stplTariff?'Свои этапы этого тарифа. Оставьте пустыми — подставятся базовые этапы услуги.':'Подставляются для тарифов без своих этапов и для услуг без тарифов.';
@@ -16300,7 +16328,8 @@ function _stplSvcBody(){
         <button class="btn-add sm" onclick="stplSvcAdd()" title="Добавить услугу"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
       </div>
       <div class="stpl-svclist">${svcs.length?svcs.map(s=>{ const u=_stplUsedSvc(s), own=!!(window.STAGE_TPL&&window.STAGE_TPL[s]);
-        return `<div class="stpl-svc-row ${s===_stplSvc?'on':''}" onclick="stplPickSvc('${_attr(s)}')">
+        return `<div class="stpl-svc-row ${s===_stplSvc?'on':''}" onclick="stplPickSvc('${_attr(s)}')" style="--svc:${svcColor(s)}">
+          <span class="stpl-svc-swatch" style="background:${svcColor(s)}"></span>
           <span class="stpl-nm">${_ddH(s)}${own?'<span class="stpl-dot" title="свой шаблон этапов"></span>':''}</span>
           ${u?`<span class="stpl-use">${u}</span>`:''}
           <button class="stpl-del" onclick="event.stopPropagation();stplSvcDel('${_attr(s)}')" title="Удалить услугу"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
@@ -16308,7 +16337,7 @@ function _stplSvcBody(){
       }).join(''):'<div class="tc-empty">Услуг пока нет</div>'}</div>
     </div>
     <div class="stpl-col-r">
-      ${_stplSvc?`${tfChips}<div class="stpl-stages-h">${_title}</div>
+      ${_stplSvc?`${_stplColorBar(_stplSvc)}${tfChips}<div class="stpl-stages-h">${_title}</div>
         <div class="stpl-hint" style="margin:-2px 0 8px">${_hint}</div>
         <div class="stpl-stages" id="stpl-stages">${stages.map((st,i)=>`<div class="stpl-stage"><span class="stpl-stnum">${i+1}</span><input value="${_attr(st)}" oninput="_stplStages[${i}]=this.value" onkeydown="stplStageKey(event,${i})" placeholder="Название этапа"><button class="stpl-del" onclick="stplStageDel(${i})" title="Удалить этап"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('')||('<div class="tc-empty">Этапов нет — добавьте'+(_stplTariff?' (или оставьте пусто — будут базовые)':'')+'</div>')}</div>
         <div class="stpl-stage-acts"><button class="btn-ghost sm" onclick="stplStageAdd()">+ Добавить этап</button><button class="btn-add sm2" onclick="stplStagesSave()">Сохранить этапы</button></div>`
@@ -16319,11 +16348,14 @@ function _stplSvcBody(){
 function stplPickSvc(s){ _stplSvc=s; _stplTariff=''; _stplStages=(stageSetFor(s,'')||[]).slice(); _stplRefresh(); }
 function stplPickTariff(t){ _stplTariff=t||''; _stplStages=_stplTariff?stageTplRaw(_stplSvc,_stplTariff):(stageSetFor(_stplSvc,'')||[]).slice(); _stplRefresh(); }
 function stplSvcAdd(){ const v=(document.getElementById('stpl-svc-new').value||'').trim(); if(!v){toast('Введите название');return;}
+  const _n=(typeof PROJECT_TAGS!=='undefined'&&PROJECT_TAGS.service)?PROJECT_TAGS.service.length:0;
+  const _autoC=STPL_PALETTE[_n%STPL_PALETTE.length];
+  window.SVC_COLORS=window.SVC_COLORS||{}; window.SVC_COLORS[v]=_autoC;
   if(typeof PROJECT_TAGS!=='undefined') PROJECT_TAGS.service=[...new Set([...(PROJECT_TAGS.service||[]),v])];
   const _in=document.getElementById('stpl-svc-new'); if(_in)_in.value='';
   _stplSvc=v; _stplTariff=''; _stplStages=[];
   _stplRefresh(); toast('Услуга добавлена');
-  if(window.LIVE && window.tTagAdd){ Promise.resolve(window.tTagAdd('service',v)).catch(()=>{}); }
+  if(window.LIVE && window.tTagAdd){ Promise.resolve(window.tTagAdd('service',v,_autoC)).catch(()=>{}); }
 }
 function stplSvcDel(name){ const u=_stplUsedSvc(name);
   if(u && window._stplConfirm!==name){ window._stplConfirm=name; toast(`«${name}» используется в ${u} ${_plural(u,'проекте','проектах','проектах')}. Нажмите ещё раз для удаления`); setTimeout(()=>{window._stplConfirm=null;},3500); return; }
@@ -16370,9 +16402,9 @@ function _stplTariffBody(){
   const order=svcs.concat(Object.keys(groups).filter(k=>svcs.indexOf(k)<0));
   const seen={}; let body='';
   order.forEach(function(svc){ if(seen[svc])return; seen[svc]=1; const g=groups[svc]; if(!g||!g.length)return;
-    body+='<div class="stpl-tgrp-h'+(svc?'':' none')+'"><span class="svc">'+(svc?_ddH(svc):'Без услуги')+'</span><span class="cnt">'+g.length+'</span></div>';
+    body+='<div class="stpl-tgrp-h'+(svc?'':' none')+'">'+(svc?'<span class="stpl-gdot" style="background:'+svcColor(svc)+'"></span>':'')+'<span class="svc">'+(svc?_ddH(svc):'Без услуги')+'</span><span class="cnt">'+g.length+'</span></div>';
     body+='<div class="stpl-list">'+g.map(function(o){ const t=o.t, i=o.i, u=_stplUsedTariff(t.name);
-      return '<div class="stpl-item tar"><div class="stpl-tar-id"><span class="stpl-nm">'+_ddH(t.name)+'</span><div class="stpl-tar-meta"><span class="stpl-svc-chip'+(t.service?'':' none')+'">'+(t.service?_ddH(t.service):'Без услуги')+'</span>'+(t.complexity?'<span class="stpl-cx">Сложность: '+_ddH(t.complexity)+'</span>':'')+(u?'<span class="stpl-use">'+u+' '+_plural(u,'проект','проекта','проектов')+'</span>':'')+'</div></div>'
+      const _sc=t.service?svcColor(t.service):''; return '<div class="stpl-item tar"'+(_sc?' style="border-left-color:'+_sc+'"':'')+'><div class="stpl-tar-id"><span class="stpl-nm">'+_ddH(t.name)+'</span><div class="stpl-tar-meta"><span class="stpl-svc-chip'+(t.service?'':' none')+'"'+(t.service?' style="'+_svcChipStyle(t.service)+'"':'')+'>'+(t.service?_ddH(t.service):'Без услуги')+'</span>'+(t.complexity?'<span class="stpl-cx">Сложность: '+_ddH(t.complexity)+'</span>':'')+(u?'<span class="stpl-use">'+u+' '+_plural(u,'проект','проекта','проектов')+'</span>':'')+'</div></div>'
         +'<div class="stpl-tar-price"><span class="stpl-price">'+((t.price==null||t.price===''||isNaN(+t.price))?'—':Number(t.price).toLocaleString('ru-RU'))+'</span><span class="stpl-per">'+_ddH(t.per||'сум / мес')+'</span></div>'
         +'<div class="stpl-tar-acts">'
         +'<button class="stpl-edit" onclick="stplTariffEdit('+i+')" title="Изменить"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'
@@ -21778,16 +21810,23 @@ window.tTimerResume = async (id) => { if(String(id).indexOf('tmp_')===0){ toast(
 
 window.tLoadTags = async () => {
   if (!SB) return;
-  const { data, error } = await SB.from('project_tags').select('kind,name').order('name');
+  const { data, error } = await SB.from('project_tags').select('kind,name,color').order('name');
   if (error) return;   // таблицы ещё нет — молча выходим
-  const t={category:[],service:[],tariff:[],dept:[],rubric:[]};
-  (data||[]).forEach(r=>{ if(t[r.kind]) t[r.kind].push(r.name); });
+  const t={category:[],service:[],tariff:[],dept:[],rubric:[]}; const col={};
+  (data||[]).forEach(r=>{ if(t[r.kind]) t[r.kind].push(r.name); if(r.kind==='service'&&r.color) col[r.name]=r.color; });
+  window.SVC_COLORS=col;
   if (typeof PROJECT_TAGS!=='undefined'){ PROJECT_TAGS.category=t.category; PROJECT_TAGS.service=t.service; PROJECT_TAGS.tariff=t.tariff; PROJECT_TAGS.dept=t.dept; PROJECT_TAGS.rubric=t.rubric; }
 };
-window.tTagAdd = async (kind,name) => { try { name=(name||'').trim(); if(!name)return;
-  const { error } = await SB.from('project_tags').insert({ agency_id: ME&&ME.agency_id, kind, name });
+window.tTagAdd = async (kind,name,color) => { try { name=(name||'').trim(); if(!name)return;
+  const row={ agency_id: ME&&ME.agency_id, kind, name }; if(color) row.color=color;
+  const { error } = await SB.from('project_tags').insert(row);
   if (error && !String(error.message||'').toLowerCase().includes('duplicate')) throw error;
   await window.tLoadTags(); } catch(e){ toast('Ошибка тега: '+(e.message||e)); } };
+window.tServiceSetColor = async (name,color) => {
+  const agency_id = ME && ME.agency_id;
+  const r = await SB.from('project_tags').update({ color:color }).eq('agency_id',agency_id).eq('kind','service').eq('name',name);
+  if(r&&r.error) throw r.error;
+};
 window.tTagDel = async (kind,name) => { try {
   const { error } = await SB.from('project_tags').delete().eq('agency_id', ME&&ME.agency_id).eq('kind',kind).eq('name',name);
   if (error) throw error;
