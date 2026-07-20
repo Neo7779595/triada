@@ -531,6 +531,14 @@ tbody tr:hover td{background:var(--bg-2)}
 .pm-sw-thumb{position:absolute;top:50%;left:3px;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:var(--txt-2);box-shadow:0 1px 3px rgba(0,0,0,.45);transition:.2s cubic-bezier(.4,.0,.2,1)}
 .pm-toggle.on .pm-switch{background:var(--accent);border-color:var(--accent)}
 .pm-toggle.on .pm-sw-thumb{transform:translateY(-50%) translateX(18px);background:var(--accent-ink)}
+.pm-toggle.dir.on{border-color:rgba(138,143,255,.5);background:linear-gradient(120deg,rgba(138,143,255,.16),transparent 70%)}
+.pm-toggle.dir .pm-ico{color:var(--violet)}
+.pm-toggle.dir.on .pm-ico{background:var(--violet);border-color:var(--violet);color:#0b0e14}
+.pm-toggle.dir.on .pm-switch{background:var(--violet);border-color:var(--violet)}
+.pm-toggle.dir.on .pm-sw-thumb{background:#0b0e14}
+#e-access-sub{transition:opacity .2s,filter .2s}
+#e-access-sub.dir-locked{opacity:.4;filter:grayscale(.5);pointer-events:none}
+.dir-badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:var(--violet);background:rgba(138,143,255,.15);border:1px solid rgba(138,143,255,.4);border-radius:6px;padding:1px 7px;vertical-align:middle}
 .modal-f{padding:16px 22px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--line);margin-top:8px}
 .modal-f .btn-ghost,.modal-f .btn-add{height:42px;min-width:126px;display:inline-flex;align-items:center;justify-content:center;padding:0 18px;font-size:14px;border-radius:9px}
 .btn-ghost{background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-2);border-radius:8px;padding:10px 18px;font-weight:600;font-size:14px;cursor:pointer}
@@ -5766,14 +5774,24 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
       <div class="emp-sec">
         <div class="emp-sec-h">Права доступа</div>
         <div class="pm-row">
-          <label class="pm-toggle" id="e-pm-card">
-            <input type="checkbox" id="e-pm" onchange="empPM=this.checked;document.getElementById('e-pm-card').classList.toggle('on',this.checked)">
-            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9H22l-5.8 4.3 2.2 6.8L12 16.8 5.6 20l2.2-6.8L2 8.9h7.6z"/></svg></span>
-            <span class="pm-tg-txt"><b>Проектный менеджер</b><em>Создаёт и удаляет проекты, управляет этапами, назначает любого исполнителя</em></span>
+          <label class="pm-toggle dir" id="e-dir-card">
+            <input type="checkbox" id="e-dir" onchange="empSetDirector(this.checked)">
+            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M4 8l4.5 3.5L12 5l3.5 6.5L20 8l-1.5 9H5.5z"/></svg></span>
+            <span class="pm-tg-txt"><b>Директор</b><em>Полный доступ 1-в-1 как у основателя: все модули, команда и настройки агентства</em></span>
             <span class="pm-switch"><span class="pm-sw-thumb"></span></span>
           </label>
         </div>
-        <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
+        <div id="e-access-sub">
+          <div class="pm-row">
+            <label class="pm-toggle" id="e-pm-card">
+              <input type="checkbox" id="e-pm" onchange="empPM=this.checked;document.getElementById('e-pm-card').classList.toggle('on',this.checked)">
+              <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9H22l-5.8 4.3 2.2 6.8L12 16.8 5.6 20l2.2-6.8L2 8.9h7.6z"/></svg></span>
+              <span class="pm-tg-txt"><b>Проектный менеджер</b><em>Создаёт и удаляет проекты, управляет этапами, назначает любого исполнителя</em></span>
+              <span class="pm-switch"><span class="pm-sw-thumb"></span></span>
+            </label>
+          </div>
+          <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
+        </div>
       </div>
       <div class="emp-sec">
         <div class="emp-sec-h">Вход в систему</div>
@@ -6583,13 +6601,13 @@ function enterAgency(){
 /* ——— единый механизм прав: используется навигацией, поиском И модулями ——— */
 function agCanView(m){
   const me=(window.tMe&&window.tMe())||null;
-  if(!me || me.role!=='member') return true;          // владелец/админ видят всё
+  if(!me || me.role!=='member' || me.is_director) return true;          // владелец/админ/директор видят всё
   const p=me.permissions||{};
   return !!(p[m]&&p[m].view);
 }
 function agCanEdit(m){
   const me=(window.tMe&&window.tMe())||null;
-  if(!me || me.role!=='member') return true;          // владелец/админ редактируют всё
+  if(!me || me.role!=='member' || me.is_director) return true;          // владелец/админ/директор редактируют всё
   const p=me.permissions||{};
   return !!(p[m]&&p[m].edit);
 }
@@ -6617,11 +6635,15 @@ function agCanEditProject(p){
 }
 function agIsOwner(){
   const me=(window.tMe&&window.tMe())||null;
-  return !me || me.role!=='member';                   // управлять командой может только владелец/админ
+  return !me || me.role!=='member' || !!me.is_director;   // владелец/админ/директор — полный доступ
+}
+function agIsDirector(){
+  const me=(window.tMe&&window.tMe())||null;
+  return !!(me && me.role==='member' && me.is_director);
 }
 function agIsPM(){
   const me=(window.tMe&&window.tMe())||null;
-  if(!me || me.role!=='member') return true;          // владелец/админ — всегда PM по правам
+  if(!me || me.role!=='member' || me.is_director) return true;   // владелец/админ/директор — всегда PM по правам
   return !!me.is_pm;                                   // сотрудник — только с отметкой PM
 }
 function agMyId(){ const me=(window.tMe&&window.tMe())||null; return me?me.id:null; }
@@ -6669,7 +6691,7 @@ function agRenderPlanChip(){
 }
 function _tgBy(){ const me=(window.tMe&&window.tMe())||null;
   if(!me || me.role!=='member') return 'Генеральный профиль · '+((me&&me.agencyName)||'Агентство');
-  let s=me.full_name||'Коллега'; if(me.is_pm) s+=' · Проект-менеджер'; return s; }
+  let s=me.full_name||'Коллега'; if(me.is_director) s+=' · Директор'; else if(me.is_pm) s+=' · Проект-менеджер'; return s; }
 function _syncUchip(){
   const me=(window.tMe&&window.tMe())||null; if(!me) return;
   const nm=document.getElementById('ag-uchip-nm');
@@ -6766,7 +6788,7 @@ function applyAgencyPerms(){
   const me=(window.tMe&&window.tMe())||null;
   const nav=document.querySelectorAll('#app-ag .nav-i');
   const np=document.querySelector('[onclick="openNewProject()"]');
-  if(!me || me.role!=='member'){ nav.forEach(n=>n.style.display=''); if(np)np.style.display=''; return null; }
+  if(!me || me.role!=='member' || me.is_director){ nav.forEach(n=>n.style.display=''); if(np)np.style.display=''; return null; }
   const perms=me.permissions||{}; let first=null;
   nav.forEach(n=>{ const m=n.dataset.m; const ok=!!(perms[m]&&perms[m].view); n.style.display=ok?'':'none'; if(ok&&!first)first=m; });
   if(np)np.style.display=(perms.projects&&perms.projects.edit)?'':'none';
@@ -7203,7 +7225,7 @@ function pjLeadsPickerRender(){
     return true;
   });
   if(!rows.length){ list.innerHTML='<div class="np-team-empty">Никого не найдено</div>'; pjLeadsPickCount(); return; }
-  list.innerHTML=rows.map(function(m){var c=m.color||'#37E6C8'; var on=work.has(m._id); var ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase()); return '<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="pjLeadsTogglePick(\''+m._id+'\')"><span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+(m.avatar?('<img src="'+String(m.avatar).replace(/"/g,'')+'" alt="">'):ltr)+'</span><span class="np-tm-n">'+_ddH(m.name||'—')+'</span><span class="np-tm-r">'+_ddH(m.role||'')+(m.is_pm?' · PM':'')+'</span><span class="np-tm-ck">'+ck+'</span></button>';}).join('');
+  list.innerHTML=rows.map(function(m){var c=m.color||'#37E6C8'; var on=work.has(m._id); var ltr=_ddH((m.name||'?').trim().charAt(0).toUpperCase()); return '<button type="button" class="np-tm'+(on?' on':'')+'" data-id="'+_attr(m._id)+'" onclick="pjLeadsTogglePick(\''+m._id+'\')"><span class="np-tm-av" style="background:'+c+'22;color:'+c+'">'+(m.avatar?('<img src="'+String(m.avatar).replace(/"/g,'')+'" alt="">'):ltr)+'</span><span class="np-tm-n">'+_ddH(m.name||'—')+'</span><span class="np-tm-r">'+_ddH(m.role||'')+(m.is_director?' · Директор':(m.is_pm?' · PM':''))+'</span><span class="np-tm-ck">'+ck+'</span></button>';}).join('');
   pjLeadsPickCount();
 }
 function pjLeadsTogglePick(id){ var w=window._pjLeadsWork; if(w.has(id))w.delete(id); else w.add(id); pjLeadsPickerRender(); }
@@ -15974,11 +15996,11 @@ function renderTeam(){
         <th>#</th><th>Сотрудник</th><th>TPI</th><th>Профиль · O·S·Q·R</th><th>Выработка</th><th>Медиана цикла</th><th>Возвраты</th><th class="col-spark">Динамика</th><th class="col-arch">Тип</th>
       </tr></thead><tbody>
       ${rows.length?rows.map(r=>{const m=r.m,g=_gradeOf(r.tpi),st=actColor(m._lastDays),low=r.n<3;
-        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div></div></div>`;
+        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div></div></div>`;
         if(low){
           const need=Math.max(0,3-r.n);
           const hint=`<div class="ti-hint">${need>0?`ещё ${need} ${_taskWord(need)} до оценки`:'оценка формируется'}</div>`;
-          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div>${hint}</div></div>`;
+          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div>${hint}</div></div>`;
           return `<tr class="ti-low" ${agIsOwner()?`onclick="openEmpEdit(${r._i})" style="cursor:pointer"`:'style="cursor:default"'}>
         <td><span class="ti-rank idle">–</span></td>
         <td>${idCellLow}</td>
@@ -16500,12 +16522,15 @@ function permColAll(col){ const keys=_permKeys();
   else { const cand=keys.filter(k=>empPerms[k]&&empPerms[k].view); const all=cand.length>0&&cand.every(k=>empPerms[k].edit); keys.forEach(k=>{ if(empPerms[k]&&empPerms[k].view)empPerms[k].edit=!all; }); }
   renderPermGrid();
 }
+var empDirector=false;
+function _dirRefresh(){ const c=document.getElementById('e-dir-card'); if(c)c.classList.toggle('on',!!empDirector); const s=document.getElementById('e-access-sub'); if(s)s.classList.toggle('dir-locked',!!empDirector); const inp=document.getElementById('e-dir'); if(inp)inp.checked=!!empDirector; }
+function empSetDirector(checked){ empDirector=checked; if(checked){ empPM=true; const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=true; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.add('on'); permPreset('full'); } _dirRefresh(); renderPermGrid(); }
 function openEmp(){
   if(!agIsOwner()){ toast('Управление командой доступно только владельцу'); return; }
   empEditIdx=null;
   empPerms={};
   _permKeys().forEach(k=>empPerms[k]={view:false,edit:false});
-  empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.remove('on'); }
+  empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.remove('on'); } empDirector=false; _dirRefresh();
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass','phone','tg'].forEach(id=>document.getElementById('e-'+id).value='');
   document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Команда',_tagList('dept',['Продакшн','Администрация','Руководство'],'Продакшн'),'Продакшн','Выбери или создай','dept');
@@ -16528,7 +16553,7 @@ function openEmpEdit(i){
   document.getElementById('e-pass').value='';
   document.getElementById('e-phone').value=e.phone||'';
   document.getElementById('e-tg').value=e.tg||e.tg_username||'';
-  empPM=!!e.is_pm; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=empPM; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.toggle('on',empPM); }
+  empPM=!!e.is_pm; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=empPM; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.toggle('on',empPM); } empDirector=!!e.is_director; _dirRefresh();
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Редактировать сотрудника';
   document.getElementById('emp-save').textContent='Сохранить изменения';
@@ -16604,10 +16629,10 @@ function saveEmp(){
   const phone=document.getElementById('e-phone').value.trim();
   const tg=document.getElementById('e-tg').value.trim();
   const mods=Object.keys(empPerms).filter(k=>empPerms[k].view).length;
-  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM,dept}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
+  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM,is_director:empDirector,dept}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,is_director:empDirector,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
   if(empEditIdx!=null){
     const e=TEAM[empEditIdx];
-    Object.assign(e,{name,role,dept,color:empColor,phone,tg,is_pm:empPM,perms:JSON.parse(JSON.stringify(empPerms))});
+    Object.assign(e,{name,role,dept,color:empColor,phone,tg,is_pm:empPM,is_director:empDirector,perms:JSON.parse(JSON.stringify(empPerms))});
     if(login)e.login=login;
     closeEmp(); teamTab='employees'; renderTeam();
     toast(`${name} обновлён · доступ к ${mods} модулям`);
@@ -21336,7 +21361,7 @@ const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]|
   dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, tg_linked_at:p.tg_linked_at||null, tg_chat_title:p.tg_chat_title||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]), leads:Array.isArray(p.leads)?p.leads:(typeof p.leads==='string'?(function(){try{return JSON.parse(p.leads)||[];}catch(_){return [];}})():[]) });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
-  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, perms:m.permissions||{}, _id:m.id });
+  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, is_director:!!m.is_director, perms:m.permissions||{}, _id:m.id });
 
 async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
@@ -25735,7 +25760,7 @@ window._kpiScopeRows = (scope) => {
     return src.map(m => ({
       id: m.id,
       name: m.full_name || '—',
-      subtitle: (m.dept || m.role_title || '—') + (m.is_pm ? ' · PM' : ''),
+      subtitle: (m.dept || m.role_title || '—') + (m.is_director ? ' · Директор' : (m.is_pm ? ' · PM' : '')),
       avatarUrl: m.avatar_url,
       color: m.color || 'var(--accent)',
       initials: (m.full_name || '?').split(' ').filter(Boolean).map(x => x[0]).slice(0,2).join('').toUpperCase(),
@@ -26429,7 +26454,8 @@ window.tProvisionClient = async (c) => {
 window.tProvisionMember = async (m) => {
   try { await SB.functions.invoke('provision-member', { body:{
       email:(m.login||'user')+'@'+(m.slug||'agency')+'.triada.app', password:m.pass, login:m.login,
-      full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, phone:m.phone||null, tg_username:m.tg_username||null, is_pm:!!m.is_pm, permissions:m.permissions }});
+      full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, phone:m.phone||null, tg_username:m.tg_username||null, is_pm:!!m.is_pm, is_director:!!m.is_director, permissions:m.permissions }});
+    if(m.is_director){ try{ await SB.from('profiles').update({ is_director:true }).eq('login', m.login).eq('agency_id', ME&&ME.agency_id); }catch(_){} }   // подстраховка, если edge-функция не знает поле
     toast('Сотрудник создан'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
@@ -26452,6 +26478,7 @@ window.tUpdateMember = async (id, perms, contact={}) => {
     if (contact.color!==undefined) upd.color = contact.color;
     if (contact.role_title!==undefined) upd.role_title = contact.role_title;
     if (contact.is_pm!==undefined) upd.is_pm = !!contact.is_pm;
+    if (contact.is_director!==undefined) upd.is_director = !!contact.is_director;
     if (contact.dept!==undefined) upd.dept = contact.dept;
     const { error } = await SB.from('profiles').update(upd).eq('id', id);
     if (error) { toast('Не удалось сохранить: ' + error.message); return; }
