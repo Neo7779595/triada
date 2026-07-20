@@ -896,6 +896,14 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ti-av .ph{position:absolute;inset:0;margin:0;gap:0;flex-wrap:nowrap;border-radius:inherit;overflow:hidden;display:block}
 .ti-av .ph img{width:100%;height:100%;object-fit:cover;display:block}
 .ti-av .st{position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;border:2.5px solid var(--bg-1);z-index:2}
+.pres-dot{background:var(--txt-3)}
+.pres-dot.on{background:var(--pos)}
+.pres-dot.on{box-shadow:0 0 0 2.5px var(--bg-1),0 0 8px 1px rgba(67,216,140,.7);animation:presPulse 2.2s ease-in-out infinite}
+@keyframes presPulse{0%,100%{box-shadow:0 0 0 2.5px var(--bg-1),0 0 5px 0 rgba(67,216,140,.5)}50%{box-shadow:0 0 0 2.5px var(--bg-1),0 0 10px 2px rgba(67,216,140,.85)}}
+.pres-txt{color:var(--txt-3);font-weight:500}
+.pres-txt.on{color:var(--pos)}
+.btn-danger{background:transparent;border:1px solid rgba(240,120,92,.42);color:var(--neg);border-radius:10px;padding:0 16px;height:40px;font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:.14s}
+.btn-danger:hover{background:rgba(240,120,92,.12);border-color:var(--neg)}
 .ti-id .nm{font-weight:600;color:var(--txt);font-size:14.5px}
 .ti-id .sl{font-family:var(--mono);font-size:12px;color:var(--txt-3);margin-top:2px}
 .tpi-cell{display:inline-flex;align-items:center;gap:11px}
@@ -5802,6 +5810,7 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
       </div>
     </div>
     <div class="modal-f">
+      <button class="btn-danger" id="emp-del" onclick="empDelete()" style="display:none;margin-right:auto">Удалить сотрудника</button>
       <button class="btn-ghost" onclick="closeEmp()">Отмена</button>
       <button class="btn-add" id="emp-save" onclick="saveEmp()">Создать сотрудника</button>
     </div>
@@ -15996,11 +16005,11 @@ function renderTeam(){
         <th>#</th><th>Сотрудник</th><th>TPI</th><th>Профиль · O·S·Q·R</th><th>Выработка</th><th>Медиана цикла</th><th>Возвраты</th><th class="col-spark">Динамика</th><th class="col-arch">Тип</th>
       </tr></thead><tbody>
       ${rows.length?rows.map(r=>{const m=r.m,g=_gradeOf(r.tpi),st=actColor(m._lastDays),low=r.n<3;
-        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div></div></div>`;
+        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st pres-dot${_isOnline(m)?' on':''}" data-pid="${m._id}" title="${_presLabel(m)}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')} · <span class="pres-txt${_isOnline(m)?' on':''}" data-pid="${m._id}">${_presLabel(m)}</span></div></div></div>`;
         if(low){
           const need=Math.max(0,3-r.n);
           const hint=`<div class="ti-hint">${need>0?`ещё ${need} ${_taskWord(need)} до оценки`:'оценка формируется'}</div>`;
-          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st" style="background:${st}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')}</div>${hint}</div></div>`;
+          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st pres-dot${_isOnline(m)?' on':''}" data-pid="${m._id}" title="${_presLabel(m)}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')} · <span class="pres-txt${_isOnline(m)?' on':''}" data-pid="${m._id}">${_presLabel(m)}</span></div>${hint}</div></div>`;
           return `<tr class="ti-low" ${agIsOwner()?`onclick="openEmpEdit(${r._i})" style="cursor:pointer"`:'style="cursor:default"'}>
         <td><span class="ti-rank idle">–</span></td>
         <td>${idCellLow}</td>
@@ -16537,6 +16546,7 @@ function openEmp(){
   document.getElementById('e-email').textContent='ivan@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Новый сотрудник';
   document.getElementById('emp-save').textContent='Создать сотрудника';
+  { const _ed=document.getElementById('emp-del'); if(_ed)_ed.style.display='none'; }
   renderPermGrid();
   document.getElementById('ov-emp').classList.add('on');
 }
@@ -16557,10 +16567,19 @@ function openEmpEdit(i){
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Редактировать сотрудника';
   document.getElementById('emp-save').textContent='Сохранить изменения';
+  { const _ed=document.getElementById('emp-del'); if(_ed)_ed.style.display=''; }
   renderPermGrid();
   document.getElementById('ov-emp').classList.add('on');
 }
-function closeEmp(){document.getElementById('ov-emp').classList.remove('on');empEditIdx=null;}
+function closeEmp(){document.getElementById('ov-emp').classList.remove('on');empEditIdx=null;window._empDelConfirm=null;}
+function empDelete(){
+  if(empEditIdx==null) return;
+  const e=TEAM[empEditIdx]; const nm=(e&&e.name)||'сотрудник';
+  if(window._empDelConfirm!==empEditIdx){ window._empDelConfirm=empEditIdx; toast('Удалить «'+nm+'»? Нажмите ещё раз для подтверждения'); setTimeout(function(){window._empDelConfirm=null;},3500); return; }
+  window._empDelConfirm=null;
+  if(window.LIVE && window.tMemberArchive){ window.tMemberArchive(e._id, nm); closeEmp(); return; }
+  TEAM.splice(empEditIdx,1); closeEmp(); teamTab='employees'; if(typeof renderTeam==='function')renderTeam(); toast('«'+nm+'» удалён');
+}
 function closeDrill(){ const ov=document.getElementById('ov-drill'); if(ov) ov.classList.remove('on'); }
 function closeEmpStats(){ const ov=document.getElementById('ov-estats'); if(ov) ov.classList.remove('on'); }
 function openEmpStats(id){
@@ -21361,7 +21380,7 @@ const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]|
   dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, tg_linked_at:p.tg_linked_at||null, tg_chat_title:p.tg_chat_title||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]), leads:Array.isArray(p.leads)?p.leads:(typeof p.leads==='string'?(function(){try{return JSON.parse(p.leads)||[];}catch(_){return [];}})():[]) });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
-  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, is_director:!!m.is_director, perms:m.permissions||{}, _id:m.id });
+  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, is_director:!!m.is_director, perms:m.permissions||{}, _seenTs:(m.last_seen_at?Date.parse(m.last_seen_at):0), archived_at:m.archived_at||null, _id:m.id });
 
 async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
@@ -26231,7 +26250,7 @@ window.tLoadAll = async (role, opts) => {
     } else if (role === 'agency_owner' || role === 'member'){
     const [pr, tm, tpl] = await Promise.all([
       SB.from('projects').select('*').order('created_at'),
-      SB.from('profiles').select('*').eq('role','member').order('created_at'),
+      SB.from('profiles').select('*').eq('role','member').is('archived_at', null).order('created_at'),
       SB.from('stage_templates').select('service,tariff,stages') ]);
     { // слияние по id: сохраняем загруженные _tasks/_stages/_reports/_cp и identity объектов —
       // иначе каждая фоновая перезагрузка «ослепляла» открытый канбан (карточки переставали двигаться)
@@ -26322,12 +26341,31 @@ function onRtWork(){
   if (window._localTaskWriteTs && (Date.now()-window._localTaskWriteTs)<4000){ clearTimeout(_rtWT); _rtWT=setTimeout(onRtWork,1500); return; }   // эхо своих правок — не дёргаем сеть
   clearTimeout(_rtWT); _rtWT=setTimeout(_rtWorkSync,350);
 }
+/* ——— присутствие сотрудников (онлайн/оффлайн) в реальном времени ——— */
+const PRES_MS=120000;
+function _isOnline(m){ const ts=m&&m._seenTs; return !!(ts && (Date.now()-ts)<PRES_MS); }
+function _presLabel(m){ const ts=m&&m._seenTs; if(!ts) return 'не в сети'; const s=(Date.now()-ts)/1000; if(s*1000<PRES_MS) return 'онлайн'; if(s<3600) return Math.floor(s/60)+' мин назад'; if(s<86400) return Math.floor(s/3600)+' ч назад'; return Math.floor(s/86400)+' дн назад'; }
+function _presencePaint(){ const now=Date.now(); const T=(typeof TEAM!=='undefined'?TEAM:[]);
+  document.querySelectorAll('.pres-dot[data-pid]').forEach(function(el){ const m=T.find(x=>String(x._id)===el.dataset.pid); const on=!!(m&&m._seenTs&&(now-m._seenTs)<PRES_MS); el.classList.toggle('on',on); if(m)el.setAttribute('title',_presLabel(m)); });
+  document.querySelectorAll('.pres-txt[data-pid]').forEach(function(el){ const m=T.find(x=>String(x._id)===el.dataset.pid); const on=!!(m&&m._seenTs&&(now-m._seenTs)<PRES_MS); el.classList.toggle('on',on); if(m)el.textContent=_presLabel(m); });
+}
+function _presenceUpdateOne(id, ts){ const T=(typeof TEAM!=='undefined'?TEAM:[]); const m=T.find(x=>String(x._id)===String(id)); if(m){ m._seenTs=ts?(Date.parse(ts)||0):0; } _presencePaint(); }
+function onProfileRt(payload){
+  try{ const ev=payload&&(payload.eventType||payload.event); const n=payload&&payload.new, o=payload&&payload.old;
+    if(ev==='UPDATE' && n && o){ const changed=Object.keys(n).filter(k=>JSON.stringify(n[k])!==JSON.stringify(o[k]));
+      if(changed.length && changed.every(k=>k==='last_seen_at')){ _presenceUpdateOne(n.id, n.last_seen_at); return; } }   // только присутствие — без тяжёлой перезагрузки
+    if(n && n.last_seen_at) _presenceUpdateOne(n.id, n.last_seen_at);
+  }catch(_){}
+  onRt(payload);   // структурные изменения (добавили/удалили/роль/права) — обычная перезагрузка
+}
+window._isOnline=_isOnline; window._presLabel=_presLabel; window._presencePaint=_presencePaint; window._presenceUpdateOne=_presenceUpdateOne; window.onProfileRt=onProfileRt;   // renderTeam живёт в classic-скрипте — даём доступ через global
+if(!window._presTick){ window._presTick=setInterval(function(){ try{ _presencePaint(); }catch(_){} }, 20000); }
 function subscribeRealtime(){
   try{
     SB.channel('triada-rt')
       .on('postgres_changes',{event:'*',schema:'public',table:'agencies'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'projects'},onRt)
-      .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},onRt)
+      .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},onProfileRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'kb_materials'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'tools'},onRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'project_stages'},onRtWork)
@@ -26345,12 +26383,13 @@ async function routeByProfile(userArg){
   if (!user){ const { data:{ session } } = await SB.auth.getSession(); user = session && session.user; }   // локально, без сетевого getUser
   if (!user) return;
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
+  if (data && data.archived_at){ toast('Доступ к системе отозван администратором'); try{ await SB.auth.signOut(); }catch(_){} window.ME=null; ME=null; return; }
   ME = data || { role:'member' };
   window.ME = ME;                    // ME — module-scope let, на window её не было: из-за этого
                                      // _skipDirect всегда был false (лишний 403 у сотрудников),
                                      // а created_by у задач не записывался вообще.
   try{ if(ME&&ME.id) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){}                      // отметка активности через безопасную RPC (только своя строка, только last_seen_at)
-  if(!window._hbOn){ window._hbOn=true; setInterval(()=>{ try{ if(ME&&ME.id&&SB) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){} }, 120000); }
+  if(!window._hbOn){ window._hbOn=true; setInterval(()=>{ try{ if(ME&&ME.id&&SB) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){} }, 45000); }
   const _jobs=[ window.tLoadAll(ME.role, {fast:true}) ];                              // ядро данных — параллельно с инфо агентства
   if(window.tLoadPlatformSettings) _jobs.push(window.tLoadPlatformSettings().catch(()=>{}));   // pay_url и настройки платформы — доступны всем ролям (RLS: read authenticated)
   if (ME.agency_id){ _jobs.push(
@@ -26483,6 +26522,13 @@ window.tUpdateMember = async (id, perms, contact={}) => {
     const { error } = await SB.from('profiles').update(upd).eq('id', id);
     if (error) { toast('Не удалось сохранить: ' + error.message); return; }
     toast('Сотрудник обновлён'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tMemberArchive = async (id, name) => {
+  try {
+    const { error } = await SB.from('profiles').update({ archived_at: new Date().toISOString() }).eq('id', id);
+    if (error){ toast('Не удалось удалить: ' + error.message); return; }
+    toast((name||'Сотрудник') + ' удалён'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tKbAdd = async (cat, title, ty, url) => {
