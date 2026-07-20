@@ -5342,6 +5342,9 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ntf-f>*{height:38px;box-sizing:border-box;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);font-family:var(--mono);font-size:11.5px;min-width:0}
 .ntf-srch{display:flex;align-items:center;gap:8px;padding:0 11px;color:var(--txt-3)}
 .ntf-srch input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--txt);font-family:inherit;font-size:12.5px}
+/* фокус поиска — мягкая подсветка на скруглённом контейнере, без резкой прямоугольной рамки */
+.ntf-srch input:focus,.ntf-srch input:focus-visible{outline:none !important;box-shadow:none !important}
+.ntf-srch:focus-within{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .ntf-sel{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 11px;color:var(--txt-2);cursor:pointer;outline:none;width:100%}
 .ntf-tg{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;color:var(--txt-3);cursor:pointer;transition:all .15s var(--ease-out)}
 .ntf-tg:hover{color:var(--txt-2)}
@@ -5377,6 +5380,15 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ntf-seg button:hover{color:var(--txt-2)}
 .ntf-seg button.on{background:rgba(255,255,255,.08);color:var(--txt);box-shadow:0 2px 8px -2px rgba(0,0,0,.4)}
 .ntf-note.sub b{color:var(--txt-2);font-weight:600}
+.ntf-grp-c{display:flex;align-items:center;gap:9px;padding:2px 18px 10px}
+.ntf-grp-c .gl{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3);flex:none}
+.ntf-seg.sm{grid-template-columns:repeat(3,1fr);flex:1;margin-bottom:0}
+.ntf-seg.sm button{padding:6px 4px;font-size:10.5px}
+.ntf-grp{display:flex;align-items:center;gap:8px;padding:12px 6px 7px}
+.ntf-grp .gd{width:8px;height:8px;border-radius:3px;flex:none}
+.ntf-grp b{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-2);font-weight:700}
+.ntf-grp em{font-style:normal;font-family:var(--mono);font-size:9px;font-weight:700;color:var(--txt-3);background:rgba(255,255,255,.06);border-radius:5px;padding:1px 6px}
+.ntf-panel.dense .ntf-grp{padding:9px 6px 5px}
 .ntf-c-act{position:absolute;top:8px;right:8px;display:flex;gap:4px;opacity:0;transform:translateX(4px);transition:opacity .15s var(--ease-out),transform .15s var(--ease-out);z-index:3}
 .ntf-c:hover .ntf-c-act,.ntf-c-act:focus-within{opacity:1;transform:none}
 .ntf-c-act button{width:26px;height:26px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(16,20,27,.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s;padding:0}
@@ -20143,6 +20155,7 @@ window.hkHelpToggle=hkHelpToggle; window.hkSyncKeys=hkSyncKeys; window.hkProjKey
 let NTF=[], NTF_READ={}, NTF_SEEN=0, NTF_OPEN=false, NTF_VIEW='list';
 let NTF_EXP={};                          // раскрытые карточки (KPI и прочие «толстые» события)
 let NTF_DENSITY='cozy';                  // плотность списка: 'cozy' | 'compact'
+let NTF_GROUP='none';                    // группировка Радара: 'none' | 'type' | 'proj'
 let NTF_CUR=null;                        // id карточки под курсором клавиатуры (j/k)
 let NTF_SNOOZE={};                       // отложенные/скрытые сигналы: id -> до какого ts прятать
 let NTF_SIGOFF={};                       // выключенные типы сигналов: ct/ov/sn/rp/tg/kpi
@@ -20328,6 +20341,10 @@ function ntfHide(id, ev){ if(ev&&ev.stopPropagation) ev.stopPropagation();
 function _ntfDensLoad(){ try{ const v=localStorage.getItem(_ntfK('density')); if(v==='compact'||v==='cozy') NTF_DENSITY=v; }catch(e){} }
 function _ntfDensSave(){ try{ localStorage.setItem(_ntfK('density'), NTF_DENSITY); }catch(e){} }
 function ntfDensity(v){ NTF_DENSITY=(v==='compact')?'compact':'cozy'; _ntfDensSave(); const el=document.getElementById('ntf-panel'); if(el) el.classList.toggle('dense', NTF_DENSITY==='compact'); if(NTF_OPEN) ntfRender(); }
+/* ── группировка Радара ── */
+function _ntfGrpLoad(){ try{ const v=localStorage.getItem(_ntfK('group')); if(v==='none'||v==='type'||v==='proj') NTF_GROUP=v; }catch(e){} }
+function _ntfGrpSave(){ try{ localStorage.setItem(_ntfK('group'), NTF_GROUP); }catch(e){} }
+function ntfGroupSet(v){ NTF_GROUP=(v==='type'||v==='proj')?v:'none'; _ntfGrpSave(); if(NTF_OPEN) ntfRender(); }
 /* ── навигация с клавиатуры: j/k — курсор, Enter — открыть, e — решить, s — отложить ── */
 function _ntfCurPaint(){
   const el=document.getElementById('ntf-panel'); if(!el) return;
@@ -20341,9 +20358,10 @@ function ntfKey(e, code){
   const down=(code==='J'||key==='ArrowDown'), up=(code==='K'||key==='ArrowUp');
   const openK=(key==='Enter'), doneK=(code==='E'), snoozeK=(code==='S');
   if(!(down||up||openK||doneK||snoozeK)) return false;
-  const list=ntfCollapse(ntfList());
-  if(!list.length) return false;
-  const ids=list.map(function(x){ return x.id; });
+  const el=document.getElementById('ntf-panel'); if(!el) return false;
+  const nodes=Array.prototype.slice.call(el.querySelectorAll('.ntf-c[data-id]'));   // порядок = как на экране (учитывает группировку)
+  if(!nodes.length) return false;
+  const ids=nodes.map(function(n){ return n.getAttribute('data-id'); });
   let i=ids.indexOf(NTF_CUR);
   if(down||up){
     e.preventDefault();
@@ -20353,10 +20371,11 @@ function ntfKey(e, code){
   }
   e.preventDefault();
   if(i<0){ NTF_CUR=ids[0]; _ntfCurPaint(); return true; }   // первое действие без курсора — просто ставим курсор
-  const cur=list[i];
-  if(openK){ ntfGoto(cur.id); return true; }
-  if(snoozeK){ if(cur.src==='signal') ntfSnooze(cur.id, 86400000); return true; }
-  if(doneK){ if(cur.src==='signal') ntfHide(cur.id); else { ntfRead(cur.id); NTF_CUR=null; ntfRender(); } return true; }
+  const curId=ids[i], cur=NTF.find(function(x){ return x.id===curId; });
+  if(!cur) return true;
+  if(openK){ ntfGoto(curId); return true; }
+  if(snoozeK){ if(cur.src==='signal') ntfSnooze(curId, 86400000); return true; }
+  if(doneK){ if(cur.src==='signal') ntfHide(curId); else { ntfRead(curId); NTF_CUR=null; ntfRender(); } return true; }
   return true;
 }
 function ntfUnread(){ return NTF.filter(function(e){ return !NTF_READ[e.id] && !_ntfSnoozed(e); }).length; }
@@ -20950,6 +20969,45 @@ function _ntfScrollSave(el){
 function _ntfScrollRestore(el, s){
   Object.keys(s).forEach(function(sel){ const n=el.querySelector(sel); if(n) n.scrollTop=s[sel]; });
 }
+/* Разметка одной карточки — вынесена, чтобы её можно было рисовать и списком, и по группам. */
+function _ntfCardHTML(e){
+  const K=NTF_KIND[e.kind]||NTF_KIND.project;
+  const sv=NTF_SEV[e.sev]||NTF_SEV.info;
+  const cnt=e._grp?e._grp.length:0;
+  const rd=NTF_READ[e.id];
+  const open=!!NTF_EXP[e.id];
+  const roles=(e.roles||[]).slice(0, open?99:2);
+  const rich=(e.kpi&&e.kpi.length);
+  return '<article class="ntf-c'+(rd?' rd':'')+' s-'+(e.sev||'info')+(open?' op':'')+(NTF_CUR===e.id?' cur':'')+'" data-id="'+_kbEscAttr(e.id)+'">'
+    +'<button class="ntf-c-main" onclick="ntfGoto(\''+_kbEscAttr(e.id)+'\')">'
+      +'<span class="ic" style="background:'+K.c+'1c;color:'+K.c+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">'+K.i+'</svg></span>'
+      +'<span class="bd">'
+        +'<span class="t">'+escH(e.title||'')+(cnt?'<em>×'+cnt+'</em>':'')+'</span>'
+        +(e.obj?'<span class="o">'+escH(e.obj)+'</span>':'')
+        +(e.body?'<span class="d">'+escH(e.body)+'</span>':'')
+        +(roles.length?'<span class="rl">'+roles.map(function(r){
+            return r.long
+              ? '<span class="r lg"><i class="tt">'+escH(r.k)+'</i><b class="pp'+(r.muted?' m':'')+'">'+escH(r.v)+'</b></span>'
+              : '<span class="r'+(r.muted?' m':'')+'"><i>'+escH(r.k)+'</i><b>'+escH(r.v)+'</b></span>'; }).join('')
+          +((e.roles.length>2&&!open)?'<span class="r more">+'+(e.roles.length-2)+'</span>':'')
+          +(e.more?'<span class="r more">+'+e.more+' ещё</span>':'')+'</span>':'')
+        +'<span class="mt">'+(e.proj?'<i class="pj">'+escH(e.proj)+'</i>':'')+'<i>'+escH(_ntfAgo(e.ts))+'</i>'
+          +(e.src==='signal'?'<i class="sg" style="color:'+sv.c+'">сигнал</i>':'')+'</span>'
+      +'</span>'
+      +(rd?'':'<span class="dot" style="background:'+sv.c+'"></span>')
+    +'</button>'
+    +(e.src==='signal'?'<div class="ntf-c-act">'
+      +'<button title="Отложить на день" onclick="ntfSnooze(\''+_kbEscAttr(e.id)+'\','+86400000+',event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.4M8.5 2.5L5 5.5M15.5 2.5L19 5.5"/></svg></button>'
+      +'<button title="Скрыть · вернётся при изменении" onclick="ntfHide(\''+_kbEscAttr(e.id)+'\',event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg></button>'
+    +'</div>':'')
+    +(e.src==='signal'&&!rich?('<button class="ntf-cta" onclick="ntfGoto(\''+_kbEscAttr(e.id)+'\')">'+escH(_ntfCTA(e))
+        +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>'):'')
+    +(rich?('<button class="ntf-c-x" onclick="ntfExp(\''+_kbEscAttr(e.id)+'\',event)">'
+        +(open?'Свернуть':'Показать все '+e.kpi.length+' '+_plural(e.kpi.length,'показатель','показателя','показателей'))
+        +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="12" height="12" class="'+(open?'up':'')+'"><path d="M6 9l6 6 6-6"/></svg></button>'
+      +(open?_ntfKpiTable(e):'')):'')
+  +'</article>';
+}
 function ntfRender(){
   const el=document.getElementById('ntf-panel'); if(!el) return;
   el.classList.toggle('dense', NTF_DENSITY==='compact');
@@ -21038,6 +21096,21 @@ function ntfRender(){
       body='<div class="ntf-empty ok"><div class="ic ok">'+CHECK+'</div><b>Всё чисто</b>'
         +'<span>Сигналов, требующих действия, сейчас нет. Как только что-то потребует внимания — появится здесь</span></div>';
     }
+  }else if(!isFeed && NTF_GROUP!=='none'){
+    /* Радар с группировкой по типу или проекту — заголовок группы + карточки внутри */
+    const groups=[], idx={};
+    list.forEach(function(e){
+      let key,label,color;
+      if(NTF_GROUP==='type'){ const K=NTF_KIND[e.kind]||NTF_KIND.project; key='k:'+e.kind; label=K.l; color=K.c; }
+      else { key='p:'+(e.projId||e.proj||'—'); label=e.proj||'Без проекта'; color=''; }
+      if(idx[key]==null){ idx[key]=groups.length; groups.push({label:label, color:color, items:[]}); }
+      groups[idx[key]].items.push(e);
+    });
+    groups.forEach(function(g){
+      body+='<div class="ntf-grp">'+(g.color?'<span class="gd" style="background:'+g.color+'"></span>':'')
+        +'<b>'+escH(g.label)+'</b><em>'+g.items.length+'</em></div>';
+      g.items.forEach(function(e){ body+=_ntfCardHTML(e); });
+    });
   }else{
     const anyNew=isFeed&&NTF_SEEN>0&&list.some(function(e){ return e.ts>NTF_SEEN; });
     const anyOld=list.some(function(e){ return e.ts<=NTF_SEEN; });
@@ -21050,47 +21123,18 @@ function ntfRender(){
       }
       if(showWater&&!waterDone&&e.ts<=NTF_SEEN){ waterDone=true;
         body+='<div class="ntf-water"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M18 15l-6-6-6 6"/></svg>Новое с последнего визита</span></div>'; }
-      const K=NTF_KIND[e.kind]||NTF_KIND.project;
-      const sv=NTF_SEV[e.sev]||NTF_SEV.info;
-      const cnt=e._grp?e._grp.length:0;
-      const rd=NTF_READ[e.id];
-      const open=!!NTF_EXP[e.id];
-      const roles=(e.roles||[]).slice(0, open?99:2);
-      const rich=(e.kpi&&e.kpi.length);
-      body+='<article class="ntf-c'+(rd?' rd':'')+' s-'+(e.sev||'info')+(open?' op':'')+(NTF_CUR===e.id?' cur':'')+'" data-id="'+_kbEscAttr(e.id)+'">'
-        +'<button class="ntf-c-main" onclick="ntfGoto(\''+_kbEscAttr(e.id)+'\')">'
-          +'<span class="ic" style="background:'+K.c+'1c;color:'+K.c+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">'+K.i+'</svg></span>'
-          +'<span class="bd">'
-            +'<span class="t">'+escH(e.title||'')+(cnt?'<em>×'+cnt+'</em>':'')+'</span>'
-            +(e.obj?'<span class="o">'+escH(e.obj)+'</span>':'')
-            +(e.body?'<span class="d">'+escH(e.body)+'</span>':'')
-            +(roles.length?'<span class="rl">'+roles.map(function(r){
-                return r.long
-                  ? '<span class="r lg"><i class="tt">'+escH(r.k)+'</i><b class="pp'+(r.muted?' m':'')+'">'+escH(r.v)+'</b></span>'
-                  : '<span class="r'+(r.muted?' m':'')+'"><i>'+escH(r.k)+'</i><b>'+escH(r.v)+'</b></span>'; }).join('')
-              +((e.roles.length>2&&!open)?'<span class="r more">+'+(e.roles.length-2)+'</span>':'')
-              +(e.more?'<span class="r more">+'+e.more+' ещё</span>':'')+'</span>':'')
-            +'<span class="mt">'+(e.proj?'<i class="pj">'+escH(e.proj)+'</i>':'')+'<i>'+escH(_ntfAgo(e.ts))+'</i>'
-              +(e.src==='signal'?'<i class="sg" style="color:'+sv.c+'">сигнал</i>':'')+'</span>'
-          +'</span>'
-          +(rd?'':'<span class="dot" style="background:'+sv.c+'"></span>')
-        +'</button>'
-        +(e.src==='signal'?'<div class="ntf-c-act">'
-          +'<button title="Отложить на день" onclick="ntfSnooze(\''+_kbEscAttr(e.id)+'\','+86400000+',event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="13" r="8"/><path d="M12 10v3l2 1.4M8.5 2.5L5 5.5M15.5 2.5L19 5.5"/></svg></button>'
-          +'<button title="Скрыть · вернётся при изменении" onclick="ntfHide(\''+_kbEscAttr(e.id)+'\',event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg></button>'
-        +'</div>':'')
-        +(e.src==='signal'&&!rich?('<button class="ntf-cta" onclick="ntfGoto(\''+_kbEscAttr(e.id)+'\')">'+escH(_ntfCTA(e))
-            +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>'):'')
-        +(rich?('<button class="ntf-c-x" onclick="ntfExp(\''+_kbEscAttr(e.id)+'\',event)">'
-            +(open?'Свернуть':'Показать все '+e.kpi.length+' '+_plural(e.kpi.length,'показатель','показателя','показателей'))
-            +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="12" height="12" class="'+(open?'up':'')+'"><path d="M6 9l6 6 6-6"/></svg></button>'
-          +(open?_ntfKpiTable(e):'')):'')
-      +'</article>';
+      body+=_ntfCardHTML(e);
     });
   }
 
+  const groupCtrl=(!isFeed && list.length)?('<div class="ntf-grp-c"><span class="gl">Группировать</span><div class="ntf-seg sm">'
+      +'<button class="'+(NTF_GROUP==='none'?'on':'')+'" onclick="ntfGroupSet(\'none\')">Срочность</button>'
+      +'<button class="'+(NTF_GROUP==='type'?'on':'')+'" onclick="ntfGroupSet(\'type\')">Тип</button>'
+      +'<button class="'+(NTF_GROUP==='proj'?'on':'')+'" onclick="ntfGroupSet(\'proj\')">Проект</button>'
+    +'</div></div>'):'';
   el.innerHTML=head+digest+tabs+filt
     +(chips?'<div class="ntf-chips">'+chips+'</div>':'')
+    +groupCtrl
     +'<div class="ntf-list">'+body+'</div>'
     +(un?'<footer class="ntf-ft"><button onclick="ntfMarkAll()">Отметить всё прочитанным</button></footer>':'');
   _ntfScrollRestore(el,_sc);
@@ -21167,7 +21211,7 @@ function ntfBoot(){
   const cab=(typeof hkCab==='function')?hkCab():null;
   if(cab!=='ag'||!window.SB||!window.LIVE) return;
   window._ntfBooted=true;
-  ntfLoad(); ntfSndLoad(); _ntfSnoozeLoad(); _ntfSigLoad(); _ntfDensLoad(); _ntfSinceLoad(); ntfMount(); ntfBadge(); ntfSubscribe();
+  ntfLoad(); ntfSndLoad(); _ntfSnoozeLoad(); _ntfSigLoad(); _ntfDensLoad(); _ntfGrpLoad(); _ntfSinceLoad(); ntfMount(); ntfBadge(); ntfSubscribe();
   ntfScan(); ntfPoll(true);
   clearInterval(_ntfScanT); clearInterval(_ntfPollT);
   _ntfScanT=setInterval(ntfScan, 300000);                    // радар сигналов — раз в 5 минут
