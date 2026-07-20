@@ -6778,7 +6778,9 @@ function _syncUchip(){
     av.innerHTML = url?`<img src="${url.replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:letter;
     av.style.background = me.color||'var(--accent)'; }
   const sb=document.getElementById('ag-av');
-  if(sb){ const u=me.avatar_url||''; sb.innerHTML = u?`<img src="${u.replace(/"/g,'&quot;')}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:((me.agencyName||me.full_name||'D')[0]||'D').toUpperCase(); }
+  /* Левый аватар в сайдбаре — это лицо АГЕНТСТВА (одинаковое для всех сотрудников),
+     а не личное фото вошедшего. Берём логотип агентства; если не задан — буква названия. */
+  if(sb){ const u=me.agencyLogo||''; sb.innerHTML = u?`<img src="${u.replace(/"/g,'&quot;')}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:((me.agencyName||'A')[0]||'A').toUpperCase(); }
 }
 function myProfileOpen(){
   const me=(window.tMe&&window.tMe())||null;
@@ -6790,10 +6792,10 @@ function myProfileOpen(){
   const role=me.role_title||roleNames[me.role]||'Сотрудник';
 
   /* ——— слой 2 · тариф (перенесён из сайдбара) ——— */
-  const owner=(typeof agIsOwner==='function')?agIsOwner():true;   // кнопку «Обновить» видит только владелец
+  const owner=(typeof agIsOwner==='function')?agIsOwner():true;   // владелец/директор — полный доступ, обычный сотрудник тариф не видит
   const hasPlan=!!(me.agency_id||me.agencyPlan);
   let planHTML='';
-  if(hasPlan){
+  if(hasPlan && owner){                                            // данные тарифа — только у основателя и директора
     const info=agPlanLimit(); const used=agProjUsed();
     const CROWN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h18M5 17l-2-9 5.5 4L12 5l3.5 7L21 8l-2 9"/></svg>';
     let planState='ok', planInner;
@@ -22249,6 +22251,11 @@ window.tUpdateMyAvatar = async (file) => {
     const { error:e2 } = await SB.from('profiles').update({ avatar_url:url }).eq('id', me.id);  // self-update: разрешён только avatar_url (защита триггером)
     if(e2) throw e2;
     ME.avatar_url = url;
+    /* Владелец задаёт «лицо агентства»: его фото становится логотипом агентства (виден всем в сайдбаре).
+       У сотрудников/директора смена фото на логотип агентства не влияет. RLS: обновлять agencies может только владелец. */
+    if(me.role==='agency_owner' && me.agency_id){
+      try{ const { error:e3 } = await SB.from('agencies').update({ logo_url:url }).eq('id', me.agency_id); if(!e3) ME.agencyLogo = url; }catch(_e){}
+    }
     const pv = document.getElementById('myav-pv'); if(pv) pv.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
     if(typeof _syncUchip==='function') _syncUchip();
     toast('Аватар обновлён');
