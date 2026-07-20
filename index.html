@@ -5313,7 +5313,24 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ntf-sp .s i{display:block;width:100%;background:rgba(255,255,255,.14);border-radius:2px}
 .ntf-sp .s.now i{background:var(--accent)}
 .ntf-sp .s span{font-family:var(--mono);font-size:7.5px;color:var(--txt-3)}
+.ntf-dg-r{grid-template-columns:minmax(94px,1.2fr) repeat(3,1fr)}
+.ntf-solve{display:flex;flex-direction:column;justify-content:center;gap:3px;background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:12px;padding:9px 12px;min-width:0}
+.ntf-solve b{font-family:var(--mono);font-size:24px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--accent)}
+.ntf-solve span{font-size:8.5px;font-family:var(--mono);color:var(--txt-3);letter-spacing:.04em;text-transform:uppercase;line-height:1.25}
+.ntf-clear{display:flex;align-items:center;gap:13px;margin:14px 18px 4px;padding:14px 16px;background:linear-gradient(135deg,color-mix(in srgb,var(--pos) 12%,transparent),rgba(255,255,255,.02));border:1px solid color-mix(in srgb,var(--pos) 26%,transparent);border-radius:14px}
+.ntf-clear .ck{width:38px;height:38px;flex:none;border-radius:11px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--pos) 16%,transparent);color:var(--pos)}
+.ntf-clear .tx{display:flex;flex-direction:column;gap:2px}
+.ntf-clear .tx b{font-size:14px;color:var(--txt)}
+.ntf-clear .tx i{font-style:normal;font-size:11.5px;color:var(--txt-3)}
+.ntf-dg-f{grid-template-columns:1fr;justify-items:stretch;padding-bottom:6px}
+.ntf-dg-f .ntf-sp{justify-content:center;gap:5px}
+.ntf-sp-l{display:block;text-align:center;margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-3)}
+.ntf-water{display:flex;align-items:center;gap:10px;padding:13px 4px 9px;color:var(--accent)}
+.ntf-water::before,.ntf-water::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--accent-line),transparent)}
+.ntf-water span{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.ntf-empty.ok .ic.ok{background:color-mix(in srgb,var(--pos) 14%,transparent);border-color:color-mix(in srgb,var(--pos) 28%,transparent);color:var(--pos)}
 .ntf-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin:0 18px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:3px}
+.ntf-tabs-2{grid-template-columns:repeat(2,1fr)}
 .ntf-tab{display:flex;align-items:center;justify-content:center;gap:6px;background:none;border:0;color:var(--txt-3);font-family:var(--mono);font-size:11.5px;padding:7px 4px;border-radius:8px;cursor:pointer;transition:all .15s var(--ease-out)}
 .ntf-tab:hover{color:var(--txt-2)}
 .ntf-tab.on{background:rgba(255,255,255,.08);color:var(--txt);box-shadow:0 2px 8px -2px rgba(0,0,0,.4)}
@@ -20238,7 +20255,7 @@ const _NTF_SST={done:'завершён', active:'в работе', wait:'в оч
 
 /* ─── СОСТОЯНИЕ ЛЕНТЫ ────────────────────────────────────────────── */
 const NTF_MAX=400;
-let NTF_F={tab:'all', kinds:{}, proj:'', unread:false, q:''};
+let NTF_F={tab:'sig', kinds:{}, proj:'', unread:false, q:''};
 function ntfLoad(){
   if(NTF.length) return;
   try{ const f=JSON.parse(localStorage.getItem(_ntfK('feed'))||'[]'); if(Array.isArray(f)) NTF=f; }catch(e){}
@@ -20290,11 +20307,13 @@ function ntfAdd(e, silent){
   }
   if(e._rt) _ntfRescan();
 }
+function ntfRadar(){ return NTF.filter(function(e){ return e.src==='signal' && !_ntfSnoozed(e); }); }
 function ntfBadge(){
   const b=document.getElementById('ntf-bell'); if(!b) return;
-  const n=ntfUnread();
+  const rad=ntfRadar();
+  const n=rad.length;                                         // бейдж = «осталось решить» в Радаре, а не все непрочитанные
   const d=b.querySelector('.ntf-badge');
-  const crit=NTF.some(function(e){ return !NTF_READ[e.id] && e.sev==='crit'; });
+  const crit=rad.some(function(e){ return e.sev==='crit'; });
   if(d){ d.textContent=n>99?'99+':String(n); d.style.display=n?'':'none'; d.classList.toggle('crit', crit); }
   b.classList.toggle('has', !!n);
 }
@@ -20864,11 +20883,13 @@ function ntfRender(){
   const el=document.getElementById('ntf-panel'); if(!el) return;
   const _sc=_ntfScrollSave(el);
   const un=ntfUnread();
-  const sigN=NTF.filter(function(e){ return e.src==='signal'; }).length;
+  const sigVis=NTF.filter(function(e){ return e.src==='signal' && !_ntfSnoozed(e); });   // видимый Радар
+  const radarN=sigVis.length;
   const liveN=NTF.filter(function(e){ return e.src==='live'; }).length;
-  const critN=NTF.filter(function(e){ return e.sev==='crit'&&!NTF_READ[e.id]&&!_ntfSnoozed(e); }).length;
-  const warnN=NTF.filter(function(e){ return e.sev==='warn'&&!NTF_READ[e.id]&&!_ntfSnoozed(e); }).length;
-  const infoN=NTF.filter(function(e){ return (e.sev==='info'||!e.sev)&&!NTF_READ[e.id]&&!_ntfSnoozed(e); }).length;
+  const rCrit=sigVis.filter(function(e){ return e.sev==='crit'; }).length;
+  const rWarn=sigVis.filter(function(e){ return e.sev==='warn'; }).length;
+  const rInfo=sigVis.filter(function(e){ return !e.sev||e.sev==='info'; }).length;
+  const isFeed=(NTF_F.tab==='live');
   const perm=(typeof Notification!=='undefined')?Notification.permission:'unsupported';
 
   const ico=function(on,act,fn,title,svg){
@@ -20894,15 +20915,24 @@ function ntfRender(){
   if(NTF_VIEW==='set'){ el.innerHTML=head+_ntfSettings(); _ntfScrollRestore(el,_sc); return; }
 
   const stat=function(v,l,c,cls){ return '<div class="ntf-st'+(cls||'')+'"><b style="color:'+c+'">'+v+'</b><span>'+l+'</span></div>'; };
-  const digest='<div class="ntf-dg">'
-    +stat(critN,'критично','var(--neg)',(critN?' hot':''))
-    +stat(warnN,'внимание','var(--warn)','')
-    +stat(infoN,'к сведению','var(--txt)','')
-    +(liveN?('<div class="ntf-sp" title="Активность за 7 дней">'+_ntfSpark()+'</div>'):'<div class="ntf-sp none">нет активности</div>')
-  +'</div>';
+  const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M20 6L9 17l-5-5"/></svg>';
+  /* Радар — сводка «сколько горит»; Лента — пульс активности. Каждый экран показывает своё. */
+  const radarHead = radarN
+    ? '<div class="ntf-dg ntf-dg-r">'
+        +'<div class="ntf-solve"><b>'+radarN+'</b><span>'+_plural(radarN,'требует внимания','требуют внимания','требуют внимания')+'</span></div>'
+        +stat(rCrit,'критично','var(--neg)',(rCrit?' hot':''))
+        +stat(rWarn,'внимание','var(--warn)','')
+        +stat(rInfo,'к сведению','var(--txt)','')
+      +'</div>'
+    : '';                                                    // пусто в Радаре — «Всё чисто» покажет hero-состояние ниже
+  const feedHead = '<div class="ntf-dg ntf-dg-f">'
+      +(liveN?('<div class="ntf-sp" title="Активность команды за 7 дней">'+_ntfSpark()+'</div><span class="ntf-sp-l">пульс активности · 7 дней</span>')
+             :'<div class="ntf-sp none">за неделю активности не было</div>')
+    +'</div>';
+  const digest = isFeed ? feedHead : radarHead;
 
   const tab=function(k,l,n,hot){ return '<button class="ntf-tab'+(NTF_F.tab===k?' on':'')+'" onclick="ntfTab(\''+k+'\')">'+l+'<b'+(hot?' class="hot"':'')+'>'+n+'</b></button>'; };
-  const tabs='<nav class="ntf-tabs">'+tab('all','Всё',NTF.length,0)+tab('sig','Сигналы',sigN,critN)+tab('live','Активность',liveN,0)+'</nav>';
+  const tabs='<nav class="ntf-tabs ntf-tabs-2">'+tab('sig','Радар',radarN,rCrit)+tab('live','Лента',liveN,0)+'</nav>';
 
   const projs=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(function(p){ return NTF.some(function(e){ return String(e.projId)===String(p.id); }); });
   const filt='<div class="ntf-f">'
@@ -20922,17 +20952,32 @@ function ntfRender(){
   }).join('');
 
   const list=ntfCollapse(ntfList());
+  const filtered=!!(NTF_F.q||NTF_F.proj||NTF_F.unread||Object.keys(NTF_F.kinds).some(function(k){ return NTF_F.kinds[k]; }));
   let body='';
   if(!list.length){
-    body='<div class="ntf-empty"><div class="ic">'+BELLI+'</div>'
-      +'<b>'+(NTF.length?'Ничего не найдено':'Пока тихо')+'</b>'
-      +'<span>'+(NTF.length?'Смягчите фильтры — событий по такому запросу нет':'Как только что-то произойдёт, оно появится здесь')+'</span>'
-      +(NTF.length?'<button class="ntf-clr" onclick="ntfClearF()">Сбросить фильтры</button>':'')+'</div>';
+    if(filtered){
+      body='<div class="ntf-empty"><div class="ic">'+BELLI+'</div><b>Ничего не найдено</b>'
+        +'<span>Смягчите фильтры — событий по такому запросу нет</span>'
+        +'<button class="ntf-clr" onclick="ntfClearF()">Сбросить фильтры</button></div>';
+    }else if(isFeed){
+      body='<div class="ntf-empty"><div class="ic">'+BELLI+'</div><b>Пока тихо</b>'
+        +'<span>Здесь в реальном времени появляются действия команды по проектам</span></div>';
+    }else{
+      body='<div class="ntf-empty ok"><div class="ic ok">'+CHECK+'</div><b>Всё чисто</b>'
+        +'<span>Сигналов, требующих действия, сейчас нет. Как только что-то потребует внимания — появится здесь</span></div>';
+    }
   }else{
-    let day='';
+    const anyNew=isFeed&&NTF_SEEN>0&&list.some(function(e){ return e.ts>NTF_SEEN; });
+    const anyOld=list.some(function(e){ return e.ts<=NTF_SEEN; });
+    const showWater=anyNew&&anyOld;
+    let day='', waterDone=false;
     list.forEach(function(e){
-      const dk=_ntfDayLabel(e.ts);
-      if(dk!==day){ day=dk; body+='<div class="ntf-day"><span>'+escH(dk)+'</span></div>'; }
+      if(isFeed){
+        const dk=_ntfDayLabel(e.ts);
+        if(dk!==day){ day=dk; body+='<div class="ntf-day"><span>'+escH(dk)+'</span></div>'; }
+      }
+      if(showWater&&!waterDone&&e.ts<=NTF_SEEN){ waterDone=true;
+        body+='<div class="ntf-water"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M18 15l-6-6-6 6"/></svg>Новое с последнего визита</span></div>'; }
       const K=NTF_KIND[e.kind]||NTF_KIND.project;
       const sv=NTF_SEV[e.sev]||NTF_SEV.info;
       const cnt=e._grp?e._grp.length:0;
