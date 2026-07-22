@@ -14754,9 +14754,11 @@ function setDlType(t){agDlType=t;renderDeadlines();}
 function dlResetFilters(){agDlFilter='all';agDlType='all';agDlResp='all';agDlProj='all';agDlSearch='';agDlFrom='';agDlTo='';renderDeadlines();}
 function _dlFiltered(){
   const q=agDlSearch.trim().toLowerCase();
+  const _vis=(typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope member: Set(pid) видимых проектов; иначе null
   const inRange=d=>{ if(!d.due) return !(agDlFrom||agDlTo);
     if(agDlFrom && d.due<agDlFrom) return false; if(agDlTo && d.due>agDlTo) return false; return true; };
   return DEADLINES.filter(d=>
+    (!_vis || (d.pid!=null && _vis.has(d.pid))) &&                                    // дедлайн виден только если его проект в scope сотрудника
     (agDlProj==='all'||d.project===agDlProj) &&
     (agDlType==='all'||d.type===agDlType) &&
     (agDlResp==='all'||_dlOwner(d).key===agDlResp) &&
@@ -14934,7 +14936,9 @@ function _actResp(a){
 }
 function _actFiltered(){
   var q=(agDlSearch||'').trim().toLowerCase();
+  var _vis=(typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
   return DL_ACT.filter(function(a){
+    if(_vis && (a.pid==null || !_vis.has(a.pid))) return false;                       // событие фильтруется по scope проекта
     if(agDlType!=='all' && (a.type||'stage')!==agDlType) return false;
     if(agDlProj!=='all' && a.project!==agDlProj) return false;
     if(agDlResp!=='all'){ var _rid=_actResp(a).id; if(agDlResp==='__none'){ if(_rid) return false; } else if(String(_rid)!==String(agDlResp)) return false; }
@@ -22946,7 +22950,8 @@ window.tLoadKB = async () => {
     (map[k] = map[k]||{}); (map[k][r.category] = map[k][r.category]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', _id:r.id }); });
   if (typeof KB_DATA !== 'undefined'){ Object.keys(KB_DATA).forEach(k => delete KB_DATA[k]); Object.assign(KB_DATA, map); }
   if (typeof KB_PROJECTS !== 'undefined'){ KB_PROJECTS.length = 0;
-    (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p => KB_PROJECTS.push({ key:kbKeyOf(p), name:p.name, logo:p.logo||((p.name&&p.name[0])||'?').toUpperCase(), st:p.status||'active' })); }
+    const _visKB=(typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+    _visKB.forEach(p => KB_PROJECTS.push({ key:kbKeyOf(p), name:p.name, logo:p.logo||((p.name&&p.name[0])||'?').toUpperCase(), st:p.status||'active' })); }
   try { if (typeof kbProj !== 'undefined' && KB_PROJECTS[0] && !KB_PROJECTS.some(p => String(p.key)===String(kbProj))) kbProj = KB_PROJECTS[0].key; } catch(e){}
 };
 window.tLoadTools = async () => {
@@ -23653,9 +23658,11 @@ window.tLoadOverview = async () => {
     SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at'),
     SB.from('task_history').select('task_id,project_id,old_status,new_status,created_at')   // может ещё не существовать
   ]);
-  const stages = sr.data||[], tasks = tr.data||[], hist = hr.data||[];
+  const _vis = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope=member → Set(pid) видимых проектов; иначе null
+  const _pf = (arr) => (arr||[]).filter(x => !_vis || _vis.has(x.project_id));         // отсекает записи по невидимым проектам
+  const stages = _pf(sr.data), tasks = _pf(tr.data), hist = _pf(hr.data);
   const taskHistoryExists = !!(thr && !thr.error);                 // создана ли таблица журнала задач
-  const taskHist = (taskHistoryExists && thr.data) ? thr.data : [];
+  const taskHist = (taskHistoryExists && thr.data) ? _pf(thr.data) : [];
   const rank = { wait:0, active:1, done:2 };
   const dueOfStage = {}; stages.forEach(s => { dueOfStage[s.id] = s.due_date; });
   const dueOfTask  = {}; tasks.forEach(t => { dueOfTask[t.id]  = t.due_date; });
@@ -23753,9 +23760,12 @@ window.tLoadCycles = async () => {
     SB.from('project_stages').select('id,name'),
     SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at')
   ]);
-  const hist = hr.data||[];
+  const _visCy = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // фильтр по scope сотрудника
+  const hist = (hr.data||[]).filter(h => !_visCy || _visCy.has(h.project_id));
+  if(_visCy){ tr.data = (tr.data||[]).filter(t => _visCy.has(t.project_id)); }
   const nameById={}, mrrById={}, logoById={};
-  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; logoById[p.id]={url:p.logoUrl||'', letter:(p.logo||(p.name?p.name[0]:'?'))}; });
+  const _visPrjSrc = (typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  _visPrjSrc.forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; logoById[p.id]={url:p.logoUrl||'', letter:(p.logo||(p.name?p.name[0]:'?'))}; });
 
   // TRIADA-статусы → семантика цикла: done=закрытие инстанса, active=работа, wait=возврат (откат).
   // done→active НЕ возврат, а НОВЫЙ цикл (его открывает следующий active). Возврат = active→wait внутри открытого инстанса.
@@ -27563,6 +27573,12 @@ window.tLoadFinance = async () => {
     SB.from('fin_snapshots').select('*').order('period'),
     SB.from('project_services').select('project_id,service,tariff,mrr,cost,status') ]);
   if (res.error) { FINANCE = { ready:false }; return; }   // поля mrr/cost/finance ещё не добавлены
+  const _visFi = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope=member → Set(pid) видимых проектов; иначе null
+  if(_visFi){                                                                            // Финансы считаем только по видимым проектам
+    res.data = (res.data||[]).filter(p => _visFi.has(p.id));
+    if(tt && tt.data) tt.data = tt.data.filter(t => _visFi.has(t.project_id));
+    if(svcRes && svcRes.data) svcRes.data = svcRes.data.filter(s => _visFi.has(s.project_id));
+  }
   // карта услуг по проекту (только активные строки идут в разбивки)
   const svcMap = {};
   (svcRes && !svcRes.error && svcRes.data ? svcRes.data : []).forEach(s => { if((s.status||'active')!=='active') return; (svcMap[s.project_id]||(svcMap[s.project_id]=[])).push({ service:s.service||'Прочее', tariff:s.tariff||null, mrr:Number(s.mrr)||0, cost:Number(s.cost)||0 }); });
