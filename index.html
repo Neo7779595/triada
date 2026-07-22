@@ -21142,7 +21142,8 @@ function _ntfCardHTML(e){
               : '<span class="r'+(r.muted?' m':'')+'"><i>'+escH(r.k)+'</i><b>'+escH(r.v)+'</b></span>'; }).join('')
           +((e.roles.length>2&&!open)?'<span class="r more">+'+(e.roles.length-2)+'</span>':'')
           +(e.more?'<span class="r more">+'+e.more+' ещё</span>':'')+'</span>':'')
-        +'<span class="mt">'+(e.proj?'<i class="pj">'+escH(e.proj)+'</i>':'')+'<i>'+escH(_ntfAgo(e.ts))+'</i>'
+        +'<span class="mt">'+(e.proj?'<i class="pj">'+escH(e.proj)+'</i>':'')
+          +(e.src==='signal'?'':'<i>'+escH(_ntfAgo(e.ts))+'</i>')      // у сигналов «когда» несёт заголовок; относительное время (всегда «только что») убрано
           +(e.src==='signal'?'<i class="sg" style="color:'+sv.c+'">сигнал</i>':'')+'</span>'
       +'</span>'
       +(rd?'':'<span class="dot" style="background:'+sv.c+'"></span>')
@@ -21365,8 +21366,8 @@ function ntfBoot(){
   ntfLoad(); ntfSndLoad(); _ntfSnoozeLoad(); _ntfSigLoad(); _ntfDensLoad(); _ntfGrpLoad(); _ntfSinceLoad(); ntfMount(); ntfBadge(); ntfSubscribe();
   ntfScan(); ntfPoll(true);
   clearInterval(_ntfScanT); clearInterval(_ntfPollT);
-  _ntfScanT=setInterval(ntfScan, 300000);                    // радар сигналов — раз в 5 минут
-  _ntfPollT=setInterval(ntfPoll, 20000);                     // лента активности — раз в 20 секунд
+  _ntfScanT=setInterval(ntfScan, 120000);                    // радар сигналов — раз в 2 минуты (ловит переходы по времени: просрочка, дедлайн)
+  _ntfPollT=setInterval(ntfPoll, 15000);                     // лента активности — раз в 15 секунд (страховка к realtime)
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) ntfPoll(true); });
 }
 setInterval(ntfBoot, 600);
