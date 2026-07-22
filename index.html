@@ -601,6 +601,19 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .metric .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .metric .ic{width:26px;height:26px;border-radius:7px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent);flex:none}
 .metric .ic svg{width:13px;height:13px}
+/* ── живые часы-календарь в сайдбаре ── */
+.clockw{background:linear-gradient(155deg,var(--accent-dim),rgba(255,255,255,.02));border:1px solid var(--accent-line);border-radius:12px;padding:12px 13px 11px;display:flex;flex-direction:column;gap:9px;overflow:hidden;position:relative}
+.clockw-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.clockw-time{font-family:var(--mono);font-size:23px;font-weight:700;letter-spacing:.02em;line-height:1;color:var(--txt);font-variant-numeric:tabular-nums;white-space:nowrap}
+.clockw-time .ss{color:var(--accent);font-size:15px;font-weight:600;margin-left:1px;font-variant-numeric:tabular-nums}
+.clockw-ic{width:27px;height:27px;border-radius:8px;background:var(--accent-dim);border:1px solid var(--accent-line);display:flex;align-items:center;justify-content:center;color:var(--accent);flex:none}
+.clockw-ic svg{width:14px;height:14px}
+.clockw-date{font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clockw-bar{height:6px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden}
+.clockw-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#ffffff));box-shadow:0 0 10px -2px var(--accent);transition:width .8s cubic-bezier(.22,1,.36,1)}
+.clockw-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:10px;letter-spacing:.02em;color:var(--txt-3);white-space:nowrap}
+.clockw-foot b{color:var(--txt-2);font-weight:700}
+.clockw-foot #clk-pct{color:var(--accent);font-weight:700}
 
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;position:relative;z-index:20}
 .dl-range{display:flex;align-items:center;gap:8px;flex:none}
@@ -5711,7 +5724,15 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
       <div class="nav-i" data-m="tools" onclick="agNav('tools')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>Инструменты</div>
     </nav>
     <div class="metrics-rail">
-      <div class="metric"><div><div class="v">&lt;1 мес</div><div class="l">Средний LTV</div></div><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div></div>
+      <div class="clockw" id="ag-clock" title="Текущие дата и время · прогресс года">
+        <div class="clockw-top">
+          <div class="clockw-time"><span id="clk-hm">00:00</span><span class="ss" id="clk-ss">:00</span></div>
+          <div class="clockw-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v4.7l3 1.8"/></svg></div>
+        </div>
+        <div class="clockw-date" id="clk-date">—</div>
+        <div class="clockw-bar"><i id="clk-fill" style="width:0%"></i></div>
+        <div class="clockw-foot"><span id="clk-days">—</span><span id="clk-pct">0%</span></div>
+      </div>
     </div>
     <div class="side-foot">
       <button class="btn-add" style="width:100%;justify-content:center;margin-bottom:10px" onclick="openNewProject()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новый проект</button>
@@ -20148,6 +20169,22 @@ document.addEventListener('keydown', function(e){
     if(typeof toast==='function') toast('Нажми ? — все горячие клавиши');
   }, 6000);
 })();
+/* ── живые часы-календарь в сайдбаре (заменили «Средний LTV») ── */
+function _agClockTick(){
+  const hm=document.getElementById('clk-hm'); if(!hm) return;
+  const n=new Date(), z=x=>String(x).padStart(2,'0');
+  hm.textContent=z(n.getHours())+':'+z(n.getMinutes());
+  const ss=document.getElementById('clk-ss'); if(ss) ss.textContent=':'+z(n.getSeconds());
+  const WD=['вс','пн','вт','ср','чт','пт','сб'];
+  const dt=document.getElementById('clk-date'); if(dt) dt.textContent=WD[n.getDay()]+', '+z(n.getDate())+'.'+z(n.getMonth()+1)+'.'+n.getFullYear();
+  const y=n.getFullYear(), start=new Date(y,0,1,0,0,0,0), end=new Date(y+1,0,1,0,0,0,0);
+  const pct=(n-start)/(end-start)*100;
+  const totalDays=Math.round((end-start)/86400000), dayOfYear=Math.floor((n-start)/86400000)+1;
+  const fl=document.getElementById('clk-fill'); if(fl){ fl.style.width=pct.toFixed(3)+'%'; fl.title='осталось '+Math.max(0,totalDays-dayOfYear)+' дн'; }
+  const pc=document.getElementById('clk-pct'); if(pc) pc.textContent=pct.toFixed(2)+'%';
+  const dd=document.getElementById('clk-days'); if(dd) dd.innerHTML='день <b>'+dayOfYear+'</b> / '+totalDays;
+}
+_agClockTick(); setInterval(_agClockTick, 1000);
 window.hkBack=hkBack; window.hkFwd=hkFwd; window.hkGoOpen=hkGoOpen; window.hkGoPick=hkGoPick;
 window.hkHelpToggle=hkHelpToggle; window.hkSyncKeys=hkSyncKeys; window.hkProjKey=hkProjKey;
 
