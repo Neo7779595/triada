@@ -511,6 +511,29 @@ tbody tr:hover td{background:var(--bg-2)}
 .emp-sec-h{display:flex;align-items:center;gap:12px;font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin-top:2px}
 .emp-sec-h::after{content:"";flex:1;height:1px;background:var(--line)}
 #ov-emp .modal-b{gap:18px}
+/* ---- Доступ к проектам (карточка сотрудника) ---- */
+.prj-scope-tabs{display:flex;gap:6px;padding:4px;background:var(--bg-2);border:1px solid var(--line-2);border-radius:11px;margin-bottom:10px}
+.prj-scope-tab{flex:1;background:transparent;border:0;color:var(--txt-2);padding:9px 12px;border-radius:8px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:.14s}
+.prj-scope-tab:hover{color:var(--txt)}
+.prj-scope-tab.on{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 42%,transparent)}
+.prj-scope-hint{font-size:12.5px;color:var(--txt-3);margin-bottom:10px;line-height:1.5}
+.prj-scope-list{max-height:236px;overflow-y:auto;border:1px solid var(--line);border-radius:11px;padding:6px;background:var(--bg);display:flex;flex-direction:column;gap:2px}
+.prj-scope-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .14s;border:1px solid transparent}
+.prj-scope-item:hover{background:var(--bg-3)}
+.prj-scope-item.on{background:color-mix(in srgb,var(--accent) 9%,transparent);border-color:color-mix(in srgb,var(--accent) 24%,var(--line))}
+.prj-scope-ck{flex:none;width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line-2);background:var(--bg-1);display:flex;align-items:center;justify-content:center;color:transparent;transition:.14s}
+.prj-scope-item.on .prj-scope-ck{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.prj-scope-ck svg{width:12px;height:12px}
+.prj-scope-lg{flex:none;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;color:var(--txt);background:var(--bg-3);border:1px solid var(--line);overflow:hidden;position:relative}
+.prj-scope-lg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.prj-scope-nm{flex:1;min-width:0;font-size:13.5px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prj-scope-st{flex:none;font-size:10.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.prj-scope-st.done{color:var(--pos)}
+.prj-scope-empty{padding:18px 12px;text-align:center;color:var(--txt-3);font-size:13px;line-height:1.5}
+.prj-scope-foot{font-size:12.5px;color:var(--txt-3);margin-top:9px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.prj-scope-foot b{color:var(--txt-2);font-weight:700}
+.prj-scope-selall{background:transparent;border:0;color:var(--accent);cursor:pointer;font:inherit;font-size:12.5px;font-weight:700;padding:0}
+.prj-scope-selall:hover{text-decoration:underline}
 .fld-act{position:relative}
 .fld-act input{padding-right:42px!important}
 .fld-go{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
@@ -6325,6 +6348,16 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
             </label>
           </div>
           <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
+          <div class="fld" id="e-prj-fld">
+            <label>Доступ к проектам</label>
+            <div class="prj-scope-hint" id="e-prj-hint">Сотрудник видит только те проекты, где он назначен в команде.</div>
+            <div class="prj-scope-tabs">
+              <button type="button" class="prj-scope-tab" id="e-prj-t-all" onclick="empSetProjectScope('all')">Все проекты</button>
+              <button type="button" class="prj-scope-tab" id="e-prj-t-asg" onclick="empSetProjectScope('assigned')">Только назначенные</button>
+            </div>
+            <div id="e-prj-list-host"></div>
+            <div class="prj-scope-foot" id="e-prj-foot"></div>
+          </div>
         </div>
       </div>
       <div class="emp-sec">
@@ -7151,6 +7184,43 @@ function agCanEdit(m){
   const p=me.permissions||{};
   return !!(p[m]&&p[m].edit);
 }
+/* ——— доступ к отдельным проектам ———
+   Источник истины: если у member scope='assigned', видит только проекты,
+   где он числится участником (p._team). Owner/Director/PM видят всё.
+   Дефолт для существующих (нет ключа scope) — 'all' (мягкая миграция). */
+function agProjectAccessMode(){
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me) return 'all';
+  if(me.role!=='member') return 'all';                                  // owner/superadmin
+  if(me.is_director || me.is_pm) return 'all';                          // директор и ПМ — полный доступ (по требованию)
+  const p=me.permissions&&me.permissions.projects;
+  const s=p&&p.scope;
+  if(!s || s==='all') return 'all';                                     // миграция + явное all
+  return 'assigned';
+}
+function agVisibleProjectIds(){                                          // Set<pid> или null (все)
+  if(agProjectAccessMode()==='all') return null;
+  const me=(window.tMe&&window.tMe())||{};
+  const set=new Set();
+  const mid=me.id||me._id;
+  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(function(p){
+    const tm=p._team||[];
+    if(tm.some(function(t){ return String(t._id)===String(mid); })) set.add(p.id);
+  });
+  return set;
+}
+function agCanSeeProject(pid){
+  const s=agVisibleProjectIds();
+  if(!s) return true;
+  return s.has(pid);
+}
+function agVisibleProjects(){                                            // отфильтрованный список PROJECTS
+  const s=agVisibleProjectIds();
+  const list=(typeof PROJECTS!=='undefined')?PROJECTS:[];
+  if(!s) return list;
+  return list.filter(function(p){ return s.has(p.id); });
+}
+function agHasProjectScope(){ return agProjectAccessMode()==='assigned'; }
 /* Права на задачи проверяет сервер (RPC). Клиентская копия permissions грузится
    при входе и может устареть — например, владелец выдал права уже после логина.
    Поэтому НЕ гадаем: доска активна по умолчанию, и запирается только после того,
@@ -8282,7 +8352,9 @@ function setAgSort(v){agSort=v;renderProjects();}
 function projResetFilters(){agFilter='active';agCat='all';agSvc='all';agLead='all';agCplx='all';agQ='';agSort='active';renderProjects();}
 function projFiltered(){
   const q=(agQ||'').trim().toLowerCase();
+  const _vis=(typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope='assigned' → Set(pid); иначе null (все)
   let l=PROJECTS.filter(p=>{
+    if(_vis && !_vis.has(p.id))return false;                                          // сотрудник видит только назначенные проекты
     if(agFilter==='active'&&p.status!=='active')return false;
     if(agFilter==='done'&&p.status!=='done')return false;
     if(agFilter==='overdue'&&!p._overdue)return false;
@@ -8612,12 +8684,13 @@ function renderProjects(){
     try{ var _pr=smmLoadLb(); if(_pr&&_pr.then){ _pr.then(function(){ if(!_smmLbStale() && typeof renderProjects==='function' && (typeof _agCurModule!=='function' || _agCurModule()==='projects')) renderProjects(); }).catch(function(){}); } }catch(_e){}
   }
   const list = projFiltered();
-  const cats=[...new Set(PROJECTS.map(p=>p.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>(a||'').localeCompare(b||'','ru'));
-  const svcs=[...new Set(PROJECTS.map(p=>p.svc).filter(Boolean))];
+  const _visPS=(typeof agVisibleProjects==='function')?agVisibleProjects():PROJECTS;    // видимые сотруднику проекты (для сайдбара, фильтров, категорий)
+  const cats=[...new Set(_visPS.map(p=>p.cat).filter(c=>c&&c!=='—'))].sort((a,b)=>(a||'').localeCompare(b||'','ru'));
+  const svcs=[...new Set(_visPS.map(p=>p.svc).filter(Boolean))];
   const _tmL=(typeof TEAM!=='undefined'?TEAM:[]); const leadOpts=[['all','Все'],['__none','Не назначен']].concat(_tmL.map(m=>[m._id,m.name])); const leadLbl=agLead==='all'?'Все':(agLead==='__none'?'Не назначен':((_tmL.find(m=>m._id===agLead)||{}).name||'—'));
   const on=f=>agFilter===f?'on':'';
-  // GLOBAL (для сайдбара и модулей) — всегда по всей базе
-  const _actAll=PROJECTS.filter(p=>p.status==='active'), _doneAll=PROJECTS.filter(p=>p.status==='done');
+  // GLOBAL (для сайдбара и модулей) — по видимым проектам
+  const _actAll=_visPS.filter(p=>p.status==='active'), _doneAll=_visPS.filter(p=>p.status==='done');
   // SCOPED (для верхних карточек) — учитывает применённые фильтры
   const _act=list.filter(p=>p.status==='active'), _done=list.filter(p=>p.status==='done');
   const _hasFilt=(agCat!=='all'||agSvc!=='all'||agLead!=='all'||agCplx!=='all'||(agQ||'').trim()!==''||agFilter!=='active'&&agFilter!=='all');
@@ -8635,7 +8708,7 @@ function renderProjects(){
   const _nb=document.getElementById('ag-proj-ct'); if(_nb)_nb.textContent=_actAll.length;
   const _mA=document.getElementById('m-proj-act'); if(_mA)_mA.textContent=_actAll.length;
   const _mD=document.getElementById('m-proj-done'); if(_mD)_mD.textContent=_doneAll.length;
-  const _mT=document.getElementById('m-proj-all'); if(_mT)_mT.textContent=PROJECTS.length;
+  const _mT=document.getElementById('m-proj-all'); if(_mT)_mT.textContent=_visPS.length;
   document.getElementById('content-ag').innerHTML=`
     <div class="ph">
       <div><div class="eyebrow">Агентство · Портфель</div><h1>Проекты</h1>
@@ -16306,6 +16379,7 @@ function renderFinance(){
 
 /* ——— TEAM module ——— */
 let teamTab='employees', empColor=ACCENTS[0], empPerms={}, empEditIdx=null, empPM=false;
+let empProjectScope='assigned', empProjectIds=new Set();                  // scope: 'all' | 'assigned' + сет id проектов, где сотрудник участник
 let TEAM=[
   {name:'Абдурауф',role:'Дизайнер',dept:'Продакшн',color:'#37E6C8',cycle:'2,3 д',inwork:'4ч 49м',d7:'1',d30:'6',rework:16,eff:87},
   {name:'Шожахон',role:'SMM-менеджер',dept:'Продакшн',color:'#8A8FFF',cycle:'< 1 ч',inwork:'1 мин',d7:'—',d30:'2',rework:38,eff:79},
@@ -17162,13 +17236,72 @@ function permColAll(col){ const keys=_permKeys();
 }
 var empDirector=false;
 function _dirRefresh(){ const c=document.getElementById('e-dir-card'); if(c)c.classList.toggle('on',!!empDirector); const s=document.getElementById('e-access-sub'); if(s)s.classList.toggle('dir-locked',!!empDirector); const inp=document.getElementById('e-dir'); if(inp)inp.checked=!!empDirector; }
-function empSetDirector(checked){ empDirector=checked; if(checked){ empPM=true; const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=true; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.add('on'); permPreset('full'); } _dirRefresh(); renderPermGrid(); }
+function empSetDirector(checked){ empDirector=checked; if(checked){ empPM=true; const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=true; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.add('on'); permPreset('full'); } _dirRefresh(); renderPermGrid(); _renderPrjScope(); }
+/* ---- Доступ к проектам: рендер и обработчики ---- */
+function _renderPrjScope(){
+  const tAll=document.getElementById('e-prj-t-all'); const tAsg=document.getElementById('e-prj-t-asg');
+  const hint=document.getElementById('e-prj-hint');
+  const list=document.getElementById('e-prj-list-host');
+  const foot=document.getElementById('e-prj-foot');
+  const fld=document.getElementById('e-prj-fld');
+  if(!tAll||!tAsg||!list||!foot||!hint||!fld) return;
+  const dirLocked=!!empDirector;                                          // директор — полный доступ, блок скрываем
+  fld.style.display=dirLocked?'none':'';
+  if(dirLocked) return;
+  tAll.classList.toggle('on', empProjectScope==='all');
+  tAsg.classList.toggle('on', empProjectScope==='assigned');
+  if(empProjectScope==='all'){
+    hint.textContent='Сотрудник видит все проекты агентства. Аналитика, финансы и KPI считаются по всему портфелю.';
+    list.innerHTML=''; list.style.display='none';
+    foot.innerHTML='';
+    return;
+  }
+  hint.textContent='Сотрудник видит только выбранные проекты. Модули «Проекты», «Дедлайны», «Сводка», «Финансы», «KPI» будут учитывать только их.';
+  const src=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(function(p){ return p&&p.id!=null; });
+  if(!src.length){
+    list.style.display='';
+    list.innerHTML='<div class="prj-scope-list"><div class="prj-scope-empty">В агентстве пока нет проектов.<br>Создайте проект и вернитесь сюда, чтобы назначить доступ.</div></div>';
+    foot.innerHTML='';
+    return;
+  }
+  const items=src.map(function(p){
+    const on=empProjectIds.has(p.id);
+    const letter=(p.logo||((p.name||'?')[0]||'?')).toString().toUpperCase();
+    const av=(typeof logoFill==='function')?logoFill(p.logoUrl, letter):letter;
+    const st=(p.status==='done')?'<span class="prj-scope-st done">Готов</span>':(p.status==='archived'?'<span class="prj-scope-st">Архив</span>':'');
+    return '<div class="prj-scope-item'+(on?' on':'')+'" onclick="empToggleProject('+JSON.stringify(String(p.id))+')" role="checkbox" aria-checked="'+(on?'true':'false')+'" tabindex="0">'
+      +'<span class="prj-scope-ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg></span>'
+      +'<span class="prj-scope-lg">'+av+'</span>'
+      +'<span class="prj-scope-nm">'+_ddH(p.name||'Без названия')+'</span>'
+      +st
+    +'</div>';
+  }).join('');
+  list.style.display='';
+  list.innerHTML='<div class="prj-scope-list">'+items+'</div>';
+  const sel=empProjectIds.size, tot=src.length;
+  const allNow=(sel>=tot);
+  foot.innerHTML='<span>Выбрано <b>'+sel+'</b> из '+tot+'</span>'
+    +'<button type="button" class="prj-scope-selall" onclick="empSelAllProjects('+(!allNow)+')">'+(allNow?'Снять все':'Выбрать все')+'</button>';
+}
+function empSetProjectScope(s){ empProjectScope=(s==='all')?'all':'assigned'; _renderPrjScope(); }
+function empToggleProject(pid){                                            // pid приходит строкой из JSON.stringify
+  const src=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const p=src.find(function(x){ return String(x.id)===String(pid); });
+  if(!p) return;
+  if(empProjectIds.has(p.id)) empProjectIds.delete(p.id); else empProjectIds.add(p.id);
+  _renderPrjScope();
+}
+function empSelAllProjects(sel){
+  empProjectIds=new Set(sel ? (typeof PROJECTS!=='undefined'?PROJECTS:[]).map(function(p){return p.id;}) : []);
+  _renderPrjScope();
+}
 function openEmp(){
   if(!agIsOwner()){ toast('Управление командой доступно только владельцу'); return; }
   empEditIdx=null;
   empPerms={};
   _permKeys().forEach(k=>empPerms[k]={view:false,edit:false});
   empPerms.calendar={view:true,edit:false};                             // расписание для новых сотрудников доступно по умолчанию — можно снять галочку
+  empProjectScope='assigned'; empProjectIds=new Set();                  // новый сотрудник по умолчанию видит только проекты, где он назначен участником
   empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.remove('on'); } empDirector=false; _dirRefresh();
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass','phone','tg'].forEach(id=>document.getElementById('e-'+id).value='');
@@ -17178,6 +17311,7 @@ function openEmp(){
   document.getElementById('emp-save').textContent='Создать сотрудника';
   { const _ed=document.getElementById('emp-del'); if(_ed)_ed.style.display='none'; }
   renderPermGrid();
+  _renderPrjScope();
   document.getElementById('ov-emp').classList.add('on');
 }
 function openEmpEdit(i){
@@ -17186,6 +17320,11 @@ function openEmpEdit(i){
   empPerms = e.perms?JSON.parse(JSON.stringify(e.perms))
     :(()=>{const o={projects:{view:true,edit:false},calendar:{view:true,edit:false}};_permKeys().filter(k=>k!=='projects'&&k!=='calendar').forEach(k=>o[k]={view:false,edit:false});return o;})();
   if(!empPerms.calendar) empPerms.calendar={view:true,edit:false};       // миграция: у сотрудника в БД ещё нет ключа calendar — подставляем «включено» (раньше расписание было всем)
+  empProjectScope=(empPerms.projects&&empPerms.projects.scope==='assigned')?'assigned':'all';   // миграция: ключа scope нет — сохраняем прежнее поведение «видит всё»
+  empProjectIds=new Set();
+  (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(function(p){                              // проекты, где сотрудник уже в команде
+    if((p._team||[]).some(function(t){ return String(t._id)===String(e._id); })) empProjectIds.add(p.id);
+  });
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   document.getElementById('e-name').value=e.name||'';
   document.getElementById('e-role').value=e.role||'';
@@ -17200,6 +17339,7 @@ function openEmpEdit(i){
   document.getElementById('emp-save').textContent='Сохранить изменения';
   { const _ed=document.getElementById('emp-del'); if(_ed)_ed.style.display=''; }
   renderPermGrid();
+  _renderPrjScope();
   document.getElementById('ov-emp').classList.add('on');
 }
 function closeEmp(){document.getElementById('ov-emp').classList.remove('on');empDelClose();empEditIdx=null;}
@@ -17284,18 +17424,36 @@ function saveEmp(){
   const login=document.getElementById('e-login').value.trim();
   const phone=document.getElementById('e-phone').value.trim();
   const tg=document.getElementById('e-tg').value.trim();
+  /* фиксируем scope в permissions.projects.scope — источник истины для клиентской фильтрации.
+     Директор всегда 'all' (полный доступ), scope для него игнорируется. */
+  if(!empPerms.projects) empPerms.projects={view:true,edit:false};
+  const _effScope = empDirector ? 'all' : (empProjectScope==='assigned' ? 'assigned' : 'all');
+  empPerms.projects.scope = _effScope;
+  const _permsSnap = JSON.parse(JSON.stringify(empPerms));
+  const _projIdsSnap = Array.from(empProjectIds);
   const mods=Object.keys(empPerms).filter(k=>empPerms[k].view).length;
-  if(window.LIVE){ const epass=document.getElementById('e-pass').value; if(empEditIdx!=null){ window.tUpdateMember(TEAM[empEditIdx]._id, JSON.parse(JSON.stringify(empPerms)), {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM,is_director:empDirector,dept}); closeEmp(); return; } if(!login){toast('Задай логин сотруднику');return;} if(!epass){toast('Задай пароль');return;} window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,is_director:empDirector,permissions:JSON.parse(JSON.stringify(empPerms)),slug:((window.tMe&&window.tMe())||{}).agencySlug||''}); closeEmp(); return; }
+  if(window.LIVE){ const epass=document.getElementById('e-pass').value;
+    if(empEditIdx!=null){
+      const _mid=TEAM[empEditIdx]._id;
+      window.tUpdateMember(_mid, _permsSnap, {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM,is_director:empDirector,dept});
+      if(!empDirector && _effScope==='assigned' && typeof _syncMemberProjects==='function') _syncMemberProjects(_mid, _projIdsSnap);
+      closeEmp(); return;
+    }
+    if(!login){toast('Задай логин сотруднику');return;}
+    if(!epass){toast('Задай пароль');return;}
+    window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,is_director:empDirector,permissions:_permsSnap,slug:((window.tMe&&window.tMe())||{}).agencySlug||'', _projectIds:(!empDirector && _effScope==='assigned')?_projIdsSnap:null});
+    closeEmp(); return;
+  }
   if(empEditIdx!=null){
     const e=TEAM[empEditIdx];
-    Object.assign(e,{name,role,dept,color:empColor,phone,tg,is_pm:empPM,is_director:empDirector,perms:JSON.parse(JSON.stringify(empPerms))});
+    Object.assign(e,{name,role,dept,color:empColor,phone,tg,is_pm:empPM,is_director:empDirector,perms:_permsSnap});
     if(login)e.login=login;
     closeEmp(); teamTab='employees'; renderTeam();
     toast(`${name} обновлён · доступ к ${mods} модулям`);
     return;
   }
   if(!login){toast('Задай логин сотруднику');return;}
-  TEAM.push({name,role,dept,color:empColor,phone,tg,cycle:'—',inwork:'—',d7:'—',d30:'—',rework:0,eff:null,login,perms:JSON.parse(JSON.stringify(empPerms))});
+  TEAM.push({name,role,dept,color:empColor,phone,tg,cycle:'—',inwork:'—',d7:'—',d30:'—',rework:0,eff:null,login,perms:_permsSnap});
   closeEmp(); teamTab='employees'; renderTeam();
   toast(`${name} создан · доступ к ${mods} модулям · логин ${login} выдан`);
 }
@@ -27884,9 +28042,37 @@ window.tProvisionMember = async (m) => {
       email:(m.login||'user')+'@'+(m.slug||'agency')+'.triada.app', password:m.pass, login:m.login,
       full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, phone:m.phone||null, tg_username:m.tg_username||null, is_pm:!!m.is_pm, is_director:!!m.is_director, permissions:m.permissions }});
     if(m.is_director){ try{ await SB.from('profiles').update({ is_director:true }).eq('login', m.login).eq('agency_id', ME&&ME.agency_id); }catch(_){} }   // подстраховка, если edge-функция не знает поле
+    if(Array.isArray(m._projectIds)){                                                        // scope='assigned' → синхронизируем project_members для только что созданного профиля
+      try{
+        const p=await SB.from('profiles').select('id').eq('login', m.login).eq('agency_id', ME&&ME.agency_id).maybeSingle();
+        const nid=p&&p.data&&p.data.id;
+        if(nid) await _syncMemberProjects(nid, m._projectIds);
+      }catch(e){ console.warn('provision → project_members', e); }
+    }
     toast('Сотрудник создан'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
+async function _syncMemberProjects(memberId, targetPids){                                    // приводит project_members к targetPids для конкретного сотрудника
+  if(!SB || !memberId) return;
+  try{
+    const cur=await SB.from('project_members').select('project_id').eq('member_id', memberId);
+    if(cur.error) throw cur.error;
+    const curSet=new Set((cur.data||[]).map(function(r){ return String(r.project_id); }));
+    const tgtSet=new Set((targetPids||[]).map(String));
+    const toAdd=[...tgtSet].filter(function(x){ return !curSet.has(x); });
+    const toDel=[...curSet].filter(function(x){ return !tgtSet.has(x); });
+    if(toAdd.length){
+      const rows=toAdd.map(function(pid){ return {project_id: pid, member_id: memberId}; });
+      const r=await SB.from('project_members').insert(rows);
+      if(r.error) throw r.error;
+    }
+    if(toDel.length){
+      const r=await SB.from('project_members').delete().eq('member_id', memberId).in('project_id', toDel);
+      if(r.error) throw r.error;
+    }
+  }catch(e){ console.warn('sync project_members', e); if(typeof toast==='function') toast('Не удалось синхронизировать доступ к проектам: '+(e.message||e)); }
+}
+window._syncMemberProjects=_syncMemberProjects;
 window.tUpdateMemberPerms = async (id, perms) => {
   try { await SB.from('profiles').update({ permissions: perms }).eq('id', id);
     toast('Доступы обновлены'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
