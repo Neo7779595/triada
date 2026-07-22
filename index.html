@@ -7058,10 +7058,10 @@ function enterAgency(){
 }
 /* ——— единый механизм прав: используется навигацией, поиском И модулями ——— */
 function agCanView(m){
-  if(m==='calendar') return true;                                       // расписание доступно всем сотрудникам (бронируют своё время)
   const me=(window.tMe&&window.tMe())||null;
   if(!me || me.role!=='member' || me.is_director) return true;          // владелец/админ/директор видят всё
   const p=me.permissions||{};
+  if(m==='calendar' && !p.calendar) return true;                        // миграция: у старых сотрудников без ключа calendar — доступ по-прежнему есть
   return !!(p[m]&&p[m].view);
 }
 function agCanEdit(m){
@@ -7251,7 +7251,7 @@ function applyAgencyPerms(){
   const np=document.querySelector('[onclick="openNewProject()"]');
   if(!me || me.role!=='member' || me.is_director){ nav.forEach(n=>n.style.display=''); if(np)np.style.display=''; return null; }
   const perms=me.permissions||{}; let first=null;
-  nav.forEach(n=>{ const m=n.dataset.m; const ok=!!(perms[m]&&perms[m].view); n.style.display=ok?'':'none'; if(ok&&!first)first=m; });
+  nav.forEach(n=>{ const m=n.dataset.m; const ok = (m==='calendar' && !perms.calendar) ? true : !!(perms[m]&&perms[m].view); n.style.display=ok?'':'none'; if(ok&&!first)first=m; });
   if(np)np.style.display=(perms.projects&&perms.projects.edit)?'':'none';
   return first;
 }
@@ -16962,7 +16962,7 @@ function stplTariffDel(service,name){ const u=_stplUsedTariff(name);
 
 /* employee creation with permission grid + login */
 function pickEmpColor(c,el){empColor=c;[...el.parentNode.children].forEach(s=>s.classList.remove('on'));el.classList.add('on');}
-function _permKeys(){ return ['projects','deadlines','overview','cycles','finance','team','kpi','leaderboard','kb','tools']; }
+function _permKeys(){ return ['projects','deadlines','calendar','overview','cycles','finance','team','kpi','leaderboard','kb','tools']; }
 function renderPermGrid(){
   const keys=_permKeys();
   const CK='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
@@ -17007,6 +17007,7 @@ function openEmp(){
   empEditIdx=null;
   empPerms={};
   _permKeys().forEach(k=>empPerms[k]={view:false,edit:false});
+  empPerms.calendar={view:true,edit:false};                             // расписание для новых сотрудников доступно по умолчанию — можно снять галочку
   empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.remove('on'); } empDirector=false; _dirRefresh();
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   ['name','role','login','pass','phone','tg'].forEach(id=>document.getElementById('e-'+id).value='');
@@ -17022,7 +17023,8 @@ function openEmpEdit(i){
   if(!agIsOwner()){ toast('Редактирование сотрудников доступно только владельцу'); return; }
   const e=TEAM[i]; empEditIdx=i; empColor=e.color||ACCENTS[0];
   empPerms = e.perms?JSON.parse(JSON.stringify(e.perms))
-    :(()=>{const o={projects:{view:true,edit:false}};_permKeys().filter(k=>k!=='projects').forEach(k=>o[k]={view:false,edit:false});return o;})();
+    :(()=>{const o={projects:{view:true,edit:false},calendar:{view:true,edit:false}};_permKeys().filter(k=>k!=='projects'&&k!=='calendar').forEach(k=>o[k]={view:false,edit:false});return o;})();
+  if(!empPerms.calendar) empPerms.calendar={view:true,edit:false};       // миграция: у сотрудника в БД ещё нет ключа calendar — подставляем «включено» (раньше расписание было всем)
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
   document.getElementById('e-name').value=e.name||'';
   document.getElementById('e-role').value=e.role||'';
