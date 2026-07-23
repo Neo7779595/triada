@@ -1131,7 +1131,7 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 .sav-lg.dl i{background:var(--warn);border-radius:50%;width:8px;height:8px;box-shadow:0 0 5px color-mix(in srgb,var(--warn) 60%,transparent)}
 .sav-hint{margin-left:auto;color:var(--txt-3);font-size:11px;font-family:var(--mono);letter-spacing:.02em;opacity:.85}
 /* Ось */
-.sav-tbl-head{display:grid;grid-template-columns:290px 1fr;align-items:center;padding:2px 14px 12px 4px;border-bottom:1px solid var(--line);margin-top:2px}
+.sav-tbl-head{display:grid;grid-template-columns:290px 1fr;align-items:center;padding:14px 14px 12px 4px;border-bottom:1px solid var(--line);margin-top:2px}
 .sav-tbl-name{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);padding-left:8px;font-weight:700}
 .sav-tbl-axis{position:relative;height:20px}
 .sav-axis-h{position:absolute;top:0;transform:translateX(-50%);font-family:var(--mono);font-size:10.5px;color:var(--txt-3);font-weight:700;letter-spacing:.03em}
@@ -1166,7 +1166,12 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 .sav-track-grid{position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 1px,transparent 1px calc(100%/16));pointer-events:none}
 .sav-track-work{position:absolute;top:0;bottom:0;background:linear-gradient(180deg,rgba(55,230,200,.055),rgba(55,230,200,.02));border-left:1px dashed rgba(55,230,200,.24);border-right:1px dashed rgba(55,230,200,.24);z-index:0;pointer-events:none}
 .sav-track-now{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);z-index:5;pointer-events:none;box-shadow:0 0 14px rgba(55,230,200,.7),0 0 4px rgba(55,230,200,.9)}
-.sav-now-lb{position:absolute;top:-5px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9px;font-weight:800;color:var(--accent-ink);background:var(--accent);padding:2.5px 6px;border-radius:5px;white-space:nowrap;box-shadow:0 4px 12px -3px rgba(55,230,200,.6);letter-spacing:.03em}
+/* «Сейчас» — единая метка на оси часов сверху */
+.sav-axis-now{position:absolute;top:-3px;transform:translateX(-50%);font-family:var(--mono);font-size:9.5px;font-weight:800;color:var(--accent-ink);background:var(--accent);padding:3px 7px;border-radius:5px;white-space:nowrap;box-shadow:0 4px 12px -3px rgba(55,230,200,.55);letter-spacing:.04em;z-index:6}
+.sav-axis-now::after{content:"";position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid var(--accent)}
+.sav-axis-now.edge-left{transform:translateX(0);left:0!important}
+.sav-axis-now.edge-right{transform:translateX(-100%)}
+.sav-axis-now.edge-left::after,.sav-axis-now.edge-right::after{display:none}
 .sav-blk{position:absolute;top:5px;bottom:5px;border:0;border-radius:7px;background:color-mix(in srgb,var(--cc) 22%,transparent);border-left:3px solid var(--cc);color:var(--txt);padding:3px 8px;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;justify-content:center;gap:2px;transition:background .16s cubic-bezier(.4,.9,.4,1),transform .16s;z-index:3;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 -1px 0 rgba(0,0,0,.12)}
 .sav-blk:hover{background:color-mix(in srgb,var(--cc) 40%,transparent);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px -6px rgba(0,0,0,.5)}
 .sav-blk-tm{font-family:var(--mono);font-size:9px;font-weight:800;color:var(--cc);letter-spacing:.03em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -20098,7 +20103,10 @@ function _schTeam(){
   const nowTimeStr=isToday?_schFmtT(nowMs):'';
   const wL=((9-SCH_W0)/(SCH_W1-SCH_W0))*100, wW=((18-9)/(SCH_W1-SCH_W0))*100;
   const band='<div class="sav-track-work" style="left:'+wL.toFixed(2)+'%;width:'+wW.toFixed(2)+'%"></div>'
-    +(nowLeft!=null?'<span class="sav-track-now" style="left:'+nowLeft.toFixed(2)+'%"><span class="sav-now-lb">'+nowTimeStr+'</span></span>':'');
+    +(nowLeft!=null?'<span class="sav-track-now" style="left:'+nowLeft.toFixed(2)+'%"></span>':'');
+  /* Метка «сейчас» — одна общая, на оси часов сверху, с обработкой краёв */
+  const nowEdgeCls = nowLeft==null ? '' : (nowLeft<6 ? ' edge-left' : (nowLeft>94 ? ' edge-right' : ''));
+  const axisNow = nowLeft==null ? '' : '<span class="sav-axis-now'+nowEdgeCls+'" style="left:'+nowLeft.toFixed(2)+'%">'+nowTimeStr+'</span>';
   const rows=people.map(function(p){
     const mine=(window.BOOKINGS||[]).filter(function(b){ return b.status!=='cancelled' && (b.members||[]).some(function(m){ return String(m.id)===String(p.id); }) && b.startsAt<dayStart+86400000 && b.endsAt>dayStart; });
     const dls=(avail.tasks||[]).filter(function(t){ return String(t.assignee)===String(p.id); });
@@ -20176,7 +20184,7 @@ function _schTeam(){
     /* Ось часов */
     +'<div class="sav-tbl-head">'
       +'<div class="sav-tbl-name">Сотрудник</div>'
-      +'<div class="sav-tbl-axis">'+ticks+hlabels+'</div>'
+      +'<div class="sav-tbl-axis">'+ticks+hlabels+axisNow+'</div>'
     +'</div>'
     /* Строки */
     +'<div class="sav-tbl-body">'+(people.length?rows:'<div class="sched-dim" style="padding:24px;text-align:center;color:var(--txt-3)">Нет сотрудников</div>')+'</div>'
