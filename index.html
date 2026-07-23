@@ -2855,6 +2855,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-bar-l{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
 .cp-bar-r{display:flex;align-items:center;gap:8px;margin-left:auto}
 .cp-div{width:1px;height:24px;background:var(--line-2);flex:0 0 auto;opacity:.65;margin:0 1px}
+/* Двухстрочный тулбар — чёткая иерархия: сверху идентификация+статус+CTA, снизу поиск+инструменты */
+.cp-bar.cp-bar-v2{display:flex;flex-direction:column;align-items:stretch;gap:0;padding:0;flex-wrap:nowrap;background:linear-gradient(180deg,color-mix(in srgb,var(--bg-1) 92%,#fff 2%),var(--bg-1))}
+.cp-bar.cp-bar-v2 .cp-bar-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;flex-wrap:wrap}
+.cp-bar.cp-bar-v2 .cp-bar-primary{padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.cp-bar.cp-bar-v2 .cp-bar-tools{padding:9px 16px 11px;background:color-mix(in srgb,var(--bg) 45%,transparent)}
+.cp-bar.cp-bar-v2 .cp-bar-l{gap:11px;flex-wrap:wrap;min-width:0}
+.cp-bar.cp-bar-v2 .cp-bar-r{gap:8px;flex-wrap:wrap;margin-left:auto}
+/* Сгруппированные кнопки: две связанные кнопки без разделительного gap'а, слитная пилюля */
+.cp-btngroup{display:inline-flex;align-items:center;height:34px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:10px;overflow:hidden}
+.cp-btngroup .cp-mini{border:0;border-radius:0;height:100%;background:transparent;padding:0 12px}
+.cp-btngroup .cp-mini+.cp-mini{border-left:1px solid var(--line)}
+.cp-btngroup .cp-mini:hover{background:var(--bg-2);color:var(--txt);border-color:transparent}
+.cp-btngroup .cp-mini:active{transform:none}
 .cp-id{display:flex;align-items:center;gap:10px;min-width:0}
 .cp-id-ic{width:32px;height:32px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);flex:0 0 auto;box-shadow:inset 0 0 0 1px var(--accent-line)}
 .cp-id-ic svg{width:16px;height:16px}
@@ -10579,32 +10592,46 @@ function cpRender(p){
   if(cpRowSel.size){ const _ids=new Set((sh.rows||[]).map(function(r){return r.id;})); cpRowSel.forEach(function(id){ if(!_ids.has(id))cpRowSel.delete(id); }); }
   const sid=sh.id, ap=p._cpAppr||{}; const showClient=!!(p._cpShared&&p._cpShared[sid])||Object.keys(ap).some(function(k){return k.indexOf(sid+'/')===0;});
   let html='<div class="cp">';
-  html+='<div class="cp-bar"><div class="cp-bar-l">'
-    +'<span class="cp-id"><span class="cp-id-ic">'+CP_IC.table+'</span><span class="cp-id-tx"><span class="cp-id-name">'+_ddH(sh.name)+'</span><span class="cp-id-sub">'+sh.rows.length+' '+_plural(sh.rows.length,'строка','строки','строк')+'</span></span></span>'
-    +'<span class="cp-div"></span>'
-    +cpProgHTML(sh)
-    +(cpRowSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteRows()">'+CP_IC.trash+'Удалить '+cpRowSel.size+'</button>'):'')
-    +(cpColSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteCols()">'+CP_IC.trash+'Удалить '+cpColSel.size+' кол.</button>'):'')
-    +'<div class="cp-search">'+CP_IC.search+'<input id="cp-q" placeholder="Поиск по таблице" value="'+_ddA(cpQ)+'" oninput="cpSearch(this.value)"></div>'
-    +(sh.sort?('<span class="cp-fchip">Сорт: '+_ddH(((sh.cols.find(c=>c.id===sh.sort.col))||{}).name||'')+' '+(sh.sort.dir==='asc'?'↑':'↓')+'<button onclick="cpSortClear()">✕</button></span>'):'')
-    +((sh.filt&&Object.keys(sh.filt).length)?('<span class="cp-fchip">Фильтры '+Object.keys(sh.filt).length+'<button onclick="cpClearFilters()">✕</button></span>'):'')
-    +cpSheetApprHTML(p,sh)
-    +cpClientSummaryHTML(p,sh)
-    +'</div><div class="cp-bar-r">'
-    +'<span class="cp-status"><span class="cp-save" id="cp-save">'+cpSaveHTML()+'</span>'+cpSendStatusHTML(p,sh)+'</span>'
-    +'<span class="cp-div"></span>'
-    +'<span class="cp-iconset">'
-      +'<button class="cp-mini cp-ico" title="Отменить · Ctrl+Z" onclick="cpUndo()">'+CP_IC.undo+'</button>'
-      +'<button class="cp-mini cp-ico" title="Повторить · Ctrl+Y" onclick="cpRedo()">'+CP_IC.redo+'</button>'
-      +'<button class="cp-mini cp-ico" title="Обновить решения клиента" onclick="cpRefreshAppr(cpP())">'+CP_IC.refresh+'</button>'
-      +'<button class="cp-mini cp-ico'+(cpSelHasMerge()?' on':'')+'" title="'+(cpSelHasMerge()?'Разъединить ячейки':'Объединить ячейки (выдели несколько по горизонтали)')+'" onclick="cpMergeToggle()">'+CP_IC.merge+'</button>'
-    +'</span>'
-    +'<button class="cp-mini" onclick="cpAddCol()">'+CP_IC.plus+'Колонка</button>'
-    +'<button class="cp-mini" onclick="cpImport()">'+CP_IC.upload+'Импорт</button>'
-    +'<button class="cp-mini" onclick="cpPlanGallery()">'+CP_IC.grid+'Таблицы</button>'
-    +'<button class="cp-mini" onclick="cpTplManager()">'+CP_IC.tpl+'Списки</button>'
-    +'<button class="cp-mini cp-send" onclick="cpSendSheet()">'+CP_IC.send+'Отправить на согласование</button>'
-    +'</div></div>';
+  /* Тулбар — две чёткие строки: сверху идентификация + статус + CTA, снизу поиск + инструменты */
+  const sortChip=sh.sort?('<span class="cp-fchip">Сорт: '+_ddH(((sh.cols.find(c=>c.id===sh.sort.col))||{}).name||'')+' '+(sh.sort.dir==='asc'?'↑':'↓')+'<button onclick="cpSortClear()">✕</button></span>'):'';
+  const filtChip=(sh.filt&&Object.keys(sh.filt).length)?('<span class="cp-fchip">Фильтры '+Object.keys(sh.filt).length+'<button onclick="cpClearFilters()">✕</button></span>'):'';
+  const delRowsBtn=cpRowSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteRows()">'+CP_IC.trash+'Удалить '+cpRowSel.size+'</button>'):'';
+  const delColsBtn=cpColSel.size?('<button class="cp-mini cp-del" onclick="cpDeleteCols()">'+CP_IC.trash+'Удалить '+cpColSel.size+' кол.</button>'):'';
+  html+='<div class="cp-bar cp-bar-v2">'
+    +'<div class="cp-bar-row cp-bar-primary">'
+      +'<div class="cp-bar-l">'
+        +'<span class="cp-id"><span class="cp-id-ic">'+CP_IC.table+'</span><span class="cp-id-tx"><span class="cp-id-name">'+_ddH(sh.name)+'</span><span class="cp-id-sub">'+sh.rows.length+' '+_plural(sh.rows.length,'строка','строки','строк')+'</span></span></span>'
+        +'<span class="cp-div"></span>'
+        +cpProgHTML(sh)
+      +'</div>'
+      +'<div class="cp-bar-r">'
+        +'<span class="cp-status"><span class="cp-save" id="cp-save">'+cpSaveHTML()+'</span>'+cpSendStatusHTML(p,sh)+cpSheetApprHTML(p,sh)+cpClientSummaryHTML(p,sh)+'</span>'
+        +'<button class="cp-mini cp-send" onclick="cpSendSheet()">'+CP_IC.send+'Отправить на согласование</button>'
+      +'</div>'
+    +'</div>'
+    +'<div class="cp-bar-row cp-bar-tools">'
+      +'<div class="cp-bar-l">'
+        +'<div class="cp-search">'+CP_IC.search+'<input id="cp-q" placeholder="Поиск по таблице" value="'+_ddA(cpQ)+'" oninput="cpSearch(this.value)"></div>'
+        +sortChip+filtChip+delRowsBtn+delColsBtn
+      +'</div>'
+      +'<div class="cp-bar-r">'
+        +'<span class="cp-iconset">'
+          +'<button class="cp-mini cp-ico" title="Отменить · Ctrl+Z" onclick="cpUndo()">'+CP_IC.undo+'</button>'
+          +'<button class="cp-mini cp-ico" title="Повторить · Ctrl+Y" onclick="cpRedo()">'+CP_IC.redo+'</button>'
+          +'<button class="cp-mini cp-ico" title="Обновить решения клиента" onclick="cpRefreshAppr(cpP())">'+CP_IC.refresh+'</button>'
+          +'<button class="cp-mini cp-ico'+(cpSelHasMerge()?' on':'')+'" title="'+(cpSelHasMerge()?'Разъединить ячейки':'Объединить ячейки (выдели несколько по горизонтали)')+'" onclick="cpMergeToggle()">'+CP_IC.merge+'</button>'
+        +'</span>'
+        +'<span class="cp-btngroup">'
+          +'<button class="cp-mini" onclick="cpAddCol()">'+CP_IC.plus+'Колонка</button>'
+          +'<button class="cp-mini" onclick="cpImport()">'+CP_IC.upload+'Импорт</button>'
+        +'</span>'
+        +'<span class="cp-btngroup">'
+          +'<button class="cp-mini" onclick="cpPlanGallery()">'+CP_IC.grid+'Таблицы</button>'
+          +'<button class="cp-mini" onclick="cpTplManager()">'+CP_IC.tpl+'Списки</button>'
+        +'</span>'
+      +'</div>'
+    +'</div>'
+  +'</div>';
   const gw=40+cols.reduce((s,c)=>s+c.w,0)+44+(showClient?240:0);
   html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px">';
   html+='<div class="cp-hr"><div class="cp-gut cp-hgut" onclick="cpRowPickAll()" title="Выделить все строки"><span class="cp-hnum">№</span></div>';
