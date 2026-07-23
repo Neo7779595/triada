@@ -17244,6 +17244,10 @@ function permColAll(col){ const keys=_permKeys();
 var empDirector=false;
 function _dirRefresh(){ const c=document.getElementById('e-dir-card'); if(c)c.classList.toggle('on',!!empDirector); const s=document.getElementById('e-access-sub'); if(s)s.classList.toggle('dir-locked',!!empDirector); const inp=document.getElementById('e-dir'); if(inp)inp.checked=!!empDirector; }
 function empSetDirector(checked){ empDirector=checked; if(checked){ empPM=true; const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=true; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.add('on'); permPreset('full'); } _dirRefresh(); renderPermGrid(); _renderPrjScope(); }
+/* тумблер «Проектный менеджер» — тоже даёт полный доступ, поэтому синхронизируем блок «Доступ к проектам» */
+document.addEventListener('change', function(ev){
+  if(ev && ev.target && ev.target.id==='e-pm'){ empPM=!!ev.target.checked; if(typeof _renderPrjScope==='function') _renderPrjScope(); }
+});
 /* ---- Доступ к проектам: рендер и обработчики ---- */
 function _renderPrjScope(){
   const tAll=document.getElementById('e-prj-t-all'); const tAsg=document.getElementById('e-prj-t-asg');
@@ -17252,9 +17256,25 @@ function _renderPrjScope(){
   const foot=document.getElementById('e-prj-foot');
   const fld=document.getElementById('e-prj-fld');
   if(!tAll||!tAsg||!list||!foot||!hint||!fld) return;
-  const dirLocked=!!empDirector;                                          // директор — полный доступ, блок скрываем
-  fld.style.display=dirLocked?'none':'';
-  if(dirLocked) return;
+  /* Директор и ПМ по правилам агентства всегда имеют полный доступ ко всем проектам —
+     блок «Доступ к проектам» игнорируется при сохранении, поэтому показываем поясняющий баннер
+     вместо интерактивного списка, чтобы владелец не думал, что выбор работает. */
+  const locked = !!(empDirector || empPM);
+  fld.style.display='';
+  if(locked){
+    const _role = empDirector ? 'Директор' : 'Проектный менеджер';
+    hint.innerHTML = '<b style="color:var(--txt-2)">'+_role+'</b> видит все проекты агентства — сузить нельзя. Снимите переключатель «'+_role+'» выше, чтобы выбирать проекты индивидуально.';
+    tAll.classList.remove('on'); tAsg.classList.remove('on');
+    tAll.setAttribute('disabled',''); tAsg.setAttribute('disabled','');
+    tAll.style.opacity='.45'; tAsg.style.opacity='.45';
+    tAll.style.pointerEvents='none'; tAsg.style.pointerEvents='none';
+    list.innerHTML=''; list.style.display='none';
+    foot.innerHTML='';
+    return;
+  }
+  tAll.removeAttribute('disabled'); tAsg.removeAttribute('disabled');
+  tAll.style.opacity=''; tAsg.style.opacity='';
+  tAll.style.pointerEvents=''; tAsg.style.pointerEvents='';
   tAll.classList.toggle('on', empProjectScope==='all');
   tAsg.classList.toggle('on', empProjectScope==='assigned');
   if(empProjectScope==='all'){
