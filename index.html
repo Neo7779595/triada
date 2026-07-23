@@ -3358,6 +3358,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-sbar-sep{width:1px;height:14px;background:var(--line-2);opacity:.65;flex:0 0 auto}
 .cp-sbar-st{color:var(--txt-2);font-weight:500}
 .cp-sbar-st b{color:var(--txt);font-weight:800;font-family:var(--mono);letter-spacing:.02em}
+.cp-sbar-spacer{flex:1 1 auto;min-width:8px}
+.cp-zoom-btn{display:inline-flex;align-items:center;gap:3px;padding:4px 9px 4px 11px;background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-2);border-radius:6px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em;cursor:pointer;transition:background .12s ease,color .12s ease,border-color .12s ease}
+.cp-zoom-btn:hover{background:var(--bg-3);color:var(--txt);border-color:color-mix(in srgb,var(--accent) 30%,var(--line-2))}
+.cp-zoom-btn .cp-fbtn-car{color:var(--txt-3);font-size:8.5px}
 /* Кнопки быстрой клавиши в контекстном меню */
 .cp-popi .cp-ctx-k{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--txt-3);background:var(--bg-3);padding:1px 5px;border-radius:4px;font-weight:600;letter-spacing:.02em;box-shadow:inset 0 0 0 1px var(--line);border:0}
 .cp-sheets{display:flex;align-items:stretch;border-top:1px solid var(--line);background:var(--bg-1);flex:0 0 auto;overflow-x:auto}
@@ -11900,7 +11904,8 @@ function cpRender(p){
   html+=cpNameBarHTML();
   html+=cpFormatBarHTML();
   const gw=40+cols.reduce((s,c)=>s+c.w,0)+44+(showClient?240:0);
-  html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px">';
+  const _cpZ=(sh&&sh.zoom)||1;
+  html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px;zoom:'+_cpZ+'">';
   html+='<div class="cp-hr"><div class="cp-gut cp-hgut" onclick="cpRowPickAll()" title="Выделить все строки"><span class="cp-hnum">№</span></div>';
   const hmInfo=cpHeadMergeInfo(sh);
   cols.forEach((col,ci)=>{ if(hmInfo && hmInfo.covered.has(ci)) return; const isM=hmInfo&&hmInfo.anchorW[ci]!=null; const wOv=isM?hmInfo.anchorW[ci]:null; html+=cpHeadCell(col,ci,wOv,isM); });
@@ -13391,6 +13396,38 @@ function cpAutoSumMenu(e){
   /* Автофокус на поиск */
   setTimeout(function(){ const inp=document.querySelector('.cp-pop.cp-pop-funcs .cp-func-search input'); if(inp) inp.focus(); },10);
 }
+/* ══════ Масштаб таблицы (как в Google Sheets) — 50/75/100/125/150/200% ══════ */
+function cpGetZoom(){ const sh=cpSheet(); const z=+((sh&&sh.zoom)||1); return isNaN(z)?1:Math.max(0.25,Math.min(4,z)); }
+function cpSetZoom(z){
+  const sh=cpSheet(); if(!sh) return;
+  const clamped=Math.max(0.25,Math.min(4,+z||1));
+  sh.zoom=clamped;
+  cpSave();
+  /* Мгновенный apply без ререндера — просто меняем inline style */
+  const grid=document.querySelector('.cp-grid'); if(grid) grid.style.zoom=clamped;
+  const btn=document.querySelector('.cp-zoom-btn'); if(btn) btn.innerHTML=Math.round(clamped*100)+'%<span class="cp-fbtn-car">▾</span>';
+}
+function cpZoomStep(delta){
+  const opts=[0.25,0.5,0.75,0.9,1,1.25,1.5,2,3];
+  const cur=cpGetZoom();
+  let idx=opts.findIndex(function(x){return Math.abs(x-cur)<0.005;});
+  if(idx<0){ /* nearest */ let best=0, bd=Infinity; opts.forEach(function(x,i){ const d=Math.abs(x-cur); if(d<bd){bd=d;best=i;} }); idx=best; }
+  const next=Math.max(0,Math.min(opts.length-1,idx+delta));
+  cpSetZoom(opts[next]);
+}
+function cpZoomReset(){ cpSetZoom(1); }
+function cpZoomMenu(e){
+  const cur=Math.round(cpGetZoom()*100);
+  const opts=[50,75,90,100,125,150,200];
+  let h='<div class="cp-popi cp-popi-hdr">Масштаб таблицы</div>';
+  opts.forEach(function(p){ h+='<button class="cp-popi cp-popi-fmt'+(cur===p?' on':'')+'" onclick="cpSetZoom('+(p/100)+');cpCloseFloat()"><span class="cp-fmt-nm">'+p+'%</span><span class="cp-fmt-ex">'+(p===100?'по умолчанию':'')+'</span></button>'; });
+  h+='<div class="sep"></div>';
+  h+='<button class="cp-popi" onclick="cpZoomStep(-1);cpCloseFloat();setTimeout(cpZoomMenu,50,event)">Уменьшить</button>';
+  h+='<button class="cp-popi" onclick="cpZoomStep(1);cpCloseFloat();setTimeout(cpZoomMenu,50,event)">Увеличить</button>';
+  h+='<button class="cp-popi" onclick="cpZoomReset();cpCloseFloat()">Сбросить к 100%</button>';
+  const btn=(e&&e.target&&e.target.closest?e.target.closest('button'):null)||(e&&e.target);
+  if(btn) cpFloat(btn, h);
+}
 /* Открыть редактор с "=" и активным автокомплитом — юзер печатает имя функции */
 function cpInsertFuncPrompt(){
   cpEd={r:cpSel.r, c:cpSel.c}; cpRerender();
@@ -13444,6 +13481,10 @@ function cpNbarCommit(){
 }
 function cpNbarBlur(){ if(_cpAutoc) cpAutocClose(); cpFmulaHighlightsClear(); _cpFmulaJustPicked=false; cpNbarCommit(); }
 /* Статус-бар: показывает Sum/Avg/Count/Min/Max для выделенного числового диапазона */
+function cpZoomControlHTML(){
+  const z=Math.round(cpGetZoom()*100);
+  return '<button class="cp-zoom-btn" title="Масштаб таблицы" onclick="cpZoomMenu(event)">'+z+'%<span class="cp-fbtn-car">▾</span></button>';
+}
 function cpStatusBarHTML(){
   const sh=cpSheet(); if(!sh) return '';
   const x=cpRect();
@@ -13454,7 +13495,7 @@ function cpStatusBarHTML(){
     const hint = editingF
       ? '<span class="cp-sbar-hint cp-sbar-hint-hot">Тяни мышкой по ячейкам — они станут диапазоном в формуле · Enter — сохранить · Esc — отмена</span>'
       : '<span class="cp-sbar-hint">Ctrl+C · Ctrl+V · Ctrl+A · Tab · Enter · ↑↓←→ · = для формулы</span>';
-    return '<div class="cp-sbar"><span class="cp-sbar-lb">Ячейка</span><span class="cp-sbar-cell">'+cellRef+'</span>'+hint+'</div>';
+    return '<div class="cp-sbar"><span class="cp-sbar-lb">Ячейка</span><span class="cp-sbar-cell">'+cellRef+'</span>'+hint+'<span class="cp-sbar-spacer"></span>'+cpZoomControlHTML()+'</div>';
   }
   const disp=cpDisp(sh);
   let count=0, sum=0, mn=Infinity, mx=-Infinity, nums=0;
@@ -13476,7 +13517,7 @@ function cpStatusBarHTML(){
     stats+='<span class="cp-sbar-sep"></span><span class="cp-sbar-st">min <b>'+fN(mn)+'</b></span>';
     stats+='<span class="cp-sbar-sep"></span><span class="cp-sbar-st">max <b>'+fN(mx)+'</b></span>';
   }
-  return '<div class="cp-sbar">'+stats+'</div>';
+  return '<div class="cp-sbar">'+stats+'<span class="cp-sbar-spacer"></span>'+cpZoomControlHTML()+'</div>';
 }
 /* Autofit ширины колонки под контент */
 function cpAutofitCol(ci){
