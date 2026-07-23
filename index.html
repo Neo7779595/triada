@@ -3465,6 +3465,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-diff-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px 2px 7px;border-radius:6px;color:var(--dc);background:color-mix(in srgb,var(--dc) 12%,transparent);border:1px solid color-mix(in srgb,var(--dc) 30%,transparent)}
 .pk-diff-dot{width:6px;height:6px;border-radius:50%;background:var(--dc);flex:none}
 .pk-prio-tag{display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;width:22px;height:20px;border-radius:6px;background:var(--bg-3);border:1px solid var(--line-2);cursor:default}
+.pk-att-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px 2px 7px;border-radius:6px;color:var(--txt-2);background:rgba(255,255,255,.04);border:1px solid var(--line-2);font-family:var(--mono);letter-spacing:.02em;cursor:default}
+.pk-att-tag svg{opacity:.72}
+.pk-card:hover .pk-att-tag{border-color:color-mix(in srgb,var(--accent) 28%,var(--line-2));color:var(--accent)}
+.pk-card:hover .pk-att-tag svg{opacity:1}
+/* Drag&drop файлов на модалку задачи */
+.pd-task-drop{position:relative}
+.pd-task-drop.drag-over::after{content:'Отпустите файл — прикрепим к задаче';position:absolute;inset:8px;border:2px dashed var(--accent);border-radius:14px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:5;backdrop-filter:blur(1px);text-shadow:0 1px 6px rgba(0,0,0,.55)}
 .pk-card:hover{border-color:var(--accent-line);box-shadow:0 10px 26px -12px rgba(0,0,0,.72)}
 .pk-card:active{cursor:grabbing}
 .pk-card.dragging{opacity:.45;transform:scale(.97);box-shadow:none}
@@ -9289,6 +9296,7 @@ async function pdNewTask(st){
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddTask()">Создать</button></div></div>`);
   pdSubRender();
   _pdTaskAttRender();
+  _pdTaskAttWireDrop();
 }
 function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи задачу');return;}
   const stage_id=_v('pd2-stg'); if(!stage_id){toast('Выбери этап');return;}
@@ -9345,6 +9353,7 @@ async function pdTaskEdit(id){
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveTask('${id}')">Сохранить</button></div></div>`);
   pdSubRender();
   _pdTaskAttRender();
+  _pdTaskAttWireDrop();
 }
 function pdSaveTask(id){ const title=_v('pd2-ttl'); if(!title){toast('Введи название');return;}
   const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
@@ -9413,6 +9422,21 @@ async function _pdTaskAttOpen(i){
   else if(a.url) window.open(a.url,'_blank','noopener');
 }
 function _pdTaskAttDel(i){ const a=window._pdTaskAtt||[]; if(i>=0 && i<a.length){ a.splice(i,1); _pdTaskAttRender(); } }
+/* Drag & drop файлов на всю модалку задачи (модалка pd2 · modal-b) */
+function _pdTaskAttWireDrop(){
+  const el=document.querySelector('#ov-pd2 .modal-b'); if(!el) return;
+  el.classList.add('pd-task-drop');
+  if(el._dropWired) return; el._dropWired=1;
+  const hasFiles=e=>{ const t=e&&e.dataTransfer&&e.dataTransfer.types; if(!t) return false; for(let i=0;i<t.length;i++) if(t[i]==='Files') return true; return false; };
+  el.addEventListener('dragenter', function(e){ if(!hasFiles(e)) return; e.preventDefault(); e.stopPropagation(); el.classList.add('drag-over'); });
+  el.addEventListener('dragover',  function(e){ if(!hasFiles(e)) return; e.preventDefault(); e.stopPropagation(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; });
+  el.addEventListener('dragleave', function(e){ if(e.relatedTarget && el.contains(e.relatedTarget)) return; el.classList.remove('drag-over'); });
+  el.addEventListener('drop', function(e){
+    if(!hasFiles(e)) return; e.preventDefault(); e.stopPropagation(); el.classList.remove('drag-over');
+    const files=(e.dataTransfer&&e.dataTransfer.files)||null; if(!files||!files.length) return;
+    _pdTaskAttFile({ files: files, value: '' });                                      // fake input с нужным интерфейсом
+  });
+}
 function pdSubRender(){ const box=document.getElementById('pd2-sub'); if(!box) return; const arr=window._pdSub||[]; const done=arr.filter(s=>s.done).length, tot=arr.length, pct=tot?Math.round(done/tot*100):0;
   box.innerHTML=(tot?`<div class="subpb ${done===tot?'full':''}"><i style="width:${pct}%"></i></div><div class="subhdr">${done} из ${tot} · ${pct}%</div>`:'<div class="subempty">Пока нет подзадач</div>')+arr.map((s,i)=>`<div class="subrow"><button type="button" class="subchk ${s.done?'on':''}" onclick="pdSubToggle(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button><span class="subtxt ${s.done?'done':''}">${_ddH(s.title)}</span><button type="button" class="subdel" title="Удалить" onclick="pdSubDel(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join(''); }
 function pdSubAdd(){ const inp=document.getElementById('pd2-subnew'); if(!inp)return; const v=(inp.value||'').trim(); if(!v){inp.focus();return;} (window._pdSub=window._pdSub||[]).push({id:_subUid(),title:v,done:false}); inp.value=''; pdSubRender(); inp.focus(); }
@@ -9631,9 +9655,11 @@ function renderPd(){
           const _diffMap={hard:'var(--neg)',medium:'var(--warn)',easy:'var(--pos)'};
           const _dc=_diffMap[c.difficulty]||'';
           const _diffLbl={hard:'Сложная',medium:'Средняя',easy:'Лёгкая'}[c.difficulty]||'';
+          const _attN=(Array.isArray(c.attachments)?c.attachments.length:0);                                              // счётчик ссылок и файлов
+          const _attTag=_attN?`<span class="pk-att-tag" title="${_attN} ${_plural(_attN,'вложение','вложения','вложений')}"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.6 8.6a5 5 0 01-7-7L14 4.5a3.3 3.3 0 015 5l-9.2 9.2a1.7 1.7 0 01-2.4-2.4l8.5-8.5"/></svg>${_attN}</span>`:'';
           return `<div class="pk-card${_dc?' has-diff':''}" draggable="${_ro?'false':'true'}" data-tkid="${c.id}"${_dc?` style="--pk-diff:${_dc}"`:''} ondragstart="pkDrag(event,'${c.id}')" ondragend="pkDragEnd(event)">
               <div class="pk-card-top"><div class="t">${_ddH(c.title)}</div><div class="pk-card-acts"><button class="gear" title="Редактировать" onclick="event.stopPropagation();pdTaskEdit('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H22a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button><button class="del" title="Удалить" onclick="event.stopPropagation();pdTaskDel('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div>
-              ${(_diffLbl||c.priority)?`<div class="pk-tags">${_diffLbl?`<span class="pk-diff-tag" style="--dc:${_dc}"><span class="pk-diff-dot"></span>${_diffLbl}</span>`:''}${c.priority?`<span class="pk-prio-tag" title="${_eisenTitle(c.priority)}">${_eisenEmoji(c.priority)}</span>`:''}</div>`:''}
+              ${(_diffLbl||c.priority||_attN)?`<div class="pk-tags">${_diffLbl?`<span class="pk-diff-tag" style="--dc:${_dc}"><span class="pk-diff-dot"></span>${_diffLbl}</span>`:''}${c.priority?`<span class="pk-prio-tag" title="${_eisenTitle(c.priority)}">${_eisenEmoji(c.priority)}</span>`:''}${_attTag}</div>`:''}
               ${stg?`<div class="pk-stage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg><span>${_ddH(stg.name)}</span></div>`:''}
               ${timer}
               ${rtimer}
