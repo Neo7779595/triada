@@ -1709,6 +1709,13 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 .tool-card .tc-url{margin-top:4px;font-size:11.5px;color:var(--txt-3);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1;letter-spacing:.005em;display:flex;align-items:center;gap:5px}
 .tool-card .tc-url svg{width:11px;height:11px;flex:none}
 .tool-card .tc-badge{position:static;top:auto;right:auto}
+.tool-card .tc-r{display:flex;align-items:center;gap:6px;position:relative;z-index:2}
+.tool-card .tc-act{opacity:0;transform:translateY(-3px) scale(.92);width:26px;height:26px;border-radius:7px;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .18s var(--ease-out),transform .18s var(--ease-out),color .16s,background .16s,border-color .16s;pointer-events:none;flex-shrink:0}
+.tool-card:hover .tc-act{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.tool-card .tc-act:hover{background:var(--bg-3);color:var(--txt);border-color:var(--line-2)}
+.tool-card .tc-act-edit:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 32%,var(--line-2));background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.tool-card .tc-act-del:hover{color:var(--neg);border-color:color-mix(in srgb,var(--neg) 32%,var(--line-2));background:color-mix(in srgb,var(--neg) 8%,transparent)}
+.tool-card .tc-act svg{width:12px;height:12px}
 @media (max-width:900px){.tools-bar{grid-template-columns:1fr;gap:10px}.tools-filt{overflow-x:auto}.tools-actions{justify-self:end}}
 .tool-add svg{width:20px;height:20px}
 .tool-card .tc-name{font-weight:600;font-size:15px;margin-top:auto;padding-top:14px}
@@ -19115,7 +19122,11 @@ function renderTools(){
       return `<div class="tool-card" data-nm="${_ddH(it.name)}" data-ty="${it.ty}" data-url="${_ddH(it.url)}" onclick="toolOpen(${si},${ii})">
         <div class="tool-card-top">
           <div class="tc-ic" style="background:${c}22;color:${c}">${TOOL_ABBR[it.ty]||'··'}</div>
-          <span class="tc-badge" style="background:${c}22;color:${c}">${it.ty}</span>
+          <div class="tc-r">
+            <button class="tc-act tc-act-edit" onclick="event.stopPropagation();toolEdit(${si},${ii})" title="Редактировать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+            <button class="tc-act tc-act-del" onclick="event.stopPropagation();toolDel(${si},${ii})" title="Удалить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>
+            <span class="tc-badge" style="background:${c}22;color:${c}">${it.ty}</span>
+          </div>
         </div>
         <div class="tc-name">${_ddH(it.name)}</div>
         <div class="tc-url"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>${_ddH(dm)}</div>
@@ -19225,6 +19236,63 @@ function toolSaveAdd(){
   if(window.LIVE){ window.tToolAdd(cat,name,ty,url); pd2Close(); return; }
   const s=TOOLS_DATA.find(x=>x.cat===cat); if(s)s.items.push({name,url:url||'—',ty});
   pd2Close(); renderTools(); toast(`«${name}» добавлен`);
+}
+function toolEdit(si,ii){
+  const s=TOOLS_DATA[si]; if(!s) return; const it=s.items[ii]; if(!it) return;
+  const tcats=TOOLS_DATA.map(x=>x.cat);
+  const urlPre=(it.url&&it.url!=='—')?it.url:'';
+  pd2Open(`<div class="modal">
+    <div class="modal-h"><h3>Редактировать инструмент</h3><p>${_ddH(it.name)} · ${_ddH(s.cat)}</p></div>
+    <div class="modal-b">
+      <div class="fld2">
+        <div class="fld"><label>Категория</label>${selField('tl-cat', tcats, s.cat)}</div>
+        <div class="fld"><label>Тип</label>${selField('tl-ty', Object.keys(TOOL_TYPES), it.ty)}</div>
+      </div>
+      <div class="fld"><label>Название</label><input id="tl-name" placeholder="Miro · аналитика" value="${_ddH(it.name)}"></div>
+      <div class="fld"><label>Ссылка</label><input id="tl-url" placeholder="miro.com/board/…" value="${_ddH(urlPre)}"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" style="color:var(--neg)" onclick="toolDelFromEdit(${si},${ii})">Удалить</button>
+      <button class="btn-ghost" onclick="pd2Close()">Отмена</button>
+      <button class="btn-add" onclick="toolSaveEdit(${si},${ii})">Сохранить</button>
+    </div></div>`);
+}
+function toolSaveEdit(si,ii){
+  const s=TOOLS_DATA[si]; if(!s){ pd2Close(); return; }
+  const it=s.items[ii]; if(!it){ pd2Close(); return; }
+  const cat=_v('tl-cat'),ty=_v('tl-ty'),name=_v('tl-name'),url=_v('tl-url');
+  if(!name){ toast('Введи название'); return; }
+  if(window.LIVE){
+    if(!it._id){ toast('Не удалось найти запись'); return; }
+    window.tToolUpdate(it._id,{category:cat,name,ty,url}); pd2Close(); return;
+  }
+  /* mock-режим */
+  it.name=name; it.ty=ty; it.url=url||'—';
+  if(cat!==s.cat){
+    const dst=TOOLS_DATA.find(x=>x.cat===cat);
+    if(dst){ dst.items.push(it); s.items.splice(ii,1); }
+  }
+  pd2Close(); renderTools(); toast(`«${name}» обновлён`);
+}
+function toolDelFromEdit(si,ii){ pd2Close(); setTimeout(function(){ toolDel(si,ii); },80); }
+function toolDel(si,ii){
+  const s=TOOLS_DATA[si]; if(!s) return; const it=s.items[ii]; if(!it) return;
+  pd2Open(`<div class="modal" style="max-width:420px">
+    <div class="modal-h"><h3>Удалить инструмент?</h3><p>«${_ddH(it.name)}» будет убран из «${_ddH(s.cat)}». Это нельзя отменить.</p></div>
+    <div class="modal-f" style="justify-content:flex-end;gap:8px">
+      <button class="btn-ghost" onclick="pd2Close()">Отмена</button>
+      <button class="btn-add" style="background:var(--neg);color:#fff" onclick="toolDelConfirm(${si},${ii})">Удалить</button>
+    </div></div>`);
+}
+function toolDelConfirm(si,ii){
+  const s=TOOLS_DATA[si]; if(!s){ pd2Close(); return; }
+  const it=s.items[ii]; if(!it){ pd2Close(); return; }
+  if(window.LIVE){
+    if(!it._id){ toast('Не удалось найти запись'); pd2Close(); return; }
+    window.tToolDel(it._id); pd2Close(); return;
+  }
+  s.items.splice(ii,1);
+  pd2Close(); renderTools(); toast('Инструмент удалён');
 }
 function toolAddCat(){
   pd2Open(`<div class="modal">
@@ -29198,6 +29266,18 @@ window.tKbDel = async (id) => {
 window.tToolAdd = async (cat, name, ty, url) => {
   try { await SB.from('tools').insert({ agency_id: ME&&ME.agency_id, category:cat, name, kind:ty, url:url||null });
     toast('Инструмент добавлен'); await window.tLoadTools(); renderTools();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tToolUpdate = async (id, patch) => {
+  try { if(!id) return;
+    const p = {}; if(patch.category!=null) p.category = patch.category; if(patch.name!=null) p.name = patch.name; if(patch.ty!=null) p.kind = patch.ty; if('url' in patch) p.url = patch.url||null;
+    await SB.from('tools').update(p).eq('id', id);
+    toast('Инструмент обновлён'); await window.tLoadTools(); renderTools();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+window.tToolDel = async (id) => {
+  try { if(!id) return; await SB.from('tools').delete().eq('id', id);
+    toast('Инструмент удалён'); await window.tLoadTools(); renderTools();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 
