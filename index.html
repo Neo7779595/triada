@@ -9026,6 +9026,8 @@ function _tgDeepLink(){
 }
 window._tgDeepLink=_tgDeepLink;
 function openProject(i){
+  const _pchk=PROJECTS[i];                                                            // защита от прямого вызова по индексу невидимого проекта (палитра, deep-link)
+  if(_pchk && typeof agCanSeeProject==='function' && !agCanSeeProject(_pchk.id)){ toast('Нет доступа к этому проекту'); return; }
   pdIdx=i;pdTabCur='stages';
   window._pdLastTab=null; window._pdLastProj=null;   // первая отрисовка модалки — с анимацией входа
   const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id; p._stReloaded=0;   // сбрасываем одноразовый авто-повтор загрузки этапов
@@ -13906,7 +13908,7 @@ let _smmLbData=null, _smmLbMetric='er', _smmLbLoading=false, _smmLbSortDir='desc
    window._smmProjLoaded, из-за которого пустой кеш залипал до перезагрузки страницы. */
 let _smmLbSig='', _smmLbErrAt=0;
 const _SMM_LB_ERR_TTL=15000;
-function _smmIds(){ return ((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]).map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }
+function _smmIds(){ const _src=(typeof agVisibleProjects==='function')?agVisibleProjects():((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]); return _src.map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }   // scope=member → берём только видимые проекты, тогда весь SMM-Лидерборд идёт по ним
 function _smmLbStale(){ const s=_smmIds(); return !!s && s!==_smmLbSig && !(_smmLbErrAt && Date.now()-_smmLbErrAt<_SMM_LB_ERR_TTL); }
 function smmLbReset(){ _smmLbAll=null; _smmLbData=null; _smmLbPeriods=[]; _smmLbSig=''; _smmLbErrAt=0; _smmLbLoading=false; }
 /* total_* — то, что реально ввели в отчёте. Раньше охват считался как
@@ -14534,19 +14536,20 @@ function cmdkIndex(cab){
     AGENCIES.forEach(a=>add({g:'Агентства',ic:CMDK_IC.agency,t:a.name,s:a.vertical||'Агентство',badge:a.name[0],kind:'agency',run:()=>{genNav('agencies');openDrawer(a.id);}}));
     [['agencies','Агентства'],['analytics','Аналитика'],['tariffs','Тарифы'],['settings','Настройки']].forEach(([k,l])=>add({g:'Разделы',ic:CMDK_IC.module,t:l,s:'Генеральный кабинет',badge:l[0],kind:'module',run:()=>genNav(k)}));
   } else if(cab==='ag'){
-    const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+    const PJ=(typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);   // scope=member → палитра ищет только по видимым проектам, этапам и командам
     // Проекты
-    if(agCanView('projects')) PJ.forEach((p,i)=>{
+    if(agCanView('projects')) PJ.forEach(p=>{
+      const gi = PROJECTS.indexOf(p);                                                      // глобальный индекс в полном PROJECTS — openProject() адресуется им, а не позицией в отфильтрованном PJ
       // ответственный и команда — в подзаголовок проекта
       let _lead=p._lead; if(!_lead && p.lead_id){ const _x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===p.lead_id); if(_x)_lead={name:_x.name}; }
       const _team=(p._team||[]);
       const teamStr = _lead ? ('ПМ: '+_lead.name+(_team.length?' · +'+_team.length:'')) : (_team.length?_team.length+' в команде':'');
-      add({g:'Проекты',ic:CMDK_IC.project,t:p.name,s:(p.cat&&p.cat!=='—'?p.cat+' · ':'')+(p.svc||'')+(p.pct!=null?' · '+p.pct+'%':''),people:teamStr,peopleList:(_lead?[_lead.name]:[]).concat(_team.map(m=>m.name)),badge:p.logo,logoUrl:p.logoUrl,kind:'project',prio:5,run:()=>{agNav('projects');openProject(i);}});
+      add({g:'Проекты',ic:CMDK_IC.project,t:p.name,s:(p.cat&&p.cat!=='—'?p.cat+' · ':'')+(p.svc||'')+(p.pct!=null?' · '+p.pct+'%':''),people:teamStr,peopleList:(_lead?[_lead.name]:[]).concat(_team.map(m=>m.name)),badge:p.logo,logoUrl:p.logoUrl,kind:'project',prio:5,run:()=>{agNav('projects');openProject(gi);}});
       // ответственный проекта как отдельный результат
       if(_lead && _lead.name){ const _m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x.name===_lead.name);
-        add({g:'Ответственные',ic:CMDK_IC.person,t:_lead.name,s:'Ответственный · '+p.name,sub:'ПМ',parent:p.name,avatar:(_m&&_m.avatar)||_lead.avatar,color:(_m&&_m.color)||_lead.color,badge:(_lead.name[0]||'?'),kind:'person',prio:3,run:()=>{agNav('projects');openProject(i);}}); }
+        add({g:'Ответственные',ic:CMDK_IC.person,t:_lead.name,s:'Ответственный · '+p.name,sub:'ПМ',parent:p.name,avatar:(_m&&_m.avatar)||_lead.avatar,color:(_m&&_m.color)||_lead.color,badge:(_lead.name[0]||'?'),kind:'person',prio:3,run:()=>{agNav('projects');openProject(gi);}}); }
       // участники команды проекта
-      _team.forEach(mm=>add({g:'Команда проекта',ic:CMDK_IC.person,t:mm.name,s:'В команде · '+p.name,sub:'команда',parent:p.name,avatar:mm.avatar,color:mm.color,badge:(mm.name[0]||'?'),kind:'person',prio:2,run:()=>{agNav('projects');openProject(i);}}));
+      _team.forEach(mm=>add({g:'Команда проекта',ic:CMDK_IC.person,t:mm.name,s:'В команде · '+p.name,sub:'команда',parent:p.name,avatar:mm.avatar,color:mm.color,badge:(mm.name[0]||'?'),kind:'person',prio:2,run:()=>{agNav('projects');openProject(gi);}}));
     });
     // Этапы и задачи (из загруженных проектов + дедлайнов)
     PJ.forEach(p=>{
@@ -23505,6 +23508,15 @@ window.tLoadBookings = async () => {
       id:b.id, projId:b.project_id||null, projName:(b.project&&b.project.name)||'', title:b.title||'', kind:b.kind||'other', status:b.status||'hold',
       startsAt:new Date(b.starts_at).getTime(), endsAt:new Date(b.ends_at).getTime(), allDay:!!b.all_day,
       location:b.location||'', note:b.note||'', attachments:Array.isArray(b.attachments)?b.attachments:[], createdBy:b.created_by||null, createdAt:b.created_at, members:byB[b.id]||[] }; });
+    /* scope=member → показываем брони проектов из scope, плюс бесплановые (project_id=null) — только если сам участник. */
+    const _visBK = (typeof agVisibleProjectIds==='function') ? agVisibleProjectIds() : null;
+    if (_visBK){
+      const _mid = (window.tMe && window.tMe()) ? String((window.tMe().id)||'') : '';
+      window.BOOKINGS = window.BOOKINGS.filter(function(b){
+        if (b.projId != null) return _visBK.has(b.projId);                                       // бронь проекта — видит только если проект в scope
+        return (b.members||[]).some(function(m){ return String(m.id) === _mid; });               // без проекта — только если сам среди участников
+      });
+    }
     if(typeof window.onBookingsLoaded==='function') window.onBookingsLoaded();
   }catch(e){ console.warn('[bookings] load ex', e); }
 };
@@ -23908,8 +23920,10 @@ window.tLoadTeam = async () => {
   let tr2=await SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started,difficulty,priority');
   if(tr2.error && /difficulty|priority/.test(tr2.error.message||'')) tr2=tr;   // колонок ещё нет — используем базовую выборку
   const trUse = (tr2 && !tr2.error) ? tr2 : tr;
-  const tasks = (trUse.data||[]).filter(t=>!_doneProj.has(t.project_id)), hist = hr.data||[];
-  const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];   // task_history может ещё не существовать
+  const _visLB = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope=member → операционный лидерборд/статистика команды считаются только по видимым проектам
+  const tasks = (trUse.data||[]).filter(t => !_doneProj.has(t.project_id) && (!_visLB || _visLB.has(t.project_id)));
+  const hist = (hr.data||[]).filter(h => !_visLB || _visLB.has(h.project_id));
+  const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];   // task_history не имеет project_id, но его id-задач автоматически ограничатся taskDue/taskProj ниже
   const taskDue = {}; tasks.forEach(t=>{ if(t.id!=null) taskDue[t.id]=t.due_date||null; });
   const taskDiff = {}; tasks.forEach(t=>{ if(t.id!=null && t.difficulty) taskDiff[t.id]=t.difficulty; });   // сложность по задаче (для взвешивания выработки)
   const taskProj = {}; tasks.forEach(t=>{ if(t.id!=null) taskProj[t.id]=t.project_id; });                   // проект задачи (для эталона скорости)
@@ -24287,35 +24301,47 @@ window._kpiTeamMembers = async (teamId, atISO) => {
 
 /* Внутренний фильтр задач/истории по scope */
 window._kpiFilterByScope = async (raw, scopeKind, scopeId) => {
-  if (scopeKind === 'agency' || !scopeKind) return { tasks: raw.tasks, taskHist: raw.taskHist, stageHist: raw.stageHist };
-  if (scopeKind === 'project'){
-    return {
+  let out;
+  if (scopeKind === 'agency' || !scopeKind) out = { tasks: raw.tasks, taskHist: raw.taskHist, stageHist: raw.stageHist };
+  else if (scopeKind === 'project'){
+    out = {
       tasks: raw.tasks.filter(t => t.project_id === scopeId),
       taskHist: raw.taskHist.filter(h => (raw.byTask[h.task_id]||{}).project_id === scopeId),
       stageHist: raw.stageHist.filter(h => h.project_id === scopeId),
     };
   }
-  if (scopeKind === 'member'){
+  else if (scopeKind === 'member'){
     const uid = scopeId;
     // ВАЖНО: taskHist ТОЛЬКО по СВОИМ задачам (assignee_id=uid).
     // changed_by=uid включал бы задачи, статус которых поменял этот сотрудник
     // (например лид переместил чужую задачу в done) — они посчитались бы в его выработке.
-    return {
+    out = {
       tasks: raw.tasks.filter(t => t.assignee_id === uid),
       taskHist: raw.taskHist.filter(h => (raw.byTask[h.task_id]||{}).assignee_id === uid),
       stageHist: raw.stageHist.filter(h => h.changed_by === uid),
     };
   }
-  if (scopeKind === 'team'){
+  else if (scopeKind === 'team'){
     const midSet = new Set(await _kpiTeamMembers(scopeId, raw.toISO));
     // Аналогично member: только задачи членов команды по assignee_id.
-    return {
+    out = {
       tasks: raw.tasks.filter(t => midSet.has(t.assignee_id)),
       taskHist: raw.taskHist.filter(h => midSet.has((raw.byTask[h.task_id]||{}).assignee_id)),
       stageHist: raw.stageHist.filter(h => midSet.has(h.changed_by)),
     };
   }
-  return { tasks:[], taskHist:[], stageHist:[] };
+  else out = { tasks:[], taskHist:[], stageHist:[] };
+  /* Дополнительный слой: сотрудник со scope='assigned' видит KPI только по своим проектам.
+     Owner/Director/PM возвращают null → фильтр не применяется. */
+  const _vis = (typeof agVisibleProjectIds === 'function') ? agVisibleProjectIds() : null;
+  if (_vis) {
+    out = {
+      tasks: out.tasks.filter(t => _vis.has(t.project_id)),
+      taskHist: out.taskHist.filter(h => _vis.has((raw.byTask[h.task_id]||{}).project_id)),
+      stageHist: out.stageHist.filter(h => _vis.has(h.project_id)),
+    };
+  }
+  return out;
 };
 
 /* ── 1. cycle_time (медиана «активна → done» задачи, часы) ── */
@@ -24486,14 +24512,19 @@ window._kpiInvalidateSmmRaw = () => { _kpiSmmRawCache = { key:null, ts:0, data:n
 /* Резолвим набор project_id для scope */
 window._kpiSmmScopeProjects = async (scopeKind, scopeId) => {
   const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
-  if (scopeKind === 'project') return [scopeId];
-  if (scopeKind === 'agency' || !scopeKind) return P.map(x => x.id);
-  if (scopeKind === 'team'){
+  let pids;
+  if (scopeKind === 'project') pids = [scopeId];
+  else if (scopeKind === 'agency' || !scopeKind) pids = P.map(x => x.id);
+  else if (scopeKind === 'team'){
     // Проекты, где lead или один из leads входит в команду
     const mids = new Set(await _kpiTeamMembers(scopeId));
-    return P.filter(p => mids.has(p.lead_id) || (Array.isArray(p.leads) && p.leads.some(id => mids.has(id)))).map(p => p.id);
+    pids = P.filter(p => mids.has(p.lead_id) || (Array.isArray(p.leads) && p.leads.some(id => mids.has(id)))).map(p => p.id);
   }
-  return [];
+  else pids = [];
+  /* Пересекаем с видимыми сотруднику проектами (scope='assigned' → SMM только по своим). */
+  const _vis = (typeof agVisibleProjectIds === 'function') ? agVisibleProjectIds() : null;
+  if (_vis) pids = pids.filter(id => _vis.has(id));
+  return pids;
 };
 
 /* Хелпер для reach-weighted mean */
@@ -24819,7 +24850,7 @@ window.kpiComputePortfolioAll = async (sc, id, from, to) => {
 /* Здоровье портфеля — как в Сводке: не просроченные И не застойные (14+ дней без активности) */
 window.kpiComputePortfolioHealth = async (sc, id) => {
   if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
-  const P = (typeof PROJECTS!=='undefined' ? PROJECTS : []);
+  const P = (typeof agVisibleProjects==='function') ? agVisibleProjects() : (typeof PROJECTS!=='undefined' ? PROJECTS : []);   // scope=member → только видимые
   const active = P.filter(p => p.status !== 'done');
   if (!active.length) return { value:null, sample_size:0, confidence:null };
   const STALE_DAYS = 14;
@@ -24865,7 +24896,7 @@ window.kpiComputeMRR = async (sc, id) => {
   const F = (typeof FINANCE!=='undefined' ? FINANCE : {}) || {};
   if (F.totalMrr == null){
     // Fallback: сумма mrr из PROJECTS
-    const P = (typeof PROJECTS!=='undefined' ? PROJECTS : []);
+    const P = (typeof agVisibleProjects==='function') ? agVisibleProjects() : (typeof PROJECTS!=='undefined' ? PROJECTS : []);   // scope=member → только видимые
     const active = P.filter(p => p.status !== 'done' && p.status !== 'blocked');
     const sum = active.reduce((s,p) => s + (+p.mrr || 0), 0);
     return { value: sum, sample_size: active.length, confidence: _kpiConfidence('mrr', active.length) };
