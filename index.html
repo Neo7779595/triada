@@ -754,6 +754,38 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .sched-add:hover{filter:brightness(1.06);box-shadow:0 7px 22px -5px rgba(55,230,200,.62);transform:translateY(-1px)}
 .sched-add:active{transform:translateY(0);box-shadow:0 3px 12px -5px rgba(55,230,200,.5)}
 .sched-add svg{width:16px;height:16px}
+/* filter */
+.sched-filt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sched-search{position:relative;display:flex;align-items:center;height:38px;background:var(--bg-2);border:1px solid var(--line);border-radius:11px;padding:0 10px 0 34px;transition:.16s;min-width:210px}
+.sched-search:focus-within{border-color:var(--accent-line);background:var(--accent-dim);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)}
+.sched-search>svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--txt-3);pointer-events:none}
+.sched-search:focus-within>svg{color:var(--accent)}
+.sched-search input{flex:1;border:0;background:none;color:var(--txt);font:500 13px var(--font);outline:none;padding:0 22px 0 0;min-width:100px;letter-spacing:.01em}
+.sched-search input::placeholder{color:var(--txt-3);font-weight:400}
+.sched-search-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:7px;border:0;background:none;color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s}
+.sched-search-x:hover{background:var(--bg-3);color:var(--txt)}
+.sched-search-x svg{width:12px;height:12px}
+.sched-filt-mid-wrap{position:relative}
+.sched-filt-mid{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px 0 6px;border-radius:11px;border:1px solid var(--line);background:var(--bg-2);color:var(--txt-2);cursor:pointer;transition:.16s;font-size:12.5px;font-weight:500;min-width:160px}
+.sched-filt-mid:hover{border-color:var(--line-2);color:var(--txt)}
+.sched-filt-mid.on{border-color:var(--accent-line);background:var(--accent-dim);color:var(--accent);font-weight:600}
+.sched-filt-mid .lb{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sched-filt-mid .chev{color:var(--txt-3);transition:.16s;flex-shrink:0}
+.sched-filt-mid.on .chev{color:var(--accent)}
+.sched-filt-mid .sch-av{flex-shrink:0}
+.sch-av-all{background:var(--bg-3);color:var(--txt-2);width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:12px;line-height:1}
+.sched-filt-dd{position:absolute;top:calc(100% + 6px);right:0;min-width:240px;max-width:300px;max-height:340px;overflow-y:auto;background:var(--bg-1);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 18px 44px -14px rgba(0,0,0,.55),0 4px 14px -6px rgba(0,0,0,.4);padding:6px;z-index:60;display:flex;flex-direction:column;gap:2px;animation:schFiltIn .16s cubic-bezier(.2,.9,.35,1.05)}
+@keyframes schFiltIn{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.sched-filt-opt{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;border:0;background:none;color:var(--txt-2);cursor:pointer;transition:.12s;font-size:12.5px;font-weight:500;text-align:left}
+.sched-filt-opt:hover{background:var(--bg-2);color:var(--txt)}
+.sched-filt-opt.on{background:var(--accent-dim);color:var(--accent);font-weight:600}
+.sched-filt-opt .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sched-filt-opt svg{color:var(--accent);flex-shrink:0}
+.sched-filt-empty{color:var(--txt-3);font-size:12px;text-align:center;padding:16px 10px}
+.sched-filt-clr{display:flex;align-items:center;gap:6px;height:38px;padding:0 12px;border-radius:11px;border:1px solid var(--line);background:var(--bg-2);color:var(--txt-2);cursor:pointer;transition:.16s;font-size:12.5px;font-weight:500}
+.sched-filt-clr:hover{color:#FF8B7C;border-color:#FF8B7C;background:rgba(255,139,124,.08)}
+.sched-filt-clr svg{width:12px;height:12px}
+@media(max-width:900px){.sched-search{min-width:0;flex:1}.sched-filt{flex:1;min-width:0}.sched-filt-mid{min-width:0}.sched-filt-mid .lb{max-width:100px}.sched-filt-dd{right:auto;left:0}}
 /* week */
 .sched-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:stretch}
 .sched-col{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:196px;display:flex;flex-direction:column;transition:.16s}
@@ -19422,6 +19454,7 @@ const MOD_INFO={
 /* ═══════════════════ РАСПИСАНИЕ · календарь-брони (Фаза 2) ═══════════════════ */
 let SCH_VIEW='week', SCH_ANCHOR=null, _schEditId=null, _schMembers=[];
 let _schDate=null, _schT1='10:00', _schT2='11:00', _schAllDay=false, _schCalY=0, _schCalM=0, _schPanel=null, _schMemQ='', _schRouteLoc='', _schAttach=[], _schFileExpiry=604800;
+let SCH_FILT_Q='', SCH_FILT_MID='all', SCH_FILT_OPEN=false;
 const SCH_EXP=[[3600,'1 час'],[86400,'1 день'],[604800,'7 дней'],[2592000,'30 дней']];
 const _SCH_MONG=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 const SCH_KINDS=[['shoot','Съёмка','#37E6C8'],['meeting','Встреча','#8A8FFF'],['call','Звонок','#43D88C'],['montage','Монтаж','#E3B567'],['task','Работа','#22C3E6'],['other','Другое','#8A97A6']];
@@ -19453,6 +19486,74 @@ function _schDayBookings(dayStart){
   return (window.BOOKINGS||[]).filter(function(b){ return b.startsAt<z && b.endsAt>a; })
     .sort(function(x,y){ if(x.allDay!==y.allDay) return x.allDay?-1:1; return x.startsAt-y.startsAt; });
 }
+/* ——— Фильтр по сотруднику (единый для всех вкладок) ——— */
+function _schFiltActive(){ return !!(SCH_FILT_Q && String(SCH_FILT_Q).trim()) || (String(SCH_FILT_MID||'all')!=='all'); }
+function _schBookingMatchesFilter(b){
+  const q=String(SCH_FILT_Q||'').trim().toLowerCase();
+  const mid=String(SCH_FILT_MID||'all');
+  if(!q && mid==='all') return true;
+  const ms=(b&&b.members)||[];
+  if(mid!=='all' && !ms.some(function(p){ return String(p.id)===mid; })) return false;
+  if(q){
+    const hitMember = ms.some(function(p){ return String(p.name||'').toLowerCase().indexOf(q)>=0; });
+    if(!hitMember) return false;
+  }
+  return true;
+}
+function _schVisibleDay(ts){ return _schDayBookings(ts).filter(_schBookingMatchesFilter); }
+function _schPersonMatchesFilter(p){
+  const q=String(SCH_FILT_Q||'').trim().toLowerCase();
+  const mid=String(SCH_FILT_MID||'all');
+  if(mid!=='all' && String(p.id)!==mid) return false;
+  if(q && String(p.name||'').toLowerCase().indexOf(q)<0) return false;
+  return true;
+}
+function schFiltQ(v){ SCH_FILT_Q=String(v||''); _schPaint(); setTimeout(function(){ const el=document.getElementById('schFiltInp'); if(el){ el.focus(); try{ el.setSelectionRange(el.value.length,el.value.length); }catch(e){} } },0); }
+function schFiltMid(v){ SCH_FILT_MID=String(v||'all'); SCH_FILT_OPEN=false; _schPaint(); }
+function schFiltClear(){ SCH_FILT_Q=''; SCH_FILT_MID='all'; SCH_FILT_OPEN=false; _schPaint(); }
+function schFiltToggle(ev){ if(ev){ ev.stopPropagation(); ev.preventDefault(); } SCH_FILT_OPEN=!SCH_FILT_OPEN; _schPaint(); if(SCH_FILT_OPEN){ setTimeout(function(){ document.addEventListener('mousedown',_schFiltDocClose,true); },10); } }
+function _schFiltDocClose(ev){ const dd=document.getElementById('schFiltDD'); if(dd && !dd.contains(ev.target) && !ev.target.closest('.sched-filt-mid')){ SCH_FILT_OPEN=false; document.removeEventListener('mousedown',_schFiltDocClose,true); _schPaint(); } }
+function _schFiltPickHtml(){
+  const q=String(SCH_FILT_Q||'').trim().toLowerCase();
+  const people=_schPeople();
+  const filtered=q?people.filter(function(p){ return String(p.name||'').toLowerCase().indexOf(q)>=0; }):people;
+  const items=[{id:'all',name:'Все сотрудники',_all:true}].concat(filtered);
+  return items.map(function(p){
+    const on=String(SCH_FILT_MID||'all')===String(p.id);
+    const av=p._all?'<span class="sch-av sch-av-all">👥</span>':_schAv(p,22);
+    return '<button class="sched-filt-opt'+(on?' on':'')+'" onclick="schFiltMid(\''+String(p.id).replace(/\\/g,'\\\\').replace(/\'/g,'\\\'')+'\')">'
+      +av+'<span class="nm">'+escH(p.name||'?')+'</span>'
+      +(on?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M5 12l5 5L20 7"/></svg>':'')
+    +'</button>';
+  }).join('') || '<div class="sched-filt-empty">Никого не найдено</div>';
+}
+function _schFiltBadge(){
+  const mid=String(SCH_FILT_MID||'all');
+  if(mid==='all') return 'Все сотрудники';
+  const p=_schPeople().find(function(x){ return String(x.id)===mid; });
+  return p?p.name:'Все сотрудники';
+}
+function _schFiltHtml(){
+  const q=SCH_FILT_Q||'';
+  const active=_schFiltActive();
+  const midBadge=_schFiltBadge();
+  const midAvatar=(function(){ const mid=String(SCH_FILT_MID||'all'); if(mid==='all') return '<span class="sch-av sch-av-all">👥</span>'; const p=_schPeople().find(function(x){ return String(x.id)===mid; }); return p?_schAv(p,22):'<span class="sch-av sch-av-all">👥</span>'; })();
+  return '<div class="sched-filt">'
+    +'<div class="sched-search">'
+      +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>'
+      +'<input id="schFiltInp" type="text" placeholder="Поиск сотрудника" value="'+_ddA(q)+'" oninput="schFiltQ(this.value)" autocomplete="off" spellcheck="false">'
+      +(q?'<button class="sched-search-x" onclick="schFiltQ(\'\')" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>':'')
+    +'</div>'
+    +'<div class="sched-filt-mid-wrap">'
+      +'<button class="sched-filt-mid'+(SCH_FILT_MID!=='all'?' on':'')+'" onclick="schFiltToggle(event)">'
+        +midAvatar+'<span class="lb">'+escH(midBadge)+'</span>'
+        +'<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M6 9l6 6 6-6"/></svg>'
+      +'</button>'
+      +(SCH_FILT_OPEN?'<div id="schFiltDD" class="sched-filt-dd">'+_schFiltPickHtml()+'</div>':'')
+    +'</div>'
+    +(active?'<button class="sched-filt-clr" onclick="schFiltClear()" title="Сбросить фильтр"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>':'')
+  +'</div>';
+}
 function renderSchedule(){ if(window.tLoadBookings) window.tLoadBookings(); _schPaint(); }   // открытие модуля — грузим свежее
 function _schPaint(){
   _schInit();
@@ -19472,6 +19573,7 @@ function _schToolbar(){
       +'<button class="sched-navb" onclick="schNav(1)" title="Вперёд">'+chev(1)+'</button>'
       +'<span class="sched-label">'+label+'</span></div>'
     +'<div class="sched-right">'
+      +_schFiltHtml()
       +'<div class="sched-seg"><button class="'+(SCH_VIEW==='week'?'on':'')+'" onclick="schView(\'week\')">Неделя</button><button class="'+(SCH_VIEW==='month'?'on':'')+'" onclick="schView(\'month\')">Месяц</button><button class="'+(SCH_VIEW==='team'?'on':'')+'" onclick="schView(\'team\')">Команда</button></div>'
       +'<button class="sched-add" onclick="schNewBooking()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Бронь</button>'
     +'</div></div>';
@@ -19488,8 +19590,8 @@ function _schChip(b){
 function _schWeek(){
   const mon=_schMonday(SCH_ANCHOR), today=_schToday().getTime(); let cols='';
   for(let i=0;i<7;i++){ const day=new Date(mon); day.setDate(mon.getDate()+i); const ts=day.getTime();
-    const list=_schDayBookings(ts);
-    const chips=list.length?list.map(_schChip).join(''):'<button class="sched-day-add" title="Добавить бронь" onclick="event.stopPropagation();schNewBookingAt('+ts+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg></button>';
+    const list=_schVisibleDay(ts);
+    const chips=list.length?list.map(_schChip).join(''):(_schFiltActive()?'<div class="sched-empty-day">—</div>':'<button class="sched-day-add" title="Добавить бронь" onclick="event.stopPropagation();schNewBookingAt('+ts+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg></button>');
     const cnt=list.length?'<span class="cnt">'+list.length+'</span>':'';
     cols+='<div class="sched-col'+(ts===today?' today':'')+(i>=5?' we':'')+'">'
       +'<div class="sched-col-h" onclick="schDay('+ts+')"><span class="wd">'+SCH_WD[i]+'</span><span class="hr">'+cnt+'<span class="dn">'+day.getDate()+'</span></span></div>'
@@ -19504,7 +19606,7 @@ function _schMonth(){
   const wdh=SCH_WD.map(function(w,i){ return '<div class="sched-mwd'+(i>=5?' we':'')+'">'+w+'</div>'; }).join('');
   const start=new Date(y,mo,1-startDow); let cells='';
   for(let i=0;i<rows*7;i++){ const cell=new Date(start); cell.setDate(start.getDate()+i); cell.setHours(0,0,0,0); const ts=cell.getTime();
-    const inMo=cell.getMonth()===mo, list=_schDayBookings(ts), max=3;
+    const inMo=cell.getMonth()===mo, list=_schVisibleDay(ts), max=3;
     const shown=list.slice(0,max).map(function(b){ return '<button class="sched-mev'+(b.status==='cancelled'?' cancel':'')+(b.status==='hold'?' hold':'')+'" style="--cc:'+_schColor(b)+'" onclick="schOpen(\''+b.id+'\',event)"><i></i>'+(b.allDay?'':'<em>'+_schFmtT(b.startsAt)+'</em> ')+escH(b.title)+'</button>'; }).join('');
     const more=list.length>max?'<button class="sched-more" onclick="schDay('+ts+',event)">+'+(list.length-max)+' ещё</button>':'';
     cells+='<div class="sched-cell'+(inMo?'':' out')+(ts===today?' today':'')+((cell.getDay()===0||cell.getDay()===6)?' we':'')+'" onclick="schDay('+ts+')">'
@@ -19518,7 +19620,7 @@ function schView(v){ SCH_VIEW=(v==='month'||v==='team')?v:'week'; _schPaint(); }
 function schNav(dir){ const d=new Date(SCH_ANCHOR); if(SCH_VIEW==='week') d.setDate(d.getDate()+7*dir); else if(SCH_VIEW==='team') d.setDate(d.getDate()+dir); else d.setMonth(d.getMonth()+dir); SCH_ANCHOR=d; _schPaint(); }
 function schToday(){ SCH_ANCHOR=_schToday(); _schPaint(); }
 /* ——— день: список броней + добавить ——— */
-function schDay(ts, ev){ if(ev) ev.stopPropagation(); const list=_schDayBookings(ts); const d=new Date(ts);
+function schDay(ts, ev){ if(ev) ev.stopPropagation(); const list=_schVisibleDay(ts); const d=new Date(ts);
   const wi=(d.getDay()+6)%7, isToday=ts===_schToday().getTime();
   const WDF=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
   const cnt=list.length, cntTxt=cnt?(cnt+' '+(typeof _plural==='function'?_plural(cnt,'бронь','брони','броней'):'броней')):'свободно';
@@ -19801,7 +19903,9 @@ function _schTeam(){
   const avail=window.AVAIL||{tasks:[],load:{}};
   const span=(SCH_W1-SCH_W0)*3600000; let hlabels='';
   for(let h=SCH_W0;h<=SCH_W1;h+=2) hlabels+='<span class="avail-h" style="left:'+(((h-SCH_W0)*3600000)/span*100)+'%">'+_z2(h)+'</span>';
-  const people=_schPeople(); let freeN=0, busyN=0;
+  const peopleAll=_schPeople();
+  const people=peopleAll.filter(_schPersonMatchesFilter);
+  let freeN=0, busyN=0;
   const isToday=dayStart===_schToday().getTime();
   const nowPos=isToday?_availPos(Date.now(), Date.now()+60000, dayStart):null;
   const nowLeft=nowPos?nowPos.left:null;
