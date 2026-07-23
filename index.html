@@ -3066,8 +3066,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* Name box + edit bar над сеткой (стиль Google Sheets) */
 .cp-nbar{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--line);background:var(--bg-1);height:36px;flex:0 0 auto}
 .cp-nbar-name{display:flex;align-items:center;justify-content:center;min-width:84px;padding:0 12px;font-family:var(--mono);font-size:12.5px;color:var(--accent);font-weight:800;letter-spacing:.05em;background:color-mix(in srgb,var(--accent) 8%,transparent);border-right:1px solid var(--line-2)}
-.cp-nbar-fx{display:flex;align-items:center;justify-content:center;padding:0 13px;font-family:Georgia,serif;font-size:14.5px;color:var(--txt-3);font-weight:600;border-right:1px solid var(--line-2);background:var(--bg-2);font-style:italic}
+.cp-nbar-fx{display:flex;align-items:center;justify-content:center;padding:0 13px;font-family:Georgia,serif;font-size:14.5px;color:var(--txt-3);font-weight:600;border-right:1px solid var(--line-2);background:var(--bg-2);font-style:italic;transition:color .16s,background .16s}
+.cp-nbar-fx.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .cp-nbar-fx i{font-style:italic;font-size:11.5px;margin-left:-1px}
+.cp-nbar-ed.cp-nbar-ed-fmula{font-family:var(--mono);color:var(--accent);font-size:13px}
+.cp-ed.cp-ed-fmula{font-family:var(--mono);color:var(--accent)}
 .cp-nbar-ed{flex:1;border:0;background:transparent;padding:0 14px;font-family:var(--font);font-size:13.5px;color:var(--txt);outline:none !important;box-shadow:none !important;letter-spacing:.005em;min-width:0}
 .cp-nbar-ed:focus{background:color-mix(in srgb,var(--accent) 5%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 30%,transparent) !important}
 .cp-nbar-ed::placeholder{color:var(--txt-3);font-weight:400}
@@ -10660,11 +10663,226 @@ function cpCellView(col,v){
   return '<span class="cp-txt">'+_ddH(v)+'</span>';
 }
 function cpEditor(row,col){
-  const v=row.c[col.id]==null?'':row.c[col.id];
-  if(col.type==='long') return '<textarea id="cp-ed" class="cp-ed cp-ta" onkeydown="cpEdKey(event)" onblur="cpBlur()">'+_ddH(v)+'</textarea>';
-  const t=col.type==='date'?'date':'text';
-  const im=(col.type==='num'||col.type==='money')?' inputmode="decimal"':'';
-  return '<input id="cp-ed" type="'+t+'" class="cp-ed" value="'+_ddA(v)+'"'+im+' onkeydown="cpEdKey(event)" onblur="cpBlur()">';
+  /* Если ячейка содержит формулу — редактируем исходник, не результат */
+  const fmula=(row.f&&row.f[col.id])?row.f[col.id]:null;
+  const v = fmula!=null ? fmula : (row.c[col.id]==null?'':row.c[col.id]);
+  if(col.type==='long' && !fmula) return '<textarea id="cp-ed" class="cp-ed cp-ta" onkeydown="cpEdKey(event)" onblur="cpBlur()">'+_ddH(v)+'</textarea>';
+  const t=(fmula||col.type==='date'?(fmula?'text':'date'):'text');
+  const im=(!fmula&&(col.type==='num'||col.type==='money'))?' inputmode="decimal"':'';
+  return '<input id="cp-ed" type="'+t+'" class="cp-ed'+(fmula?' cp-ed-fmula':'')+'" value="'+_ddA(v)+'"'+im+' onkeydown="cpEdKey(event)" onblur="cpBlur()">';
+}
+/* ═══════════════════ ФОРМУЛЫ (Google Sheets-style) ═══════════════════ */
+/* Модель: row.f[colId] = "=A1+B1"  ·  row.c[colId] = вычисленный результат */
+function cpColLetter(n){ let s=''; n=n|0; do{ s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; }while(n>=0); return s; }
+function cpFmulaColIdx(letters){ let n=0; letters=String(letters).toUpperCase(); for(let i=0;i<letters.length;i++){ const c=letters.charCodeAt(i)-64; if(c<1||c>26) return -1; n=n*26+c; } return n-1; }
+/* Токенизатор */
+function cpFmulaTokenize(s){
+  const T=[]; let i=0; const L=s.length;
+  while(i<L){
+    const c=s[i];
+    if(c===' '||c==='\t'||c==='\n'){ i++; continue; }
+    if(/[0-9]/.test(c) || (c==='.' && i+1<L && /[0-9]/.test(s[i+1]))){
+      let j=i; while(j<L && /[0-9._]/.test(s[j])) j++;
+      T.push({t:'num', v:parseFloat(s.slice(i,j).replace(/_/g,''))}); i=j; continue;
+    }
+    if(c==='"'){
+      let j=i+1, buf=''; while(j<L && s[j]!=='"'){ if(s[j]==='\\'&&j+1<L){ buf+=s[j+1]; j+=2; } else { buf+=s[j]; j++; } }
+      T.push({t:'str', v:buf}); i=j+1; continue;
+    }
+    if(c==="'"){ let j=i+1, buf=''; while(j<L && s[j]!=="'"){ buf+=s[j]; j++; } T.push({t:'str', v:buf}); i=j+1; continue; }
+    if(/[A-Za-zА-Яа-я_$]/.test(c)){
+      let j=i; while(j<L && /[A-Za-zА-Яа-я0-9_$]/.test(s[j])) j++;
+      const word=s.slice(i,j);
+      /* Cell ref: [$?][A-Z]+[$?][0-9]+ */
+      const mR=/^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(word);
+      if(mR){
+        const c1=cpFmulaColIdx(mR[2]), r1=parseInt(mR[4],10)-1;
+        if(c1>=0){
+          if(s[j]===':'){
+            let k=j+1; while(k<L && /[A-Za-z0-9$]/.test(s[k])) k++;
+            const w2=s.slice(j+1,k);
+            const mR2=/^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(w2);
+            if(mR2){ const c2=cpFmulaColIdx(mR2[2]), r2=parseInt(mR2[4],10)-1; if(c2>=0){ T.push({t:'range', c1,r1,c2,r2}); i=k; continue; } }
+          }
+          T.push({t:'ref', c:c1, r:r1}); i=j; continue;
+        }
+      }
+      const up=word.toUpperCase();
+      if(up==='TRUE'||up==='ИСТИНА'){ T.push({t:'bool',v:true}); i=j; continue; }
+      if(up==='FALSE'||up==='ЛОЖЬ'){ T.push({t:'bool',v:false}); i=j; continue; }
+      if(up==='AND'||up==='OR'||up==='NOT'){ T.push({t:'op',v:up}); i=j; continue; }
+      T.push({t:'name', v:up}); i=j; continue;
+    }
+    const two=s.slice(i,i+2);
+    if(two==='<>'||two==='<='||two==='>='){ T.push({t:'op',v:two}); i+=2; continue; }
+    if('+-*/^%&=<>(),;:'.indexOf(c)>=0){ T.push({t:'op',v:c}); i++; continue; }
+    throw '#ERROR!';
+  }
+  return T;
+}
+/* Recursive-descent parser (левоассоциативные, кроме ^) */
+function cpFmulaParser(tokens){
+  const P={pos:0, tokens};
+  P.peek=function(){ return P.tokens[P.pos]; };
+  P.eat=function(){ return P.tokens[P.pos++]; };
+  P.expect=function(t,v){ const tok=P.eat(); if(!tok||(t&&tok.t!==t)||(v!=null&&tok.v!==v)) throw '#ERROR!'; return tok; };
+  P.match=function(t,v){ const tok=P.peek(); if(!tok) return false; if(t&&tok.t!==t) return false; if(v!=null&&tok.v!==v) return false; return true; };
+  P.parseExpr=function(){ return P.parseOr(); };
+  P.parseOr=function(){ let x=P.parseAnd(); while(P.match('op','OR')){ P.eat(); x={t:'binop',op:'OR',l:x,r:P.parseAnd()}; } return x; };
+  P.parseAnd=function(){ let x=P.parseCmp(); while(P.match('op','AND')){ P.eat(); x={t:'binop',op:'AND',l:x,r:P.parseCmp()}; } return x; };
+  P.parseCmp=function(){ let x=P.parseAdd(); const ops=['=','<>','<','>','<=','>=']; for(const o of ops){ if(P.match('op',o)){ P.eat(); return {t:'binop',op:o,l:x,r:P.parseAdd()}; } } return x; };
+  P.parseAdd=function(){ let x=P.parseMul(); while(P.match('op','+')||P.match('op','-')||P.match('op','&')){ const op=P.eat().v; x={t:'binop',op,l:x,r:P.parseMul()}; } return x; };
+  P.parseMul=function(){ let x=P.parseUnary(); while(P.match('op','*')||P.match('op','/')){ const op=P.eat().v; x={t:'binop',op,l:x,r:P.parseUnary()}; } return x; };
+  P.parseUnary=function(){ if(P.match('op','-')){ P.eat(); return {t:'unary',op:'-',v:P.parsePower()}; } if(P.match('op','+')){ P.eat(); return P.parsePower(); } if(P.match('op','NOT')){ P.eat(); return {t:'unary',op:'NOT',v:P.parsePower()}; } return P.parsePower(); };
+  P.parsePower=function(){ let x=P.parsePct(); if(P.match('op','^')){ P.eat(); x={t:'binop',op:'^',l:x,r:P.parsePower()}; } return x; };
+  P.parsePct=function(){ let x=P.parsePrim(); if(P.match('op','%')){ P.eat(); x={t:'unary',op:'%',v:x}; } return x; };
+  P.parsePrim=function(){
+    const tok=P.peek(); if(!tok) throw '#ERROR!';
+    if(tok.t==='num'){ P.eat(); return {t:'num',v:tok.v}; }
+    if(tok.t==='str'){ P.eat(); return {t:'str',v:tok.v}; }
+    if(tok.t==='bool'){ P.eat(); return {t:'bool',v:tok.v}; }
+    if(tok.t==='ref'){ P.eat(); return {t:'ref',r:tok.r,c:tok.c}; }
+    if(tok.t==='range'){ P.eat(); return {t:'range',r1:tok.r1,c1:tok.c1,r2:tok.r2,c2:tok.c2}; }
+    if(tok.t==='name'){ const name=tok.v; P.eat(); P.expect('op','('); const args=[]; if(!P.match('op',')')){ args.push(P.parseExpr()); while(P.match('op',',')||P.match('op',';')){ P.eat(); args.push(P.parseExpr()); } } P.expect('op',')'); return {t:'call', name, args}; }
+    if(P.match('op','(')){ P.eat(); const e=P.parseExpr(); P.expect('op',')'); return e; }
+    throw '#ERROR!';
+  };
+  return P;
+}
+/* Приведение к числу — терпимо парсит money, %, пробелы, запятую */
+function _cpFNum(v){ if(v==null||v==='') return 0; if(typeof v==='number') return v; if(typeof v==='boolean') return v?1:0; if(Array.isArray(v)) return v.reduce(function(a,b){ return a+_cpFNum(b); },0); const s=String(v).replace(/\s/g,'').replace(/[₽$€]|сум/gi,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:n; }
+function _cpFStr(v){ if(v==null) return ''; if(Array.isArray(v)) return v.map(_cpFStr).join(''); if(typeof v==='number') return String(Math.round(v*1e10)/1e10); if(typeof v==='boolean') return v?'ИСТИНА':'ЛОЖЬ'; return String(v); }
+/* Evaluator */
+function cpFmulaEval(ast, sh, ctx){
+  if(!ast) return '';
+  const T=ast.t;
+  if(T==='num'||T==='str'||T==='bool') return ast.v;
+  if(T==='ref'){
+    if(ctx&&ctx.stack&&ctx.stack.has(ast.r+':'+ast.c)) throw '#CIRCULAR!';
+    const col=sh.cols[ast.c]; if(!col) throw '#REF!';
+    const row=sh.rows[ast.r]; if(!row) return 0;
+    /* Если у самой ссылочной ячейки формула — сначала вычислим её (мемо через ctx.stack) */
+    if(row.f&&row.f[col.id]){ if(ctx&&ctx.stack){ ctx.stack.add(ast.r+':'+ast.c); const v=cpEvalFormulaInner(row.f[col.id], sh, {stack:ctx.stack}); ctx.stack.delete(ast.r+':'+ast.c); return v; } }
+    const v=row.c[col.id]; if(v==null||v==='') return 0;
+    /* Пытаемся числом; если не число — вернуть строку */
+    const n=_cpFNum(v); if(!isNaN(n)&&String(v).trim()!==''&&/^[-+]?[\d\s.,]+%?$/.test(String(v).trim())) return n;
+    return v;
+  }
+  if(T==='range'){
+    const out=[]; const r1=Math.min(ast.r1,ast.r2), r2=Math.max(ast.r1,ast.r2), c1=Math.min(ast.c1,ast.c2), c2=Math.max(ast.c1,ast.c2);
+    for(let r=r1;r<=Math.min(r2, sh.rows.length-1); r++){ const row=sh.rows[r]; if(!row) continue;
+      for(let c=c1;c<=Math.min(c2, sh.cols.length-1); c++){ const col=sh.cols[c]; if(!col) continue;
+        if(row.f&&row.f[col.id]){ if(ctx&&ctx.stack){ ctx.stack.add(r+':'+c); out.push(cpEvalFormulaInner(row.f[col.id], sh, {stack:ctx.stack})); ctx.stack.delete(r+':'+c); } else { out.push(row.c[col.id]); } }
+        else { const v=row.c[col.id]; if(v!=null&&v!=='') out.push(v); }
+      }
+    }
+    return out;
+  }
+  if(T==='binop'){
+    const l=cpFmulaEval(ast.l, sh, ctx), r=cpFmulaEval(ast.r, sh, ctx); const op=ast.op;
+    switch(op){
+      case '+': return _cpFNum(l)+_cpFNum(r);
+      case '-': return _cpFNum(l)-_cpFNum(r);
+      case '*': return _cpFNum(l)*_cpFNum(r);
+      case '/': { const rr=_cpFNum(r); if(rr===0) throw '#DIV/0!'; return _cpFNum(l)/rr; }
+      case '^': return Math.pow(_cpFNum(l), _cpFNum(r));
+      case '&': return _cpFStr(l)+_cpFStr(r);
+      case '=': return (typeof l==='number'||typeof r==='number')? _cpFNum(l)===_cpFNum(r) : _cpFStr(l)===_cpFStr(r);
+      case '<>': return (typeof l==='number'||typeof r==='number')? _cpFNum(l)!==_cpFNum(r) : _cpFStr(l)!==_cpFStr(r);
+      case '<': return _cpFNum(l)<_cpFNum(r);
+      case '>': return _cpFNum(l)>_cpFNum(r);
+      case '<=': return _cpFNum(l)<=_cpFNum(r);
+      case '>=': return _cpFNum(l)>=_cpFNum(r);
+      case 'AND': return !!l && !!r;
+      case 'OR': return !!l || !!r;
+    }
+    throw '#ERROR!';
+  }
+  if(T==='unary'){
+    const v=cpFmulaEval(ast.v, sh, ctx);
+    if(ast.op==='-') return -_cpFNum(v);
+    if(ast.op==='%') return _cpFNum(v)/100;
+    if(ast.op==='NOT') return !v;
+    throw '#ERROR!';
+  }
+  if(T==='call') return cpFmulaCall(ast.name, ast.args, sh, ctx);
+  throw '#ERROR!';
+}
+function cpFmulaCall(name, args, sh, ctx){
+  const ev=function(a){ return cpFmulaEval(a, sh, ctx); };
+  const flatNums=function(){ const out=[]; args.forEach(function(a){ const v=ev(a); if(Array.isArray(v)) v.forEach(function(x){ const n=_cpFNum(x); if(!isNaN(n)&&x!=null&&x!=='') out.push(n); }); else if(v!=null&&v!==''){ const n=_cpFNum(v); if(!isNaN(n)) out.push(n); } }); return out; };
+  const flatAll=function(){ const out=[]; args.forEach(function(a){ const v=ev(a); if(Array.isArray(v)) v.forEach(function(x){ out.push(x); }); else out.push(v); }); return out; };
+  switch(name){
+    case 'SUM':    case 'СУММ':    return flatNums().reduce(function(a,b){return a+b;},0);
+    case 'AVG': case 'AVERAGE': case 'СРЗНАЧ': { const n=flatNums(); return n.length?n.reduce(function(a,b){return a+b;},0)/n.length:0; }
+    case 'COUNT': case 'СЧЁТ': return flatNums().length;
+    case 'COUNTA':case 'СЧЁТЗ': return flatAll().filter(function(x){ return x!=null&&x!==''; }).length;
+    case 'MIN':   case 'МИН':   { const n=flatNums(); return n.length?Math.min.apply(null,n):0; }
+    case 'MAX':   case 'МАКС':  { const n=flatNums(); return n.length?Math.max.apply(null,n):0; }
+    case 'IF':    case 'ЕСЛИ':  { if(args.length<2) throw '#N/A'; return ev(args[0]) ? ev(args[1]) : (args[2]?ev(args[2]):false); }
+    case 'AND':   case 'И':     { for(let i=0;i<args.length;i++) if(!ev(args[i])) return false; return true; }
+    case 'OR':    case 'ИЛИ':   { for(let i=0;i<args.length;i++) if(ev(args[i])) return true; return false; }
+    case 'NOT':   case 'НЕ':    return !ev(args[0]);
+    case 'LEN':   case 'ДЛСТР': return _cpFStr(ev(args[0])).length;
+    case 'UPPER': case 'ПРОПИСН': return _cpFStr(ev(args[0])).toUpperCase();
+    case 'LOWER': case 'СТРОЧН': return _cpFStr(ev(args[0])).toLowerCase();
+    case 'TRIM':  case 'СЖПРОБЕЛЫ': return _cpFStr(ev(args[0])).trim();
+    case 'CONCAT': case 'CONCATENATE': case 'СЦЕПИТЬ': return args.map(function(a){ return _cpFStr(ev(a)); }).join('');
+    case 'TODAY': case 'СЕГОДНЯ': { const d=new Date(); return _pp0(d.getDate())+'.'+_pp0(d.getMonth()+1)+'.'+d.getFullYear(); }
+    case 'NOW':   case 'ТДАТА':   { const d=new Date(); return _pp0(d.getDate())+'.'+_pp0(d.getMonth()+1)+'.'+d.getFullYear()+' '+_pp0(d.getHours())+':'+_pp0(d.getMinutes()); }
+    case 'IFERROR': case 'ЕСЛИОШИБКА': { try { return ev(args[0]); } catch(e){ return args[1]?ev(args[1]):''; } }
+    case 'ROUND': case 'ОКРУГЛ':  { const n=_cpFNum(ev(args[0])); const d=args[1]?_cpFNum(ev(args[1])):0; const p=Math.pow(10,d); return Math.round(n*p)/p; }
+    case 'ABS':   case 'ABS_':    return Math.abs(_cpFNum(ev(args[0])));
+    case 'INT':   case 'ЦЕЛОЕ':   return Math.floor(_cpFNum(ev(args[0])));
+    case 'MOD':   case 'ОСТАТ':   { const b=_cpFNum(ev(args[1])); if(b===0) throw '#DIV/0!'; return _cpFNum(ev(args[0]))%b; }
+    case 'POWER': case 'СТЕПЕНЬ': return Math.pow(_cpFNum(ev(args[0])), _cpFNum(ev(args[1])));
+    case 'SQRT':  case 'КОРЕНЬ':  { const x=_cpFNum(ev(args[0])); if(x<0) throw '#NUM!'; return Math.sqrt(x); }
+    case 'DAYS':  case 'ДНИ':     { const a=_cpParseDate(ev(args[0])), b=_cpParseDate(ev(args[1])); if(!a||!b) throw '#VALUE!'; return Math.round((b-a)/86400000); }
+    case 'PI':    return Math.PI;
+    case 'E':     return Math.E;
+  }
+  throw '#NAME?';
+  function _pp0(x){ return String(x).padStart(2,'0'); }
+}
+function _cpParseDate(v){
+  if(v instanceof Date) return v;
+  const s=String(v||'').trim();
+  let m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  m=/^(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?$/.exec(s);
+  if(m){ const y=m[3]?(+m[3]<100?2000+ +m[3]:+m[3]):(new Date().getFullYear()); return new Date(y,+m[2]-1,+m[1]); }
+  return null;
+}
+/* Внешний eval (ловит все ошибки, возвращает строку-код ошибки) */
+function cpEvalFormula(expr, sh, curRow){ return cpEvalFormulaInner(expr, sh, {stack:new Set()}); }
+function cpEvalFormulaInner(expr, sh, ctx){
+  if(expr==null||!String(expr).startsWith('=')) return expr;
+  try {
+    const tokens=cpFmulaTokenize(String(expr).slice(1));
+    if(!tokens.length) return '';
+    const P=cpFmulaParser(tokens);
+    const ast=P.parseExpr();
+    if(P.pos<tokens.length) throw '#ERROR!';
+    const v=cpFmulaEval(ast, sh, ctx);
+    if(typeof v==='number'){ if(!isFinite(v)) return '#NUM!'; return v; }
+    return v;
+  } catch(e){ return typeof e==='string'?e:'#ERROR!'; }
+}
+/* Пересчёт всех формул на листе (итеративно, чтобы дать зависимостям сойтись) */
+function cpRecomputeSheet(sh){
+  if(!sh||!sh.rows) return;
+  const fs=[];
+  sh.rows.forEach(function(row){ if(row.f) Object.keys(row.f).forEach(function(cid){ fs.push({row:row, cid:cid, expr:row.f[cid]}); }); });
+  if(!fs.length) return;
+  let iter=0, changed=true;
+  while(changed && iter++ < 8){
+    changed=false;
+    fs.forEach(function(f){
+      let v; try { v=cpEvalFormula(f.expr, sh, f.row); } catch(e){ v='#ERROR!'; }
+      const cur=f.row.c[f.cid];
+      if(String(cur)!==String(v)){ f.row.c[f.cid]=v; changed=true; }
+    });
+  }
 }
 function cpHeadCell(col,ci,wOverride,isMerged){
   const sh=cpSheet(); const sticky=ci===0?' cp-c0':'';
@@ -10707,7 +10925,10 @@ function CP_TYICON(t){
 }
 
 function cpRender(p){
-  const d=cpData(p), sh=cpSheet(), cols=sh.cols, disp=cpDisp(sh);
+  const d=cpData(p), sh=cpSheet();
+  /* Пересчёт всех формул перед рендером (нужно до cpDisp, чтобы сортировка/фильтр видели свежие значения) */
+  cpRecomputeSheet(sh);
+  const cols=sh.cols, disp=cpDisp(sh);
   if(cpRowSel.size){ const _ids=new Set((sh.rows||[]).map(function(r){return r.id;})); cpRowSel.forEach(function(id){ if(!_ids.has(id))cpRowSel.delete(id); }); }
   const sid=sh.id, ap=p._cpAppr||{}; const showClient=!!(p._cpShared&&p._cpShared[sid])||Object.keys(ap).some(function(k){return k.indexOf(sid+'/')===0;});
   let html='<div class="cp">';
@@ -10909,7 +11130,12 @@ function cpEdit(r,c,init){
   setTimeout(()=>{ const i=document.getElementById('cp-ed'); if(i){ if(init!=null){i.value=init;} i.focus(); if(init==null&&i.select){i.select();} else { try{const L=i.value.length;i.setSelectionRange(L,L);}catch(_e){} } } },0);
 }
 function cpCellEl(r,c){ return document.querySelector('.cp-cell[data-r="'+r+'"][data-c="'+c+'"]'); }
-function cpStore(){ if(!cpEd)return; const i=document.getElementById('cp-ed'); if(!i)return; const row=cpRowAt(cpEd.r),col=cpColAt(cpEd.c); if(!row)return; const v=i.value; if(v==='') delete row.c[col.id]; else row.c[col.id]=v; cpSave(); }
+function cpStore(){ if(!cpEd)return; const i=document.getElementById('cp-ed'); if(!i)return; const row=cpRowAt(cpEd.r),col=cpColAt(cpEd.c); if(!row)return; const v=i.value;
+  if(v===''){ delete row.c[col.id]; if(row.f) delete row.f[col.id]; if(row.f&&!Object.keys(row.f).length) delete row.f; }
+  else if(v.startsWith('=')){ if(!row.f) row.f={}; row.f[col.id]=v; row.c[col.id]=cpEvalFormula(v, cpSheet(), row); }
+  else { row.c[col.id]=v; if(row.f&&row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; } }
+  cpSave();
+}
 function cpBlur(){ if(cpEd){ cpStore(); cpEd=null; cpRerender(); } }
 function cpEdKey(e){
   const col=cpColAt(cpEd.c);
@@ -11095,13 +11321,15 @@ function cpNameBarHTML(){
   const sh=cpSheet(); if(!sh) return '';
   const disp=cpDisp(sh);
   const row=disp[cpSel.r], col=sh.cols[cpSel.c];
-  const val=(row&&col)?(row.c[col.id]==null?'':String(row.c[col.id])):'';
+  /* Показываем формулу-исходник (если есть), иначе — значение */
+  const hasF=!!(row&&col&&row.f&&row.f[col.id]);
+  const val=(row&&col)? (hasF?row.f[col.id]:(row.c[col.id]==null?'':String(row.c[col.id]))) : '';
   const nameLbl=cpA1(cpSel.r,cpSel.c);
   const colName=col?col.name:'';
   return '<div class="cp-nbar">'
     +'<div class="cp-nbar-name" title="Активная ячейка">'+nameLbl+'</div>'
-    +'<span class="cp-nbar-fx" title="Формулы (в разработке)">ƒ<i>x</i></span>'
-    +'<input id="cp-nbar-ed" class="cp-nbar-ed" value="'+_ddA(val)+'" placeholder="'+_ddA(colName?('Значение · '+colName):'Значение ячейки')+'" oninput="cpNbarInput(this.value)" onkeydown="cpNbarKey(event)" onblur="cpNbarBlur()" onfocus="cpNbarFocus()">'
+    +'<span class="cp-nbar-fx'+(hasF?' active':'')+'" title="'+(hasF?'В этой ячейке формула':'Начни ввод с = для формулы')+'">ƒ<i>x</i></span>'
+    +'<input id="cp-nbar-ed" class="cp-nbar-ed'+(hasF?' cp-nbar-ed-fmula':'')+'" value="'+_ddA(val)+'" placeholder="'+_ddA(colName?('Значение · '+colName+' · = для формулы'):'Значение или =формула')+'" oninput="cpNbarInput(this.value)" onkeydown="cpNbarKey(event)" onblur="cpNbarBlur()" onfocus="cpNbarFocus()">'
   +'</div>';
 }
 let cpNbarActive=false;
@@ -11121,8 +11349,15 @@ function cpNbarCommit(){
   const sh=cpSheet(), disp=cpDisp(sh);
   const row=disp[cpSel.r], col=sh.cols[cpSel.c];
   if(!row||!col){ cpNbarActive=false; return; }
-  const cur=row.c[col.id]==null?'':String(row.c[col.id]);
-  if(v!==cur){ if(v==='') delete row.c[col.id]; else row.c[col.id]=v; cpSave(); }
+  const curF=(row.f&&row.f[col.id])||null;
+  const curV=row.c[col.id]==null?'':String(row.c[col.id]);
+  if(v.startsWith('=')){
+    if(v!==curF){ if(!row.f) row.f={}; row.f[col.id]=v; row.c[col.id]=cpEvalFormula(v, sh, row); cpSave(); }
+  } else if(v===''){
+    if(curV!==''||curF){ delete row.c[col.id]; if(row.f){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; } cpSave(); }
+  } else if(v!==curV||curF){
+    row.c[col.id]=v; if(row.f&&row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; } cpSave();
+  }
   cpNbarActive=false;
 }
 function cpNbarBlur(){ cpNbarCommit(); }
