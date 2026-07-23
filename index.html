@@ -25316,6 +25316,12 @@ window._kpiShellHTML = () => {
 .kpi-nav-badge{margin-left:auto;background:var(--warn);color:#241900;padding:1px 7px;border-radius:8px;font-size:10.5px;font-weight:700;font-family:var(--mono);line-height:1.35;box-shadow:0 0 0 1.5px var(--bg)}
 .kpi-nav-badge.crit{background:var(--neg);color:#fff;animation:kpiPulse 2.4s ease-in-out infinite}
 @keyframes kpiPulse{0%,100%{box-shadow:0 0 0 1.5px var(--bg), 0 0 0 0 rgba(242,102,102,0.55)}50%{box-shadow:0 0 0 1.5px var(--bg), 0 0 0 6px rgba(242,102,102,0)}}
+/* KPI · сегментированный бейдж «по плану / отстают» */
+.kpi-nav-seg{margin-left:auto;display:inline-flex;align-items:stretch;gap:0;border-radius:8px;overflow:hidden;font-size:10.5px;font-weight:800;font-family:var(--mono);line-height:1.35;box-shadow:0 0 0 1.5px var(--bg);letter-spacing:.02em}
+.kpi-nav-seg-pos,.kpi-nav-seg-warn{display:inline-flex;align-items:center;justify-content:center;padding:1px 7px;min-width:16px}
+.kpi-nav-seg-pos{background:var(--pos);color:#04211a}
+.kpi-nav-seg-warn{background:var(--warn);color:#241900}
+.kpi-nav-seg-pos+.kpi-nav-seg-warn{box-shadow:inset 1px 0 0 rgba(0,0,0,.25)}
 /* KPI · плитка в Сводке */
 .kpi-ovtile{display:flex;align-items:center;gap:20px;padding:16px 20px;background:linear-gradient(135deg, rgba(138,143,255,.08), rgba(55,230,200,.04));border:1px solid var(--line);border-radius:14px;cursor:pointer;margin-bottom:14px;transition:all .18s var(--ease-out);position:relative;overflow:hidden}
 .kpi-ovtile:hover{border-color:rgba(138,143,255,.28);transform:translateY(-1px);box-shadow:0 6px 18px -8px rgba(0,0,0,.4)}
@@ -27465,36 +27471,76 @@ window.kpiComputeSmmScore = async (scopeKind, scopeId, fromISO, toISO) => {
 };
 
 /* ── 2. Badge алертов в сайдбаре — рядом с пунктом KPI ── */
-window._kpiAlertsCache = { ts:0, count:0, critical:0 };
+window._kpiAlertsCache = { ts:0, onTrack:0, behind:0 };
 
 window._kpiRefreshNavBadge = async () => {
   if (!SB || !ME || !ME.agency_id) return;        // у суперадмина нет агентства — KPI-бейдж к нему не относится
   const now = Date.now();
   // Кэш 2 минуты
   if (_kpiAlertsCache.ts && now - _kpiAlertsCache.ts < 120000) { _kpiApplyNavBadge(); return; }
-  const alerts = await kpiFetchAlerts({});
-  /* Бейдж в сайдбаре — только осмысленные проблемы: warning + critical.
-     info/no_data — это состояние «метрика ещё не собрана», не сигнал; они
-     генерятся пачками при первом расчёте и захламляют счётчик. */
-  const meaningful = alerts.filter(a => a && a.severity !== 'info' && a.kind !== 'no_data');
-  const critical = meaningful.filter(a => a.severity === 'critical').length;
-  _kpiAlertsCache = { ts: now, count: meaningful.length, critical };
+  const seg = await _kpiGoalsForBadge();
+  _kpiAlertsCache = { ts: now, onTrack: seg.onTrack, behind: seg.behind };
   _kpiApplyNavBadge();
 };
+
+/* Считает цели активного KPI-периода и разбивает на «идём по плану» / «отстаём»
+   с учётом темпа: ожидаемое значение к сегодня = baseline + (target-baseline)×pace,
+   где pace = прожитая доля периода. Если у цели нет baseline — берём minimum либо 0.
+   Если для метрики нет текущего значения — цель в подсчёт не идёт. */
+async function _kpiGoalsForBadge(){
+  if (typeof kpiFetchPeriods!=='function' || typeof kpiComputeAll!=='function') return {onTrack:0, behind:0};
+  const periods = await kpiFetchPeriods({status:'active', limit:1}).catch(()=>[]);
+  const per = periods[0];
+  if (!per || !per.start_date || !per.end_date) return {onTrack:0, behind:0};
+  const startMs = new Date(String(per.start_date).slice(0,10)+'T00:00:00').getTime();
+  const endMs   = new Date(String(per.end_date).slice(0,10)+'T23:59:59').getTime();
+  const nowMs   = Date.now();
+  const totalMs = endMs - startMs;
+  const pace = totalMs > 0 ? Math.max(0, Math.min(1, (nowMs - startMs) / totalMs)) : 1;
+  const tg = await SB.from('kpi_targets').select('*').eq('period_id', per.id);
+  const targets = (tg.data||[]).filter(t => t && t.target != null);
+  if (!targets.length) return {onTrack:0, behind:0};
+  const scopes = {};
+  targets.forEach(t => { const k = t.scope_kind + '|' + (t.scope_id||''); (scopes[k] = scopes[k] || []).push(t); });
+  let onTrack = 0, behind = 0;
+  for (const k of Object.keys(scopes)){
+    const [sk, sid] = k.split('|');
+    let cur = {};
+    try { cur = await kpiComputeAll(sk, sid || null, per.start_date, per.end_date) || {}; } catch(_) { cur = {}; }
+    scopes[k].forEach(t => {
+      const M = (window.KPI_METRICS||{})[t.metric_key] || {};
+      const raw = cur[t.metric_key];
+      const val = (raw && typeof raw === 'object') ? (raw.value != null ? raw.value : raw.current) : raw;
+      if (val == null || t.target == null) return;                                          // без данных не считаем ни туда, ни туда
+      const dir = t.direction || M.dir || 'up';
+      const baselineRaw = (t.baseline_value != null ? t.baseline_value : (t.baseline != null ? t.baseline : (t.minimum != null ? t.minimum : 0)));
+      const baseline = Number(baselineRaw) || 0;
+      const target = Number(t.target);
+      const expected = baseline + (target - baseline) * pace;
+      const ok = (dir === 'up') ? (Number(val) >= expected) : (Number(val) <= expected);
+      if (ok) onTrack++; else behind++;
+    });
+  }
+  return {onTrack, behind};
+}
 
 window._kpiApplyNavBadge = () => {
   const nav = document.querySelector('.nav-i[data-m="kpi"]');
   if (!nav) return;
-  // Убираем старый badge если есть
+  // Убираем предыдущие бейджи (обе версии — старую одиночную и новую сегментированную)
   const old = nav.querySelector('.kpi-nav-badge'); if (old) old.remove();
-  const { count, critical } = _kpiAlertsCache;
-  if (!count) return;
-  const b = document.createElement('span');
-  b.className = 'kpi-nav-badge';
-  b.textContent = count;
-  b.title = `${count} активных сигналов${critical?', из них '+critical+' критичных':''}`;
-  if (critical > 0) b.classList.add('crit');
-  nav.appendChild(b);
+  const seg = nav.querySelector('.kpi-nav-seg');   if (seg) seg.remove();
+  const onTrack = _kpiAlertsCache.onTrack || 0;
+  const behind  = _kpiAlertsCache.behind  || 0;
+  if (!onTrack && !behind) return;
+  const wrap = document.createElement('span');
+  wrap.className = 'kpi-nav-seg';
+  wrap.title = onTrack + ' по плану · ' + behind + ' отстают';
+  let html = '';
+  if (onTrack) html += '<span class="kpi-nav-seg-pos">'+onTrack+'</span>';
+  if (behind)  html += '<span class="kpi-nav-seg-warn">'+behind+'</span>';
+  wrap.innerHTML = html;
+  nav.appendChild(wrap);
 };
 
 /* Запуск при готовности сессии */
