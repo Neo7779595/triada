@@ -3009,6 +3009,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-add{display:flex;align-items:center;gap:7px;padding:10px 14px;color:var(--txt-3);font-size:14px;cursor:pointer}
 .cp-add:hover{color:var(--accent)}
 .cp-empty{padding:36px 16px;color:var(--txt-3);font-size:14px}
+/* Status bar под сеткой — как у Google Sheets */
+.cp-sbar{display:flex;align-items:center;gap:10px;padding:8px 16px;border-top:1px solid var(--line);background:linear-gradient(180deg,var(--bg-1),color-mix(in srgb,var(--bg-1) 92%,#000 8%));font-family:var(--mono);font-size:11.5px;color:var(--txt-2);letter-spacing:.02em;flex-wrap:wrap;min-height:34px;flex:0 0 auto}
+.cp-sbar-lb{color:var(--txt-3);text-transform:uppercase;letter-spacing:.11em;font-size:10px;font-weight:800}
+.cp-sbar-cell{color:var(--accent);font-weight:800;font-size:12px;padding:2.5px 7px;background:color-mix(in srgb,var(--accent) 10%,transparent);border-radius:5px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent);letter-spacing:.03em}
+.cp-sbar-hint{color:var(--txt-3);font-size:10.5px;font-weight:500;opacity:.75}
+.cp-sbar-sep{width:1px;height:14px;background:var(--line-2);opacity:.65;flex:0 0 auto}
+.cp-sbar-st{color:var(--txt-2);font-weight:500}
+.cp-sbar-st b{color:var(--txt);font-weight:800;font-family:var(--mono);letter-spacing:.02em}
+/* Кнопки быстрой клавиши в контекстном меню */
+.cp-popi .cp-ctx-k{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--txt-3);background:var(--bg-3);padding:1px 5px;border-radius:4px;font-weight:600;letter-spacing:.02em;box-shadow:inset 0 0 0 1px var(--line);border:0}
 .cp-sheets{display:flex;align-items:stretch;border-top:1px solid var(--line);background:var(--bg-1);flex:0 0 auto;overflow-x:auto}
 .cp-stab{display:flex;align-items:center;gap:7px;padding:9px 13px;font-size:13.5px;color:var(--txt-3);border-right:1px solid var(--line);cursor:pointer;white-space:nowrap}
 .cp-stab:hover{color:var(--txt-2)}
@@ -10606,7 +10616,7 @@ function cpHeadCell(col,ci,wOverride,isMerged){
   const arr=sd?('<span class="cp-sarr">'+(sd==='asc'?'↑':'↓')+'</span>'):'';
   const fil=cpFiltGet(col.id)?('<span class="cp-funnel">'+CP_IC.funnel+'</span>'):'';
   const inner='<span class="ti">'+CP_TYICON(col.type)+'</span><span class="nm" onclick="event.stopPropagation();cpSortToggle('+ci+')" title="Сортировка по колонке">'+_ddH(col.name)+'</span>'+arr+fil+'<button class="cp-hmenu" onclick="event.stopPropagation();cpColMenu(event,'+ci+')">⋮</button>';
-  const pickable=_cpTplPickId && col.sys!=='pub'; const pickCls=_cpTplPickId?(pickable?' cp-pick':' cp-pick-off'):''; return '<div class="cp-head cp-dragcol'+sticky+mergedCls+pickCls+(cpColSel.has(col.id)?' colsel':'')+'" data-c="'+ci+'" onclick="if(cpTplPickHead(event,'+ci+'))return;cpColPick(event,'+ci+')" title="'+(pickable?'Применить шаблон к этой колонке':(isMerged?'Объединённый заголовок · клик — выделить · Merge — разъединить':'Клик — выделить столбец'))+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+w+'px">'+inner+'<span class="cp-cresz" onmousedown="cpColRz(event,'+ci+')"></span></div>';
+  const pickable=_cpTplPickId && col.sys!=='pub'; const pickCls=_cpTplPickId?(pickable?' cp-pick':' cp-pick-off'):''; return '<div class="cp-head cp-dragcol'+sticky+mergedCls+pickCls+(cpColSel.has(col.id)?' colsel':'')+'" data-c="'+ci+'" onclick="if(cpTplPickHead(event,'+ci+'))return;cpColPick(event,'+ci+')" title="'+(pickable?'Применить шаблон к этой колонке':(isMerged?'Объединённый заголовок · клик — выделить · Merge — разъединить':'Клик — выделить столбец'))+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+w+'px">'+inner+'<span class="cp-cresz" onmousedown="cpColRz(event,'+ci+')" ondblclick="event.stopPropagation();cpAutofitCol('+ci+')" title="Тянуть — изменить ширину · Двойной клик — по содержимому"></span></div>';
 }
 function cpHeadMergeInfo(sh){
   if(!sh||!sh.headM||!sh.headM.length)return null;
@@ -10699,13 +10709,14 @@ function cpRender(p){
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
       const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(col.type==='check'?' cp-cchk':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'')+((mInfo&&mInfo.anchorW[ci]!=null)?' cp-merged':'')+(col.align?(' cp-al-'+col.align):'');
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
-      html+='<div class="'+cls+'" style="width:'+((mInfo&&mInfo.anchorW[ci]!=null)?mInfo.anchorW[ci]:col.w)+'px'+_rh+'" data-r="'+ri+'" data-c="'+ci+'" onmousedown="cpCellDown(event,'+ri+','+ci+')" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
+      html+='<div class="'+cls+'" style="width:'+((mInfo&&mInfo.anchorW[ci]!=null)?mInfo.anchorW[ci]:col.w)+'px'+_rh+'" data-r="'+ri+'" data-c="'+ci+'" onmousedown="cpCellDown(event,'+ri+','+ci+')" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')" oncontextmenu="cpCellMenu(event,'+ri+','+ci+');return false;">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
     });
     if(showClient){ const a=ap[sid+'/'+row.id]; html+='<div class="cp-cell cp-clapcell" style="width:240px'+_rh+'">'+cpApprCellHTML(a)+'</div>'; }
     html+='<div class="cp-pad"></div></div>';
   });
   html+='<div class="cp-add" onclick="cpAddRow()">'+CP_IC.plus+'Добавить строку</div>';
   html+='</div></div>';
+  html+=cpStatusBarHTML();
   html+=cpSheetsBar(d);
   html+='</div>';
   return html;
@@ -10842,19 +10853,220 @@ function cpEdKey(e){
   if(e.key==='Tab'){ e.preventDefault(); cpStore(); cpEd=null; cpMoveSel(0,e.shiftKey?-1:1); cpRerender(); return; }
 }
 function cpMoveSel(dr,dc){ const sh=cpSheet(), nr=cpDisp(sh).length, nc=sh.cols.length; let r=cpSel.r+dr, c=cpSel.c+dc; r=Math.max(0,Math.min(nr-1,r)); c=Math.max(0,Math.min(nc-1,c)); cpSel={r,c}; }
+/* Google-Sheets-style «прыжок к краю» — с непустой ячейки до конца непрерывной группы, с пустой — до первой непустой */
+function cpEdge(r,c,dr,dc){
+  const sh=cpSheet(), disp=cpDisp(sh), nr=disp.length, nc=sh.cols.length;
+  if(dr===0&&dc===0) return [r,c];
+  const V=function(rr,cc){ const row=disp[rr], col=sh.cols[cc]; if(!row||!col) return null; const v=row.c[col.id]; return (v==null||v==='')?null:v; };
+  const cur=V(r,c);
+  let nr2=r, nc2=c;
+  if(dr!==0){
+    const maxR=dr>0?nr-1:0; if(r===maxR) return [r,c];
+    if(cur!=null){ let last=r; for(let i=r+dr; dr>0?i<=maxR:i>=maxR; i+=dr){ if(V(i,c)!=null) last=i; else break; } nr2=(last!==r)?last:(r+dr); }
+    else { let tgt=maxR; for(let i=r+dr; dr>0?i<=maxR:i>=maxR; i+=dr){ if(V(i,c)!=null){ tgt=i; break; } } nr2=tgt; }
+  }
+  if(dc!==0){
+    const maxC=dc>0?nc-1:0; if(c===maxC) return [r,c];
+    if(cur!=null){ let last=c; for(let i=c+dc; dc>0?i<=maxC:i>=maxC; i+=dc){ if(V(r,i)!=null) last=i; else break; } nc2=(last!==c)?last:(c+dc); }
+    else { let tgt=maxC; for(let i=c+dc; dc>0?i<=maxC:i>=maxC; i+=dc){ if(V(r,i)!=null){ tgt=i; break; } } nc2=tgt; }
+  }
+  return [nr2,nc2];
+}
+function cpSelectAll(){ const sh=cpSheet(), nr=cpDisp(sh).length, nc=sh.cols.length; if(!nr||!nc) return; cpSel={r:0,c:0}; cpSelEnd={r:nr-1,c:nc-1}; cpRowSel=new Set(); cpColSel=new Set(); cpRerender(); }
+/* A1-нотация: 0→A, 25→Z, 26→AA, ... */
+function cpA1(r,c){ let s='',n=c; do{ s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; }while(n>=0); return s+(r+1); }
+/* Прокрутка контейнера, чтобы активная ячейка была видна */
+function cpScrollToSel(){
+  const scroll=document.querySelector('.cp-scroll'); if(!scroll) return;
+  const cell=scroll.querySelector('.cp-cell.cp-sel'); if(!cell) return;
+  const cr=cell.getBoundingClientRect(), sr=scroll.getBoundingClientRect();
+  const stickyTop=42, stickyLeft=44+((cell.classList.contains('cp-c0'))?0:150);
+  if(cr.top < sr.top+stickyTop) scroll.scrollTop -= (sr.top+stickyTop - cr.top);
+  else if(cr.bottom > sr.bottom-10) scroll.scrollTop += (cr.bottom - sr.bottom+10);
+  if(cr.left < sr.left+stickyLeft) scroll.scrollLeft -= (sr.left+stickyLeft - cr.left);
+  else if(cr.right > sr.right-10) scroll.scrollLeft += (cr.right - sr.right+10);
+}
+/* Копирование выделения в буфер как TSV (совместимо с Google Sheets / Excel) */
+function cpCopy(cut){
+  const sh=cpSheet(); if(!sh) return; const disp=cpDisp(sh), x=cpRect();
+  const rows=[];
+  for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; const cells=[];
+    for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; const v=(row&&col&&row.c[col.id]!=null)?String(row.c[col.id]):''; cells.push(v.replace(/\t/g,' ').replace(/\n/g,' ')); }
+    rows.push(cells.join('\t'));
+  }
+  const tsv=rows.join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(tsv).then(function(){ if(typeof toast==='function') toast(cut?'Вырезано':'Скопировано'); if(cut) cpClearSel(); }).catch(function(){ if(typeof toast==='function') toast('Не удалось скопировать'); });
+  } else { if(typeof toast==='function') toast('Буфер обмена недоступен'); }
+}
+/* Вставка из буфера — принимает TSV, вставляет от активной ячейки */
+function cpPasteHandler(e){
+  if(pdTabCur!=='content'||cpEd) return;
+  const tag=(e.target&&e.target.tagName)||''; if(tag==='INPUT'||tag==='TEXTAREA') return;
+  const sh=cpSheet(); if(!sh) return;
+  const text=(e.clipboardData||window.clipboardData).getData('text/plain');
+  if(!text) return;
+  e.preventDefault();
+  let lines=text.replace(/\r\n/g,'\n').split('\n');
+  if(lines.length && lines[lines.length-1]==='') lines.pop();
+  const grid=lines.map(function(l){ return l.split('\t'); });
+  if(!grid.length) return;
+  const startR=cpSel.r, startC=cpSel.c;
+  /* Довыделим строк, если не хватает */
+  while(sh.rows.length < startR+grid.length){ sh.rows.push({id:cpUid(), c:{}}); }
+  const disp2=cpDisp(sh);
+  let changed=false;
+  grid.forEach(function(rowVals, ri){
+    const row=disp2[startR+ri]; if(!row) return;
+    rowVals.forEach(function(val, ci){
+      const col=sh.cols[startC+ci]; if(!col) return;
+      if(col.sys==='pub') return; /* pub — check-колонка, TSV не подходит */
+      if(val==='') { if(row.c[col.id]!=null){ delete row.c[col.id]; changed=true; } }
+      else { row.c[col.id]=val; changed=true; }
+    });
+  });
+  if(changed){
+    cpSelEnd={r:Math.min(sh.rows.length-1, startR+grid.length-1), c:Math.min(sh.cols.length-1, startC+grid[0].length-1)};
+    cpSave(); cpRerender();
+    if(typeof toast==='function') toast('Вставлено');
+  }
+}
+/* Статус-бар: показывает Sum/Avg/Count/Min/Max для выделенного числового диапазона */
+function cpStatusBarHTML(){
+  const sh=cpSheet(); if(!sh) return '';
+  const x=cpRect();
+  const single=(x.r0===x.r1 && x.c0===x.c1);
+  const cellRef=cpA1(x.r0,x.c0);
+  if(single){ return '<div class="cp-sbar"><span class="cp-sbar-lb">Ячейка</span><span class="cp-sbar-cell">'+cellRef+'</span><span class="cp-sbar-hint">Ctrl+C · Ctrl+V · Ctrl+A · Tab · Enter · ↑↓←→</span></div>'; }
+  const disp=cpDisp(sh);
+  let count=0, sum=0, mn=Infinity, mx=-Infinity, nums=0;
+  for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; if(!row) continue;
+    for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(!col) continue;
+      const v=row.c[col.id]; if(v==null||v==='') continue; count++;
+      const n=parseFloat(String(v).replace(/\s/g,'').replace(/[^\d.,\-eE]/g,'').replace(',','.'));
+      if(!isNaN(n) && isFinite(n)){ sum+=n; if(n<mn) mn=n; if(n>mx) mx=n; nums++; }
+    }
+  }
+  const cells=(x.r1-x.r0+1)*(x.c1-x.c0+1);
+  const rng=cpA1(x.r0,x.c0)+':'+cpA1(x.r1,x.c1);
+  const fN=function(n){ const r=Math.round(n*100)/100; return r.toLocaleString('ru-RU',{maximumFractionDigits:2}); };
+  let stats='<span class="cp-sbar-lb">Выделено</span><span class="cp-sbar-cell">'+rng+'</span><span class="cp-sbar-hint">'+cells+' '+_plural(cells,'ячейка','ячейки','ячеек')+'</span>';
+  if(count>0){ stats+='<span class="cp-sbar-sep"></span><span class="cp-sbar-st">Значений <b>'+count+'</b></span>'; }
+  if(nums>0){
+    stats+='<span class="cp-sbar-sep"></span><span class="cp-sbar-st">Σ <b>'+fN(sum)+'</b></span>';
+    stats+='<span class="cp-sbar-sep"></span><span class="cp-sbar-st">⌀ <b>'+fN(sum/nums)+'</b></span>';
+    stats+='<span class="cp-sbar-sep"></span><span class="cp-sbar-st">min <b>'+fN(mn)+'</b></span>';
+    stats+='<span class="cp-sbar-sep"></span><span class="cp-sbar-st">max <b>'+fN(mx)+'</b></span>';
+  }
+  return '<div class="cp-sbar">'+stats+'</div>';
+}
+/* Autofit ширины колонки под контент */
+function cpAutofitCol(ci){
+  const sh=cpSheet(), col=sh.cols[ci]; if(!col) return;
+  const rows=cpDisp(sh);
+  const measure=document.createElement('span');
+  measure.style.cssText='position:absolute;left:-99999px;top:-99999px;white-space:nowrap;visibility:hidden;padding:0';
+  document.body.appendChild(measure);
+  measure.style.font='700 12.5px var(--font)'; measure.style.letterSpacing='.04em'; measure.style.textTransform='uppercase';
+  measure.textContent=col.name||'';
+  let maxW=measure.offsetWidth + 78; /* header + icon + menu + padding */
+  measure.style.font='400 14px var(--font)'; measure.style.letterSpacing='0'; measure.style.textTransform='none';
+  rows.forEach(function(r){ const v=r.c[col.id]; if(v==null||v==='') return; measure.textContent=String(v); const w=measure.offsetWidth+30; if(w>maxW) maxW=w; });
+  document.body.removeChild(measure);
+  col.w = Math.max(80, Math.min(600, Math.ceil(maxW)));
+  cpSave(); cpRerender();
+}
+/* Контекстное меню по правому клику на ячейке */
+function cpCellMenu(e,r,c){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  /* Если выделение содержит эту ячейку — не меняем; иначе — селект её */
+  const x=cpRect();
+  const inRect=(r>=x.r0&&r<=x.r1&&c>=x.c0&&c<=x.c1);
+  if(!inRect){ cpSel={r,c}; cpSelEnd=null; cpRowSel=new Set(); cpColSel=new Set(); cpRerender(); }
+  const row=cpRowAt(r); if(!row) return;
+  const I={cp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+    ct:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/></svg>',
+    pt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
+    cl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+    afit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4"/></svg>',
+    ir:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>',
+    tr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>'};
+  const kbd=function(k){ return '<kbd class="cp-ctx-k">'+k+'</kbd>'; };
+  let h='';
+  h+='<button class="cp-popi" onclick="cpCopy(false)">'+I.cp+'Копировать'+kbd('Ctrl+C')+'</button>';
+  h+='<button class="cp-popi" onclick="cpCopy(true)">'+I.ct+'Вырезать'+kbd('Ctrl+X')+'</button>';
+  h+='<button class="cp-popi" onclick="if(navigator.clipboard&&navigator.clipboard.readText){navigator.clipboard.readText().then(function(t){cpPasteHandler({clipboardData:{getData:function(){return t;}},preventDefault:function(){}})})};cpCloseFloat()">'+I.pt+'Вставить'+kbd('Ctrl+V')+'</button>';
+  h+='<button class="cp-popi" onclick="cpClearSel();cpCloseFloat()">'+I.cl+'Очистить'+kbd('Del')+'</button>';
+  h+='<div class="sep"></div>';
+  h+='<button class="cp-popi" onclick="cpAutofitCol('+c+');cpCloseFloat()">'+I.afit+'Ширина по содержимому</button>';
+  h+='<div class="sep"></div>';
+  h+='<button class="cp-popi" onclick="cpRowIns(\''+row.id+'\',0)">'+I.ir+'Строка сверху</button>';
+  h+='<button class="cp-popi" onclick="cpRowIns(\''+row.id+'\',1)">'+I.ir+'Строка снизу</button>';
+  h+='<button class="cp-popi" onclick="cpRowDup(\''+row.id+'\')">Дублировать строку</button>';
+  h+='<button class="cp-popi" onclick="cpRowDel(\''+row.id+'\')" style="color:var(--neg)">'+I.tr+'Удалить строку</button>';
+  h+='<div class="sep"></div>';
+  h+='<button class="cp-popi" onclick="cpColIns('+c+',0)">'+I.ir+'Колонка слева</button>';
+  h+='<button class="cp-popi" onclick="cpColIns('+c+',1)">'+I.ir+'Колонка справа</button>';
+  h+='<button class="cp-popi" onclick="cpColDel('+c+')" style="color:var(--neg)">'+I.tr+'Удалить колонку</button>';
+  /* Показываем меню у курсора */
+  const fake={ getBoundingClientRect:function(){ return {left:e.clientX-2, top:e.clientY-4, right:e.clientX+2, bottom:e.clientY+4, width:4, height:8}; } };
+  cpFloat(fake, h);
+}
 function cpKey(e){
   if(pdTabCur!=='content'||cpEd) return;
   const tag=(e.target&&e.target.tagName)||''; if(tag==='INPUT'||tag==='TEXTAREA') return;
-  if(!cpSheet()) return;
+  const sh=cpSheet(); if(!sh) return;
   const k=e.key, mod=e.ctrlKey||e.metaKey;
-  if(mod&&(k==='z'||k==='Z')){ e.preventDefault(); if(e.shiftKey)cpRedo(); else cpUndo(); return; }
-  if(mod&&(k==='y'||k==='Y')){ e.preventDefault(); cpRedo(); return; }
-  if(mod&&(k==='d'||k==='D')){ e.preventDefault(); cpFillDown(); return; }
-  if(k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight'){ e.preventDefault(); const dr=k==='ArrowUp'?-1:(k==='ArrowDown'?1:0), dc=k==='ArrowLeft'?-1:(k==='ArrowRight'?1:0); if(e.shiftKey){ cpExtendSel(dr,dc); } else { cpMoveSel(dr,dc); cpSelEnd=null; } cpRerender(); return; }
-  if(k==='Enter'||k==='F2'){ e.preventDefault(); cpEdit(cpSel.r,cpSel.c); return; }
+  /* Undo/Redo */
+  if(mod&&(k==='z'||k==='Z'||k==='я'||k==='Я')){ e.preventDefault(); if(e.shiftKey)cpRedo(); else cpUndo(); return; }
+  if(mod&&(k==='y'||k==='Y'||k==='н'||k==='Н')){ e.preventDefault(); cpRedo(); return; }
+  /* Fill down */
+  if(mod&&(k==='d'||k==='D'||k==='в'||k==='В')){ e.preventDefault(); cpFillDown(); return; }
+  /* Copy / Cut (Paste ловится глобальным paste-listener'ом) */
+  if(mod&&(k==='c'||k==='C'||k==='с'||k==='С')){ e.preventDefault(); cpCopy(false); return; }
+  if(mod&&(k==='x'||k==='X'||k==='ч'||k==='Ч')){ e.preventDefault(); cpCopy(true); return; }
+  /* Select all */
+  if(mod&&(k==='a'||k==='A'||k==='ф'||k==='Ф')){ e.preventDefault(); cpSelectAll(); return; }
+  /* Tab / Shift+Tab — навигация вправо/влево */
+  if(k==='Tab'){ e.preventDefault(); cpMoveSel(0, e.shiftKey?-1:1); cpSelEnd=null; cpRerender(); cpScrollToSel(); return; }
+  /* Enter — начать редактирование; Shift+Enter — прыжок вверх */
+  if(k==='Enter'){ e.preventDefault(); if(e.shiftKey){ cpMoveSel(-1,0); cpSelEnd=null; cpRerender(); cpScrollToSel(); } else { cpEdit(cpSel.r,cpSel.c); } return; }
+  if(k==='F2'){ e.preventDefault(); cpEdit(cpSel.r,cpSel.c); return; }
+  /* Стрелки — с модификаторами прыгаем к краю данных, с Shift — расширяем */
+  if(k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight'){
+    e.preventDefault();
+    const dr=k==='ArrowUp'?-1:(k==='ArrowDown'?1:0), dc=k==='ArrowLeft'?-1:(k==='ArrowRight'?1:0);
+    if(mod){
+      const from = e.shiftKey && cpSelEnd ? cpSelEnd : cpSel;
+      const edge = cpEdge(from.r, from.c, dr, dc);
+      if(e.shiftKey){ cpSelEnd={r:edge[0],c:edge[1]}; }
+      else { cpSel={r:edge[0],c:edge[1]}; cpSelEnd=null; }
+    } else if(e.shiftKey){ cpExtendSel(dr,dc); }
+    else { cpMoveSel(dr,dc); cpSelEnd=null; }
+    cpRerender(); cpScrollToSel(); return;
+  }
+  /* Home / End */
+  if(k==='Home'){ e.preventDefault();
+    if(mod){ if(e.shiftKey){ cpSelEnd={r:0,c:0}; } else { cpSel={r:0,c:0}; cpSelEnd=null; } }
+    else { if(e.shiftKey){ if(!cpSelEnd)cpSelEnd={r:cpSel.r,c:cpSel.c}; cpSelEnd.c=0; } else { cpSel={r:cpSel.r,c:0}; cpSelEnd=null; } }
+    cpRerender(); cpScrollToSel(); return; }
+  if(k==='End'){ e.preventDefault();
+    const lastR=cpDisp(sh).length-1, lastC=sh.cols.length-1;
+    if(mod){ if(e.shiftKey){ cpSelEnd={r:lastR,c:lastC}; } else { cpSel={r:lastR,c:lastC}; cpSelEnd=null; } }
+    else { if(e.shiftKey){ if(!cpSelEnd)cpSelEnd={r:cpSel.r,c:cpSel.c}; cpSelEnd.c=lastC; } else { cpSel={r:cpSel.r,c:lastC}; cpSelEnd=null; } }
+    cpRerender(); cpScrollToSel(); return; }
+  /* PageUp / PageDown */
+  if(k==='PageUp'||k==='PageDown'){ e.preventDefault(); const step=k==='PageUp'?-15:15;
+    if(e.shiftKey){ const nr=cpDisp(sh).length; if(!cpSelEnd) cpSelEnd={r:cpSel.r,c:cpSel.c}; cpSelEnd.r=Math.max(0,Math.min(nr-1, cpSelEnd.r+step)); }
+    else { cpMoveSel(step,0); cpSelEnd=null; }
+    cpRerender(); cpScrollToSel(); return; }
+  /* Delete / Backspace */
   if(k==='Delete'||k==='Backspace'){ e.preventDefault(); if(cpColSel.size)cpDeleteCols(); else if(cpRowSel.size)cpDeleteRows(); else cpClearSel(); return; }
+  /* Печатный символ — сразу редактируем */
   if(k.length===1&&!mod&&!e.altKey){ e.preventDefault(); cpSelEnd=null; cpEdit(cpSel.r,cpSel.c,k); }
 }
+/* Глобальный paste — только когда в контент-плане и не в input'е */
+document.addEventListener('paste', cpPasteHandler);
 
 /* ---- select option menu ---- */
 function cpChipCarDown(e,el){ if(e&&e.stopPropagation)e.stopPropagation(); }
