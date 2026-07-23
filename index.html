@@ -756,9 +756,9 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .sched-add svg{width:16px;height:16px}
 /* filter */
 .sched-filt{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.sched-search{position:relative;display:flex;align-items:center;height:38px;background:var(--bg-2);border:1px solid var(--line);border-radius:11px;padding:0 10px 0 34px;transition:.16s;min-width:210px}
-.sched-search:focus-within{border-color:var(--accent-line);background:var(--accent-dim);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent)}
-.sched-search>svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--txt-3);pointer-events:none}
+.sched-search{position:relative;display:flex;align-items:center;height:38px;background:var(--bg-2);border:1px solid var(--line);border-radius:11px;padding:0 10px 0 34px;transition:border-color .16s,box-shadow .16s;min-width:210px}
+.sched-search:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--line-2));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent),0 0 22px -6px color-mix(in srgb,var(--accent) 45%,transparent)}
+.sched-search>svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--txt-3);pointer-events:none;transition:color .16s}
 .sched-search:focus-within>svg{color:var(--accent)}
 .sched-search input{flex:1;border:0;background:none;color:var(--txt);font:500 13px var(--font);outline:none;padding:0 22px 0 0;min-width:100px;letter-spacing:.01em}
 .sched-search input::placeholder{color:var(--txt-3);font-weight:400}
@@ -773,7 +773,9 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .sched-filt-mid .chev{color:var(--txt-3);transition:.16s;flex-shrink:0}
 .sched-filt-mid.on .chev{color:var(--accent)}
 .sched-filt-mid .sch-av{flex-shrink:0}
-.sch-av-all{background:var(--bg-3);color:var(--txt-2);width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:12px;line-height:1}
+.sch-av-all{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 22%,var(--bg-3)),color-mix(in srgb,var(--accent) 8%,var(--bg-3)));color:var(--accent);width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;line-height:1;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent),0 0 0 1px color-mix(in srgb,var(--accent) 15%,transparent)}
+.sched-filt-mid.on .sch-av-all{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 32%,var(--bg-3)),color-mix(in srgb,var(--accent) 14%,var(--bg-3)))}
+.sched-filt-opt.on .sch-av-all{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 35%,var(--bg-2)),color-mix(in srgb,var(--accent) 15%,var(--bg-2)))}
 .sched-filt-dd{position:absolute;top:calc(100% + 6px);right:0;min-width:240px;max-width:300px;max-height:340px;overflow-y:auto;background:var(--bg-1);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 18px 44px -14px rgba(0,0,0,.55),0 4px 14px -6px rgba(0,0,0,.4);padding:6px;z-index:60;display:flex;flex-direction:column;gap:2px;animation:schFiltIn .16s cubic-bezier(.2,.9,.35,1.05)}
 @keyframes schFiltIn{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 .sched-filt-opt{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;border:0;background:none;color:var(--txt-2);cursor:pointer;transition:.12s;font-size:12.5px;font-weight:500;text-align:left}
@@ -19541,6 +19543,17 @@ function schFiltMid(v){ SCH_FILT_MID=String(v||'all'); SCH_FILT_OPEN=false; _sch
 function schFiltClear(){ SCH_FILT_Q=''; SCH_FILT_MID='all'; SCH_FILT_OPEN=false; _schPaint(); }
 function schFiltToggle(ev){ if(ev){ ev.stopPropagation(); ev.preventDefault(); } SCH_FILT_OPEN=!SCH_FILT_OPEN; _schPaint(); if(SCH_FILT_OPEN){ setTimeout(function(){ document.addEventListener('mousedown',_schFiltDocClose,true); },10); } }
 function _schFiltDocClose(ev){ const dd=document.getElementById('schFiltDD'); if(dd && !dd.contains(ev.target) && !ev.target.closest('.sched-filt-mid')){ SCH_FILT_OPEN=false; document.removeEventListener('mousedown',_schFiltDocClose,true); _schPaint(); } }
+function _schAllIconHtml(){
+  /* Премиальная SVG-иконка «все сотрудники» — две пересекающиеся полукруглые фигуры */
+  return '<span class="sch-av sch-av-all">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">'
+      +'<circle cx="9" cy="8.2" r="3.3"/>'
+      +'<path d="M2.6 19.8c.55-3.35 3.2-5.4 6.4-5.4s5.85 2.05 6.4 5.4"/>'
+      +'<path d="M15.6 5.6a3.2 3.2 0 0 1 0 5.4"/>'
+      +'<path d="M17 14.6c2.4.35 4.15 2.35 4.4 5.2"/>'
+    +'</svg>'
+  +'</span>';
+}
 function _schFiltPickHtml(){
   const q=String(SCH_FILT_Q||'').trim().toLowerCase();
   const people=_schPeople();
@@ -19548,7 +19561,7 @@ function _schFiltPickHtml(){
   const items=[{id:'all',name:'Все сотрудники',_all:true}].concat(filtered);
   return items.map(function(p){
     const on=String(SCH_FILT_MID||'all')===String(p.id);
-    const av=p._all?'<span class="sch-av sch-av-all">👥</span>':_schAv(p,22);
+    const av=p._all?_schAllIconHtml():_schAv(p,22);
     return '<button class="sched-filt-opt'+(on?' on':'')+'" onclick="schFiltMid(\''+String(p.id).replace(/\\/g,'\\\\').replace(/\'/g,'\\\'')+'\')">'
       +av+'<span class="nm">'+escH(p.name||'?')+'</span>'
       +(on?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M5 12l5 5L20 7"/></svg>':'')
@@ -19565,7 +19578,7 @@ function _schFiltHtml(){
   const q=SCH_FILT_Q||'';
   const active=_schFiltActive();
   const midBadge=_schFiltBadge();
-  const midAvatar=(function(){ const mid=String(SCH_FILT_MID||'all'); if(mid==='all') return '<span class="sch-av sch-av-all">👥</span>'; const p=_schPeople().find(function(x){ return String(x.id)===mid; }); return p?_schAv(p,22):'<span class="sch-av sch-av-all">👥</span>'; })();
+  const midAvatar=(function(){ const mid=String(SCH_FILT_MID||'all'); if(mid==='all') return _schAllIconHtml(); const p=_schPeople().find(function(x){ return String(x.id)===mid; }); return p?_schAv(p,22):_schAllIconHtml(); })();
   return '<div class="sched-filt">'
     +'<div class="sched-search">'
       +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>'
@@ -19590,16 +19603,16 @@ function _schPaint(){
   host.innerHTML='<div class="sched">'+_schToolbar()+body+'</div>';
 }
 function _schToolbar(){
-  let label;
-  if(SCH_VIEW==='week'){ const mon=_schMonday(SCH_ANCHOR); const sun=new Date(mon); sun.setDate(mon.getDate()+6); label=_schFmtD(mon.getTime())+' – '+_schFmtD(sun.getTime()); }
-  else if(SCH_VIEW==='team'){ const d=new Date(SCH_ANCHOR); label=SCH_WD[(d.getDay()+6)%7]+', '+d.getDate()+' '+SCH_MON[d.getMonth()].toLowerCase()+' '+d.getFullYear(); }
-  else { const d=new Date(SCH_ANCHOR); label=SCH_MON[d.getMonth()]+' '+d.getFullYear(); }
+  let label='';
+  if(SCH_VIEW==='team'){ const d=new Date(SCH_ANCHOR); label=SCH_WD[(d.getDay()+6)%7]+', '+d.getDate()+' '+SCH_MON[d.getMonth()].toLowerCase()+' '+d.getFullYear(); }
+  else if(SCH_VIEW==='month'){ const d=new Date(SCH_ANCHOR); label=SCH_MON[d.getMonth()]+' '+d.getFullYear(); }
+  /* Week: без текстовой метки — даты уже в шапках колонок */
   const chev=function(dir){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="'+(dir<0?'M15 18l-6-6 6-6':'M9 6l6 6-6 6')+'"/></svg>'; };
   return '<div class="sched-tb">'
     +'<div class="sched-nav"><button class="sched-navb" onclick="schNav(-1)" title="Назад">'+chev(-1)+'</button>'
       +'<button class="sched-today" onclick="schToday()">Сегодня</button>'
       +'<button class="sched-navb" onclick="schNav(1)" title="Вперёд">'+chev(1)+'</button>'
-      +'<span class="sched-label">'+label+'</span></div>'
+      +(label?'<span class="sched-label">'+label+'</span>':'')+'</div>'
     +'<div class="sched-right">'
       +_schFiltHtml()
       +'<div class="sched-seg"><button class="'+(SCH_VIEW==='week'?'on':'')+'" onclick="schView(\'week\')">Неделя</button><button class="'+(SCH_VIEW==='month'?'on':'')+'" onclick="schView(\'month\')">Месяц</button><button class="'+(SCH_VIEW==='team'?'on':'')+'" onclick="schView(\'team\')">Команда</button></div>'
