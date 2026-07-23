@@ -3060,6 +3060,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-sarr{color:var(--accent);font-size:13.5px;font-weight:700;flex:0 0 auto}
 .cp-head .nm{cursor:pointer}
 .cp-head.cp-c0{position:sticky;left:40px;z-index:6;background:var(--bg-1)}
+.cp-head.cp-hmerged{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 12%,var(--bg-1)),var(--bg-1));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent);border-right-color:color-mix(in srgb,var(--accent) 40%,var(--line));position:relative}
+.cp-head.cp-hmerged .nm{color:var(--accent);font-weight:700}
+.cp-head.cp-hmerged .ti svg{color:var(--accent)}
+.cp-head.cp-hmerged::before{content:'';position:absolute;left:6px;right:6px;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);border-radius:0 0 2px 2px;opacity:.75;pointer-events:none}
 .cp-head.cp-dragover{box-shadow:inset 3px 0 0 var(--accent)}
 .cp-row.cp-rowover>.cp-gut{box-shadow:inset 0 3px 0 var(--accent)}
 .cp-gut[draggable=true]{cursor:grab}
@@ -10570,17 +10574,40 @@ function cpEditor(row,col){
   const im=(col.type==='num'||col.type==='money')?' inputmode="decimal"':'';
   return '<input id="cp-ed" type="'+t+'" class="cp-ed" value="'+_ddA(v)+'"'+im+' onkeydown="cpEdKey(event)" onblur="cpBlur()">';
 }
-function cpHeadCell(col,ci){
+function cpHeadCell(col,ci,wOverride,isMerged){
   const sh=cpSheet(); const sticky=ci===0?' cp-c0':'';
+  const w=(wOverride!=null)?wOverride:col.w;
+  const mergedCls=isMerged?' cp-hmerged':'';
   if(cpHeadEd===col.id){
     const inp='<input id="cp-hed" class="cp-hed" value="'+_ddA(col.name)+'" onkeydown="cpHeadKey(event,'+ci+')" onblur="cpHeadCommit('+ci+')" onclick="event.stopPropagation()">';
-    return '<div class="cp-head'+sticky+'" style="width:'+col.w+'px">'+inp+'</div>';
+    return '<div class="cp-head'+sticky+mergedCls+'" style="width:'+w+'px">'+inp+'</div>';
   }
   const sd=(sh.sort&&sh.sort.col===col.id)?sh.sort.dir:'';
   const arr=sd?('<span class="cp-sarr">'+(sd==='asc'?'↑':'↓')+'</span>'):'';
   const fil=cpFiltGet(col.id)?('<span class="cp-funnel">'+CP_IC.funnel+'</span>'):'';
   const inner='<span class="ti">'+CP_TYICON(col.type)+'</span><span class="nm" onclick="event.stopPropagation();cpSortToggle('+ci+')" title="Сортировка по колонке">'+_ddH(col.name)+'</span>'+arr+fil+'<button class="cp-hmenu" onclick="event.stopPropagation();cpColMenu(event,'+ci+')">⋮</button>';
-  const pickable=_cpTplPickId && col.sys!=='pub'; const pickCls=_cpTplPickId?(pickable?' cp-pick':' cp-pick-off'):''; return '<div class="cp-head cp-dragcol'+sticky+pickCls+(cpColSel.has(col.id)?' colsel':'')+'" data-c="'+ci+'" onclick="if(cpTplPickHead(event,'+ci+'))return;cpColPick(event,'+ci+')" title="'+(pickable?'Применить шаблон к этой колонке':'Клик — выделить столбец')+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+col.w+'px">'+inner+'<span class="cp-cresz" onmousedown="cpColRz(event,'+ci+')"></span></div>';
+  const pickable=_cpTplPickId && col.sys!=='pub'; const pickCls=_cpTplPickId?(pickable?' cp-pick':' cp-pick-off'):''; return '<div class="cp-head cp-dragcol'+sticky+mergedCls+pickCls+(cpColSel.has(col.id)?' colsel':'')+'" data-c="'+ci+'" onclick="if(cpTplPickHead(event,'+ci+'))return;cpColPick(event,'+ci+')" title="'+(pickable?'Применить шаблон к этой колонке':(isMerged?'Объединённый заголовок · клик — выделить · Merge — разъединить':'Клик — выделить столбец'))+'" draggable="true" ondragstart="cpDragColStart(event,'+ci+')" ondragover="cpDragColOver(event,this)" ondragleave="cpDragColLeave(this)" ondrop="cpDragColDrop(event,'+ci+')" ondragend="cpDragEnd()" style="width:'+w+'px">'+inner+'<span class="cp-cresz" onmousedown="cpColRz(event,'+ci+')"></span></div>';
+}
+function cpHeadMergeInfo(sh){
+  if(!sh||!sh.headM||!sh.headM.length)return null;
+  const cols=sh.cols||[]; const pos={}; cols.forEach(function(c,i){ pos[c.id]=i; });
+  const anchorW={}, members={}; const covered=new Set();
+  sh.headM.forEach(function(setArr){
+    if(!Array.isArray(setArr)||setArr.length<2)return;
+    const idxs=[]; let ok=true;
+    setArr.forEach(function(id){ const p=pos[id]; if(p==null){ok=false;} else idxs.push(p); });
+    if(!ok||idxs.length<2)return;
+    idxs.sort(function(a,b){return a-b;});
+    if(idxs[idxs.length-1]-idxs[0]+1!==idxs.length)return;
+    const a=idxs[0];
+    if(anchorW[a]!=null||covered.has(a))return;
+    let clash=false; idxs.forEach(function(p){ if(covered.has(p))clash=true; });
+    if(clash)return;
+    let w=0; idxs.forEach(function(p){ w+=(cols[p].w||150); });
+    anchorW[a]=w; members[a]=idxs.map(function(p){return cols[p].id;});
+    idxs.forEach(function(p,k){ if(k>0)covered.add(p); });
+  });
+  return {anchorW:anchorW,covered:covered,members:members};
 }
 function CP_TYICON(t){
   const m={text:'<path d="M4 7h16M4 12h10M4 17h7"/>',long:'<path d="M4 6h16M4 10h16M4 14h12M4 18h8"/>',num:'<path d="M6 4l-1 16M14 4l-1 16M4 9h16M3 15h16"/>',money:'<path d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H8m0 0h8a2.5 2.5 0 0 1 0 5H8"/>',date:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',select:'<circle cx="12" cy="12" r="8"/><path d="M9 12l2 2 4-4"/>',check:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/>',link:'<path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1"/>'};
@@ -10635,7 +10662,8 @@ function cpRender(p){
   const gw=40+cols.reduce((s,c)=>s+c.w,0)+44+(showClient?240:0);
   html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px">';
   html+='<div class="cp-hr"><div class="cp-gut cp-hgut" onclick="cpRowPickAll()" title="Выделить все строки"><span class="cp-hnum">№</span></div>';
-  cols.forEach((col,ci)=>{ html+=cpHeadCell(col,ci); });
+  const hmInfo=cpHeadMergeInfo(sh);
+  cols.forEach((col,ci)=>{ if(hmInfo && hmInfo.covered.has(ci)) return; const isM=hmInfo&&hmInfo.anchorW[ci]!=null; const wOv=isM?hmInfo.anchorW[ci]:null; html+=cpHeadCell(col,ci,wOv,isM); });
   if(showClient) html+='<div class="cp-head cp-claphead" style="width:240px"><span class="nm">Клиент</span></div>';
   html+='<div class="cp-addcol" onclick="cpAddCol()">'+CP_IC.plus+'</div></div>';
   if(!disp.length){
@@ -10932,6 +10960,10 @@ function cpDeleteCols(){
   const n=delIds.length;
   sh.cols=remaining;
   (sh.rows||[]).forEach(function(r){ if(r.c) delIds.forEach(function(id){ delete r.c[id]; }); });
+  /* row-merge cleanup */
+  (sh.rows||[]).forEach(function(r){ if(!r.m)return; r.m=r.m.map(function(s){return s.filter(function(id){return delIds.indexOf(id)<0;});}).filter(function(s){return s.length>=2;}); if(!r.m.length) delete r.m; });
+  /* header-merge cleanup */
+  if(sh.headM){ sh.headM=sh.headM.map(function(s){return s.filter(function(id){return delIds.indexOf(id)<0;});}).filter(function(s){return s.length>=2;}); if(!sh.headM.length) delete sh.headM; }
   if(sh.sort&&cpColSel.has(sh.sort.col))sh.sort=null;
   if(sh.filt) delIds.forEach(function(id){ if(sh.filt[id])delete sh.filt[id]; });
   cpColSel=new Set(); cpColAnchor=null;
@@ -12059,12 +12091,22 @@ function cpMergeInfo(row,cols){
 }
 function cpSelHasMerge(){
   const sh=(typeof cpSheet==='function')?cpSheet():null; if(!sh)return false;
-  const cols=sh.cols, disp=cpDisp(sh), x=cpRect();
+  const cols=sh.cols;
+  /* Режим заголовков: выделены только колонки — проверяем sh.headM */
+  if(cpColSel.size>=1 && !cpRowSel.size){
+    const info=cpHeadMergeInfo(sh); if(!info) return false;
+    for(const id of cpColSel){ const idx=cols.findIndex(function(c){return c.id===id;}); if(idx>=0 && (info.anchorW[idx]!=null||info.covered.has(idx))) return true; }
+    return false;
+  }
+  const disp=cpDisp(sh), x=cpRect();
   for(var r=x.r0;r<=x.r1;r++){ const row=disp[r]; if(!row)continue; const info=cpMergeInfo(row,cols); if(!info)continue; for(var c=x.c0;c<=x.c1;c++){ if(info.anchorW[c]!=null||info.covered.has(c))return true; } }
   return false;
 }
 function cpMergeToggle(){
-  const sh=cpSheet(); if(!sh)return; const cols=sh.cols, disp=cpDisp(sh), x=cpRect();
+  const sh=cpSheet(); if(!sh)return; const cols=sh.cols;
+  /* Если выделены только заголовки (колонки) — работаем с заголовочным merge */
+  if(cpColSel.size>=1 && !cpRowSel.size){ cpHeadMergeToggle(); return; }
+  const disp=cpDisp(sh), x=cpRect();
   const rowsInSel=[]; for(var r=x.r0;r<=x.r1;r++){ if(disp[r])rowsInSel.push(disp[r]); }
   if(!rowsInSel.length)return;
   let hasMerge=false;
@@ -12072,6 +12114,30 @@ function cpMergeToggle(){
   if(hasMerge){ cpDoUnmerge(rowsInSel,cols,x); return; }
   if(x.c1<=x.c0){ if(typeof toast==='function')toast('Выдели несколько ячеек по горизонтали'); return; }
   cpDoMerge(rowsInSel,cols,x);
+}
+function cpHeadMergeToggle(){
+  const sh=cpSheet(); if(!sh)return; const cols=sh.cols;
+  const selIds=Array.from(cpColSel);
+  const selIdxs=selIds.map(function(id){return cols.findIndex(function(c){return c.id===id;});}).filter(function(i){return i>=0;}).sort(function(a,b){return a-b;});
+  const info=cpHeadMergeInfo(sh);
+  /* Уже смёржено — разъединяем */
+  const alreadyMerged = info && selIdxs.some(function(i){ return info.anchorW[i]!=null || info.covered.has(i); });
+  if(alreadyMerged){
+    const touchIds=new Set(selIds);
+    /* если выделена только anchor-колонка — расширяем touchIds всеми members этого группы */
+    if(info){ selIdxs.forEach(function(i){ if(info.members[i]) info.members[i].forEach(function(id){ touchIds.add(id); }); }); }
+    sh.headM = (sh.headM||[]).filter(function(s){ return !s.some(function(id){ return touchIds.has(id); }); });
+    if(!sh.headM.length) delete sh.headM;
+    cpSave(); cpRerender(); if(typeof toast==='function')toast('Заголовки разъединены');
+    return;
+  }
+  if(selIdxs.length<2){ if(typeof toast==='function')toast('Выдели 2+ соседних заголовка (Shift-click)'); return; }
+  if(selIdxs[selIdxs.length-1]-selIdxs[0]+1 !== selIdxs.length){ if(typeof toast==='function')toast('Заголовки должны идти подряд'); return; }
+  const ids = selIdxs.map(function(i){ return cols[i].id; });
+  if(!sh.headM) sh.headM=[];
+  sh.headM = sh.headM.filter(function(s){ return !s.some(function(id){ return ids.indexOf(id)>=0; }); });
+  sh.headM.push(ids.slice());
+  cpSave(); cpRerender(); if(typeof toast==='function')toast('Заголовки объединены');
 }
 function cpDoMerge(rowsInSel,cols,x){
   const setIds=[]; for(var c=x.c0;c<=x.c1;c++){ if(cols[c])setIds.push(cols[c].id); }
