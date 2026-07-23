@@ -3071,6 +3071,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-nbar-fx i{font-style:italic;font-size:11.5px;margin-left:-1px}
 .cp-nbar-ed.cp-nbar-ed-fmula{font-family:var(--mono);color:var(--accent);font-size:13px}
 .cp-ed.cp-ed-fmula{font-family:var(--mono);color:var(--accent)}
+/* Автокомплит формул — плавающий поповер (стиль Google Sheets) */
+.cp-autoc{position:fixed;z-index:200;background:var(--bg-1);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px -8px rgba(0,0,0,.6),0 4px 12px -2px rgba(0,0,0,.35);max-height:340px;overflow:auto;font-family:var(--font);padding:4px 0}
+.cp-autoc .cp-ai{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:7px 12px;cursor:pointer;transition:background .1s;border-radius:0}
+.cp-autoc .cp-ai:hover,.cp-autoc .cp-ai-on{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.cp-autoc .cp-ai-n{font-family:var(--mono);font-weight:800;font-size:12.5px;color:var(--accent);letter-spacing:.02em}
+.cp-autoc .cp-ai-s{font-family:var(--mono);font-size:11px;color:var(--txt-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-autoc .cp-ai-d{font-size:11.5px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.cp-autoc .cp-ai-hint{padding:6px 12px 4px;font-size:10.5px;color:var(--txt-3);border-top:1px solid var(--line-2);letter-spacing:.03em}
+/* AutoSum button */
+.cp-fbtn.cp-fbtn-sigma{font-family:'Georgia',serif;font-weight:700;font-size:17px;line-height:1;color:var(--accent-2, var(--accent))}
 .cp-nbar-ed{flex:1;border:0;background:transparent;padding:0 14px;font-family:var(--font);font-size:13.5px;color:var(--txt);outline:none !important;box-shadow:none !important;letter-spacing:.005em;min-width:0}
 .cp-nbar-ed:focus{background:color-mix(in srgb,var(--accent) 5%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 30%,transparent) !important}
 .cp-nbar-ed::placeholder{color:var(--txt-3);font-weight:400}
@@ -10666,10 +10676,10 @@ function cpEditor(row,col){
   /* Если ячейка содержит формулу — редактируем исходник, не результат */
   const fmula=(row.f&&row.f[col.id])?row.f[col.id]:null;
   const v = fmula!=null ? fmula : (row.c[col.id]==null?'':row.c[col.id]);
-  if(col.type==='long' && !fmula) return '<textarea id="cp-ed" class="cp-ed cp-ta" onkeydown="cpEdKey(event)" onblur="cpBlur()">'+_ddH(v)+'</textarea>';
+  if(col.type==='long' && !fmula) return '<textarea id="cp-ed" class="cp-ed cp-ta" onkeydown="cpEdKey(event)" oninput="cpAutocInput(\'cp-ed\')" onblur="cpBlur()">'+_ddH(v)+'</textarea>';
   const t=(fmula||col.type==='date'?(fmula?'text':'date'):'text');
   const im=(!fmula&&(col.type==='num'||col.type==='money'))?' inputmode="decimal"':'';
-  return '<input id="cp-ed" type="'+t+'" class="cp-ed'+(fmula?' cp-ed-fmula':'')+'" value="'+_ddA(v)+'"'+im+' onkeydown="cpEdKey(event)" onblur="cpBlur()">';
+  return '<input id="cp-ed" type="'+t+'" class="cp-ed'+(fmula?' cp-ed-fmula':'')+'" value="'+_ddA(v)+'"'+im+' onkeydown="cpEdKey(event)" oninput="cpAutocInput(\'cp-ed\')" onblur="cpBlur()">';
 }
 /* ═══════════════════ ФОРМУЛЫ (Google Sheets-style) ═══════════════════ */
 /* Модель: row.f[colId] = "=A1+B1"  ·  row.c[colId] = вычисленный результат */
@@ -10693,18 +10703,19 @@ function cpFmulaTokenize(s){
     if(/[A-Za-zА-Яа-я_$]/.test(c)){
       let j=i; while(j<L && /[A-Za-zА-Яа-я0-9_$]/.test(s[j])) j++;
       const word=s.slice(i,j);
-      /* Cell ref: [$?][A-Z]+[$?][0-9]+ */
+      /* Cell ref: [$?][A-Z]+[$?][0-9]+ — $ помечает абсолютную (не сдвигаемую при autofill) ось */
       const mR=/^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(word);
       if(mR){
         const c1=cpFmulaColIdx(mR[2]), r1=parseInt(mR[4],10)-1;
+        const ac1=(mR[1]==='$'), ar1=(mR[3]==='$');
         if(c1>=0){
           if(s[j]===':'){
             let k=j+1; while(k<L && /[A-Za-z0-9$]/.test(s[k])) k++;
             const w2=s.slice(j+1,k);
             const mR2=/^(\$?)([A-Za-z]+)(\$?)(\d+)$/.exec(w2);
-            if(mR2){ const c2=cpFmulaColIdx(mR2[2]), r2=parseInt(mR2[4],10)-1; if(c2>=0){ T.push({t:'range', c1,r1,c2,r2}); i=k; continue; } }
+            if(mR2){ const c2=cpFmulaColIdx(mR2[2]), r2=parseInt(mR2[4],10)-1; const ac2=(mR2[1]==='$'), ar2=(mR2[3]==='$'); if(c2>=0){ T.push({t:'range', c1,r1,c2,r2,ac1,ar1,ac2,ar2}); i=k; continue; } }
           }
-          T.push({t:'ref', c:c1, r:r1}); i=j; continue;
+          T.push({t:'ref', c:c1, r:r1, ac:ac1, ar:ar1}); i=j; continue;
         }
       }
       const up=word.toUpperCase();
@@ -10749,6 +10760,162 @@ function cpFmulaParser(tokens){
   };
   return P;
 }
+/* Сериализация ref в A1-нотацию с учётом $-меток абсолютности */
+function cpSerializeRef(c, r, ac, ar){
+  const dol='\x24';
+  return (ac?dol:'')+cpColLetter(c)+(ar?dol:'')+(r+1);
+}
+/* Сдвиг всех НЕ-абсолютных ссылок в формуле на (dr, dc) — для autofill / copy-paste */
+function cpAdjustFormula(expr, dr, dc){
+  if(expr==null) return expr;
+  const s=String(expr);
+  if(!s.startsWith('=')) return expr;
+  if(dr===0&&dc===0) return expr;
+  let tokens;
+  try { tokens=cpFmulaTokenize(s.slice(1)); }
+  catch(e){ return expr; }
+  let out='=';
+  let prev=null;
+  for(let i=0;i<tokens.length;i++){
+    const tok=tokens[i];
+    /* Разделитель между двумя алфа-токенами, чтобы `AND` не слиплось с соседями */
+    if(prev && (prev.t==='name'||prev.t==='bool'||(prev.t==='op'&&/^(AND|OR|NOT)$/.test(prev.v))) &&
+        (tok.t==='name'||tok.t==='bool'||tok.t==='ref'||tok.t==='range'||(tok.t==='op'&&/^(AND|OR|NOT)$/.test(tok.v)))) out+=' ';
+    if(tok.t==='num') out+=String(tok.v);
+    else if(tok.t==='str') out+='"'+String(tok.v).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"';
+    else if(tok.t==='bool') out+=(tok.v?'TRUE':'FALSE');
+    else if(tok.t==='ref'){
+      const nr=tok.ar?tok.r:(tok.r+dr);
+      const nc=tok.ac?tok.c:(tok.c+dc);
+      if(nr<0||nc<0) out+='#REF!';
+      else out+=cpSerializeRef(nc, nr, tok.ac, tok.ar);
+    }
+    else if(tok.t==='range'){
+      const nr1=tok.ar1?tok.r1:(tok.r1+dr);
+      const nc1=tok.ac1?tok.c1:(tok.c1+dc);
+      const nr2=tok.ar2?tok.r2:(tok.r2+dr);
+      const nc2=tok.ac2?tok.c2:(tok.c2+dc);
+      if(nr1<0||nc1<0||nr2<0||nc2<0) out+='#REF!';
+      else out+=cpSerializeRef(nc1, nr1, tok.ac1, tok.ar1)+':'+cpSerializeRef(nc2, nr2, tok.ac2, tok.ar2);
+    }
+    else if(tok.t==='op'){ out+=tok.v; }
+    else if(tok.t==='name'){ out+=tok.v; }
+    prev=tok;
+  }
+  return out;
+}
+/* Каталог функций — для автокомплита в формулах */
+const CP_FUNCS=[
+  {n:'SUM',ru:'СУММ',d:'Сумма чисел',s:'(диапазон)'},
+  {n:'AVERAGE',ru:'СРЗНАЧ',d:'Среднее арифметическое',s:'(диапазон)',a:['AVG']},
+  {n:'COUNT',ru:'СЧЁТ',d:'Количество чисел',s:'(диапазон)'},
+  {n:'COUNTA',ru:'СЧЁТЗ',d:'Количество непустых',s:'(диапазон)'},
+  {n:'MIN',ru:'МИН',d:'Минимальное значение',s:'(диапазон)'},
+  {n:'MAX',ru:'МАКС',d:'Максимальное значение',s:'(диапазон)'},
+  {n:'IF',ru:'ЕСЛИ',d:'Условное значение',s:'(условие; если-да; если-нет)'},
+  {n:'AND',ru:'И',d:'Логическое И',s:'(a; b; …)'},
+  {n:'OR',ru:'ИЛИ',d:'Логическое ИЛИ',s:'(a; b; …)'},
+  {n:'NOT',ru:'НЕ',d:'Логическое НЕ',s:'(значение)'},
+  {n:'IFERROR',ru:'ЕСЛИОШИБКА',d:'Значение при ошибке',s:'(значение; если-ошибка)'},
+  {n:'LEN',ru:'ДЛСТР',d:'Длина строки',s:'(текст)'},
+  {n:'UPPER',ru:'ПРОПИСН',d:'В верхний регистр',s:'(текст)'},
+  {n:'LOWER',ru:'СТРОЧН',d:'В нижний регистр',s:'(текст)'},
+  {n:'TRIM',ru:'СЖПРОБЕЛЫ',d:'Убрать лишние пробелы',s:'(текст)'},
+  {n:'CONCAT',ru:'СЦЕПИТЬ',d:'Склеить строки',s:'(a; b; …)',a:['CONCATENATE']},
+  {n:'ROUND',ru:'ОКРУГЛ',d:'Округление',s:'(число; знаки)'},
+  {n:'ABS',ru:'ABS',d:'Модуль числа',s:'(число)'},
+  {n:'INT',ru:'ЦЕЛОЕ',d:'Целая часть',s:'(число)'},
+  {n:'MOD',ru:'ОСТАТ',d:'Остаток от деления',s:'(число; делитель)'},
+  {n:'POWER',ru:'СТЕПЕНЬ',d:'Возведение в степень',s:'(основание; степень)'},
+  {n:'SQRT',ru:'КОРЕНЬ',d:'Квадратный корень',s:'(число)'},
+  {n:'TODAY',ru:'СЕГОДНЯ',d:'Сегодняшняя дата',s:'()'},
+  {n:'NOW',ru:'ТДАТА',d:'Текущие дата и время',s:'()'},
+  {n:'DAYS',ru:'ДНИ',d:'Дней между датами',s:'(нач; кон)'},
+  {n:'PI',ru:'PI',d:'Число π',s:'()'},
+  {n:'E',ru:'E',d:'Число e',s:'()'}
+];
+function cpFmulaSuggest(prefix){
+  const p=(prefix||'').toUpperCase(); if(!p) return [];
+  const out=[]; const seen={};
+  CP_FUNCS.forEach(function(f){
+    const names=[f.n]; if(f.ru&&f.ru!==f.n) names.push(f.ru); if(f.a) f.a.forEach(function(x){ names.push(x); });
+    for(const nm of names){ if(nm.startsWith(p)){ if(!seen[f.n]){ out.push({f:f, hit:nm}); seen[f.n]=1; } break; } }
+  });
+  return out.slice(0,8);
+}
+/* Ищем "префикс функции" перед курсором в формуле */
+function cpAutocMatch(value, cursorPos){
+  if(value==null||!String(value).startsWith('=')) return null;
+  const before=String(value).slice(0, cursorPos);
+  const m=/([A-Za-zА-Яа-я_$][A-Za-zА-Яа-я0-9_]*)$/.exec(before);
+  if(!m) return null;
+  /* Не срабатывать, если после префикса идёт открытая скобка (уже вызвано) */
+  const rest=String(value).slice(cursorPos, cursorPos+1);
+  if(rest==='(') return null;
+  return { prefix:m[1], start:cursorPos-m[1].length, end:cursorPos };
+}
+/* Состояние автокомплита формул */
+let _cpAutoc=null;
+function cpAutocOpen(inputId, list, ctx){
+  _cpAutoc={inputId:inputId, list:list, sel:0, ctx:ctx};
+  cpAutocRender();
+}
+function cpAutocClose(){ _cpAutoc=null; const el=document.getElementById('cp-autoc'); if(el) el.remove(); }
+function cpAutocRender(){
+  let el=document.getElementById('cp-autoc');
+  if(!_cpAutoc){ if(el) el.remove(); return; }
+  const inp=document.getElementById(_cpAutoc.inputId); if(!inp){ cpAutocClose(); return; }
+  if(!el){ el=document.createElement('div'); el.id='cp-autoc'; el.className='cp-autoc'; document.body.appendChild(el); }
+  const r=inp.getBoundingClientRect();
+  el.style.left=r.left+'px'; el.style.top=(r.bottom+2)+'px'; el.style.minWidth=Math.max(280, r.width)+'px';
+  let html='';
+  _cpAutoc.list.forEach(function(it, i){
+    const cls='cp-ai'+(i===_cpAutoc.sel?' cp-ai-on':'');
+    html+='<div class="'+cls+'" data-i="'+i+'" onmousedown="event.preventDefault();cpAutocPick('+i+')" onmouseenter="cpAutocSel('+i+')">'
+      +'<span class="cp-ai-n">'+_ddH(it.f.n)+'</span>'
+      +'<span class="cp-ai-s">'+_ddH(it.f.s)+'</span>'
+      +'<span class="cp-ai-d">'+_ddH(it.f.d)+'</span>'
+      +'</div>';
+  });
+  html+='<div class="cp-ai-hint">↑↓ выбор · Tab/Enter вставить · Esc отменить</div>';
+  el.innerHTML=html;
+}
+function cpAutocSel(i){ if(!_cpAutoc) return; _cpAutoc.sel=Math.max(0, Math.min(_cpAutoc.list.length-1, i)); cpAutocRender(); }
+function cpAutocMove(d){ if(!_cpAutoc) return; _cpAutoc.sel=(_cpAutoc.sel+d+_cpAutoc.list.length)%_cpAutoc.list.length; cpAutocRender(); }
+function cpAutocPick(i){
+  if(!_cpAutoc) return;
+  if(i==null) i=_cpAutoc.sel;
+  const it=_cpAutoc.list[i]; if(!it) return;
+  const inp=document.getElementById(_cpAutoc.inputId); if(!inp){ cpAutocClose(); return; }
+  const ctx=_cpAutoc.ctx;
+  const v=inp.value; const before=v.slice(0, ctx.start); const after=v.slice(ctx.end);
+  const insert=it.f.n+'(';
+  inp.value=before+insert+after;
+  const caret=before.length+insert.length;
+  try{ inp.setSelectionRange(caret, caret); }catch(_e){}
+  inp.focus();
+  cpAutocClose();
+}
+function cpAutocKey(e){
+  if(!_cpAutoc) return false;
+  const k=e.key;
+  if(k==='ArrowDown'){ e.preventDefault(); cpAutocMove(1); return true; }
+  if(k==='ArrowUp'){ e.preventDefault(); cpAutocMove(-1); return true; }
+  if(k==='Tab'||k==='Enter'){ e.preventDefault(); cpAutocPick(); return true; }
+  if(k==='Escape'){ e.preventDefault(); cpAutocClose(); return true; }
+  return false;
+}
+function cpAutocInput(inputId){
+  const inp=document.getElementById(inputId); if(!inp){ cpAutocClose(); return; }
+  const val=inp.value; const cur=(inp.selectionStart!=null)?inp.selectionStart:val.length;
+  const m=cpAutocMatch(val, cur);
+  if(!m){ cpAutocClose(); return; }
+  const list=cpFmulaSuggest(m.prefix);
+  if(!list.length){ cpAutocClose(); return; }
+  cpAutocOpen(inputId, list, m);
+}
+window.addEventListener('scroll', function(){ if(_cpAutoc) cpAutocRender(); }, true);
+window.addEventListener('resize', function(){ if(_cpAutoc) cpAutocRender(); });
 /* Приведение к числу — терпимо парсит money, %, пробелы, запятую */
 function _cpFNum(v){ if(v==null||v==='') return 0; if(typeof v==='number') return v; if(typeof v==='boolean') return v?1:0; if(Array.isArray(v)) return v.reduce(function(a,b){ return a+_cpFNum(b); },0); const s=String(v).replace(/\s/g,'').replace(/[₽$€]|сум/gi,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:n; }
 function _cpFStr(v){ if(v==null) return ''; if(Array.isArray(v)) return v.map(_cpFStr).join(''); if(typeof v==='number') return String(Math.round(v*1e10)/1e10); if(typeof v==='boolean') return v?'ИСТИНА':'ЛОЖЬ'; return String(v); }
@@ -11136,9 +11303,11 @@ function cpStore(){ if(!cpEd)return; const i=document.getElementById('cp-ed'); i
   else { row.c[col.id]=v; if(row.f&&row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; } }
   cpSave();
 }
-function cpBlur(){ if(cpEd){ cpStore(); cpEd=null; cpRerender(); } }
+function cpBlur(){ if(_cpAutoc) cpAutocClose(); if(cpEd){ cpStore(); cpEd=null; cpRerender(); } }
 function cpEdKey(e){
   const col=cpColAt(cpEd.c);
+  /* Автокомплит формулы перехватывает стрелки, Tab, Enter, Escape пока открыт */
+  if(cpAutocKey(e)) return;
   if(e.key==='Escape'){ e.preventDefault(); cpEd=null; cpRerender(); return; }
   if(e.key==='Enter'&&!(e.shiftKey&&col.type==='long')){ e.preventDefault(); cpStore(); cpEd=null; cpMoveSel(1,0); cpRerender(); return; }
   if(e.key==='Tab'){ e.preventDefault(); cpStore(); cpEd=null; cpMoveSel(0,e.shiftKey?-1:1); cpRerender(); return; }
@@ -11178,14 +11347,10 @@ function cpScrollToSel(){
   else if(cr.right > sr.right-10) scroll.scrollLeft += (cr.right - sr.right+10);
 }
 /* Копирование выделения в буфер как TSV (совместимо с Google Sheets / Excel) */
+/* Одновременно populates _cpClip — формулы/стили для умной вставки внутри агентства */
 function cpCopy(cut){
-  const sh=cpSheet(); if(!sh) return; const disp=cpDisp(sh), x=cpRect();
-  const rows=[];
-  for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; const cells=[];
-    for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; const v=(row&&col&&row.c[col.id]!=null)?String(row.c[col.id]):''; cells.push(v.replace(/\t/g,' ').replace(/\n/g,' ')); }
-    rows.push(cells.join('\t'));
-  }
-  const tsv=rows.join('\n');
+  const sh=cpSheet(); if(!sh) return;
+  const tsv=cpTSV();
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(tsv).then(function(){ if(typeof toast==='function') toast(cut?'Вырезано':'Скопировано'); if(cut) cpClearSel(); }).catch(function(){ if(typeof toast==='function') toast('Не удалось скопировать'); });
   } else { if(typeof toast==='function') toast('Буфер обмена недоступен'); }
@@ -11206,14 +11371,35 @@ function cpPasteHandler(e){
   /* Довыделим строк, если не хватает */
   while(sh.rows.length < startR+grid.length){ sh.rows.push({id:cpUid(), c:{}}); }
   const disp2=cpDisp(sh);
+  const useInt=(typeof _cpClip!=='undefined') && _cpClip && _cpClip.tsv===text;
+  const dr=useInt?(startR-_cpClip.r0):0, dc=useInt?(startC-_cpClip.c0):0;
   let changed=false;
   grid.forEach(function(rowVals, ri){
     const row=disp2[startR+ri]; if(!row) return;
     rowVals.forEach(function(val, ci){
       const col=sh.cols[startC+ci]; if(!col) return;
       if(col.sys==='pub') return; /* pub — check-колонка, TSV не подходит */
-      if(val==='') { if(row.c[col.id]!=null){ delete row.c[col.id]; changed=true; } }
-      else { row.c[col.id]=val; changed=true; }
+      const clip=useInt&&_cpClip.cells[ri]?_cpClip.cells[ri][ci]:null;
+      let fmulaSrc=null;
+      if(clip && clip.f!=null) fmulaSrc=cpAdjustFormula(clip.f, dr, dc);
+      else if(typeof val==='string' && val.startsWith('=')) fmulaSrc=val;
+      if(fmulaSrc!=null){
+        if(!row.f) row.f={};
+        row.f[col.id]=fmulaSrc;
+        row.c[col.id]=cpEvalFormula(fmulaSrc, sh, row);
+        changed=true;
+      } else if(val===''){
+        if(row.c[col.id]!=null){ delete row.c[col.id]; changed=true; }
+        if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; changed=true; }
+      } else {
+        row.c[col.id]=val; changed=true;
+        if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; }
+      }
+      /* Стили ячейки из внутреннего клипборда — только если совпадает с последним copy */
+      if(useInt && clip && clip.st){
+        if(!row.st) row.st={};
+        row.st[col.id]=JSON.parse(JSON.stringify(clip.st));
+      }
     });
   });
   if(changed){
@@ -11313,8 +11499,27 @@ function cpFormatBarHTML(){
     +'<span class="cp-fsep"></span>'
     +'<button class="cp-fbtn'+on('w')+'" title="Перенос текста" onclick="cpFmtWrap()">'+WR+'</button>'
     +'<span class="cp-fsep"></span>'
+    +'<button class="cp-fbtn cp-fbtn-sigma" title="Автосумма · вставить =SUM(…) в активную ячейку по числам выше" onclick="cpAutoSum()">Σ</button>'
+    +'<span class="cp-fsep"></span>'
     +'<button class="cp-fbtn" title="Сбросить форматирование" onclick="cpFmtClear()">'+CL+'</button>'
   +'</div>';
+}
+/* Автосумма: определяем непрерывный числовой блок над (или слева от) активной ячейки и вставляем =SUM(…) */
+function cpAutoSum(){
+  const sh=cpSheet(); if(!sh) return; const disp=cpDisp(sh);
+  const r=cpSel.r, c=cpSel.c; const col=sh.cols[c]; if(!col) return;
+  const isNum=function(v){ if(v==null||v==='') return false; const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.')); return !isNaN(n) && isFinite(n); };
+  /* Сначала пробуем сверху: непрерывный числовой блок в этой же колонке */
+  let above=null; if(r>0){ let up=r-1; while(up>=0){ const row=disp[up]; if(!row) break; const v=row.c[col.id]; if(!isNum(v)) break; up--; } if(up<r-1){ above={r1:up+1, r2:r-1, kind:'col'}; } }
+  let left=null; if(!above && c>0){ let lc=c-1; while(lc>=0){ const row=disp[r]; if(!row) break; const cc=sh.cols[lc]; if(!cc) break; const v=row.c[cc.id]; if(!isNum(v)) break; lc--; } if(lc<c-1){ left={c1:lc+1, c2:c-1, kind:'row'}; } }
+  let expr=null;
+  if(above){ expr='=SUM('+cpA1(above.r1,c)+':'+cpA1(above.r2,c)+')'; }
+  else if(left){ expr='=SUM('+cpA1(r,left.c1)+':'+cpA1(r,left.c2)+')'; }
+  else { expr='=SUM()'; }
+  const row=disp[r]; if(!row) return;
+  if(!row.f) row.f={}; row.f[col.id]=expr; row.c[col.id]=cpEvalFormula(expr, sh, row);
+  cpSave(); cpRerender();
+  if(typeof toast==='function') toast(above?'Автосумма по колонке':(left?'Автосумма по строке':'Заготовка =SUM()'));
 }
 /* Name box + edit bar над таблицей (стиль Google Sheets) */
 function cpNameBarHTML(){
@@ -11329,7 +11534,7 @@ function cpNameBarHTML(){
   return '<div class="cp-nbar">'
     +'<div class="cp-nbar-name" title="Активная ячейка">'+nameLbl+'</div>'
     +'<span class="cp-nbar-fx'+(hasF?' active':'')+'" title="'+(hasF?'В этой ячейке формула':'Начни ввод с = для формулы')+'">ƒ<i>x</i></span>'
-    +'<input id="cp-nbar-ed" class="cp-nbar-ed'+(hasF?' cp-nbar-ed-fmula':'')+'" value="'+_ddA(val)+'" placeholder="'+_ddA(colName?('Значение · '+colName+' · = для формулы'):'Значение или =формула')+'" oninput="cpNbarInput(this.value)" onkeydown="cpNbarKey(event)" onblur="cpNbarBlur()" onfocus="cpNbarFocus()">'
+    +'<input id="cp-nbar-ed" class="cp-nbar-ed'+(hasF?' cp-nbar-ed-fmula':'')+'" value="'+_ddA(val)+'" placeholder="'+_ddA(colName?('Значение · '+colName+' · = для формулы'):'Значение или =формула')+'" oninput="cpAutocInput(\'cp-nbar-ed\')" onkeydown="cpNbarKey(event)" onblur="cpNbarBlur()" onfocus="cpNbarFocus()">'
   +'</div>';
 }
 let cpNbarActive=false;
@@ -11337,6 +11542,8 @@ function cpNbarFocus(){ cpNbarActive=true; }
 function cpNbarInput(){ /* нужен для оптимизации будущих auto-suggests */ }
 function cpNbarKey(e){
   const k=e.key;
+  /* Автокомплит формулы перехватывает стрелки, Tab, Enter, Escape пока открыт */
+  if(cpAutocKey(e)) return;
   if(k==='Enter'){ e.preventDefault(); cpNbarCommit(); if(!e.shiftKey){ cpMoveSel(1,0); } else { cpMoveSel(-1,0); } cpSelEnd=null; cpRerender(); const c=document.querySelector('.cp-scroll'); if(c) c.focus(); return; }
   if(k==='Escape'){ e.preventDefault(); const inp=document.getElementById('cp-nbar-ed'); cpNbarActive=false; if(inp){ inp.blur(); } cpRerender(); return; }
   if(k==='Tab'){ e.preventDefault(); cpNbarCommit(); cpMoveSel(0, e.shiftKey?-1:1); cpSelEnd=null; cpRerender(); return; }
@@ -11360,7 +11567,7 @@ function cpNbarCommit(){
   }
   cpNbarActive=false;
 }
-function cpNbarBlur(){ cpNbarCommit(); }
+function cpNbarBlur(){ if(_cpAutoc) cpAutocClose(); cpNbarCommit(); }
 /* Статус-бар: показывает Sum/Avg/Count/Min/Max для выделенного числового диапазона */
 function cpStatusBarHTML(){
   const sh=cpSheet(); if(!sh) return '';
@@ -12584,17 +12791,115 @@ function cpRect(){ const a=cpSel, b=cpSelEnd||cpSel; return {r0:Math.min(a.r,b.r
 function cpInRect(r,c){ if(!cpSelEnd)return false; if(r===cpSel.r&&c===cpSel.c)return false; const x=cpRect(); return r>=x.r0&&r<=x.r1&&c>=x.c0&&c<=x.c1; }
 function cpExtendSel(dr,dc){ if(!cpSelEnd)cpSelEnd={r:cpSel.r,c:cpSel.c}; const sh=cpSheet(),nr=cpDisp(sh).length,nc=sh.cols.length; cpSelEnd={r:Math.max(0,Math.min(nr-1,cpSelEnd.r+dr)),c:Math.max(0,Math.min(nc-1,cpSelEnd.c+dc))}; }
 function cpClearSel(){ const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); let ch=false; for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; if(!row)continue; for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(col&&row.c[col.id]!=null){ delete row.c[col.id]; ch=true; } } } if(ch){ cpSave(); cpRerender(); } }
-function cpFillDown(){ const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); if(x.r1<=x.r0)return; let ch=false; for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(!col)continue; const top=disp[x.r0]?disp[x.r0].c[col.id]:undefined; for(let r=x.r0+1;r<=x.r1;r++){ const row=disp[r]; if(!row)continue; if(top==null||top===''){ if(row.c[col.id]!=null){delete row.c[col.id];ch=true;} } else { row.c[col.id]=top; ch=true; } } } if(ch){ cpSave(); cpRerender(); } }
-function cpTSV(){ const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); const lines=[]; for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; const cells=[]; for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; let v=(row&&col)?row.c[col.id]:''; if(v==null)v=''; cells.push(String(v).replace(/\t/g,' ').replace(/\r?\n/g,' ')); } lines.push(cells.join('\t')); } return lines.join('\n'); }
-function cpPasteTSV(text){ let sh=cpSheet(); const filtered=!!(cpQ||(sh.filt&&Object.keys(sh.filt).length)); let disp=cpDisp(sh); const grid=String(text).replace(/\r/g,'').split('\n').map(function(l){return l.split('\t');}); if(grid.length>1&&grid[grid.length-1].length===1&&grid[grid.length-1][0]==='')grid.pop(); if(!grid.length)return; const x=cpRect(); const r0=x.r0,c0=x.c0; let changed=false; for(let i=0;i<grid.length;i++){ let row=disp[r0+i]; if(!row){ if(filtered)break; row={id:cpUid(),c:{}}; sh.rows.push(row); disp=cpDisp(sh); row=disp[r0+i]||row; } for(let j=0;j<grid[i].length;j++){ const c=c0+j; const col=sh.cols[c]; if(!col)continue; const v=grid[i][j]; if(v===''){ if(row.c[col.id]!=null){delete row.c[col.id];changed=true;} } else { row.c[col.id]=v; changed=true; } } } if(changed){ cpSel={r:r0,c:c0}; const rr=Math.min(r0+grid.length-1,cpDisp(sh).length-1), cc=Math.min(c0+(grid[0]?grid[0].length:1)-1,sh.cols.length-1); cpSelEnd=(rr>r0||cc>c0)?{r:rr,c:cc}:null; cpSave(); cpRerender(); if(typeof toast==='function')toast('Вставлено'); } }
+function cpFillDown(){
+  const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); if(x.r1<=x.r0)return;
+  let ch=false;
+  for(let c=x.c0;c<=x.c1;c++){
+    const col=sh.cols[c]; if(!col)continue;
+    const topRow=disp[x.r0];
+    const topF=(topRow&&topRow.f&&topRow.f[col.id])||null;
+    const top=topRow?topRow.c[col.id]:undefined;
+    for(let r=x.r0+1;r<=x.r1;r++){
+      const row=disp[r]; if(!row)continue;
+      if(topF!=null){
+        const newF=cpAdjustFormula(topF, r-x.r0, 0);
+        if(!row.f) row.f={};
+        row.f[col.id]=newF;
+        row.c[col.id]=cpEvalFormula(newF, sh, row);
+        ch=true;
+      } else if(top==null||top===''){
+        if(row.c[col.id]!=null){delete row.c[col.id]; ch=true;}
+        if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; ch=true; }
+      } else {
+        row.c[col.id]=top; ch=true;
+        if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; }
+      }
+    }
+  }
+  if(ch){ cpSave(); cpRerender(); }
+}
+/* Внутренний клипборд: помнит формулы/стили выделения, чтобы при вставке сдвигать ссылки как Google Sheets */
+let _cpClip=null;
+function cpTSV(){
+  const sh=cpSheet(),disp=cpDisp(sh),x=cpRect();
+  const lines=[]; const clipCells=[]; const shId=sh?sh.id:null;
+  for(let r=x.r0;r<=x.r1;r++){
+    const row=disp[r]; const cells=[]; const arr=[];
+    for(let c=x.c0;c<=x.c1;c++){
+      const col=sh.cols[c];
+      let v=(row&&col)?row.c[col.id]:''; if(v==null)v='';
+      cells.push(String(v).replace(/\t/g,' ').replace(/\r?\n/g,' '));
+      arr.push({
+        v: (row&&col)?(row.c[col.id]==null?null:row.c[col.id]):null,
+        f: (row&&col&&row.f)?(row.f[col.id]||null):null,
+        st: (row&&col&&row.st)?(row.st[col.id]||null):null
+      });
+    }
+    lines.push(cells.join('\t'));
+    clipCells.push(arr);
+  }
+  const tsv=lines.join('\n');
+  _cpClip={ tsv:tsv, r0:x.r0, r1:x.r1, c0:x.c0, c1:x.c1, cells:clipCells, sh:shId, t:Date.now() };
+  return tsv;
+}
+function cpPasteTSV(text){
+  let sh=cpSheet(); if(!sh) return;
+  const filtered=!!(cpQ||(sh.filt&&Object.keys(sh.filt).length));
+  let disp=cpDisp(sh);
+  const useInt = _cpClip && _cpClip.tsv===text;
+  const grid=String(text).replace(/\r/g,'').split('\n').map(function(l){return l.split('\t');});
+  if(grid.length>1&&grid[grid.length-1].length===1&&grid[grid.length-1][0]==='')grid.pop();
+  if(!grid.length) return;
+  const x=cpRect();
+  const r0=x.r0,c0=x.c0;
+  const dr=useInt?(r0-_cpClip.r0):0, dc=useInt?(c0-_cpClip.c0):0;
+  let changed=false;
+  for(let i=0;i<grid.length;i++){
+    let row=disp[r0+i];
+    if(!row){ if(filtered)break; row={id:cpUid(),c:{}}; sh.rows.push(row); disp=cpDisp(sh); row=disp[r0+i]||row; }
+    for(let j=0;j<grid[i].length;j++){
+      const c=c0+j; const col=sh.cols[c]; if(!col)continue;
+      const raw=grid[i][j];
+      const clip=useInt&&_cpClip.cells[i]?_cpClip.cells[i][j]:null;
+      /* Определяем формулу: приоритет внутреннего клипборда, иначе если текст начинается с "=" */
+      let fmulaSrc=null;
+      if(clip && clip.f!=null) fmulaSrc=cpAdjustFormula(clip.f, dr, dc);
+      else if(typeof raw==='string' && raw.startsWith('=')) fmulaSrc=raw;
+      if(fmulaSrc!=null){
+        if(!row.f) row.f={};
+        row.f[col.id]=fmulaSrc;
+        row.c[col.id]=cpEvalFormula(fmulaSrc, sh, row);
+        changed=true;
+      } else if(raw===''){
+        if(row.c[col.id]!=null){ delete row.c[col.id]; changed=true; }
+        if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; changed=true; }
+      } else {
+        row.c[col.id]=raw; changed=true;
+        if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; }
+      }
+      /* Формат-стили из внутреннего клипборда, если есть */
+      if(useInt && clip && clip.st){
+        if(!row.st) row.st={};
+        row.st[col.id]=JSON.parse(JSON.stringify(clip.st));
+      }
+    }
+  }
+  if(changed){
+    cpSel={r:r0,c:c0};
+    const rr=Math.min(r0+grid.length-1,cpDisp(sh).length-1), cc=Math.min(c0+(grid[0]?grid[0].length:1)-1,sh.cols.length-1);
+    cpSelEnd=(rr>r0||cc>c0)?{r:rr,c:cc}:null;
+    cpSave(); cpRerender();
+    if(typeof toast==='function')toast('Вставлено');
+  }
+}
 function cpActive(){ if(pdTabCur!=='content'||cpEd)return false; const ae=document.activeElement, tag=ae&&ae.tagName; if(tag==='INPUT'||tag==='TEXTAREA')return false; return !!cpSheet(); }
 function cpOnCopy(e){ if(!cpActive())return; try{ e.clipboardData.setData('text/plain',cpTSV()); e.preventDefault(); }catch(_e){} }
 function cpOnCut(e){ if(!cpActive())return; try{ e.clipboardData.setData('text/plain',cpTSV()); e.preventDefault(); cpClearSel(); }catch(_e){} }
-function cpOnPaste(e){ if(!cpActive())return; try{ const t=(e.clipboardData||window.clipboardData).getData('text'); e.preventDefault(); cpPasteTSV(t); }catch(_e){} }
+/* cpOnPaste дублировал cpPasteHandler и вызывал double-paste — фактическая логика теперь в cpPasteHandler на уровне 11567 */
 async function cpRefreshAppr(p){ if(!(window.LIVE&&window.SB))return; try{ const pid=p.id; const r2=await window.SB.from('content_shares').select('sheet_id,shared_at,data').eq('project_id',pid); p._cpShared={}; if(r2&&r2.data)r2.data.forEach(function(x){ p._cpShared[x.sheet_id]={at:x.shared_at,hash:cpHash(JSON.stringify(x.data||{}))}; }); const r3=await window.SB.from('content_approvals').select('sheet_id,row_id,status,comment').eq('project_id',pid); p._cpAppr={}; if(r3&&r3.data)r3.data.forEach(function(x){ p._cpAppr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; }); if(pdTabCur==='content' && !(typeof cpEd!=='undefined'&&cpEd))renderPd(); }catch(e){ console.warn('cp refresh',e); } }
 document.addEventListener('copy',cpOnCopy);
 document.addEventListener('cut',cpOnCut);
-document.addEventListener('paste',cpOnPaste);
+/* paste-listener зарегистрирован выше как cpPasteHandler — второй регистрации быть не должно */
 
 function cpClientSummaryHTML(p,sh){ const ap=p._cpAppr||{}, pre=sh.id+'/'; let ok=0,ch=0; Object.keys(ap).forEach(function(k){ if(k.indexOf(pre)===0&&k!==pre+'__sheet__'){ if(ap[k].status==='approved')ok++; else if(ap[k].status==='changes')ch++; } }); if(!ok&&!ch)return ''; let h='<span class="cp-clsum" title="Решения клиента по строкам">'; if(ok)h+='<span class="ok">✓ '+ok+'</span>'; if(ch)h+='<span class="ch">✎ '+ch+'</span>'; h+='</span>'; return h; }
 window.addEventListener('focus',function(){ try{ if(document.querySelector('#app-cl .nav-i[data-cm="content"].on')&&document.getElementById('content-cl')&&typeof renderClContent==='function') renderClContent(); }catch(_e){} });
@@ -12661,7 +12966,52 @@ function cpFillStart(e){ e.preventDefault(); e.stopPropagation(); if(cpEd)return
 function cpFillMove(e){ if(!cpFill)return; const el=document.elementFromPoint(e.clientX,e.clientY); const cell=el&&el.closest?el.closest('.cp-cell'):null; if(cell&&cell.getAttribute('data-r')!=null){ const r=parseInt(cell.getAttribute('data-r'),10); if(!isNaN(r)){ cpFill.toR=Math.max(cpFill.src.r1,r); cpFillPreview(); } } }
 function cpFillPreview(){ document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); if(!cpFill)return; const x=cpFill.src; for(let r=x.r1+1;r<=cpFill.toR;r++){ for(let c=x.c0;c<=x.c1;c++){ const cell=document.querySelector('.cp-cell[data-r="'+r+'"][data-c="'+c+'"]'); if(cell)cell.classList.add('cp-fillprev'); } } }
 function cpFillEnd(){ document.removeEventListener('mousemove',cpFillMove); document.body.classList.remove('cp-filling'); document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); const f=cpFill; cpFill=null; if(f&&f.toR>f.src.r1)cpFillApply(f); }
-function cpFillApply(f){ const sh=cpSheet(); let disp=cpDisp(sh); const x=f.src; const filtered=!!(cpQ||(sh.filt&&Object.keys(sh.filt).length)); const count=f.toR-x.r1; for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(!col)continue; const srcVals=[]; for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; srcVals.push(row?(row.c[col.id]==null?'':String(row.c[col.id])):''); } const gen=cpFillSeries(srcVals,count); for(let i=0;i<count;i++){ let row=disp[x.r1+1+i]; if(!row){ if(filtered)break; row={id:cpUid(),c:{}}; sh.rows.push(row); disp.push(row); } if(!row)break; const v=gen[i]; if(v===''||v==null)delete row.c[col.id]; else row.c[col.id]=v; } } cpSel={r:x.r0,c:x.c0}; cpSelEnd={r:f.toR,c:x.c1}; cpSave(); cpRerender(); }
+function cpFillApply(f){
+  const sh=cpSheet(); let disp=cpDisp(sh); const x=f.src;
+  const filtered=!!(cpQ||(sh.filt&&Object.keys(sh.filt).length));
+  const count=f.toR-x.r1;
+  const srcSpans=x.r1-x.r0+1;
+  for(let c=x.c0;c<=x.c1;c++){
+    const col=sh.cols[c]; if(!col)continue;
+    const srcVals=[], srcFmulas=[];
+    for(let r=x.r0;r<=x.r1;r++){
+      const row=disp[r];
+      srcVals.push(row?(row.c[col.id]==null?'':String(row.c[col.id])):'');
+      srcFmulas.push((row&&row.f&&row.f[col.id])||null);
+    }
+    const hasFmula=srcFmulas.some(function(f){return f!=null;});
+    const gen=hasFmula?null:cpFillSeries(srcVals,count);
+    for(let i=0;i<count;i++){
+      let row=disp[x.r1+1+i];
+      if(!row){ if(filtered)break; row={id:cpUid(),c:{}}; sh.rows.push(row); disp.push(row); }
+      if(!row)break;
+      if(hasFmula){
+        const targetR=x.r1+1+i;
+        const srcIdx=i%srcSpans;
+        const sourceR=x.r0+srcIdx;
+        const dr=targetR-sourceR;
+        const srcF=srcFmulas[srcIdx];
+        if(srcF!=null){
+          const newF=cpAdjustFormula(srcF, dr, 0);
+          if(!row.f) row.f={};
+          row.f[col.id]=newF;
+          row.c[col.id]=cpEvalFormula(newF, sh, row);
+        } else {
+          const v=srcVals[srcIdx];
+          if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; }
+          if(v===''||v==null){ if(row.c[col.id]!=null) delete row.c[col.id]; }
+          else row.c[col.id]=v;
+        }
+      } else {
+        const v=gen[i];
+        if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; }
+        if(v===''||v==null){ if(row.c[col.id]!=null) delete row.c[col.id]; }
+        else row.c[col.id]=v;
+      }
+    }
+  }
+  cpSel={r:x.r0,c:x.c0}; cpSelEnd={r:f.toR,c:x.c1}; cpSave(); cpRerender();
+}
 
 /* ===================== КОНТЕНТ-ПЛАН · ресайз колонок (ширина) и строк (высота) ===================== */
 function cpColRz(e,ci){ e.preventDefault(); e.stopPropagation(); const col=cpColAt(ci); if(!col)return; cpRz={t:'col',ci:ci,x:e.clientX,w:col.w}; document.body.classList.add('cp-rzing','cp-rzing-col'); document.addEventListener('mousemove',cpRzMove); document.addEventListener('mouseup',cpRzEnd,{once:true}); }
