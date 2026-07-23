@@ -32542,15 +32542,24 @@ async function routeByProfile(userArg){
 }
 
 window.tLogin = async () => {
-  const email = document.getElementById('lg-login').value.trim();
-  const pass = document.getElementById('lg-pass').value;
+  const email = document.getElementById('lg-login').value.trim().toLowerCase();       // email — регистронезависимо, пробелы срезаем
+  const pass = document.getElementById('lg-pass').value.trim();                        // пароль — срезаем пробелы (частая причина «Invalid credentials» после copy-paste/autofill)
   if (!email || !pass){ toast('Введи email и пароль'); return; }
   const btn=document.getElementById('lg-btn');
   if(btn&&btn.disabled) return;                                                       // защита от двойного клика
   const _btnTxt=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.style.opacity='.7'; btn.textContent='Входим…'; }
   const _btnBack=()=>{ if(btn){ btn.disabled=false; btn.style.opacity=''; btn.textContent=_btnTxt||'Войти'; } };
+  // ⬤ Чистим сессию перед логином — фикс интермиттент "Invalid login credentials",
+  //   когда старый истёкший/битый токен в localStorage конфликтует с новым sign-in.
+  try{ await SB.auth.signOut({ scope: 'local' }); }catch(_e){}
+  const tryLogin = async () => await SB.auth.signInWithPassword({ email, password: pass });
   try{
-    const { data, error } = await SB.auth.signInWithPassword({ email, password: pass });
+    let { data, error } = await tryLogin();
+    // ⬤ Ретрай для intermittent сбоев Supabase Auth (rate-limit spikes, network flapping)
+    if (error && /invalid login credentials|network|failed to fetch|timeout/i.test(String(error.message||''))){
+      await new Promise(r => setTimeout(r, 450));
+      ({ data, error } = await tryLogin());
+    }
     if (error){ toast('Вход не удался: ' + error.message); _btnBack(); return; }
     await routeByProfile(data && data.user);                                          // user уже в ответе — без лишнего запроса getUser
     _btnBack();
