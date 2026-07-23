@@ -11603,6 +11603,8 @@ function cpFloat(anchor,html){
 /* ---- selection / editing ---- */
 function cpClick(e,r,c){
   if(cpCellJustDragged){cpCellJustDragged=false;return;}
+  /* Только что переключились с одного edit'a на другой в cpCellDown — не дублируем toggle/меню */
+  if(_cpEditSwitch){ _cpEditSwitch=false; return; }
   /* Если сейчас редактируется формула — клик по ячейке вставляет её ссылку, а не переносит фокус */
   const fid=cpFmulaActiveInput();
   if(fid){
@@ -11617,11 +11619,27 @@ function cpClick(e,r,c){
   }
   if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); cpColSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ if(col.sys==='pub'){ cpPubMenu(r,c,e); return; } cpToggle(r,c); return; } cpRerender();
 }
+let _cpEditSwitch=false;
 function cpCellDown(e,r,c){
   if(e&&e.button!=null&&e.button!==0)return;
   /* Во время редактирования формулы клики только вставляют ссылки — preventDefault сохраняет фокус на input'e */
   if(cpFmulaActiveInput()){ if(e)e.preventDefault(); return; }
-  if(cpEd)return;
+  /* Если сейчас редактируется другая ячейка — сохраняем правку и мгновенно переносим выделение на новую */
+  if(cpEd){
+    if(e) e.preventDefault(); /* блокируем blur/focus-race, чтобы cpBlur не запустил второй rerender */
+    /* Тот же клетчатый клик? Ничего не делаем — редактор остаётся активным */
+    if(cpEd.r===r && cpEd.c===c) return;
+    cpStore();
+    cpEd=null;
+    if(e&&e.shiftKey){
+      cpSelEnd={r:r,c:c}; cpRowSel=new Set(); cpColSel=new Set();
+    } else {
+      cpSel={r,c}; cpSelEnd=null; cpRowSel=new Set(); cpColSel=new Set();
+    }
+    _cpEditSwitch=true; /* Пропустить последующий cpClick — он бы сделал double-toggle для check-колонок */
+    cpRerender();
+    return;
+  }
   if(e)e.preventDefault();
   if(e&&e.shiftKey){
     cpSelEnd={r:r,c:c}; cpRowSel=new Set(); cpColSel=new Set();
