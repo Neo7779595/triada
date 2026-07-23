@@ -3050,6 +3050,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-popi:hover{background:var(--bg-3);color:var(--txt)}
 .cp-popi.on{color:var(--accent)}
 .cp-pop .sep{height:1px;background:var(--line);margin:4px 2px}
+/* Меню выбора типа колонки (+ Колонка) */
+.cp-addmenu{min-width:280px;padding:4px}
+.cp-addmenu-h{font-family:var(--mono);font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--txt-3);font-weight:700;padding:8px 10px 4px}
+.cp-addmenu-sep{height:1px;background:var(--line);margin:5px 6px}
+.cp-addmenu-i{display:flex;align-items:center;gap:11px;width:100%;background:none;border:0;color:var(--txt-2);font-size:13.5px;padding:8px 10px;border-radius:8px;cursor:pointer;text-align:left;font-family:var(--font);transition:background .14s,color .14s}
+.cp-addmenu-i:hover{background:var(--bg-3);color:var(--txt)}
+.cp-addmenu-i.is-off{opacity:.4;cursor:not-allowed}
+.cp-addmenu-i.is-off:hover{background:none;color:var(--txt-2)}
+.cp-addmenu-ic{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--bg-3);border-radius:8px;color:var(--txt-2);box-shadow:inset 0 0 0 1px var(--line)}
+.cp-addmenu-ic svg{width:15px;height:15px}
+.cp-addmenu-i:hover .cp-addmenu-ic{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
+.cp-addmenu-i.is-off:hover .cp-addmenu-ic{background:var(--bg-3);color:var(--txt-3);box-shadow:inset 0 0 0 1px var(--line)}
+.cp-addmenu-tx{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.cp-addmenu-tx b{font-size:13.5px;font-weight:600;color:var(--txt);letter-spacing:.005em}
+.cp-addmenu-i:hover .cp-addmenu-tx b{color:var(--txt)}
+.cp-addmenu-tx em{font-style:normal;font-size:11.5px;color:var(--txt-3);margin-top:2px;font-weight:400}
+.cp-addmenu-pub .cp-addmenu-ic{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 32%,transparent)}
+.cp-addmenu-pub:hover .cp-addmenu-ic{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+.cp-addmenu-pub .cp-addmenu-tx b{color:var(--accent);font-weight:700}
 .cp-pop .ttl{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-3);padding:6px 9px 3px}
 .cp-types{display:grid;grid-template-columns:1fr 1fr;gap:3px}
 .cp-types .cp-popi{padding:6px 8px}
@@ -10506,11 +10525,12 @@ function cpSeed(){
 }
 function cpSeedEmpty(name,color){
   const c=(nm,type,w,opts)=>({id:cpUid(),name:nm,type,w,opts:opts||[]});
-  const cols=[c('Название','text',230),c('Дата','date',120),c('Статус','select',170,[{v:'Идея',c:'gray'},{v:'В работе',c:'amber'},{v:'Готово',c:'green'}]),{id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]}];
+  const cols=[c('Название','text',230),c('Дата','date',120),c('Статус','select',170,[{v:'Идея',c:'gray'},{v:'В работе',c:'amber'},{v:'Готово',c:'green'}])];
   const rows=[{id:cpUid(),c:{}},{id:cpUid(),c:{}},{id:cpUid(),c:{}}];
   return {id:cpUid(),name:name||'Новый лист',color:color||'gray',hidden:false,cols,rows};
 }
-function cpEnsurePub(d){ if(!d||!d.sheets)return; d.sheets.forEach(function(s){ if(!s.cols)s.cols=[]; var pc=s.cols.find(function(c){return c.sys==='pub';}); if(!pc){ s.cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]}); } else if(pc.w<160){ pc.w=172; } }); }
+/* «Статус публикации» больше не форсится — только приводим ширину, если её вручную вставили и она уже задана */
+function cpEnsurePub(d){ if(!d||!d.sheets)return; d.sheets.forEach(function(s){ if(!s.cols)return; var pc=s.cols.find(function(c){return c.sys==='pub';}); if(pc && pc.w<160) pc.w=172; }); }
 function cpPubStats(sh){ const pc=(sh.cols||[]).find(function(c){return c.sys==='pub';}); if(!pc) return {done:0,total:0,pct:0}; let total=0,done=0; (sh.rows||[]).forEach(function(r){ const has=(sh.cols||[]).some(function(c){ if(c.sys==='pub')return false; const v=r.c[c.id]; return v!=null&&String(v).trim()!==''; }); if(!has)return; total++; if(r.c[pc.id])done++; }); return {done:done,total:total,pct: total?Math.round(done/total*100):0}; }
 function cpProgHTML(sh){ const st=cpPubStats(sh); const ic='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'; return '<span class="cp-prog" id="cp-prog" title="Опубликовано '+st.done+' из '+st.total+'"><span class="cp-prog-ic">'+ic+'</span><span class="cp-prog-track"><span class="cp-prog-fill" style="width:'+st.pct+'%"></span></span><span class="cp-prog-pct">'+st.pct+'%</span><span class="cp-prog-lb">опубликовано</span></span>'; }
 function cpProgRender(){ const sh=cpSheet(), st=cpPubStats(sh); const el=document.getElementById('cp-prog'); if(!el)return; const f=el.querySelector('.cp-prog-fill'); if(f)f.style.width=st.pct+'%'; const p=el.querySelector('.cp-prog-pct'); if(p)p.textContent=st.pct+'%'; el.setAttribute('title','Опубликовано '+st.done+' из '+st.total); }
@@ -10649,7 +10669,7 @@ function cpRender(p){
           +'<button class="cp-mini cp-ico'+(cpSelHasMerge()?' on':'')+'" title="'+(cpSelHasMerge()?'Разъединить ячейки':'Объединить ячейки (выдели несколько по горизонтали)')+'" onclick="cpMergeToggle()">'+CP_IC.merge+'</button>'
         +'</span>'
         +'<span class="cp-btngroup">'
-          +'<button class="cp-mini" onclick="cpAddCol()">'+CP_IC.plus+'Колонка</button>'
+          +'<button class="cp-mini" onclick="cpAddCol(event)">'+CP_IC.plus+'Колонка</button>'
           +'<button class="cp-mini" onclick="cpImport()">'+CP_IC.upload+'Импорт</button>'
         +'</span>'
         +'<span class="cp-btngroup">'
@@ -10665,7 +10685,7 @@ function cpRender(p){
   const hmInfo=cpHeadMergeInfo(sh);
   cols.forEach((col,ci)=>{ if(hmInfo && hmInfo.covered.has(ci)) return; const isM=hmInfo&&hmInfo.anchorW[ci]!=null; const wOv=isM?hmInfo.anchorW[ci]:null; html+=cpHeadCell(col,ci,wOv,isM); });
   if(showClient) html+='<div class="cp-head cp-claphead" style="width:240px"><span class="nm">Клиент</span></div>';
-  html+='<div class="cp-addcol" onclick="cpAddCol()">'+CP_IC.plus+'</div></div>';
+  html+='<div class="cp-addcol" onclick="cpAddCol(event)">'+CP_IC.plus+'</div></div>';
   if(!disp.length){
     html+='<div class="cp-empty">'+(cpQ?'Ничего не найдено':'Пусто — добавь первую строку ниже')+'</div>';
   }
@@ -10901,8 +10921,8 @@ function cpColMenu(e,ci){
   h+='<button class="cpm-item" onclick="cpFilterMenu(event,'+ci+')">'+I.fl+'Фильтр…</button>';
   if(cpFiltGet(col.id))h+='<button class="cpm-item" onclick="cpClearColFilter('+ci+')">'+I.xr+'Сбросить фильтр</button>';
   if(col.sys==='pub'){
-    h+='<div class="cpm-sep"></div><div class="cpm-label">Системная колонка</div>';
-    h+='<div class="cpm-note">«Статус публикации» — обязательная колонка, тип менять нельзя.</div>';
+    h+='<div class="cpm-sep"></div><div class="cpm-label">Публикационная колонка</div>';
+    h+='<div class="cpm-note">Специальный чек «опубликовано» со ссылкой на пост — попадает в прогресс листа. Можно удалить в любой момент.</div>';
     h+='<div class="cpm-sep"></div>';
     h+='<button class="cpm-item" onclick="cpColIns('+ci+',0)">'+I.il+'Вставить слева</button>';
     h+='<button class="cpm-item" onclick="cpColIns('+ci+',1)">'+I.ir+'Вставить справа</button>';
@@ -10934,10 +10954,10 @@ function cpColRename(ci){ cpCloseFloat(); cpHeadEd=cpColAt(ci).id; cpRerender();
 function cpHeadKey(e,ci){ if(e.key==='Enter'){e.preventDefault();cpHeadCommit(ci);} else if(e.key==='Escape'){cpHeadEd=null;cpRerender();} }
 function cpHeadCommit(ci){ const i=document.getElementById('cp-hed'); const col=cpColAt(ci); if(i&&col){const t=i.value.trim(); if(t)col.name=t;} cpHeadEd=null; cpSave(); cpRerender(); }
 function cpColAlign(ci,dir){ const col=cpColAt(ci); if(!col)return; if(col.align===dir)delete col.align; else col.align=dir; cpCloseFloat(); cpSave(); cpRerender(); }
-function cpColType(ci,t){ const col=cpColAt(ci); if(col&&col.sys==='pub'){if(typeof toast==='function')toast('Тип колонки публикации менять нельзя');cpCloseFloat();return;} col.type=t; if(t==='select'&&(!col.opts||!col.opts.length))col.opts=[{v:'Вариант',c:'gray'}]; if(t==='money'&&!col.cur)col.cur='uzs'; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpColType(ci,t){ const col=cpColAt(ci); if(!col)return; /* если это была publish-колонка и меняем тип — снимаем sys-флаг, теряем спец-поведение */ if(col.sys==='pub' && t!=='check') delete col.sys; col.type=t; if(t==='select'&&(!col.opts||!col.opts.length))col.opts=[{v:'Вариант',c:'gray'}]; if(t==='money'&&!col.cur)col.cur='uzs'; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColCur(ci,cur){ const col=cpColAt(ci); if(col)col.cur=cur; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColIns(ci,side){ const sh=cpSheet(); sh.cols.splice(ci+(side?1:0),0,{id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpCloseFloat(); cpSave(); cpRerender(); }
-function cpColDel(ci){ const sh=cpSheet(); if(sh.cols[ci]&&sh.cols[ci].sys==='pub'){if(typeof toast==='function')toast('Колонка «Статус публикации» обязательна и не удаляется');cpCloseFloat();return;} if(sh.cols.length<=1){toast('Нельзя удалить единственную колонку');cpCloseFloat();return;} const id=sh.cols[ci].id; sh.cols.splice(ci,1); sh.rows.forEach(r=>{delete r.c[id];}); if(cpSel.c>=sh.cols.length)cpSel.c=sh.cols.length-1; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpColDel(ci){ const sh=cpSheet(); if(sh.cols.length<=1){toast('Нельзя удалить единственную колонку');cpCloseFloat();return;} const id=sh.cols[ci].id; sh.cols.splice(ci,1); sh.rows.forEach(r=>{delete r.c[id];}); /* row-merge cleanup */ sh.rows.forEach(function(r){ if(!r.m)return; r.m=r.m.map(function(s){return s.filter(function(x){return x!==id;});}).filter(function(s){return s.length>=2;}); if(!r.m.length) delete r.m; }); /* header-merge cleanup */ if(sh.headM){ sh.headM=sh.headM.map(function(s){return s.filter(function(x){return x!==id;});}).filter(function(s){return s.length>=2;}); if(!sh.headM.length) delete sh.headM; } if(cpSel.c>=sh.cols.length)cpSel.c=sh.cols.length-1; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpColPick(e,ci){
   if(cpEd){cpStore();cpEd=null;}
   const sh=cpSheet(); const col=sh.cols[ci]; if(!col)return; const id=col.id;
@@ -10953,8 +10973,7 @@ function cpColPick(e,ci){
 function cpDeleteCols(){
   if(!cpColSel.size)return;
   const sh=cpSheet();
-  const delIds=Array.from(cpColSel).filter(function(id){ const c=(sh.cols||[]).find(function(x){return x.id===id;}); return !(c&&c.sys==='pub'); });
-  if(!delIds.length){ if(typeof toast==='function')toast('Колонка «Статус публикации» обязательна'); cpColSel=new Set(); cpColAnchor=null; cpCloseFloat(); cpRerender(); return; }
+  const delIds=Array.from(cpColSel);
   const remaining=(sh.cols||[]).filter(function(c){return delIds.indexOf(c.id)<0;});
   if(!remaining.length){ if(typeof toast==='function')toast('Нельзя удалить все колонки'); return; }
   const n=delIds.length;
@@ -10971,7 +10990,58 @@ function cpDeleteCols(){
   cpSelEnd=null; cpCloseFloat(); cpSave(); cpRerender();
   if(typeof toast==='function')toast('Удалено колонок: '+n);
 }
-function cpAddCol(){ const sh=cpSheet(); sh.cols.push({id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpSave(); cpRerender(); }
+const CP_ADD_TYPES=[
+  ['text','Текст','Обычная текстовая ячейка'],
+  ['long','Заметка','Длинный многострочный текст'],
+  ['num','Число','Числовое значение'],
+  ['money','Сумма','Число с валютой'],
+  ['date','Дата','Дата события'],
+  ['select','Список','Выбор из вариантов'],
+  ['check','Флажок','Да / нет'],
+  ['link','Ссылка','URL или Telegram'],
+];
+function cpAddCol(ev){
+  const btn = (ev && (ev.currentTarget || ev.target)) || document.querySelector('.cp-mini[onclick*="cpAddCol"]') || document.querySelector('.cp-addcol');
+  if(!btn){ /* fallback: сразу добавляем текстовую */ const sh0=cpSheet(); sh0.cols.push({id:cpUid(),name:'Колонка',type:'text',w:150,opts:[]}); cpSave(); cpRerender(); return; }
+  const sh = (typeof cpSheet==='function') ? cpSheet() : null;
+  const hasPub = sh && (sh.cols||[]).some(function(c){ return c.sys==='pub'; });
+  let h='<div class="cp-addmenu-h">Тип колонки</div>';
+  CP_ADD_TYPES.forEach(function(t){
+    h += '<button class="cp-addmenu-i" onclick="cpAddColOfType(\''+t[0]+'\')"><span class="cp-addmenu-ic">'+CP_TYICON(t[0])+'</span><span class="cp-addmenu-tx"><b>'+t[1]+'</b><em>'+t[2]+'</em></span></button>';
+  });
+  h += '<div class="cp-addmenu-sep"></div>';
+  if(hasPub){
+    h += '<button class="cp-addmenu-i is-off" title="У листа уже есть колонка «Статус публикации»"><span class="cp-addmenu-ic">'+CP_TYICON('check')+'</span><span class="cp-addmenu-tx"><b>Статус публикации</b><em>Уже добавлена в этом листе</em></span></button>';
+  } else {
+    h += '<button class="cp-addmenu-i cp-addmenu-pub" onclick="cpAddColPub()"><span class="cp-addmenu-ic">'+CP_TYICON('check')+'</span><span class="cp-addmenu-tx"><b>Статус публикации</b><em>Чек «опубликовано» + ссылка на пост, попадает в прогресс листа</em></span></button>';
+  }
+  cpFloat(btn, '<div class="cp-addmenu">'+h+'</div>');
+}
+function cpAddColOfType(t){
+  const sh=cpSheet();
+  const defaults={
+    text:{name:'Колонка',w:150,opts:[]},
+    long:{name:'Заметка',w:220,opts:[]},
+    num:{name:'Число',w:110,opts:[]},
+    money:{name:'Сумма',w:130,opts:[],cur:'uzs'},
+    date:{name:'Дата',w:120,opts:[]},
+    select:{name:'Список',w:160,opts:[{v:'Вариант',c:'gray'}]},
+    check:{name:'Флажок',w:90,opts:[]},
+    link:{name:'Ссылка',w:180,opts:[]}
+  };
+  const d=defaults[t]||defaults.text;
+  const col={id:cpUid(),name:d.name,type:t,w:d.w,opts:d.opts};
+  if(d.cur) col.cur=d.cur;
+  sh.cols.push(col);
+  cpCloseFloat(); cpSave(); cpRerender();
+}
+function cpAddColPub(){
+  const sh=cpSheet();
+  if((sh.cols||[]).some(function(c){return c.sys==='pub';})){ if(typeof toast==='function')toast('Колонка «Статус публикации» уже есть'); cpCloseFloat(); return; }
+  sh.cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]});
+  cpCloseFloat(); cpSave(); cpRerender();
+  if(typeof toast==='function')toast('Колонка «Статус публикации» добавлена');
+}
 
 /* ---- rows ---- */
 function cpAddRow(){ cpSheet().rows.push({id:cpUid(),c:{}}); cpSave(); cpRerender(); }
@@ -11159,7 +11229,6 @@ function cpSheetFromWs(name,ws,shared,dateXf,hidden){
   });
   if(!rows.length)rows.push({id:cpUid(),c:{}});
   cols.forEach(function(c){ delete c._src; });
-  cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]});
   return {id:cpUid(),name:(name||'Лист').slice(0,40),color:'blue',hidden:!!hidden,cols:cols,rows:rows};
 }
 async function cpImportXlsx(input){
@@ -12058,7 +12127,7 @@ function cpTplPickCancel(){ _cpTplPickId=null; cpTplPickBannerClose(); cpRerende
 function cpTplPickHead(e,ci){
   if(!_cpTplPickId) return false;
   if(e){ e.stopPropagation(); e.preventDefault(); }
-  const col=cpColAt(ci); if(!col || col.sys==='pub'){ if(typeof toast==='function')toast('Эту колонку менять нельзя'); return true; }
+  const col=cpColAt(ci); if(!col || col.sys==='pub'){ if(typeof toast==='function')toast('Шаблоны применяются к колонкам-спискам, не к «Статусу публикации»'); return true; }
   const id=_cpTplPickId; _cpTplPickId=null; cpTplPickBannerClose();
   cpTplApply(ci,id);
   return true;
