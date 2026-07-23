@@ -3310,10 +3310,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-sarr{color:var(--accent);font-size:13.5px;font-weight:700;flex:0 0 auto}
 .cp-head .nm{cursor:pointer}
 .cp-head.cp-c0{position:sticky;left:40px;z-index:6;background:var(--bg-1)}
-.cp-head.cp-hmerged{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 12%,var(--bg-1)),var(--bg-1));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent);border-right-color:color-mix(in srgb,var(--accent) 40%,var(--line));position:relative}
-.cp-head.cp-hmerged .nm{color:var(--accent);font-weight:700}
-.cp-head.cp-hmerged .ti svg{color:var(--accent)}
-.cp-head.cp-hmerged::before{content:'';position:absolute;left:6px;right:6px;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);border-radius:0 0 2px 2px;opacity:.75;pointer-events:none}
+/* Объединённый заголовок — только тонкая мятная полоска сверху, без «закрашивания» */
+.cp-head.cp-hmerged{position:relative}
+.cp-head.cp-hmerged::before{content:'';position:absolute;left:8px;right:8px;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);border-radius:0 0 2px 2px;opacity:.6;pointer-events:none}
 .cp-head.cp-dragover{box-shadow:inset 3px 0 0 var(--accent)}
 .cp-row.cp-rowover>.cp-gut{box-shadow:inset 0 3px 0 var(--accent)}
 .cp-gut[draggable=true]{cursor:grab}
@@ -3635,7 +3634,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-gm:hover{color:var(--txt)}
 .cp-row.rowsel>.cp-cell{background:rgba(55,230,200,.12)}
 .cp-cell.cp-colsel{background-image:linear-gradient(rgba(55,230,200,.14),rgba(55,230,200,.14))}
-.cp-head.colsel{background:rgba(55,230,200,.15);box-shadow:inset 0 -2px 0 var(--accent)}
+/* Выделенный целиком столбец — только подчёркивание снизу, без закрашивания заголовка */
+.cp-head.colsel{box-shadow:inset 0 -2px 0 var(--accent)}
 .cp-row.rowsel>.cp-cell.cp-c0{background:rgba(55,230,200,.12)}
 .cp-row.rowsel>.cp-gut{background:var(--accent-dim);color:var(--accent)}
 .cp-mini.cp-del{border-color:color-mix(in srgb,var(--neg) 45%,transparent);color:var(--neg)}
@@ -12200,9 +12200,29 @@ function cpCellStyleAttr(row,col,sh){
 }
 function cpCellWrap(row,col){ const f=cpCellFmt(row,col); return f&&f.w; }
 function cpFmtRectCells(){
-  const sh=cpSheet(); if(!sh) return []; const disp=cpDisp(sh), x=cpRect();
-  const out=[]; for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; if(!row) continue;
-    for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(!col) continue; out.push({row,col}); } }
+  const sh=cpSheet(); if(!sh) return []; const disp=cpDisp(sh);
+  const out=[];
+  /* Если выделены целые колонки (клик по заголовку) — применяем ко всем строкам этих колонок */
+  if(cpColSel && cpColSel.size){
+    const colsArr=(sh.cols||[]).filter(function(c){return cpColSel.has(c.id);});
+    disp.forEach(function(row){ if(!row) return;
+      colsArr.forEach(function(col){ out.push({row:row, col:col}); });
+    });
+    return out;
+  }
+  /* Если выделены целые строки — применяем ко всем колонкам этих строк */
+  if(cpRowSel && cpRowSel.size){
+    const rowsArr=disp.filter(function(r){return r && cpRowSel.has(r.id);});
+    const cols=sh.cols||[];
+    rowsArr.forEach(function(row){
+      cols.forEach(function(col){ out.push({row:row, col:col}); });
+    });
+    return out;
+  }
+  /* Иначе — по выделенному прямоугольнику ячеек */
+  const x=cpRect();
+  for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; if(!row) continue;
+    for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(!col) continue; out.push({row:row,col:col}); } }
   return out;
 }
 function _cpFmtCleanup(row){ if(!row.st) return; Object.keys(row.st).forEach(function(k){ if(!Object.keys(row.st[k]).length) delete row.st[k]; }); if(!Object.keys(row.st).length) delete row.st; }
