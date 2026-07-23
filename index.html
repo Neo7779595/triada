@@ -27473,8 +27473,12 @@ window._kpiRefreshNavBadge = async () => {
   // Кэш 2 минуты
   if (_kpiAlertsCache.ts && now - _kpiAlertsCache.ts < 120000) { _kpiApplyNavBadge(); return; }
   const alerts = await kpiFetchAlerts({});
-  const critical = alerts.filter(a => a.severity === 'critical').length;
-  _kpiAlertsCache = { ts: now, count: alerts.length, critical };
+  /* Бейдж в сайдбаре — только осмысленные проблемы: warning + critical.
+     info/no_data — это состояние «метрика ещё не собрана», не сигнал; они
+     генерятся пачками при первом расчёте и захламляют счётчик. */
+  const meaningful = alerts.filter(a => a && a.severity !== 'info' && a.kind !== 'no_data');
+  const critical = meaningful.filter(a => a.severity === 'critical').length;
+  _kpiAlertsCache = { ts: now, count: meaningful.length, critical };
   _kpiApplyNavBadge();
 };
 
