@@ -17276,7 +17276,11 @@ function _renderPrjScope(){
     const letter=(p.logo||((p.name||'?')[0]||'?')).toString().toUpperCase();
     const av=(typeof logoFill==='function')?logoFill(p.logoUrl, letter):letter;
     const st=(p.status==='done')?'<span class="prj-scope-st done">Готов</span>':(p.status==='archived'?'<span class="prj-scope-st">Архив</span>':'');
-    return '<div class="prj-scope-item'+(on?' on':'')+'" onclick="empToggleProject('+JSON.stringify(String(p.id))+')" role="checkbox" aria-checked="'+(on?'true':'false')+'" tabindex="0">'
+    /* pid эскейпим для JS-строки внутри HTML-атрибута: одинарные кавычки и обратный слэш → \' и \\,
+       затем результат идёт в _ddA (для & " < >). JSON.stringify тут не подходит — он даёт двойные
+       кавычки, которые сразу закрывают onclick="…". */
+    const _pidJs=String(p.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return '<div class="prj-scope-item'+(on?' on':'')+'" onclick="empToggleProject(\''+_ddA(_pidJs)+'\')" role="checkbox" aria-checked="'+(on?'true':'false')+'" tabindex="0">'
       +'<span class="prj-scope-ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg></span>'
       +'<span class="prj-scope-lg">'+av+'</span>'
       +'<span class="prj-scope-nm">'+_ddH(p.name||'Без названия')+'</span>'
