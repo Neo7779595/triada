@@ -3009,6 +3009,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-add{display:flex;align-items:center;gap:7px;padding:10px 14px;color:var(--txt-3);font-size:14px;cursor:pointer}
 .cp-add:hover{color:var(--accent)}
 .cp-empty{padding:36px 16px;color:var(--txt-3);font-size:14px}
+/* Name box + edit bar над сеткой (стиль Google Sheets) */
+.cp-nbar{display:flex;align-items:stretch;gap:0;border-bottom:1px solid var(--line);background:var(--bg-1);height:36px;flex:0 0 auto}
+.cp-nbar-name{display:flex;align-items:center;justify-content:center;min-width:84px;padding:0 12px;font-family:var(--mono);font-size:12.5px;color:var(--accent);font-weight:800;letter-spacing:.05em;background:color-mix(in srgb,var(--accent) 8%,transparent);border-right:1px solid var(--line-2)}
+.cp-nbar-fx{display:flex;align-items:center;justify-content:center;padding:0 13px;font-family:Georgia,serif;font-size:14.5px;color:var(--txt-3);font-weight:600;border-right:1px solid var(--line-2);background:var(--bg-2);font-style:italic}
+.cp-nbar-fx i{font-style:italic;font-size:11.5px;margin-left:-1px}
+.cp-nbar-ed{flex:1;border:0;background:transparent;padding:0 14px;font-family:var(--font);font-size:13.5px;color:var(--txt);outline:none !important;box-shadow:none !important;letter-spacing:.005em;min-width:0}
+.cp-nbar-ed:focus{background:color-mix(in srgb,var(--accent) 5%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 30%,transparent) !important}
+.cp-nbar-ed::placeholder{color:var(--txt-3);font-weight:400}
 /* Status bar под сеткой — как у Google Sheets */
 .cp-sbar{display:flex;align-items:center;gap:10px;padding:8px 16px;border-top:1px solid var(--line);background:linear-gradient(180deg,var(--bg-1),color-mix(in srgb,var(--bg-1) 92%,#000 8%));font-family:var(--mono);font-size:11.5px;color:var(--txt-2);letter-spacing:.02em;flex-wrap:wrap;min-height:34px;flex:0 0 auto}
 .cp-sbar-lb{color:var(--txt-3);text-transform:uppercase;letter-spacing:.11em;font-size:10px;font-weight:800}
@@ -10689,6 +10697,7 @@ function cpRender(p){
       +'</div>'
     +'</div>'
   +'</div>';
+  html+=cpNameBarHTML();
   const gw=40+cols.reduce((s,c)=>s+c.w,0)+44+(showClient?240:0);
   html+='<div class="cp-scroll"><div class="cp-grid" style="min-width:'+gw+'px">';
   html+='<div class="cp-hr"><div class="cp-gut cp-hgut" onclick="cpRowPickAll()" title="Выделить все строки"><span class="cp-hnum">№</span></div>';
@@ -10931,6 +10940,42 @@ function cpPasteHandler(e){
     if(typeof toast==='function') toast('Вставлено');
   }
 }
+/* Name box + edit bar над таблицей (стиль Google Sheets) */
+function cpNameBarHTML(){
+  const sh=cpSheet(); if(!sh) return '';
+  const disp=cpDisp(sh);
+  const row=disp[cpSel.r], col=sh.cols[cpSel.c];
+  const val=(row&&col)?(row.c[col.id]==null?'':String(row.c[col.id])):'';
+  const nameLbl=cpA1(cpSel.r,cpSel.c);
+  const colName=col?col.name:'';
+  return '<div class="cp-nbar">'
+    +'<div class="cp-nbar-name" title="Активная ячейка">'+nameLbl+'</div>'
+    +'<span class="cp-nbar-fx" title="Формулы (в разработке)">ƒ<i>x</i></span>'
+    +'<input id="cp-nbar-ed" class="cp-nbar-ed" value="'+_ddA(val)+'" placeholder="'+_ddA(colName?('Значение · '+colName):'Значение ячейки')+'" oninput="cpNbarInput(this.value)" onkeydown="cpNbarKey(event)" onblur="cpNbarBlur()" onfocus="cpNbarFocus()">'
+  +'</div>';
+}
+let cpNbarActive=false;
+function cpNbarFocus(){ cpNbarActive=true; }
+function cpNbarInput(){ /* нужен для оптимизации будущих auto-suggests */ }
+function cpNbarKey(e){
+  const k=e.key;
+  if(k==='Enter'){ e.preventDefault(); cpNbarCommit(); if(!e.shiftKey){ cpMoveSel(1,0); } else { cpMoveSel(-1,0); } cpSelEnd=null; cpRerender(); const c=document.querySelector('.cp-scroll'); if(c) c.focus(); return; }
+  if(k==='Escape'){ e.preventDefault(); const inp=document.getElementById('cp-nbar-ed'); cpNbarActive=false; if(inp){ inp.blur(); } cpRerender(); return; }
+  if(k==='Tab'){ e.preventDefault(); cpNbarCommit(); cpMoveSel(0, e.shiftKey?-1:1); cpSelEnd=null; cpRerender(); return; }
+  e.stopPropagation();
+}
+function cpNbarCommit(){
+  if(!cpNbarActive) return;
+  const inp=document.getElementById('cp-nbar-ed'); if(!inp) return;
+  const v=inp.value;
+  const sh=cpSheet(), disp=cpDisp(sh);
+  const row=disp[cpSel.r], col=sh.cols[cpSel.c];
+  if(!row||!col){ cpNbarActive=false; return; }
+  const cur=row.c[col.id]==null?'':String(row.c[col.id]);
+  if(v!==cur){ if(v==='') delete row.c[col.id]; else row.c[col.id]=v; cpSave(); }
+  cpNbarActive=false;
+}
+function cpNbarBlur(){ cpNbarCommit(); }
 /* Статус-бар: показывает Sum/Avg/Count/Min/Max для выделенного числового диапазона */
 function cpStatusBarHTML(){
   const sh=cpSheet(); if(!sh) return '';
@@ -12104,19 +12149,60 @@ function cpClientSummaryHTML(p,sh){ const ap=p._cpAppr||{}, pre=sh.id+'/'; let o
 window.addEventListener('focus',function(){ try{ if(document.querySelector('#app-cl .nav-i[data-cm="content"].on')&&document.getElementById('content-cl')&&typeof renderClContent==='function') renderClContent(); }catch(_e){} });
 /* ===================== КОНТЕНТ-ПЛАН · fill handle (как в Google Sheets) ===================== */
 let cpFill=null;
+/* Словари для паттерн-заполнения (дни недели / месяцы, ru/en, короткие/полные, любой регистр) */
+const _CP_WD_FULL=['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'];
+const _CP_WD_SHORT=['пн','вт','ср','чт','пт','сб','вс'];
+const _CP_WD_EN_FULL=['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+const _CP_WD_EN_SHORT=['mon','tue','wed','thu','fri','sat','sun'];
+const _CP_MO_FULL=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const _CP_MO_GEN=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const _CP_MO_SHORT=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const _CP_MO_EN_FULL=['january','february','march','april','may','june','july','august','september','october','november','december'];
+const _CP_MO_EN_SHORT=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function _cpCase(src,txt){ /* переносим регистр первой буквы источника на генерируемое значение */
+  if(!src) return txt; const s=String(src);
+  if(s===s.toUpperCase()&&s.toLowerCase()!==s) return txt.toUpperCase();
+  if(s[0]===s[0].toUpperCase()&&s[0].toLowerCase()!==s[0]) return txt.charAt(0).toUpperCase()+txt.slice(1);
+  return txt;
+}
+function _cpMatchList(vals, list){ /* если все vals из одного списка — вернуть [индексы, полный ли регистр по 1-му]; иначе null */
+  const idxs=[]; for(const v of vals){ const i=list.indexOf(String(v||'').toLowerCase().trim()); if(i<0) return null; idxs.push(i); } return idxs;
+}
 function cpFillSeries(vals,count){
   const out=[];
   if(!vals.length){ for(let i=0;i<count;i++)out.push(''); return out; }
   var _pp=function(x){ return String(x).padStart(2,'0'); };
+  /* ISO дата */
   var _iso=function(v){ return /^\d{4}-\d{2}-\d{2}$/.test(String(v==null?'':v).trim()); };
   if(vals.every(_iso)){ var _d=vals.map(function(v){ return Math.round(Date.parse(v+'T00:00:00Z')/86400000); }); var _st=vals.length>=2?(_d[_d.length-1]-_d[_d.length-2]):1; if(_st===0)_st=1; var _last=_d[_d.length-1]; for(var _i=0;_i<count;_i++){ _last+=_st; var _dt=new Date(_last*86400000); out.push(_dt.getUTCFullYear()+'-'+_pp(_dt.getUTCMonth()+1)+'-'+_pp(_dt.getUTCDate())); } return out; }
+  /* DMY дата */
   var _dmy=function(v){ return /^(\d{1,2})[.\/](\d{1,2})(?:[.\/](\d{2,4}))?$/.exec(String(v==null?'':v).trim()); };
   if(vals.every(function(v){return _dmy(v);})){ var _hy=!!_dmy(vals[0])[3]; var _m=vals.map(function(v){ var g=_dmy(v); var yy=g[3]?(+g[3]<100?2000+(+g[3]):+g[3]):(new Date().getFullYear()); return Date.UTC(yy,(+g[2])-1,+g[1]); }); var _s2=vals.length>=2?Math.round((_m[_m.length-1]-_m[_m.length-2])/86400000):1; if(_s2===0)_s2=1; var _c=_m[_m.length-1]; for(var _j=0;_j<count;_j++){ _c+=_s2*86400000; var _e=new Date(_c); out.push(_pp(_e.getUTCDate())+'.'+_pp(_e.getUTCMonth()+1)+(_hy?('.'+_e.getUTCFullYear()):'')); } return out; }
+  /* Дни недели и месяцы — циклические списки */
+  const _lists=[
+    {list:_CP_WD_FULL, mod:7},{list:_CP_WD_SHORT, mod:7},
+    {list:_CP_WD_EN_FULL, mod:7},{list:_CP_WD_EN_SHORT, mod:7},
+    {list:_CP_MO_FULL, mod:12},{list:_CP_MO_GEN, mod:12},{list:_CP_MO_SHORT, mod:12},
+    {list:_CP_MO_EN_FULL, mod:12},{list:_CP_MO_EN_SHORT, mod:12}
+  ];
+  for(const L of _lists){
+    const idx=_cpMatchList(vals, L.list); if(!idx) continue;
+    let step=idx.length>=2?(idx[idx.length-1]-idx[idx.length-2]):1;
+    /* нормализация циклического шага (при перепрыгивании через границу списка) */
+    if(step<-L.mod/2) step+=L.mod; else if(step>L.mod/2) step-=L.mod;
+    if(step===0) step=1;
+    let last=idx[idx.length-1];
+    for(let i=0;i<count;i++){ last=((last+step)%L.mod+L.mod)%L.mod; out.push(_cpCase(vals[vals.length-1], L.list[last])); }
+    return out;
+  }
+  /* Числа */
   var _isNum=function(v){ v=String(v==null?'':v).trim(); return v!==''&&/^[-+]?[\d\s.,]+%?$/.test(v)&&!isNaN(cpNum(v)); };
   const nums=vals.map(function(v){ return _isNum(v)?cpNum(v):null; });
   if(nums.every(function(n){return n!==null;})){ let step=vals.length>=2?(nums[nums.length-1]-nums[nums.length-2]):1; let last=nums[nums.length-1]; for(let i=0;i<count;i++){ last+=step; out.push(String(Math.round(last*1e6)/1e6)); } return out; }
+  /* Text + number (Пост 1 → Пост 2, 3, …) */
   const m=vals.map(function(v){ return /^(.*?)(-?\d+)\s*$/.exec(v==null?'':v); });
   if(m.every(function(x){return x;})&&m.every(function(x){return x[1]===m[0][1];})){ const pre=m[0][1]; const seq=m.map(function(x){return parseInt(x[2],10);}); let step=seq.length>=2?(seq[seq.length-1]-seq[seq.length-2]):1; let last=seq[seq.length-1]; for(let i=0;i<count;i++){ last+=step; out.push(pre+last); } return out; }
+  /* Fallback — циклическое повторение */
   for(let i=0;i<count;i++){ out.push(vals[i%vals.length]); }
   return out;
 }
