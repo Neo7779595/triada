@@ -12226,11 +12226,16 @@ function cpAutoSum(){
   let expr=null;
   if(above){ expr='=SUM('+cpA1(above.r1,c)+':'+cpA1(above.r2,c)+')'; }
   else if(left){ expr='=SUM('+cpA1(r,left.c1)+':'+cpA1(r,left.c2)+')'; }
-  else { expr='=SUM()'; }
+  else {
+    /* Нечего суммировать — открываем редактор с готовым '=SUM(' чтобы юзер сам довыбрал диапазон */
+    cpEd={r:r,c:c}; cpRerender();
+    setTimeout(function(){ const i=document.getElementById('cp-ed'); if(i){ i.value='=SUM('; i.focus(); try{ i.setSelectionRange(5,5); }catch(_e){} cpAutocInput('cp-ed'); } },0);
+    return;
+  }
   const row=disp[r]; if(!row) return;
   if(!row.f) row.f={}; row.f[col.id]=expr; row.c[col.id]=cpEvalFormula(expr, sh, row);
   cpSave(); cpRerender();
-  if(typeof toast==='function') toast(above?'Автосумма по колонке':(left?'Автосумма по строке':'Заготовка =SUM()'));
+  if(typeof toast==='function') toast(above?'Автосумма по колонке':'Автосумма по строке');
 }
 /* Name box + edit bar над таблицей (стиль Google Sheets) */
 function cpNameBarHTML(){
@@ -12435,7 +12440,7 @@ function cpSelectMenu(r,c,anchor){
   setTimeout(()=>{const i=document.getElementById('cp-newopt');if(i)i.focus();},10);
 }
 function cpSetSelect(r,c,v){ const row=cpRowAt(r),col=cpColAt(c); if(row){row.c[col.id]=v;cpSave();} cpCloseFloat(); cpRerender(); }
-function cpClearSelect(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(row){delete row.c[col.id];cpSave();} cpCloseFloat(); cpRerender(); }
+function cpClearSelect(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(row){ delete row.c[col.id]; if(row.f&&row.f[col.id]!=null){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; } cpSave(); } cpCloseFloat(); cpRerender(); }
 function cpAddOpt(c,r,v){ v=(v||'').trim(); if(!v)return; const col=cpColAt(c); col.opts=col.opts||[]; if(!col.opts.some(o=>o.v===v)){ col.opts.push({v,c:CP_PALK[col.opts.length%CP_PALK.length]}); } const row=cpRowAt(r); if(row){row.c[col.id]=v;} cpSave(); cpCloseFloat(); cpRerender(); }
 
 /* ---- date cell · кастомный календарь (тот же, что в дедлайнах/датах проекта) ---- */
@@ -13501,7 +13506,19 @@ function cpRedo(){ const p=cpP(); if(!p||!(p._cpRedo&&p._cpRedo.length))return; 
 function cpRect(){ const a=cpSel, b=cpSelEnd||cpSel; return {r0:Math.min(a.r,b.r),r1:Math.max(a.r,b.r),c0:Math.min(a.c,b.c),c1:Math.max(a.c,b.c)}; }
 function cpInRect(r,c){ if(!cpSelEnd)return false; if(r===cpSel.r&&c===cpSel.c)return false; const x=cpRect(); return r>=x.r0&&r<=x.r1&&c>=x.c0&&c<=x.c1; }
 function cpExtendSel(dr,dc){ if(!cpSelEnd)cpSelEnd={r:cpSel.r,c:cpSel.c}; const sh=cpSheet(),nr=cpDisp(sh).length,nc=sh.cols.length; cpSelEnd={r:Math.max(0,Math.min(nr-1,cpSelEnd.r+dr)),c:Math.max(0,Math.min(nc-1,cpSelEnd.c+dc))}; }
-function cpClearSel(){ const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); let ch=false; for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; if(!row)continue; for(let c=x.c0;c<=x.c1;c++){ const col=sh.cols[c]; if(col&&row.c[col.id]!=null){ delete row.c[col.id]; ch=true; } } } if(ch){ cpSave(); cpRerender(); } }
+function cpClearSel(){
+  const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); let ch=false;
+  for(let r=x.r0;r<=x.r1;r++){
+    const row=disp[r]; if(!row)continue;
+    for(let c=x.c0;c<=x.c1;c++){
+      const col=sh.cols[c]; if(!col) continue;
+      if(row.c[col.id]!=null){ delete row.c[col.id]; ch=true; }
+      /* Также удаляем формулу — иначе она пересчитается снова при рендере */
+      if(row.f&&row.f[col.id]!=null){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; ch=true; }
+    }
+  }
+  if(ch){ cpSave(); cpRerender(); }
+}
 function cpFillDown(){
   const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); if(x.r1<=x.r0)return;
   let ch=false;
