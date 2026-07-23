@@ -9273,7 +9273,7 @@ async function pdNewTask(st){
   const _stLbl=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
   const stArr=stages.map(s=>[s.id, _stLbl(s)]);
   const _defSt=(stages.find(s=>s.status==='active')||stages[0]).id;
-  window._pdSub=[];
+  window._pdSub=[]; window._pdTaskAtt=[];
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${escH(p.name)} · Операционка</p></div>
     <div class="modal-b">
@@ -9284,16 +9284,19 @@ async function pdNewTask(st){
       <div class="fld"><label>Исполнитель</label>${_nativeSelect('pd2-asg', [['','— не назначен —']].concat(teamArr), '')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate','')}${timeField('pd2-ttime','')}</div></div>
       ${_subFldHtml()}
+      ${_pdTaskAttFldHtml()}
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddTask()">Создать</button></div></div>`);
   pdSubRender();
+  _pdTaskAttRender();
 }
 function pdAddTask(){ const title=_v('pd2-ttl'); if(!title){toast('Введи задачу');return;}
   const stage_id=_v('pd2-stg'); if(!stage_id){toast('Выбери этап');return;}
   const T=PROJECTS[pdIdx]._tasks||[]; const idx=T.length?Math.max(...T.map(t=>t.idx||0))+1:0;
   const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
+  const attachments=(window._pdTaskAtt||[]).filter(a=>a && !a._up).map(a=>a.type==='file'?({type:'file',path:a.path,name:a.name,size:a.size,mime:a.mime}):({type:'link',url:a.url,name:a.name}));
   const _diff=_v('pd2-diff-v')||null, _prio=_v('pd2-prio-v')||null;
-  const row={title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx,subtasks};
+  const row={title,stage_id,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,status:pdNewSt,idx,subtasks,attachments};
   if(_diff)row.difficulty=_diff; if(_prio)row.priority=_prio;
   if(window.tTaskAdd) window.tTaskAdd(PROJECTS[pdIdx].id,row); }
 function pdTaskDel(id){
@@ -9324,6 +9327,7 @@ async function pdTaskEdit(id){
   else if(window.tLoadProjectWork) window.tLoadProjectWork(p.id).catch(()=>{});                     // иначе открываем мгновенно, освежаем в фоне
   const t=(p._tasks||[]).find(x=>x.id===id); if(!t){toast('Задача не найдена');return;}
   window._pdSub=(Array.isArray(t.subtasks)?t.subtasks:[]).map(s=>({id:(s&&s.id)||_subUid(),title:(s&&s.title)||'',done:!!(s&&s.done)}));
+  window._pdTaskAtt=(Array.isArray(t.attachments)?t.attachments:[]).map(a=>Object.assign({}, a));
   const _stLbl2=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
   let stArr=(p._stages||[]).map(s=>[s.id,_stLbl2(s)]);
   const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
@@ -9336,17 +9340,79 @@ async function pdTaskEdit(id){
       <div class="fld"><label>Исполнитель</label>${_nativeSelect('pd2-asg', [['','— не назначен —']].concat(teamArr), t.assignee_id||'')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate', t.due_date||'')}${timeField('pd2-ttime', t.due_time||'')}</div></div>
       ${_subFldHtml()}
+      ${_pdTaskAttFldHtml()}
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveTask('${id}')">Сохранить</button></div></div>`);
   pdSubRender();
+  _pdTaskAttRender();
 }
 function pdSaveTask(id){ const title=_v('pd2-ttl'); if(!title){toast('Введи название');return;}
   const subtasks=(window._pdSub||[]).map(s=>({id:s.id,title:s.title,done:!!s.done}));
-  const patch={title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,subtasks};
+  const attachments=(window._pdTaskAtt||[]).filter(a=>a && !a._up).map(a=>a.type==='file'?({type:'file',path:a.path,name:a.name,size:a.size,mime:a.mime}):({type:'link',url:a.url,name:a.name}));
+  const patch={title,stage_id:_v('pd2-stg')||null,assignee_id:_v('pd2-asg')||null,due_date:_v('pd2-tdate')||null,due_time:_v('pd2-ttime')||null,subtasks,attachments};
   patch.difficulty=_v('pd2-diff-v')||null; patch.priority=_v('pd2-prio-v')||null;
   if(window.tTaskUpdate) window.tTaskUpdate(id,patch); }
 function _subUid(){ return 's'+Math.random().toString(36).slice(2,9); }
 function _subFldHtml(){ return `<div class="fld"><label>Подзадачи</label><div class="subwrap"><div id="pd2-sub" class="sublist"></div><div class="subadd"><input id="pd2-subnew" placeholder="Новая подзадача…" onkeydown="pdSubKey(event)"><button type="button" class="subaddbtn" onclick="pdSubAdd()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div></div>`; }
+/* ─── Материалы задачи (ссылки + файлы) — переиспользуем стили .sch-* из брони ─── */
+function _pdTaskAttFldHtml(){
+  const linkI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007 0l2-2a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-2 2a5 5 0 007 7l1-1"/></svg>';
+  const clipI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 11.5l-8.6 8.6a5 5 0 01-7-7L14 4.5a3.3 3.3 0 015 5l-9.2 9.2a1.7 1.7 0 01-2.4-2.4l8.5-8.5"/></svg>';
+  return '<div class="fld"><label>Материалы</label>'
+    +'<div class="sch-attadd"><div class="sch-linkwrap"><span class="ic">'+linkI+'</span><input id="pd2-att-link" placeholder="Вставьте ссылку — договор, ТЗ, Google Docs…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_pdTaskAttAddLink();}"></div><button type="button" class="sch-attbtn" onclick="_pdTaskAttAddLink()">Добавить</button></div>'
+    +'<div class="sch-attfile"><button type="button" class="sch-filebtn" onclick="document.getElementById(\'pd2-att-file\').click()">'+clipI+'Прикрепить файл</button></div>'
+    +'<input type="file" id="pd2-att-file" style="display:none" multiple onchange="_pdTaskAttFile(this)">'
+    +'<div class="sch-attlist" id="pd2-att-list"></div>'
+    +'<span class="sch-hint">Файлы приватны — доступ по ссылке 7 дней с момента открытия</span>'
+  +'</div>';
+}
+function _pdTaskFmtSize(n){ n=+n||0; if(n<1024) return n+' Б'; if(n<1048576) return Math.round(n/1024)+' КБ'; return (n/1048576).toFixed(1)+' МБ'; }
+function _pdTaskAttRender(){
+  const el=document.getElementById('pd2-att-list'); if(!el) return;
+  const arr=window._pdTaskAtt||[];
+  if(!arr.length){ el.innerHTML=''; return; }
+  const xI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="13" height="13"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+  const linkI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007 0l2-2a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-2 2a5 5 0 007 7l1-1"/></svg>';
+  const fileI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>';
+  el.innerHTML=arr.map(function(a,i){
+    const isFile=a.type==='file';
+    const up=!!(a._up && !a.path);
+    let nm;
+    if(up) nm='<span class="an load">'+_ddH(a.name||'файл')+' · загрузка…</span>';
+    else if(isFile) nm='<button type="button" class="an" onclick="_pdTaskAttOpen('+i+')">'+_ddH(a.name||'Файл')+'</button>';
+    else nm='<a href="'+_ddA(a.url||'')+'" target="_blank" rel="noopener" class="an">'+_ddH(a.name||a.url||'')+'</a>';
+    const meta=isFile?('файл'+(a.size?(' · '+_pdTaskFmtSize(a.size)):'')+(up?'':' · 7 дней')):'ссылка';
+    return '<div class="sch-attitem'+(up?' up':'')+'"><span class="ai">'+(isFile?fileI:linkI)+'</span>'+nm+'<span class="as">'+_ddH(meta)+'</span><button type="button" class="ax" onclick="_pdTaskAttDel('+i+')" title="Убрать">'+xI+'</button></div>';
+  }).join('');
+}
+function _pdTaskAttAddLink(){
+  const inp=document.getElementById('pd2-att-link'); if(!inp) return;
+  let u=(inp.value||'').trim(); if(!u) return;
+  if(!/^https?:\/\//i.test(u)){ if(/^[\w.-]+\.[a-z]{2,}/i.test(u)) u='https://'+u; else { toast('Введите корректную ссылку'); return; } }
+  let name=u.replace(/^https?:\/\//i,'').replace(/\/+$/,''); if(name.length>52) name=name.slice(0,50)+'…';
+  (window._pdTaskAtt=window._pdTaskAtt||[]).push({ type:'link', url:u, name:name });
+  inp.value=''; _pdTaskAttRender();
+}
+async function _pdTaskAttFile(input){
+  const files=Array.prototype.slice.call(input.files||[]); input.value=''; if(!files.length) return;
+  if(!window.tTaskUpload){ toast('Нет соединения'); return; }
+  window._pdTaskAtt=window._pdTaskAtt||[];
+  for(const f of files){
+    if(f.size>50*1024*1024){ toast('Файл «'+f.name+'» больше 50 МБ'); continue; }
+    const ph={ type:'file', url:'', name:f.name, size:f.size, mime:f.type, _up:true };
+    window._pdTaskAtt.push(ph); _pdTaskAttRender();
+    const res=await window.tTaskUpload(f);
+    const i=window._pdTaskAtt.indexOf(ph); if(i<0) continue;
+    if(res){ window._pdTaskAtt[i]=res; } else { window._pdTaskAtt.splice(i,1); }
+    _pdTaskAttRender();
+  }
+}
+async function _pdTaskAttOpen(i){
+  const a=(window._pdTaskAtt||[])[i]; if(!a) return;
+  if(a.path && window.tTaskSignedUrl){ toast('Открываю файл…'); const u=await window.tTaskSignedUrl(a.path, 604800); if(u) window.open(u,'_blank','noopener'); else toast('Не удалось открыть файл'); }
+  else if(a.url) window.open(a.url,'_blank','noopener');
+}
+function _pdTaskAttDel(i){ const a=window._pdTaskAtt||[]; if(i>=0 && i<a.length){ a.splice(i,1); _pdTaskAttRender(); } }
 function pdSubRender(){ const box=document.getElementById('pd2-sub'); if(!box) return; const arr=window._pdSub||[]; const done=arr.filter(s=>s.done).length, tot=arr.length, pct=tot?Math.round(done/tot*100):0;
   box.innerHTML=(tot?`<div class="subpb ${done===tot?'full':''}"><i style="width:${pct}%"></i></div><div class="subhdr">${done} из ${tot} · ${pct}%</div>`:'<div class="subempty">Пока нет подзадач</div>')+arr.map((s,i)=>`<div class="subrow"><button type="button" class="subchk ${s.done?'on':''}" onclick="pdSubToggle(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button><span class="subtxt ${s.done?'done':''}">${_ddH(s.title)}</span><button type="button" class="subdel" title="Удалить" onclick="pdSubDel(${i})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join(''); }
 function pdSubAdd(){ const inp=document.getElementById('pd2-subnew'); if(!inp)return; const v=(inp.value||'').trim(); if(!v){inp.focus();return;} (window._pdSub=window._pdSub||[]).push({id:_subUid(),title:v,done:false}); inp.value=''; pdSubRender(); inp.focus(); }
@@ -23729,6 +23795,22 @@ window.tBookingUpload = async (file) => {
 window.tBookingSignedUrl = async (path, ttl) => {
   if(!SB||!path) return null;
   try{ const { data, error } = await SB.storage.from('booking-files').createSignedUrl(path, ttl||604800); if(error) throw error; return (data&&data.signedUrl)||null; }
+  catch(e){ toast('Ссылка недоступна: '+(e.message||e)); return null; }
+};
+window.tTaskUpload = async (file) => {                                       // task-files bucket, приватный, первая папка = agency_id (RLS)
+  if(!SB||!ME||!ME.agency_id){ toast('Профиль ещё загружается'); return null; }
+  try{
+    const safe=String(file.name||'file').replace(/[^\w.\-]+/g,'_').slice(-80);
+    const rand=Math.random().toString(36).slice(2,8);
+    const path=ME.agency_id+'/'+Date.now()+'_'+rand+'_'+safe;
+    const { error } = await SB.storage.from('task-files').upload(path, file, { upsert:false, contentType:file.type||undefined });
+    if(error) throw error;
+    return { type:'file', path:path, name:String(file.name||'Файл'), size:file.size||0, mime:file.type||'' };
+  }catch(e){ toast('Загрузка не удалась: '+(e.message||e)); return null; }
+};
+window.tTaskSignedUrl = async (path, ttl) => {
+  if(!SB||!path) return null;
+  try{ const { data, error } = await SB.storage.from('task-files').createSignedUrl(path, ttl||604800); if(error) throw error; return (data&&data.signedUrl)||null; }
   catch(e){ toast('Ссылка недоступна: '+(e.message||e)); return null; }
 };
 window.tBookingSave = async (data, members, attachments) => {
