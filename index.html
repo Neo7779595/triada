@@ -3462,27 +3462,114 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-colmore-wrap{padding:0 12px 12px}
 .pk-colmore{display:block;width:100%;padding:9px;font-size:13px;font-weight:500;color:var(--txt-3);background:transparent;border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:.15s var(--ease)}
 .pk-colmore:hover{color:var(--txt-2);border-color:var(--line-2);background:var(--bg-2)}
-.pk-card{position:relative;min-width:0;background:var(--bg-2);border:1px solid var(--line-2);border-radius:11px;padding:12px 13px 11px 16px;cursor:grab;transition:transform .16s var(--ease),box-shadow .16s var(--ease),border-color .16s var(--ease)}
-.pk-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--pk-diff,var(--pk-accent,var(--accent)))}
-.pk-card.has-diff{border-color:color-mix(in srgb,var(--pk-diff) 28%,var(--line-2));background:linear-gradient(180deg,color-mix(in srgb,var(--pk-diff) 5%,var(--bg-2)),var(--bg-2))}
-.pk-card.has-diff::before{width:4px;box-shadow:0 0 10px -2px var(--pk-diff)}
-.pk-card.has-diff:hover{border-color:color-mix(in srgb,var(--pk-diff) 50%,var(--line-2))}
-.pk-tags{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
-.pk-diff-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px 2px 7px;border-radius:6px;color:var(--dc);background:color-mix(in srgb,var(--dc) 12%,transparent);border:1px solid color-mix(in srgb,var(--dc) 30%,transparent)}
-.pk-diff-dot{width:6px;height:6px;border-radius:50%;background:var(--dc);flex:none}
-.pk-prio-tag{display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;width:22px;height:20px;border-radius:6px;background:var(--bg-3);border:1px solid var(--line-2);cursor:default}
-.pk-att-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px 2px 7px;border-radius:6px;color:var(--txt-2);background:rgba(255,255,255,.04);border:1px solid var(--line-2);font-family:var(--mono);letter-spacing:.02em;cursor:default}
-.pk-att-tag svg{opacity:.72}
-.pk-card:hover .pk-att-tag{border-color:color-mix(in srgb,var(--accent) 28%,var(--line-2));color:var(--accent)}
+/* ─── Kanban card · «depth» дизайн ──────────────────────────────────────
+   Многослойные тени (inner top highlight, inner bottom shadow, base line,
+   soft outer) дают ощущение поднятой над доской пластины. Диф-полоса
+   слева стала градиентной и светится, ховер приподнимает карточку с
+   accent-halo, dragging чуть наклоняет — как будто уносишь физический
+   стикер. */
+.pk-card{
+  position:relative;min-width:0;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--bg-2) 94%, #fff 3%) 0%, var(--bg-2) 42%, color-mix(in srgb, var(--bg-2) 92%, #000 8%) 100%);
+  border:1px solid var(--line-2);
+  border-radius:14px;
+  padding:14px 15px 12px 18px;
+  cursor:grab;
+  transition:transform .22s cubic-bezier(.22,1,.36,1), box-shadow .22s cubic-bezier(.22,1,.36,1), border-color .18s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    inset 0 -1px 0 rgba(0,0,0,.28),
+    0 1px 0 rgba(0,0,0,.35),
+    0 6px 16px -10px rgba(0,0,0,.55);
+}
+.pk-card::before{
+  content:"";position:absolute;left:0;top:8px;bottom:8px;width:4px;
+  border-radius:0 4px 4px 0;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--pk-diff, var(--pk-accent, var(--accent))) 85%, transparent), var(--pk-diff, var(--pk-accent, var(--accent))));
+  box-shadow:0 0 12px -2px var(--pk-diff, var(--pk-accent, var(--accent)));
+}
+.pk-card.has-diff{
+  border-color:color-mix(in srgb, var(--pk-diff) 26%, var(--line-2));
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--pk-diff) 9%, var(--bg-2)) 0%,
+    var(--bg-2) 45%,
+    color-mix(in srgb, var(--bg-2) 92%, #000 8%) 100%);
+}
+.pk-card.has-diff::before{width:5px;box-shadow:0 0 18px -2px var(--pk-diff), inset -1px 0 0 color-mix(in srgb, #fff 22%, transparent)}
+.pk-card.has-diff:hover{
+  border-color:color-mix(in srgb, var(--pk-diff) 55%, var(--line-2));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(0,0,0,.32),
+    0 1px 0 rgba(0,0,0,.4),
+    0 22px 44px -20px rgba(0,0,0,.78),
+    0 0 32px -10px color-mix(in srgb, var(--pk-diff) 45%, transparent);
+}
+.pk-tags{display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap}
+.pk-diff-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;font-weight:700;
+  padding:3px 9px 3px 8px;border-radius:7px;
+  color:var(--dc);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--dc) 20%, transparent), color-mix(in srgb, var(--dc) 8%, transparent));
+  border:1px solid color-mix(in srgb, var(--dc) 42%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--dc) 22%, transparent),
+    inset 0 -1px 0 rgba(0,0,0,.28),
+    0 2px 4px -2px color-mix(in srgb, var(--dc) 25%, transparent);
+}
+.pk-diff-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--dc) 30%, #fff), var(--dc) 60%);
+  box-shadow:0 0 6px var(--dc), inset 0 -1px 0 rgba(0,0,0,.25);
+  flex:none;
+}
+.pk-prio-tag{
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:12px;line-height:1;
+  width:24px;height:22px;border-radius:7px;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--bg-3) 96%, #fff 4%), color-mix(in srgb, var(--bg-3) 78%, #000 12%));
+  border:1px solid var(--line-2);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    inset 0 -1px 0 rgba(0,0,0,.32),
+    0 1px 2px -1px rgba(0,0,0,.5);
+  cursor:default;
+}
+.pk-att-tag{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:700;
+  padding:3px 9px 3px 8px;border-radius:7px;
+  color:var(--txt-2);
+  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.018));
+  border:1px solid var(--line-2);
+  font-family:var(--mono);letter-spacing:.02em;cursor:default;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    inset 0 -1px 0 rgba(0,0,0,.3),
+    0 1px 2px -1px rgba(0,0,0,.4);
+  transition:.16s ease;
+}
+.pk-att-tag svg{opacity:.75}
+.pk-card:hover .pk-att-tag{border-color:color-mix(in srgb, var(--accent) 34%, var(--line-2));color:var(--accent);box-shadow:inset 0 1px 0 rgba(255,255,255,.08), inset 0 -1px 0 rgba(0,0,0,.28), 0 2px 8px -3px color-mix(in srgb, var(--accent) 30%, transparent)}
 .pk-card:hover .pk-att-tag svg{opacity:1}
 /* Drag&drop файлов на модалку задачи */
 .pd-task-drop{position:relative}
 .pd-task-drop.drag-over::after{content:'Отпустите файл — прикрепим к задаче';position:absolute;inset:8px;border:2px dashed var(--accent);border-radius:14px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:5;backdrop-filter:blur(1px);text-shadow:0 1px 6px rgba(0,0,0,.55)}
-.pk-card:hover{border-color:var(--accent-line);box-shadow:0 10px 26px -12px rgba(0,0,0,.72)}
-.pk-card:active{cursor:grabbing}
-.pk-card.dragging{opacity:.45;transform:scale(.97);box-shadow:none}
+.pk-card:hover{
+  transform:translateY(-2px);
+  border-color:var(--accent-line);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(0,0,0,.3),
+    0 1px 0 rgba(0,0,0,.4),
+    0 22px 44px -20px rgba(0,0,0,.78),
+    0 0 28px -10px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.pk-card:active{cursor:grabbing;transform:translateY(-1px)}
+.pk-card.dragging{opacity:.55;transform:scale(.97) rotate(-1.5deg);box-shadow:0 30px 50px -20px rgba(0,0,0,.85)}
 .pk-card-top{display:flex;align-items:flex-start;gap:8px}
-.pk-card .t{flex:1;min-width:0;font-size:14px;font-weight:600;line-height:1.34;color:var(--txt);overflow-wrap:anywhere;word-break:break-word}
+.pk-card .t{flex:1;min-width:0;font-size:14.5px;font-weight:650;line-height:1.32;color:var(--txt);letter-spacing:-.008em;overflow-wrap:anywhere;word-break:break-word;text-shadow:0 1px 0 rgba(0,0,0,.28)}
 .pk-card .del{flex:none;background:none;border:0;color:var(--txt-3);cursor:pointer;width:21px;height:21px;border-radius:6px;display:flex;align-items:center;justify-content:center;opacity:0;transition:.14s}
 .pk-card:hover .del{opacity:1}
 .pk-card .del:hover{background:var(--neg-dim);color:var(--neg)}
@@ -3494,25 +3581,79 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pk-card .gear svg{width:13px;height:13px}
 .pk-card .gear:hover svg{animation:gearSpin 1.4s linear infinite}
 @keyframes gearSpin{to{transform:rotate(1turn)}}
-.pk-stage{display:inline-flex;align-items:center;gap:6px;max-width:100%;margin-top:10px;font-size:12px;color:var(--txt-2);background:var(--bg-3);border:1px solid var(--line);padding:3px 8px;border-radius:6px}
+.pk-stage{
+  display:inline-flex;align-items:center;gap:7px;max-width:100%;
+  margin-top:11px;font-size:12px;color:var(--txt-2);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--bg-3) 96%, #fff 4%), var(--bg-3));
+  border:1px solid var(--line);padding:4px 10px 4px 9px;border-radius:8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    inset 0 -1px 0 rgba(0,0,0,.28),
+    0 1px 2px -1px rgba(0,0,0,.4);
+}
 .pk-stage svg{width:11px;height:11px;color:var(--txt-3);flex:none}
 .pk-stage span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pk-foot{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line)}
-.pk-av{position:relative;overflow:hidden;width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#06140f;flex:none}
-.pk-who{font-size:12.5px;color:var(--txt-2);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:84px}
-.pk-due{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--txt-3);font-family:var(--mono);white-space:nowrap}
+.pk-foot{display:flex;align-items:center;gap:9px;margin-top:12px;padding-top:11px;position:relative}
+.pk-foot::before{content:"";position:absolute;top:0;left:-2px;right:-2px;height:1px;background:linear-gradient(90deg, transparent, var(--line) 12%, var(--line) 88%, transparent)}
+.pk-av{
+  position:relative;overflow:hidden;
+  width:26px;height:26px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:#06140f;flex:none;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.32),
+    inset 0 -1px 0 rgba(0,0,0,.3),
+    0 2px 6px -2px rgba(0,0,0,.55);
+}
+.pk-who{font-size:12.5px;color:var(--txt-2);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:84px;letter-spacing:-.005em}
+.pk-due{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--txt-3);font-family:var(--mono);white-space:nowrap;font-variant-numeric:tabular-nums}
 .pk-due svg{width:11px;height:11px}
 .pk-due.over{color:var(--neg)}
-.pk-adv{margin-left:auto;flex:none;border:1px solid var(--line-2);background:var(--bg-1);color:var(--txt-2);width:26px;height:26px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s var(--ease)}
-.pk-adv:hover{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);transform:translateX(1px)}
+.pk-adv{
+  margin-left:auto;flex:none;
+  border:1px solid var(--line-2);
+  background:linear-gradient(180deg, var(--bg-1), color-mix(in srgb, var(--bg-1) 88%, #000 12%));
+  color:var(--txt-2);
+  width:28px;height:28px;border-radius:9px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:transform .18s var(--ease), background .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.06),
+    inset 0 -1px 0 rgba(0,0,0,.3),
+    0 2px 4px -2px rgba(0,0,0,.5);
+}
+.pk-adv:hover{
+  background:linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 82%, #000 8%));
+  border-color:var(--accent);color:var(--accent-ink);
+  transform:translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.35),
+    inset 0 -1px 0 rgba(0,0,0,.28),
+    0 6px 14px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+}
 .pk-adv svg{width:14px;height:14px}
 .pk-done-ic{margin-left:auto;flex:none;color:var(--pos)}
 .pk-empty{margin:2px 0;padding:24px 10px;text-align:center;font-size:12.5px;letter-spacing:.04em;color:var(--txt-3);border:1.5px dashed var(--line-2);border-radius:10px;transition:.16s}
 .pk-col.drag-over .pk-empty{border-color:var(--pk-accent);color:var(--txt-2)}
 .pk-hint{display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;color:var(--txt-3);margin-top:16px}
 @keyframes pkIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.pk-timer{display:flex;align-items:center;gap:9px;margin-top:11px;padding:7px 10px;border-radius:9px;background:var(--bg-1);border:1px solid var(--line)}
-.pk-timer.running{border-color:var(--accent-line);background:color-mix(in srgb,var(--accent) 9%,var(--bg-1))}
+.pk-timer{
+  display:flex;align-items:center;gap:9px;
+  margin-top:11px;padding:8px 11px;border-radius:10px;
+  background:linear-gradient(180deg, var(--bg-1), color-mix(in srgb, var(--bg-1) 92%, #000 8%));
+  border:1px solid var(--line);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    inset 0 -1px 0 rgba(0,0,0,.3);
+}
+.pk-timer.running{
+  border-color:var(--accent-line);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, var(--bg-1)), color-mix(in srgb, var(--accent) 5%, var(--bg-1)));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 20%, transparent),
+    inset 0 -1px 0 rgba(0,0,0,.28),
+    0 0 22px -8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
 .pk-timer .ic{display:flex;color:var(--txt-3)}
 .pk-timer .ic svg{width:14px;height:14px}
 .pk-timer.running .ic{color:var(--accent);animation:pkPulse 1.5s ease-in-out infinite}
