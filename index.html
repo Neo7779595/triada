@@ -3082,6 +3082,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* AutoSum button + меню функций */
 .cp-fbtn.cp-fbtn-sigma{font-family:'Georgia',serif;font-weight:700;font-size:17px;line-height:1;color:var(--accent-2, var(--accent));display:inline-flex;align-items:center;gap:1px;width:auto;padding:0 4px 0 6px}
 .cp-fbtn-car{font-family:var(--font);font-size:9px;color:var(--txt-3);font-weight:600;position:relative;top:1px}
+/* Font selector button */
+.cp-fbtn.cp-fbtn-font{width:auto;padding:0 6px 0 10px;gap:4px;display:inline-flex;align-items:center;font-size:11.5px;color:var(--txt);letter-spacing:.005em;min-width:96px;justify-content:space-between;background:var(--bg-2);border:1px solid var(--line-2);height:28px;margin-right:2px}
+.cp-fbtn.cp-fbtn-font:hover{background:var(--bg-3);border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.cp-fbtn-font-lbl{max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Case selector */
+.cp-fbtn.cp-fbtn-case{width:auto;padding:0 4px 0 7px;gap:2px;display:inline-flex;align-items:center;font-family:'Georgia',serif;font-size:13px;font-weight:600}
+.cp-fbtn-case-lbl{line-height:1;position:relative;top:-1px}
+.cp-fbtn-case-lbl::first-letter{font-size:14px}
 .cp-popi.cp-popi-hdr{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);font-weight:700;padding:8px 10px 4px;cursor:default;background:transparent;pointer-events:none}
 .cp-popi.cp-popi-agg{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:8px;padding:8px 12px}
 .cp-agg-ic{font-family:'Georgia',serif;font-weight:800;font-size:15px;color:var(--accent);text-align:center}
@@ -3159,6 +3167,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-sbar-lb{color:var(--txt-3);text-transform:uppercase;letter-spacing:.11em;font-size:10px;font-weight:800}
 .cp-sbar-cell{color:var(--accent);font-weight:800;font-size:12px;padding:2.5px 7px;background:color-mix(in srgb,var(--accent) 10%,transparent);border-radius:5px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent);letter-spacing:.03em}
 .cp-sbar-hint{color:var(--txt-3);font-size:10.5px;font-weight:500;opacity:.75}
+.cp-sbar-hint.cp-sbar-hint-hot{color:var(--accent);opacity:1;font-weight:600;letter-spacing:.01em}
 .cp-sbar-sep{width:1px;height:14px;background:var(--line-2);opacity:.65;flex:0 0 auto}
 .cp-sbar-st{color:var(--txt-2);font-weight:500}
 .cp-sbar-st b{color:var(--txt);font-weight:800;font-family:var(--mono);letter-spacing:.02em}
@@ -11035,6 +11044,8 @@ function cpAutocInput(inputId){
   _cpFmulaJustPicked=false;
   /* Пересчитаем подсветку ссылок формулы */
   cpFmulaHighlightsRender(inputId);
+  /* Обновим hint в статус-баре: во время формулы — «Тяни мышкой» */
+  _cpUpdateStatusBarHint();
   const m=cpAutocMatch(val, cur);
   if(!m){ cpAutocClose(); return; }
   const list=cpFmulaSuggest(m.prefix);
@@ -11136,6 +11147,20 @@ function _cpFmulaDragUp(){
   _cpFmulaDrag=null;
 }
 window.addEventListener('scroll', function(){ if(document.querySelector('.cp-fmref')){ const id=cpFmulaActiveInput(); if(id) cpFmulaHighlightsRender(id); } }, true);
+/* Обновить hint статус-бара — активно при вводе формулы, чтобы юзер видел «Тяни мышкой» */
+function _cpUpdateStatusBarHint(){
+  const sb=document.querySelector('.cp-sbar-hint');
+  if(!sb) return;
+  const inp=document.getElementById('cp-ed')||document.getElementById('cp-nbar-ed');
+  const isFmula=!!(inp && document.activeElement===inp && (inp.value||'').startsWith('='));
+  if(isFmula){
+    sb.textContent='Тяни мышкой по ячейкам — они станут диапазоном в формуле · Enter — сохранить · Esc — отмена';
+    sb.classList.add('cp-sbar-hint-hot');
+  } else {
+    sb.textContent='Ctrl+C · Ctrl+V · Ctrl+A · Tab · Enter · ↑↓←→ · = для формулы';
+    sb.classList.remove('cp-sbar-hint-hot');
+  }
+}
 window.addEventListener('scroll', function(){ if(_cpAutoc) cpAutocRender(); }, true);
 window.addEventListener('resize', function(){ if(_cpAutoc) cpAutocRender(); });
 /* Приведение к числу — терпимо парсит money, %, пробелы, запятую */
@@ -11576,7 +11601,9 @@ function cpRender(p){
     cols.forEach((col,ci)=>{
       if(mInfo&&mInfo.covered.has(ci))return;
       const sel=(cpSel.r===ri&&cpSel.c===ci), editing=(cpEd&&cpEd.r===ri&&cpEd.c===ci);
-      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(col.type==='check'?' cp-cchk':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'')+((mInfo&&mInfo.anchorW[ci]!=null)?' cp-merged':'')+(col.align?(' cp-al-'+col.align):'');
+      const cellAl=(row.st&&row.st[col.id]&&row.st[col.id].al)||null;
+      const alCls=cellAl?(' cp-al-'+cellAl):(col.align?(' cp-al-'+col.align):'');
+      const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(col.type==='check'?' cp-cchk':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'')+((mInfo&&mInfo.anchorW[ci]!=null)?' cp-merged':'')+alCls;
       const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
       const fmtAttr=cpCellStyleAttr(row,col,sh);
       html+='<div class="'+cls+(cpCellWrap(row,col)?' cp-cellwrap':'')+'" style="width:'+((mInfo&&mInfo.anchorW[ci]!=null)?mInfo.anchorW[ci]:col.w)+'px'+_rh+fmtAttr+'" data-r="'+ri+'" data-c="'+ci+'" onmousedown="cpCellDown(event,'+ri+','+ci+')" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')" oncontextmenu="cpCellMenu(event,'+ri+','+ci+');return false;">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
@@ -11943,6 +11970,17 @@ function cpCFForCell(sh, row, col){
   }
   return null;
 }
+/* Каталог шрифтов — краткий, узнаваемый набор */
+const CP_FONTS=[
+  {id:'', name:'По умолчанию', css:'var(--font)'},
+  {id:'serif', name:'Serif (Georgia)', css:'Georgia,"Times New Roman",serif'},
+  {id:'mono', name:'Monospace', css:'var(--mono)'},
+  {id:'sans-alt', name:'Roboto', css:'Roboto,Arial,sans-serif'},
+  {id:'condensed', name:'Условно-узкий', css:'"Arial Narrow","Roboto Condensed",Arial,sans-serif'},
+  {id:'handwriting', name:'Рукописный', css:'"Caveat","Segoe Script","Bradley Hand",cursive'},
+  {id:'display', name:'Display', css:'"Playfair Display",Georgia,serif'}
+];
+function _cpFontCss(id){ const it=CP_FONTS.find(function(x){return x.id===id;}); return it?it.css:''; }
 function cpCellStyleAttr(row,col,sh){
   const f=cpCellFmt(row,col);
   const cf=cpCFForCell(sh||cpSheet(), row, col);
@@ -11953,12 +11991,16 @@ function cpCellStyleAttr(row,col,sh){
   const c=(f&&f.c)||(cf&&cf.c);
   const bg=(f&&f.bg)||(cf&&cf.bg);
   const w=(f&&f.w);
+  const al=(f&&f.al)||null; /* 'l' | 'c' | 'r' — cell-level align */
+  const ff=(f&&f.ff)||null; /* font family id */
   const p=[];
   if(b) p.push('font-weight:700');
   if(i) p.push('font-style:italic');
   if(u) p.push('text-decoration:underline');
   if(c) p.push('color:'+c);
   if(bg) p.push('background:'+bg);
+  if(ff){ const css=_cpFontCss(ff); if(css) p.push('font-family:'+css); }
+  /* al обрабатывается через классы cp-al-l/c/r (см. cell class build) — не дублируем inline */
   if(w) p.push('white-space:normal;word-break:break-word;line-height:1.4;overflow-wrap:anywhere');
   return p.length ? (';'+p.join(';')) : '';
 }
@@ -11999,6 +12041,86 @@ function cpFmtClear(){
   const cells=cpFmtRectCells(); if(!cells.length) return;
   cells.forEach(function(x){ if(x.row.st){ delete x.row.st[x.col.id]; _cpFmtCleanup(x.row); } });
   cpSave(); cpRerender();
+}
+/* Установить свойство формата (al, ff и т.п.) для всех ячеек выделения */
+function cpFmtSet(prop, value){
+  const cells=cpFmtRectCells(); if(!cells.length) return;
+  cells.forEach(function(x){
+    if(!x.row.st) x.row.st={};
+    if(!x.row.st[x.col.id]) x.row.st[x.col.id]={};
+    if(value==null||value==='') delete x.row.st[x.col.id][prop];
+    else x.row.st[x.col.id][prop]=value;
+    _cpFmtCleanup(x.row);
+  });
+  cpSave(); cpRerender();
+}
+/* Меню выравнивания */
+function cpAlignMenu(e){
+  const cells=cpFmtRectCells(); const first=cells[0];
+  const cur=(first&&first.row.st&&first.row.st[first.col.id]&&first.row.st[first.col.id].al)||'';
+  const items=[
+    ['l','Слева','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 10h11M4 14h16M4 18h11"/></svg>'],
+    ['c','По центру','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M6 10h12M4 14h16M6 18h12"/></svg>'],
+    ['r','Справа','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M9 10h11M4 14h16M9 18h11"/></svg>']
+  ];
+  let h='<div class="cp-popi cp-popi-hdr">Выравнивание</div>';
+  items.forEach(function(it){
+    h+='<button class="cp-popi'+(cur===it[0]?' on':'')+'" onclick="cpFmtSet(\'al\',\''+it[0]+'\');cpCloseFloat()">'+
+      '<span class="cp-agg-ic" style="width:16px;height:16px;display:inline-flex">'+it[2]+'</span>'+
+      '<span class="cp-agg-nm">'+it[1]+'</span>'+
+      '</button>';
+  });
+  h+='<div class="sep"></div>';
+  h+='<button class="cp-popi" onclick="cpFmtSet(\'al\',\'\');cpCloseFloat()">По умолчанию (по типу колонки)</button>';
+  const btn=(e&&e.target&&e.target.closest?e.target.closest('button'):null)||(e&&e.target);
+  if(btn) cpFloat(btn, h);
+}
+/* Меню шрифта */
+function cpFontMenu(e){
+  const cells=cpFmtRectCells(); const first=cells[0];
+  const cur=(first&&first.row.st&&first.row.st[first.col.id]&&first.row.st[first.col.id].ff)||'';
+  let h='<div class="cp-popi cp-popi-hdr">Шрифт</div>';
+  CP_FONTS.forEach(function(fn){
+    h+='<button class="cp-popi'+(cur===fn.id?' on':'')+'" onclick="cpFmtSet(\'ff\',\''+fn.id+'\');cpCloseFloat()" style="font-family:'+fn.css+'">'+
+      '<span class="cp-agg-nm">'+_ddH(fn.name)+'</span>'+
+      '<span class="cp-agg-hint">Пример 123</span>'+
+      '</button>';
+  });
+  const btn=(e&&e.target&&e.target.closest?e.target.closest('button'):null)||(e&&e.target);
+  if(btn) cpFloat(btn, h);
+}
+/* Меню регистра — деструктивное преобразование текста в выделении */
+function cpCaseMenu(e){
+  const items=[
+    ['upper','ПРОПИСНЫЕ','QQ'],
+    ['lower','строчные','qq'],
+    ['title','Каждое Слово С Большой','Qq'],
+    ['sentence','Как в предложении','Qq']
+  ];
+  let h='<div class="cp-popi cp-popi-hdr">Регистр текста</div>';
+  items.forEach(function(it){
+    h+='<button class="cp-popi cp-popi-agg" onclick="cpTextCase(\''+it[0]+'\');cpCloseFloat()">'+
+      '<span class="cp-agg-ic">'+it[2]+'</span>'+
+      '<span class="cp-agg-nm">'+it[1]+'</span>'+
+      '</button>';
+  });
+  const btn=(e&&e.target&&e.target.closest?e.target.closest('button'):null)||(e&&e.target);
+  if(btn) cpFloat(btn, h);
+}
+function cpTextCase(mode){
+  const cells=cpFmtRectCells(); if(!cells.length) return;
+  let ch=false;
+  cells.forEach(function(x){
+    const v=x.row.c[x.col.id]; if(v==null||v==='') return;
+    const s=String(v); let out;
+    if(mode==='upper') out=s.toLocaleUpperCase();
+    else if(mode==='lower') out=s.toLocaleLowerCase();
+    else if(mode==='title') out=s.toLocaleLowerCase().replace(/(^|\s|["'«»„“(\[\{—-])(\S)/g, function(_,a,b){return a+b.toLocaleUpperCase();});
+    else if(mode==='sentence'){ const low=s.toLocaleLowerCase(); out=low.replace(/(^|[.!?…]\s+)(\S)/g, function(_,a,b){return a+b.toLocaleUpperCase();}); }
+    else return;
+    if(out!==s){ x.row.c[x.col.id]=out; ch=true; }
+  });
+  if(ch){ cpSave(); cpRerender(); if(typeof toast==='function') toast('Регистр обновлён'); }
 }
 /* ═══════════════════ Условное форматирование — UI ═══════════════════ */
 let _cpCFDraft=null; /* {mode:'list'|'edit', ruleId, form:{...}} */
@@ -12245,50 +12367,96 @@ function cpFormatBarHTML(){
   const U='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 4v9a6 6 0 0 0 12 0V4M5 20h14"/></svg>';
   const WR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h13a3 3 0 0 1 0 6h-3l2-2M14 18l-2-2M3 18h6"/></svg>';
   const CL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h11a1 1 0 0 1 1 1v8l-9 9-8-8 5-10z"/><path d="M14 10l-9 9"/></svg>';
+  const AL_L='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 10h11M4 14h16M4 18h11"/></svg>';
+  const AL_C='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M6 10h12M4 14h16M6 18h12"/></svg>';
+  const AL_R='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M9 10h11M4 14h16M9 18h11"/></svg>';
   const sh=cpSheet(); if(!sh) return '';
   const disp=cpDisp(sh);
   const x=cpRect();
   const row=disp[x.r0], col=sh.cols[x.c0];
   const f=(row&&col&&row.st&&row.st[col.id])||{};
   const on=function(k){ return f[k]?' on':''; };
+  const alOn=function(k){ return f.al===k?' on':''; };
   const swT=f.c || 'currentColor';
   const swBg = f.bg ? (f.bg==='transparent'?'transparent':f.bg) : 'transparent';
   const bgIcon = (swBg==='transparent') ? '<span class="cp-fcolor-none">∅</span>' : '<span class="cp-fcolor-icon" style="background:'+swBg+'"></span>';
+  const curFont=CP_FONTS.find(function(fn){return fn.id===(f.ff||'');})||CP_FONTS[0];
   return '<div class="cp-fbar">'
+    /* ── Шрифт ── */
+    +'<button class="cp-fbtn cp-fbtn-font" title="Шрифт" onclick="cpFontMenu(event)" style="font-family:'+curFont.css+'"><span class="cp-fbtn-font-lbl">'+_ddH(curFont.name.replace(/\s*\(.*\)$/,''))+'</span><span class="cp-fbtn-car">▾</span></button>'
+    +'<span class="cp-fsep"></span>'
+    /* ── Стиль текста ── */
     +'<button class="cp-fbtn'+on('b')+'" title="Полужирный · Ctrl+B" onclick="cpFmtToggle(\'b\')">'+B+'</button>'
     +'<button class="cp-fbtn'+on('i')+'" title="Курсив · Ctrl+I" onclick="cpFmtToggle(\'i\')">'+I+'</button>'
     +'<button class="cp-fbtn'+on('u')+'" title="Подчёркнутый · Ctrl+U" onclick="cpFmtToggle(\'u\')">'+U+'</button>'
+    +'<button class="cp-fbtn cp-fbtn-case" title="Регистр текста — ПРОПИСНЫЕ / строчные / С Большой" onclick="cpCaseMenu(event)"><span class="cp-fbtn-case-lbl">Aa</span><span class="cp-fbtn-car">▾</span></button>'
     +'<span class="cp-fsep"></span>'
+    /* ── Цвета ── */
     +'<button class="cp-fbtn cp-fbtn-tx" title="Цвет текста" onclick="cpFmtColorMenu(event,\'c\')"><b style="color:'+swT+'">A</b><span class="cp-fcolor-bar" style="background:'+swT+'"></span></button>'
     +'<button class="cp-fbtn cp-fbtn-bg" title="Цвет фона" onclick="cpFmtColorMenu(event,\'bg\')">'+bgIcon+'</button>'
     +'<span class="cp-fsep"></span>'
+    /* ── Выравнивание ── */
+    +'<button class="cp-fbtn'+alOn('l')+'" title="Слева" onclick="cpFmtSet(\'al\',\'l\')">'+AL_L+'</button>'
+    +'<button class="cp-fbtn'+alOn('c')+'" title="По центру" onclick="cpFmtSet(\'al\',\'c\')">'+AL_C+'</button>'
+    +'<button class="cp-fbtn'+alOn('r')+'" title="Справа" onclick="cpFmtSet(\'al\',\'r\')">'+AL_R+'</button>'
+    +'<span class="cp-fsep"></span>'
+    /* ── Перенос строк ── */
     +'<button class="cp-fbtn'+on('w')+'" title="Перенос текста" onclick="cpFmtWrap()">'+WR+'</button>'
     +'<span class="cp-fsep"></span>'
-    +'<button class="cp-fbtn cp-fbtn-sigma" title="Функции — SUM, AVERAGE, COUNT, MAX, MIN и другие" onclick="cpAutoSumMenu(event)">Σ<span class="cp-fbtn-car">▾</span></button>'
-    +'<span class="cp-fsep"></span>'
+    /* ── Формулы ── */
+    +'<button class="cp-fbtn cp-fbtn-sigma" title="Формулы — выдели диапазон и жми Σ, или выбери функцию из меню" onclick="cpAutoSumMenu(event)">Σ<span class="cp-fbtn-car">▾</span></button>'
+    /* ── Условное форматирование ── */
     +'<button class="cp-fbtn cp-fbtn-cf" title="Условное форматирование — правила окраски по значению" onclick="cpCFPopover(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M13 2L4 14h7l-2 8 9-13h-7l2-7z"/></svg></button>'
     +'<span class="cp-fsep"></span>'
-    +'<button class="cp-fbtn" title="Сбросить форматирование" onclick="cpFmtClear()">'+CL+'</button>'
+    /* ── Сброс ── */
+    +'<button class="cp-fbtn" title="Сбросить всё форматирование" onclick="cpFmtClear()">'+CL+'</button>'
   +'</div>';
 }
-/* Универсальная вставка агрегатной функции — если рядом числа, ставит готовую формулу; иначе открывает редактор с =FUNC( */
+/* Универсальная вставка агрегатной функции.
+   Логика — как в Google Sheets:
+   1) Если выделен диапазон (>1 клетка) — формула создаётся В СЛЕДУЮЩЕЙ ПУСТОЙ клетке за диапазоном (вниз для колонки, вправо для строки, вниз-под-первой-колонкой для прямоугольника)
+   2) Если выделена одна клетка и рядом есть числа — авто-детект диапазона (сверху/слева) и формула создаётся В ЭТОЙ клетке
+   3) Иначе — открываем редактор с "=FUNC(" и подсказкой «выдели мышкой» */
 function cpInsertAggregate(fname){
   const sh=cpSheet(); if(!sh) return; const disp=cpDisp(sh);
-  const r=cpSel.r, c=cpSel.c; const col=sh.cols[c]; if(!col) return;
+  const rect=cpRect();
+  const isMulti=(rect.r0!==rect.r1||rect.c0!==rect.c1);
   const isNum=function(v){ if(v==null||v==='') return false; const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.')); return !isNaN(n) && isFinite(n); };
-  const skipSelf=function(v){ /* пропускаем нашу же ячейку (может уже быть формула) */ };
-  /* Числовой блок сверху в этой же колонке */
+  /* ── Ветка 1: выделен диапазон ── */
+  if(isMulti){
+    const isVertical=(rect.c0===rect.c1);
+    const isHorizontal=(rect.r0===rect.r1);
+    let tR, tC;
+    if(isVertical){ tR=rect.r1+1; tC=rect.c0; }
+    else if(isHorizontal){ tR=rect.r0; tC=rect.c1+1; }
+    else { tR=rect.r1+1; tC=rect.c0; }
+    /* Дорастим строки при необходимости */
+    while(sh.rows.length<=tR) sh.rows.push({id:cpUid(),c:{}});
+    if(tC>=sh.cols.length) tC=rect.c1;
+    const targetRow=disp[tR]||sh.rows[tR];
+    const targetCol=sh.cols[tC];
+    if(!targetRow||!targetCol) return;
+    const expr='='+fname+'('+cpA1(rect.r0,rect.c0)+':'+cpA1(rect.r1,rect.c1)+')';
+    if(!targetRow.f) targetRow.f={};
+    targetRow.f[targetCol.id]=expr;
+    targetRow.c[targetCol.id]=cpEvalFormula(expr, sh, targetRow);
+    cpSel={r:tR,c:tC}; cpSelEnd=null;
+    cpSave(); cpRerender();
+    if(typeof toast==='function') toast(fname+'('+cpA1(rect.r0,rect.c0)+':'+cpA1(rect.r1,rect.c1)+') → '+cpA1(tR,tC));
+    return;
+  }
+  /* ── Ветка 2: одна клетка, ищем соседей ── */
+  const r=cpSel.r, c=cpSel.c; const col=sh.cols[c]; if(!col) return;
   let above=null; if(r>0){ let up=r-1; while(up>=0){ const row=disp[up]; if(!row) break; const v=row.c[col.id]; if(!isNum(v)) break; up--; } if(up<r-1){ above={r1:up+1, r2:r-1}; } }
-  /* Числовой блок слева в этой же строке */
   let left=null; if(!above && c>0){ let lc=c-1; while(lc>=0){ const row=disp[r]; if(!row) break; const cc=sh.cols[lc]; if(!cc) break; const v=row.c[cc.id]; if(!isNum(v)) break; lc--; } if(lc<c-1){ left={c1:lc+1, c2:c-1}; } }
   let expr=null;
   if(above){ expr='='+fname+'('+cpA1(above.r1,c)+':'+cpA1(above.r2,c)+')'; }
   else if(left){ expr='='+fname+'('+cpA1(r,left.c1)+':'+cpA1(r,left.c2)+')'; }
   else {
-    /* Нечего агрегировать — открываем редактор с готовым '=FUNC(' чтобы юзер сам выбрал диапазон мышкой */
+    /* ── Ветка 3: нечего агрегировать — открываем редактор с "=FUNC(" и явной подсказкой ── */
     cpEd={r:r,c:c}; cpRerender();
     const pref='='+fname+'(';
-    setTimeout(function(){ const i=document.getElementById('cp-ed'); if(i){ i.value=pref; i.focus(); try{ i.setSelectionRange(pref.length,pref.length); }catch(_e){} cpAutocInput('cp-ed'); if(typeof toast==='function') toast('Выделите ячейки мышкой — они попадут в формулу'); } },0);
+    setTimeout(function(){ const i=document.getElementById('cp-ed'); if(i){ i.value=pref; i.focus(); try{ i.setSelectionRange(pref.length,pref.length); }catch(_e){} cpAutocInput('cp-ed'); if(typeof toast==='function') toast('Выдели ячейки мышкой — они попадут в формулу'); } },0);
     return;
   }
   const row=disp[r]; if(!row) return;
@@ -12377,7 +12545,13 @@ function cpStatusBarHTML(){
   const x=cpRect();
   const single=(x.r0===x.r1 && x.c0===x.c1);
   const cellRef=cpA1(x.r0,x.c0);
-  if(single){ return '<div class="cp-sbar"><span class="cp-sbar-lb">Ячейка</span><span class="cp-sbar-cell">'+cellRef+'</span><span class="cp-sbar-hint">Ctrl+C · Ctrl+V · Ctrl+A · Tab · Enter · ↑↓←→</span></div>'; }
+  if(single){
+    const editingF = cpEd && (function(){ const i=document.getElementById('cp-ed'); return i && (i.value||'').startsWith('='); })();
+    const hint = editingF
+      ? '<span class="cp-sbar-hint cp-sbar-hint-hot">Тяни мышкой по ячейкам — они станут диапазоном в формуле · Enter — сохранить · Esc — отмена</span>'
+      : '<span class="cp-sbar-hint">Ctrl+C · Ctrl+V · Ctrl+A · Tab · Enter · ↑↓←→ · = для формулы</span>';
+    return '<div class="cp-sbar"><span class="cp-sbar-lb">Ячейка</span><span class="cp-sbar-cell">'+cellRef+'</span>'+hint+'</div>';
+  }
   const disp=cpDisp(sh);
   let count=0, sum=0, mn=Infinity, mx=-Infinity, nums=0;
   for(let r=x.r0;r<=x.r1;r++){ const row=disp[r]; if(!row) continue;
