@@ -3079,8 +3079,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-autoc .cp-ai-s{font-family:var(--mono);font-size:11px;color:var(--txt-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cp-autoc .cp-ai-d{font-size:11.5px;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 .cp-autoc .cp-ai-hint{padding:6px 12px 4px;font-size:10.5px;color:var(--txt-3);border-top:1px solid var(--line-2);letter-spacing:.03em}
-/* AutoSum button */
-.cp-fbtn.cp-fbtn-sigma{font-family:'Georgia',serif;font-weight:700;font-size:17px;line-height:1;color:var(--accent-2, var(--accent))}
+/* AutoSum button + меню функций */
+.cp-fbtn.cp-fbtn-sigma{font-family:'Georgia',serif;font-weight:700;font-size:17px;line-height:1;color:var(--accent-2, var(--accent));display:inline-flex;align-items:center;gap:1px;width:auto;padding:0 4px 0 6px}
+.cp-fbtn-car{font-family:var(--font);font-size:9px;color:var(--txt-3);font-weight:600;position:relative;top:1px}
+.cp-popi.cp-popi-hdr{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);font-weight:700;padding:8px 10px 4px;cursor:default;background:transparent;pointer-events:none}
+.cp-popi.cp-popi-agg{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:8px;padding:8px 12px}
+.cp-agg-ic{font-family:'Georgia',serif;font-weight:800;font-size:15px;color:var(--accent);text-align:center}
+.cp-agg-nm{font-size:12.5px}
+.cp-agg-fn{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);letter-spacing:.02em}
+.cp-agg-hint{font-family:var(--mono);font-size:10px;color:var(--txt-3);margin-left:auto;letter-spacing:.02em}
 /* Условное форматирование — попап */
 .cp-pop.cp-pop-cf{min-width:340px;max-width:400px;padding:0;overflow:hidden}
 .cp-cf-hdr{padding:12px 14px 10px;border-bottom:1px solid var(--line-2);background:var(--bg-2)}
@@ -11076,6 +11083,7 @@ function cpFmulaActiveInput(){
 }
 /* Вставить ссылку/диапазон на месте курсора активного formula-editor'а */
 let _cpFmulaJustPicked=false;
+let _cpFmulaLastPick=null; /* Последняя точка вставки — для shift-click расширения */
 function cpFmulaInsertRef(id, r, c, isRange, r2, c2){
   const inp=document.getElementById(id); if(!inp) return false;
   const pos=(inp.selectionStart!=null)?inp.selectionStart:inp.value.length;
@@ -11096,8 +11104,36 @@ function cpFmulaInsertRef(id, r, c, isRange, r2, c2){
   try{ inp.setSelectionRange(caret,caret); }catch(_e){}
   inp.focus();
   _cpFmulaJustPicked=true;
+  if(!isRange) _cpFmulaLastPick={r:r, c:c};
   cpFmulaHighlightsRender(id);
   return true;
+}
+/* Drag выделение диапазона во время редактирования формулы — как в Google Sheets */
+let _cpFmulaDrag=null;
+function cpFmulaDragStart(fid, r, c){
+  _cpFmulaDrag={fid:fid, sr:r, sc:c, er:r, ec:c};
+  cpFmulaInsertRef(fid, r, c);
+  document.addEventListener('mousemove', _cpFmulaDragMove);
+  document.addEventListener('mouseup', _cpFmulaDragUp, {once:true});
+}
+function _cpFmulaDragMove(ev){
+  if(!_cpFmulaDrag) return;
+  const el=document.elementFromPoint(ev.clientX, ev.clientY);
+  const cell=el&&el.closest?el.closest('.cp-cell[data-r]'):null; if(!cell) return;
+  const r=+cell.getAttribute('data-r'), c=+cell.getAttribute('data-c'); if(isNaN(r)||isNaN(c)) return;
+  if(_cpFmulaDrag.er===r && _cpFmulaDrag.ec===c) return;
+  _cpFmulaDrag.er=r; _cpFmulaDrag.ec=c;
+  const fid=cpFmulaActiveInput(); if(!fid){ _cpFmulaDragUp(); return; }
+  const s=_cpFmulaDrag;
+  if(s.sr===r && s.sc===c){
+    cpFmulaInsertRef(fid, s.sr, s.sc);
+  } else {
+    cpFmulaInsertRef(fid, s.sr, s.sc, true, r, c);
+  }
+}
+function _cpFmulaDragUp(){
+  document.removeEventListener('mousemove', _cpFmulaDragMove);
+  _cpFmulaDrag=null;
 }
 window.addEventListener('scroll', function(){ if(document.querySelector('.cp-fmref')){ const id=cpFmulaActiveInput(); if(id) cpFmulaHighlightsRender(id); } }, true);
 window.addEventListener('scroll', function(){ if(_cpAutoc) cpAutocRender(); }, true);
@@ -11605,16 +11641,9 @@ function cpClick(e,r,c){
   if(cpCellJustDragged){cpCellJustDragged=false;return;}
   /* Только что переключились с одного edit'a на другой в cpCellDown — не дублируем toggle/меню */
   if(_cpEditSwitch){ _cpEditSwitch=false; return; }
-  /* Если сейчас редактируется формула — клик по ячейке вставляет её ссылку, а не переносит фокус */
-  const fid=cpFmulaActiveInput();
-  if(fid){
+  /* Если сейчас редактируется формула — mousedown уже вставил ссылку/диапазон (cpFmulaDragStart), click не дублируем */
+  if(cpFmulaActiveInput()){
     if(e){ e.preventDefault(); e.stopPropagation(); }
-    if(e&&e.shiftKey){
-      /* Shift-click: диапазон от cpSel до (r,c). Если cpSel не выставлен — просто ячейка */
-      cpFmulaInsertRef(fid, cpSel.r, cpSel.c, true, r, c);
-    } else {
-      cpFmulaInsertRef(fid, r, c);
-    }
     return;
   }
   if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); cpColSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ if(col.sys==='pub'){ cpPubMenu(r,c,e); return; } cpToggle(r,c); return; } cpRerender();
@@ -11622,8 +11651,17 @@ function cpClick(e,r,c){
 let _cpEditSwitch=false;
 function cpCellDown(e,r,c){
   if(e&&e.button!=null&&e.button!==0)return;
-  /* Во время редактирования формулы клики только вставляют ссылки — preventDefault сохраняет фокус на input'e */
-  if(cpFmulaActiveInput()){ if(e)e.preventDefault(); return; }
+  /* Во время редактирования формулы: mousedown стартует drag для выбора диапазона (drag → A1:B5, клик → A1) */
+  const fid=cpFmulaActiveInput();
+  if(fid){
+    if(e) e.preventDefault();
+    if(e&&e.shiftKey && _cpFmulaLastPick){
+      cpFmulaInsertRef(fid, _cpFmulaLastPick.r, _cpFmulaLastPick.c, true, r, c);
+      return;
+    }
+    cpFmulaDragStart(fid, r, c);
+    return;
+  }
   /* Если сейчас редактируется другая ячейка — сохраняем правку и мгновенно переносим выделение на новую */
   if(cpEd){
     if(e) e.preventDefault(); /* блокируем blur/focus-race, чтобы cpBlur не запустил второй rerender */
@@ -12226,34 +12264,65 @@ function cpFormatBarHTML(){
     +'<span class="cp-fsep"></span>'
     +'<button class="cp-fbtn'+on('w')+'" title="Перенос текста" onclick="cpFmtWrap()">'+WR+'</button>'
     +'<span class="cp-fsep"></span>'
-    +'<button class="cp-fbtn cp-fbtn-sigma" title="Автосумма · вставить =SUM(…) в активную ячейку по числам выше" onclick="cpAutoSum()">Σ</button>'
+    +'<button class="cp-fbtn cp-fbtn-sigma" title="Функции — SUM, AVERAGE, COUNT, MAX, MIN и другие" onclick="cpAutoSumMenu(event)">Σ<span class="cp-fbtn-car">▾</span></button>'
     +'<span class="cp-fsep"></span>'
     +'<button class="cp-fbtn cp-fbtn-cf" title="Условное форматирование — правила окраски по значению" onclick="cpCFPopover(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M13 2L4 14h7l-2 8 9-13h-7l2-7z"/></svg></button>'
     +'<span class="cp-fsep"></span>'
     +'<button class="cp-fbtn" title="Сбросить форматирование" onclick="cpFmtClear()">'+CL+'</button>'
   +'</div>';
 }
-/* Автосумма: определяем непрерывный числовой блок над (или слева от) активной ячейки и вставляем =SUM(…) */
-function cpAutoSum(){
+/* Универсальная вставка агрегатной функции — если рядом числа, ставит готовую формулу; иначе открывает редактор с =FUNC( */
+function cpInsertAggregate(fname){
   const sh=cpSheet(); if(!sh) return; const disp=cpDisp(sh);
   const r=cpSel.r, c=cpSel.c; const col=sh.cols[c]; if(!col) return;
   const isNum=function(v){ if(v==null||v==='') return false; const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.')); return !isNaN(n) && isFinite(n); };
-  /* Сначала пробуем сверху: непрерывный числовой блок в этой же колонке */
-  let above=null; if(r>0){ let up=r-1; while(up>=0){ const row=disp[up]; if(!row) break; const v=row.c[col.id]; if(!isNum(v)) break; up--; } if(up<r-1){ above={r1:up+1, r2:r-1, kind:'col'}; } }
-  let left=null; if(!above && c>0){ let lc=c-1; while(lc>=0){ const row=disp[r]; if(!row) break; const cc=sh.cols[lc]; if(!cc) break; const v=row.c[cc.id]; if(!isNum(v)) break; lc--; } if(lc<c-1){ left={c1:lc+1, c2:c-1, kind:'row'}; } }
+  const skipSelf=function(v){ /* пропускаем нашу же ячейку (может уже быть формула) */ };
+  /* Числовой блок сверху в этой же колонке */
+  let above=null; if(r>0){ let up=r-1; while(up>=0){ const row=disp[up]; if(!row) break; const v=row.c[col.id]; if(!isNum(v)) break; up--; } if(up<r-1){ above={r1:up+1, r2:r-1}; } }
+  /* Числовой блок слева в этой же строке */
+  let left=null; if(!above && c>0){ let lc=c-1; while(lc>=0){ const row=disp[r]; if(!row) break; const cc=sh.cols[lc]; if(!cc) break; const v=row.c[cc.id]; if(!isNum(v)) break; lc--; } if(lc<c-1){ left={c1:lc+1, c2:c-1}; } }
   let expr=null;
-  if(above){ expr='=SUM('+cpA1(above.r1,c)+':'+cpA1(above.r2,c)+')'; }
-  else if(left){ expr='=SUM('+cpA1(r,left.c1)+':'+cpA1(r,left.c2)+')'; }
+  if(above){ expr='='+fname+'('+cpA1(above.r1,c)+':'+cpA1(above.r2,c)+')'; }
+  else if(left){ expr='='+fname+'('+cpA1(r,left.c1)+':'+cpA1(r,left.c2)+')'; }
   else {
-    /* Нечего суммировать — открываем редактор с готовым '=SUM(' чтобы юзер сам довыбрал диапазон */
+    /* Нечего агрегировать — открываем редактор с готовым '=FUNC(' чтобы юзер сам выбрал диапазон мышкой */
     cpEd={r:r,c:c}; cpRerender();
-    setTimeout(function(){ const i=document.getElementById('cp-ed'); if(i){ i.value='=SUM('; i.focus(); try{ i.setSelectionRange(5,5); }catch(_e){} cpAutocInput('cp-ed'); } },0);
+    const pref='='+fname+'(';
+    setTimeout(function(){ const i=document.getElementById('cp-ed'); if(i){ i.value=pref; i.focus(); try{ i.setSelectionRange(pref.length,pref.length); }catch(_e){} cpAutocInput('cp-ed'); if(typeof toast==='function') toast('Выделите ячейки мышкой — они попадут в формулу'); } },0);
     return;
   }
   const row=disp[r]; if(!row) return;
   if(!row.f) row.f={}; row.f[col.id]=expr; row.c[col.id]=cpEvalFormula(expr, sh, row);
   cpSave(); cpRerender();
-  if(typeof toast==='function') toast(above?'Автосумма по колонке':'Автосумма по строке');
+  if(typeof toast==='function') toast(fname+' · '+(above?'по колонке':'по строке'));
+}
+function cpAutoSum(){ cpInsertAggregate('SUM'); }
+/* Меню функций у Σ-кнопки */
+function cpAutoSumMenu(e){
+  const items=[
+    ['SUM','Σ','Сумма'],
+    ['AVERAGE','x̄','Среднее'],
+    ['COUNT','#','Количество'],
+    ['MAX','↑','Максимум'],
+    ['MIN','↓','Минимум']
+  ];
+  let h='<div class="cp-popi cp-popi-hdr">Быстрая формула</div>';
+  items.forEach(function(it){
+    h+='<button class="cp-popi cp-popi-agg" onclick="cpInsertAggregate(\''+it[0]+'\');cpCloseFloat()">'+
+      '<span class="cp-agg-ic">'+it[1]+'</span>'+
+      '<span class="cp-agg-nm">'+it[2]+'</span>'+
+      '<span class="cp-agg-fn">'+it[0]+'</span>'+
+      '</button>';
+  });
+  h+='<div class="sep"></div>';
+  h+='<button class="cp-popi" onclick="cpInsertFuncPrompt();cpCloseFloat()"><b style="font-family:Georgia,serif;font-style:italic">fx</b>&nbsp;&nbsp;Другие функции… <span class="cp-agg-hint">VLOOKUP, IF, TEXT…</span></button>';
+  const btn=(e&&e.target&&e.target.closest?e.target.closest('button'):null)||(e&&e.target)||null;
+  if(btn) cpFloat(btn, h);
+}
+/* Открыть редактор с "=" и активным автокомплитом — юзер печатает имя функции */
+function cpInsertFuncPrompt(){
+  cpEd={r:cpSel.r, c:cpSel.c}; cpRerender();
+  setTimeout(function(){ const i=document.getElementById('cp-ed'); if(i){ i.value='='; i.focus(); try{ i.setSelectionRange(1,1); }catch(_e){} cpAutocInput('cp-ed'); if(typeof toast==='function') toast('Начни печатать имя функции — подсказки покажутся'); } },0);
 }
 /* Name box + edit bar над таблицей (стиль Google Sheets) */
 function cpNameBarHTML(){
