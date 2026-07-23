@@ -677,6 +677,10 @@ tbody tr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .clkm-today-list{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
 .clkm-today-row{display:flex;align-items:center;gap:11px;padding:9px 10px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.05);border-radius:11px;transition:.14s}
 .clkm-today-row:hover{border-color:color-mix(in srgb,var(--accent) 30%,rgba(255,255,255,.08));background:rgba(255,255,255,.04)}
+.clkm-today-row-clk{cursor:pointer;outline:none}
+.clkm-today-row-clk:hover{transform:translateY(-1px);box-shadow:0 8px 22px -14px rgba(0,0,0,.55)}
+.clkm-today-row-clk:active{transform:translateY(0) scale(.995)}
+.clkm-today-row-clk:focus-visible{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
 .clkm-today-icn{flex:none;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent)}
 .clkm-today-icn.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent);border-color:color-mix(in srgb,var(--warn) 24%,transparent)}
 .clkm-today-icn.neg{color:var(--neg);background:color-mix(in srgb,var(--neg) 14%,transparent);border-color:color-mix(in srgb,var(--neg) 24%,transparent)}
@@ -21428,10 +21432,10 @@ function _clkTodayItems(){
     if(d.bucket==='done') return;                                                     // закрытые не показываем
     if(d.type==='task'){
       if(!d.assignee || String(d.assignee)!==uid) return;                             // «на что назначен» — только назначенные лично
-      items.push({ kind:'task', title:d.stage||'Задача', project:d.project||'', time:d.dueTime||'', urgency:'warn', tag:d.dueTime||'СЕГОДНЯ', sort:_clkTimeSort(d.dueTime) });
+      items.push({ kind:'task', title:d.stage||'Задача', project:d.project||'', time:d.dueTime||'', urgency:'warn', tag:d.dueTime||'СЕГОДНЯ', sort:_clkTimeSort(d.dueTime), pid:d.pid, refId:d._id });
     } else if(d.type==='stage'){
       /* этапы показываем всем, кто видит проект — они помогают понимать «сроки в моих проектах» */
-      items.push({ kind:'stage', title:d.stage||'Этап', project:d.project||'', time:d.dueTime||'', urgency:'accent', tag:'ЭТАП', sort:_clkTimeSort(d.dueTime) });
+      items.push({ kind:'stage', title:d.stage||'Этап', project:d.project||'', time:d.dueTime||'', urgency:'accent', tag:'ЭТАП', sort:_clkTimeSort(d.dueTime), pid:d.pid, refId:d._id });
     }
   });
   /* 2. Брони сегодня — где я среди участников */
@@ -21449,7 +21453,7 @@ function _clkTodayItems(){
     const tEnd=(be.getFullYear()===now.getFullYear()&&be.getMonth()===now.getMonth()&&be.getDate()===now.getDate())
       ? (String(be.getHours()).padStart(2,'0')+':'+String(be.getMinutes()).padStart(2,'0')) : '23:59';
     const range=b.allDay ? 'ВЕСЬ ДЕНЬ' : (tStart+'–'+tEnd);
-    items.push({ kind:'booking', title:b.title||'Бронь', project:b.projName||'', time:range, urgency:(b.startsAt<=now.getTime()&&b.endsAt>=now.getTime()?'pos':'accent'), tag:range, sort:_clkTimeSort(tStart) });
+    items.push({ kind:'booking', title:b.title||'Бронь', project:b.projName||'', time:range, urgency:(b.startsAt<=now.getTime()&&b.endsAt>=now.getTime()?'pos':'accent'), tag:range, sort:_clkTimeSort(tStart), bid:b.id });
   });
   items.sort(function(a,b){ return (a.sort||0)-(b.sort||0); });
   return items;
@@ -21477,8 +21481,18 @@ function _clkTodayRefresh(){
     return;
   }
   const esc=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const jsStr=v=>String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   host.innerHTML='<div class="clkm-today-list">'+items.map(function(it){
-    return '<div class="clkm-today-row">'
+    /* Готовим onclick: задача/этап → dlGoto(pid, kind, id) через модуль Проектов;
+       бронь → schOpen(bid). Модалка часов закрывается сама, т.к. openProject/schOpen
+       переоткрывают тот же overlay ov-pd2 своим содержимым. */
+    var payload;
+    if(it.kind==='booking' && it.bid) payload="_clkTodayOpen('booking','"+_ddA(jsStr(it.bid))+"')";
+    else if((it.kind==='task'||it.kind==='stage') && it.pid && it.refId) payload="_clkTodayOpen('"+it.kind+"','"+_ddA(jsStr(it.pid))+"','"+_ddA(jsStr(it.refId))+"')";
+    else payload='';
+    const attrs = payload ? (' onclick="'+payload+'" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'){'+payload+'}"') : '';
+    const cls = payload ? ' clkm-today-row-clk' : '';
+    return '<div class="clkm-today-row'+cls+'"'+attrs+'>'
       +'<span class="clkm-today-icn '+(it.urgency||'')+'">'+_clkTodayIcon(it.kind)+'</span>'
       +'<div class="clkm-today-body">'
         +'<div class="clkm-today-nm">'+esc(it.title)+'</div>'
@@ -21488,6 +21502,19 @@ function _clkTodayRefresh(){
     +'</div>';
   }).join('')+'</div>';
 }
+function _clkTodayOpen(kind, a, b){
+  /* Закрываем модалку часов, чтобы вернуть фокус в основной кабинет — потом уже открываем деталь */
+  if(typeof pd2Close==='function') pd2Close();
+  if(kind==='booking'){
+    if(typeof schOpen==='function') schOpen(a);
+    return;
+  }
+  if(kind==='task' || kind==='stage'){
+    if(typeof dlGoto==='function') dlGoto(a, kind, b);
+    return;
+  }
+}
+window._clkTodayOpen=_clkTodayOpen;
 function agClockModal(){
   const d=_clkCalc(), C=(2*Math.PI*20).toFixed(2);
   const ring=(k,l)=>'<div class="clkm-ring"><div class="clkm-ring-wrap"><svg viewBox="0 0 48 48"><circle class="bg" cx="24" cy="24" r="20"></circle><circle class="fg" id="ring-'+k+'" cx="24" cy="24" r="20" stroke-dasharray="'+C+'" stroke-dashoffset="'+C+'" transform="rotate(-90 24 24)"></circle></svg><b class="clkm-ring-pct" id="rp-'+k+'">0%</b></div><div class="clkm-ring-lbl">'+l+'</div><div class="clkm-ring-sub" id="rs-'+k+'">—</div></div>';
