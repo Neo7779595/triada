@@ -27738,43 +27738,45 @@ window._kpiRefreshNavBadge = async () => {
   _kpiApplyNavBadge();
 };
 
-/* Считает цели активного KPI-периода и разбивает на «идём по плану» / «отстаём»
-   с учётом темпа: ожидаемое значение к сегодня = baseline + (target-baseline)×pace,
-   где pace = прожитая доля периода. Если у цели нет baseline — берём minimum либо 0.
+/* Считает цели ВСЕХ активных KPI-периодов и разбивает на «идём по плану» / «отстаём»
+   с учётом темпа каждого периода: expected = baseline + (target-baseline)×pace,
+   где pace = прожитая доля этого периода. Если у цели нет baseline — берём minimum либо 0.
    Если для метрики нет текущего значения — цель в подсчёт не идёт. */
 async function _kpiGoalsForBadge(){
   if (typeof kpiFetchPeriods!=='function' || typeof kpiComputeAll!=='function') return {onTrack:0, behind:0};
-  const periods = await kpiFetchPeriods({status:'active', limit:1}).catch(()=>[]);
-  const per = periods[0];
-  if (!per || !per.start_date || !per.end_date) return {onTrack:0, behind:0};
-  const startMs = new Date(String(per.start_date).slice(0,10)+'T00:00:00').getTime();
-  const endMs   = new Date(String(per.end_date).slice(0,10)+'T23:59:59').getTime();
-  const nowMs   = Date.now();
-  const totalMs = endMs - startMs;
-  const pace = totalMs > 0 ? Math.max(0, Math.min(1, (nowMs - startMs) / totalMs)) : 1;
-  const tg = await SB.from('kpi_targets').select('*').eq('period_id', per.id);
-  const targets = (tg.data||[]).filter(t => t && t.target != null);
-  if (!targets.length) return {onTrack:0, behind:0};
-  const scopes = {};
-  targets.forEach(t => { const k = t.scope_kind + '|' + (t.scope_id||''); (scopes[k] = scopes[k] || []).push(t); });
+  const periods = await kpiFetchPeriods({status:'active', limit:50}).catch(()=>[]);         // все активные, не только первый
+  if (!periods.length) return {onTrack:0, behind:0};
+  const nowMs = Date.now();
   let onTrack = 0, behind = 0;
-  for (const k of Object.keys(scopes)){
-    const [sk, sid] = k.split('|');
-    let cur = {};
-    try { cur = await kpiComputeAll(sk, sid || null, per.start_date, per.end_date) || {}; } catch(_) { cur = {}; }
-    scopes[k].forEach(t => {
-      const M = (window.KPI_METRICS||{})[t.metric_key] || {};
-      const raw = cur[t.metric_key];
-      const val = (raw && typeof raw === 'object') ? (raw.value != null ? raw.value : raw.current) : raw;
-      if (val == null || t.target == null) return;                                          // без данных не считаем ни туда, ни туда
-      const dir = t.direction || M.dir || 'up';
-      const baselineRaw = (t.baseline_value != null ? t.baseline_value : (t.baseline != null ? t.baseline : (t.minimum != null ? t.minimum : 0)));
-      const baseline = Number(baselineRaw) || 0;
-      const target = Number(t.target);
-      const expected = baseline + (target - baseline) * pace;
-      const ok = (dir === 'up') ? (Number(val) >= expected) : (Number(val) <= expected);
-      if (ok) onTrack++; else behind++;
-    });
+  for (const per of periods){
+    if (!per || !per.start_date || !per.end_date) continue;
+    const startMs = new Date(String(per.start_date).slice(0,10)+'T00:00:00').getTime();
+    const endMs   = new Date(String(per.end_date).slice(0,10)+'T23:59:59').getTime();
+    const totalMs = endMs - startMs;
+    const pace = totalMs > 0 ? Math.max(0, Math.min(1, (nowMs - startMs) / totalMs)) : 1;
+    const tg = await SB.from('kpi_targets').select('*').eq('period_id', per.id);
+    const targets = (tg.data||[]).filter(t => t && t.target != null);
+    if (!targets.length) continue;
+    const scopes = {};
+    targets.forEach(t => { const k = t.scope_kind + '|' + (t.scope_id||''); (scopes[k] = scopes[k] || []).push(t); });
+    for (const k of Object.keys(scopes)){
+      const [sk, sid] = k.split('|');
+      let cur = {};
+      try { cur = await kpiComputeAll(sk, sid || null, per.start_date, per.end_date) || {}; } catch(_) { cur = {}; }
+      scopes[k].forEach(t => {
+        const M = (window.KPI_METRICS||{})[t.metric_key] || {};
+        const raw = cur[t.metric_key];
+        const val = (raw && typeof raw === 'object') ? (raw.value != null ? raw.value : raw.current) : raw;
+        if (val == null || t.target == null) return;                                        // без данных не считаем ни туда, ни туда
+        const dir = t.direction || M.dir || 'up';
+        const baselineRaw = (t.baseline_value != null ? t.baseline_value : (t.baseline != null ? t.baseline : (t.minimum != null ? t.minimum : 0)));
+        const baseline = Number(baselineRaw) || 0;
+        const target = Number(t.target);
+        const expected = baseline + (target - baseline) * pace;
+        const ok = (dir === 'up') ? (Number(val) >= expected) : (Number(val) <= expected);
+        if (ok) onTrack++; else behind++;
+      });
+    }
   }
   return {onTrack, behind};
 }
