@@ -410,11 +410,11 @@ button{font-family:inherit}
 .smm-cmp-card::before{content:"";position:absolute;top:0;left:14px;right:14px;height:2px;border-radius:0 0 3px 3px;background:linear-gradient(90deg, transparent, var(--smm-col, var(--accent)) 40%, var(--smm-col, var(--accent)) 60%, transparent);opacity:.35;transition:opacity .18s}
 .smm-cmp-card:hover{background:linear-gradient(180deg, color-mix(in srgb, var(--bg-1) 90%, var(--smm-col, var(--accent)) 6%), var(--bg-1) 60%, color-mix(in srgb, var(--bg-1) 90%, #000 10%))}
 .smm-cmp-card:hover::before{opacity:.9}
-.smm-cmp-hero{background:linear-gradient(180deg, color-mix(in srgb, var(--bg-1) 90%, var(--accent) 6%), var(--bg-1) 60%, color-mix(in srgb, var(--bg-1) 92%, #000 8%));padding:26px 28px 22px}
+.smm-cmp-hero{background:linear-gradient(180deg, color-mix(in srgb, var(--bg-1) 90%, var(--smm-col, var(--accent)) 6%), var(--bg-1) 60%, color-mix(in srgb, var(--bg-1) 92%, #000 8%));padding:26px 28px 22px}
 .smm-cmp-hero::before{height:3px;opacity:.7}
 .smm-cmp-l{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--txt-3);margin-bottom:12px;display:flex;flex-direction:column;gap:5px}
 .smm-cmp-l .smm-cmp-tip{font-family:var(--font);font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--txt-3);font-weight:500;opacity:.75}
-.smm-cmp-hero .smm-cmp-l{font-size:11px;color:var(--accent);letter-spacing:.24em;font-weight:800}
+.smm-cmp-hero .smm-cmp-l{font-size:11px;color:var(--smm-col, var(--accent));letter-spacing:.24em;font-weight:800}
 .smm-cmp-hero .smm-cmp-l .smm-cmp-tip{color:var(--txt-2);opacity:.9}
 .smm-cmp-v{font-family:var(--mono);font-size:30px;font-weight:750;letter-spacing:-.04em;line-height:1;color:var(--txt);margin-bottom:8px;font-variant-numeric:tabular-nums;text-shadow:0 1px 0 rgba(0,0,0,.35)}
 .smm-cmp-hero .smm-cmp-v{font-size:46px;font-weight:800;letter-spacing:-.045em}
@@ -14636,41 +14636,69 @@ function smmTabHTML(p){
 }
 function smmCompareStripHTML(norm){
   const val=x=>(x!=null&&x!==''&&+x!==0)?+x:null;
-  const pct=x=>x==null?'—':(+x).toFixed(2).replace('.',',')+'%';
+  const nf=x=>Number(x).toLocaleString('ru-RU');
+  const fmtPct=x=>x==null?'—':(+x).toFixed(2).replace('.',',')+'%';
+  const fmtNum=x=>x==null?'—':nf(x);
   const last=norm[0]||null, prev=norm[1]||null;
   const ml=last?last.s.metrics:{}, mp=prev?prev.s.metrics:{};
-  /* Первый (ER) — flagship, остальные — вторичные. Так рождается иерархия. */
+  /* Подсчёты, которые не хранятся напрямую: охват / просмотры / прирост / подписчики */
+  const derive=(m)=>{
+    if(!m) return {};
+    const reach=(m.reels_reach||0)+(m.stories_reach||0);
+    const views=(m.reels_views||0)+(m.stories_views!=null?m.stories_views:(m.stories_reach||0));
+    return {
+      subs:  val(m.subscribers_current),
+      reach: reach>0?reach:null,
+      views: views>0?views:null,
+      grow:  val(m.followers),
+      er:    val(m.er)
+    };
+  };
+  const dl=derive(ml), dp=derive(mp);
+  /* Первый (Подписчики) — flagship, дальше по значимости, ER — на последнем месте. */
   const defs=[
-    ['ER',  'er',  'var(--accent)', 'Вовлечённость'],
-    ['LR',  'lr',  '#6AA9FF',       'Лайки'],
-    ['CR',  'tr',  'var(--warn)',   'Комментарии'],
-    ['SHR', 'shr', 'var(--violet)', 'Репосты'],
-    ['SR',  'sr',  'var(--pos)',    'Сохранения']
+    ['Подписчики', 'subs',  '#8A8FFF',       'num', 'База аудитории'],
+    ['Охват',      'reach', 'var(--pos)',    'num', 'Уникальные аккаунты'],
+    ['Просмотры',  'views', '#4FD1C5',       'num', 'Reels + Stories'],
+    ['Прирост',    'grow',  'var(--violet)', 'num', 'Изменение базы за период'],
+    ['ER',         'er',    'var(--accent)', 'pct', 'Вовлечённость']
   ];
-  const cells=defs.map(([lab,key,col,tip],idx)=>{
-    const lv=last?val(ml[key]):null, pv=prev?val(mp[key]):null;
+  const cells=defs.map(([lab,key,col,type,tip],idx)=>{
+    const lv=dl[key]==null?null:dl[key], pv=dp[key]==null?null:dp[key];
+    const fmt=type==='pct'?fmtPct:fmtNum;
     let sub='—', sc='var(--txt-3)', ico='→';
     if(lv!=null&&pv!=null){
       const d=lv-pv;
       ico = d>0?'↑':d<0?'↓':'→';
-      sub=(d>0?'+':d<0?'−':'')+Math.abs(d).toFixed(2).replace('.',',')+' п.п.';
+      if(type==='pct'){
+        sub=(d>0?'+':d<0?'−':'')+Math.abs(d).toFixed(2).replace('.',',')+' п.п.';
+      } else {
+        sub=(d>0?'+':d<0?'−':'')+nf(Math.abs(Math.round(d)));
+      }
       sc=d>0?'var(--pos)':d<0?'var(--neg)':'var(--txt-3)';
+    } else if(lv!=null&&key==='grow'){
+      /* «Прирост» сам по себе — уже дельта; покажем знак */
+      sub=(lv>0?'рост базы':lv<0?'отток':'без изменений');
+      sc=lv>0?'var(--pos)':lv<0?'var(--neg)':'var(--txt-3)';
+      ico=lv>0?'↑':lv<0?'↓':'→';
     }
-    const foot=prev?('пред. '+pct(pv)):'первый отчёт';
+    /* Для «Прироста» само значение уже с ±: покажем красиво */
+    let valStr;
+    if(key==='grow' && lv!=null) valStr=(lv>0?'+':lv<0?'−':'')+nf(Math.abs(lv));
+    else valStr=fmt(lv);
+    const foot=prev?('пред. '+(function(){
+      if(key==='grow' && pv!=null) return (pv>0?'+':pv<0?'−':'')+nf(Math.abs(pv));
+      return fmt(pv);
+    })()):'первый отчёт';
     return `<div class="smm-cmp-card${idx===0?' smm-cmp-hero':''}" style="--smm-col:${col}">`
       +`<div class="smm-cmp-l">${lab}<span class="smm-cmp-tip">${tip}</span></div>`
-      +`<div class="smm-cmp-v" style="color:${lv==null?'var(--txt-3)':col}">${pct(lv)}</div>`
+      +`<div class="smm-cmp-v" style="color:${lv==null?'var(--txt-3)':col}">${valStr}</div>`
       +`<div class="smm-cmp-sub" style="color:${sc}"><span class="smm-cmp-arrow">${ico}</span>${sub}</div>`
       +`<div class="smm-cmp-rule"></div>`
       +`<div class="smm-cmp-foot">${foot}</div>`
     +`</div>`;
   });
-  const pair=(last&&prev)?(_ddH(last.s.period||'—')+' <span style="color:var(--txt-3)">←</span> '+_ddH(prev.s.period||'—')):last?(_ddH(last.s.period||'—')+' · ждём второй отчёт для сравнения'):'появится после двух SMM-отчётов с метриками';
   return `<div class="smm-cmp">`
-    +`<div class="smm-cmp-head">`
-      +`<span class="smm-cmp-eyebrow">Динамика ключевых метрик</span>`
-      +`<span class="smm-cmp-pair">${pair}</span>`
-    +`</div>`
     +`<div class="smm-cmp-strip${last?'':' dim'}">${cells.join('')}</div>`
   +`</div>`;
 }
