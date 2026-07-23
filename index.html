@@ -3090,6 +3090,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-fbtn.cp-fbtn-case{width:auto;padding:0 4px 0 7px;gap:2px;display:inline-flex;align-items:center;font-family:'Georgia',serif;font-size:13px;font-weight:600}
 .cp-fbtn-case-lbl{line-height:1;position:relative;top:-1px}
 .cp-fbtn-case-lbl::first-letter{font-size:14px}
+/* Number format buttons */
+.cp-fbtn.cp-fbtn-num{width:auto;padding:0 4px 0 8px;gap:2px;display:inline-flex;align-items:center;font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.02em}
+.cp-fbtn-num-lbl{color:var(--txt-2)}
+.cp-fbtn.cp-fbtn-pct{font-weight:700;font-size:14px;font-family:var(--mono)}
+.cp-fbtn.cp-fbtn-dec{width:auto;padding:0 6px;font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:-.02em}
+.cp-fbtn-dec-lbl{color:var(--txt-2);line-height:1}
 /* ── Панель функций формул (модал-стиль поповер) ── */
 .cp-pop.cp-pop-funcs{min-width:520px;max-width:560px;padding:0;overflow:hidden;max-height:76vh;display:flex;flex-direction:column}
 .cp-func-hdr{padding:12px 14px 10px;border-bottom:1px solid var(--line-2);background:var(--bg-2);flex:0 0 auto}
@@ -10763,7 +10769,25 @@ function cpFmtDate(v){ if(!v)return ''; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(
 function cpFmtMoney(v,col){ const n=cpNum(v); if(isNaN(n)) return _ddH(String(v)); const g=n.toLocaleString('ru-RU',{maximumFractionDigits:2}); return g+' '+((col&&col.cur==='usd')?'$':'сумм'); }
 function cpChipEmpty(col){ return '<span class="cp-chip cp-chip-full cp-chip-empty"><span class="cp-chip-t">—</span><span class="cp-chip-car" onmousedown="cpChipCarDown(event,this)" onclick="cpChipCarOpen(event,this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></span>'; }
 function cpChip(col,v){ const o=(col.opts||[]).find(x=>x.v===v); const pal=CP_PAL[o?o.c:'gray']; return '<span class="cp-chip cp-chip-full" style="background:'+pal[0]+';color:'+pal[1]+'"><span class="d"></span><span class="cp-chip-t">'+_ddH(v)+'</span><span class="cp-chip-car" onmousedown="cpChipCarDown(event,this)" onclick="cpChipCarOpen(event,this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></span>'; }
-function cpCellView(col,v){
+/* Форматирование числа по nf/dp настройкам ячейки (как в Google Sheets: increase/decrease decimals, %, валюта, тыс. разделитель) */
+function _cpFmtNum(v, nf, dp){
+  const s=String(v==null?'':v).trim();
+  if(s==='') return '';
+  const n=parseFloat(s.replace(/\s/g,'').replace(',','.'));
+  if(isNaN(n)||!isFinite(n)) return _ddH(s);
+  const dec=(dp!=null&&dp>=0)?Math.min(10,Math.max(0,dp|0)):null;
+  const opts=(dec!=null)?{minimumFractionDigits:dec,maximumFractionDigits:dec}:{maximumFractionDigits:10};
+  if(nf==='pct'){ return (n*100).toLocaleString('ru-RU',opts)+' %'; }
+  if(nf==='cur'){ return n.toLocaleString('ru-RU',opts)+' сум'; }
+  if(nf==='usd'){ return '$'+n.toLocaleString('en-US',opts); }
+  if(nf==='sci'){ return dec!=null?n.toExponential(dec):n.toExponential(); }
+  if(nf==='plain'){ return dec!=null?n.toFixed(dec):String(n); }
+  /* 'num' — с разделителем тысяч, 'auto' — c dp если задан, иначе оригинал */
+  if(nf==='num') return n.toLocaleString('ru-RU',opts);
+  if(dec!=null) return n.toLocaleString('ru-RU',opts);
+  return _ddH(s);
+}
+function cpCellView(col,v,row){
   if(v==null||v===''){ if(col.type==='check'){ v=false; } else if(col.type==='select'){ return cpChipEmpty(col); } else { return ''; } }
   if(col.type==='select') return cpChip(col,v);
   if(col.type==='check'){
@@ -10777,6 +10801,10 @@ function cpCellView(col,v){
   }
   if(col.type==='link'){ if(v==null||v==='')return ''; const _lk=cpLinkParse(v); return '<span class="cp-lnk" onclick="event.stopPropagation();cpLinkClick(this)" data-u="'+_ddA(_lk.url)+'" data-t="'+_ddA(_lk.label)+'">'+_lnkFav(_lk.url)+'<span class="cp-lnk-t">'+_ddH(_lk.label||'Открыть')+'</span></span>'; }
   if(col.type==='date') return '<span class="cp-mono">'+_ddH(cpFmtDate(v))+'</span>';
+  const st=(row&&row.st&&row.st[col.id])||null;
+  const nf=st&&st.nf; const dp=st&&(st.dp!=null?st.dp:null);
+  /* Если задан явный format/dp — применяем универсальную функцию (перекрывает money/num-типы) */
+  if(nf||dp!=null){ return '<span class="cp-mono">'+_ddH(_cpFmtNum(v, nf||'auto', dp))+'</span>'; }
   if(col.type==='money') return '<span class="cp-mono cp-money">'+cpFmtMoney(v,col)+'</span>';
   if(col.type==='num') return '<span class="cp-mono">'+_ddH(v)+'</span>';
   return '<span class="cp-txt">'+_ddH(v)+'</span>';
@@ -11739,7 +11767,7 @@ function cpRender(p){
       const cellAl=(row.st&&row.st[col.id]&&row.st[col.id].al)||null;
       const alCls=cellAl?(' cp-al-'+cellAl):(col.align?(' cp-al-'+col.align):'');
       const cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(col.type==='check'?' cp-cchk':'')+(sel?' cp-sel':'')+(cpInRect(ri,ci)?' cp-rng':'')+(cpColSel.has(col.id)?' cp-colsel':'')+((mInfo&&mInfo.anchorW[ci]!=null)?' cp-merged':'')+alCls;
-      const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id]);
+      const inner=editing?cpEditor(row,col):cpCellView(col,row.c[col.id],row);
       const fmtAttr=cpCellStyleAttr(row,col,sh);
       html+='<div class="'+cls+(cpCellWrap(row,col)?' cp-cellwrap':'')+'" style="width:'+((mInfo&&mInfo.anchorW[ci]!=null)?mInfo.anchorW[ci]:col.w)+'px'+_rh+fmtAttr+'" data-r="'+ri+'" data-c="'+ci+'" onmousedown="cpCellDown(event,'+ri+','+ci+')" onclick="cpClick(event,'+ri+','+ci+')" ondblclick="cpEdit('+ri+','+ci+')" oncontextmenu="cpCellMenu(event,'+ri+','+ci+');return false;">'+inner+((!editing&&ri===cpRect().r1&&ci===cpRect().c1)?'<span class="cp-h" onmousedown="cpFillStart(event)"></span>':'')+'</div>';
     });
@@ -12257,6 +12285,58 @@ function cpTextCase(mode){
   });
   if(ch){ cpSave(); cpRerender(); if(typeof toast==='function') toast('Регистр обновлён'); }
 }
+/* Изменение количества десятичных знаков (кнопки .0← / .0→) — как в Google Sheets */
+function cpDecimalStep(delta){
+  const cells=cpFmtRectCells(); if(!cells.length) return;
+  let ch=false;
+  cells.forEach(function(x){
+    if(!x.row.st) x.row.st={};
+    if(!x.row.st[x.col.id]) x.row.st[x.col.id]={};
+    const st=x.row.st[x.col.id];
+    /* Если dp ещё не задан — стартуем от текущего кол-ва знаков в значении (auto-detect) */
+    let cur=(st.dp!=null)?st.dp:_cpDetectDP(x.row.c[x.col.id]);
+    let next=Math.max(0,Math.min(10,cur+delta));
+    if(next===cur && delta<0 && cur===0){ /* остаёмся на 0 — ничего */ }
+    st.dp=next;
+    ch=true;
+  });
+  if(ch){ cpSave(); cpRerender(); }
+}
+function _cpDetectDP(v){
+  if(v==null||v==='') return 0;
+  const s=String(v).trim();
+  if(/^[-+]?\d+([.,]\d+)?$/.test(s)){
+    const m=/[.,](\d+)$/.exec(s);
+    return m?m[1].length:0;
+  }
+  return 2;
+}
+/* Меню форматов чисел */
+function cpNumFormatMenu(e){
+  const cells=cpFmtRectCells(); const first=cells[0];
+  const cur=(first&&first.row.st&&first.row.st[first.col.id]&&first.row.st[first.col.id].nf)||'';
+  const items=[
+    ['', 'Обычный', 'без разделителей: 1234.5', 'auto'],
+    ['num', 'Число', 'с разделителем тысяч: 1 234,5', '1 234,50'],
+    ['plain', 'Простое', 'фиксированные знаки: 1234.5', '1234.5'],
+    ['pct', 'Процент', '0.25 → 25%', '25 %'],
+    ['cur', 'Валюта (сум)', 'узбекская валюта', '1 234 сум'],
+    ['usd', 'Доллар', 'английская локаль', '$1,234.50'],
+    ['sci', 'Научный', 'экспоненциальная запись', '1.23e+3']
+  ];
+  let h='<div class="cp-popi cp-popi-hdr">Формат числа</div>';
+  items.forEach(function(it){
+    h+='<button class="cp-popi cp-popi-agg'+(cur===it[0]?' on':'')+'" onclick="cpFmtSet(\'nf\',\''+it[0]+'\');cpCloseFloat()">'+
+      '<span class="cp-agg-ic" style="font-family:var(--mono);font-size:10px;color:var(--txt-3);text-align:center">'+_ddH(it[3])+'</span>'+
+      '<span class="cp-agg-nm">'+it[1]+'</span>'+
+      '<span class="cp-agg-hint">'+_ddH(it[2])+'</span>'+
+      '</button>';
+  });
+  h+='<div class="sep"></div>';
+  h+='<button class="cp-popi" onclick="cpFmtSet(\'dp\',\'\');cpFmtSet(\'nf\',\'\');cpCloseFloat()">Сбросить формат числа</button>';
+  const btn=(e&&e.target&&e.target.closest?e.target.closest('button'):null)||(e&&e.target);
+  if(btn) cpFloat(btn, h);
+}
 /* ═══════════════════ Условное форматирование — UI ═══════════════════ */
 let _cpCFDraft=null; /* {mode:'list'|'edit', ruleId, form:{...}} */
 function cpCFPopover(e){
@@ -12534,6 +12614,12 @@ function cpFormatBarHTML(){
     +'<button class="cp-fbtn'+alOn('l')+'" title="Слева" onclick="cpFmtSet(\'al\',\'l\')">'+AL_L+'</button>'
     +'<button class="cp-fbtn'+alOn('c')+'" title="По центру" onclick="cpFmtSet(\'al\',\'c\')">'+AL_C+'</button>'
     +'<button class="cp-fbtn'+alOn('r')+'" title="Справа" onclick="cpFmtSet(\'al\',\'r\')">'+AL_R+'</button>'
+    +'<span class="cp-fsep"></span>'
+    /* ── Формат чисел ── */
+    +'<button class="cp-fbtn cp-fbtn-num" title="Формат числа (Обычный / Число / Процент / Валюта…)" onclick="cpNumFormatMenu(event)"><span class="cp-fbtn-num-lbl">123</span><span class="cp-fbtn-car">▾</span></button>'
+    +'<button class="cp-fbtn cp-fbtn-pct" title="Процент — 0.25 станет 25%" onclick="cpFmtSet(\'nf\',\'pct\')">%</button>'
+    +'<button class="cp-fbtn cp-fbtn-dec" title="Меньше десятичных знаков (убрать нули после запятой)" onclick="cpDecimalStep(-1)"><span class="cp-fbtn-dec-lbl">.0←</span></button>'
+    +'<button class="cp-fbtn cp-fbtn-dec" title="Больше десятичных знаков (добавить нули после запятой)" onclick="cpDecimalStep(1)"><span class="cp-fbtn-dec-lbl">.0→</span></button>'
     +'<span class="cp-fsep"></span>'
     /* ── Перенос строк ── */
     +'<button class="cp-fbtn'+on('w')+'" title="Перенос текста" onclick="cpFmtWrap()">'+WR+'</button>'
@@ -13785,7 +13871,7 @@ function clCpRender(){
       var _isText=(col.type==='text' && v!=null && String(v).trim()!=='');
       var _cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(_isText?' cl-read':'');
       var _at=_isText?(' data-read="'+_ddA(v)+'" data-title="'+_ddA(col.name||'')+'" data-topic="'+_ddA(_topic)+'" onclick="clCpRead(this)" onkeydown="if(event.key===\'Enter\')clCpRead(this)" role="button" tabindex="0"'):'';
-      grid+='<div class="'+_cls+'" style="width:'+cw[ci]+'px"'+_at+'>'+(typeof cpCellView==='function'?cpCellView(col,v):_ddH(v==null?'':v))+'</div>';
+      grid+='<div class="'+_cls+'" style="width:'+cw[ci]+'px"'+_at+'>'+(typeof cpCellView==='function'?cpCellView(col,v,row):_ddH(v==null?'':v))+'</div>';
     });
     const a=cp.appr[sid+'/'+row.id]||{status:'pending',comment:''};
     grid+='<div class="cp-cell clcp-appcell" data-dec="'+_ddA(row.id)+'" style="width:240px">'+clCpRowControl(row.id,a)+'</div></div>';
