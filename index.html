@@ -7267,6 +7267,14 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
               <span class="pm-switch"><span class="pm-sw-thumb"></span></span>
             </label>
           </div>
+          <div class="pm-row">
+            <label class="pm-toggle" id="e-bill-card">
+              <input type="checkbox" id="e-bill" onchange="empSetBilling(this.checked)">
+              <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+              <span class="pm-tg-txt"><b>Оплаты и тарифы</b><em>Видит статус подписки, напоминания об оплате и может открыть счёт в боте. По умолчанию — только у владельца и директора.</em></span>
+              <span class="pm-switch"><span class="pm-sw-thumb"></span></span>
+            </label>
+          </div>
           <div class="fld"><label>Доступ к модулям</label><div class="perm-grid" id="e-perms"></div></div>
           <div class="fld" id="e-prj-fld">
             <label>Доступ к проектам</label>
@@ -8216,14 +8224,18 @@ function agLimitModal(lim){
   if(!agIsPayViewer()){ toast('Обратитесь к владельцу — достигнут лимит тарифа'); return; }
   return agUpgradeFlow(null, {reason:'limit', limit:lim});
 }
-/* Кто видит биллинг: owner + director + PM. Обычный сотрудник → false.
+/* Кто видит биллинг: owner + director + сотрудник с явным разрешением permissions.billing.view.
+   PM больше НЕ получает биллинг автоматически — владелец сам включает.
    Совпадает с can_manage_billing() на стороне БД (RLS). */
 function agIsPayViewer(){
   const me=(window.tMe&&window.tMe())||null;
   if(!me) return false;
   if(me.role==='agency_owner' || me.role==='superadmin') return true;
-  if(me.role==='member' && (me.is_director || me.is_pm)) return true;
-  return false;
+  if(me.role!=='member') return false;
+  if(me.is_director) return true;
+  const perms = me.permissions || (me.perms) || null;
+  const bv = perms && perms.billing && perms.billing.view;
+  return bv===true || bv==='true';
 }
 
 /* ═══════════════════════ Тарифы: продление / апгрейд ═══════════════════════
@@ -8332,7 +8344,7 @@ function _agOpenBot(code){
 }
 /* Продление подписки на текущем тарифе (default 1 месяц) */
 async function agRenewFlow(months){
-  if(!agIsPayViewer()){ toast('Оплату может провести владелец, директор или PM'); return; }
+  if(!agIsPayViewer()){ toast('Нет доступа к биллингу. Владелец может включить галочку «Оплаты и тарифы» в вашей карточке сотрудника.'); return; }
   const me=(window.tMe&&window.tMe())||{};
   const cur=_agTariffByKey(me.agencyPlan||'');
   const intent=await _agCreatePayIntent('renew', cur&&cur.key, months||1);
@@ -8342,7 +8354,7 @@ async function agRenewFlow(months){
 /* Апгрейд на targetKey (или на следующий по sort). Enterprise → «связаться». */
 async function agUpgradeFlow(targetKey, ctx){
   ctx=ctx||{};
-  if(!agIsPayViewer()){ toast('Оплату может провести владелец, директор или PM'); return; }
+  if(!agIsPayViewer()){ toast('Нет доступа к биллингу. Владелец может включить галочку «Оплаты и тарифы» в вашей карточке сотрудника.'); return; }
   const me=(window.tMe&&window.tMe())||{};
   const cur=_agTariffByKey(me.agencyPlan||'');
   let tgt=targetKey?_agTariffByKey(targetKey):_agNextTariff(cur&&cur.key);
@@ -21561,8 +21573,24 @@ function permColAll(col){ const keys=_permKeys();
   renderPermGrid();
 }
 var empDirector=false;
-function _dirRefresh(){ const c=document.getElementById('e-dir-card'); if(c)c.classList.toggle('on',!!empDirector); const s=document.getElementById('e-access-sub'); if(s)s.classList.toggle('dir-locked',!!empDirector); const inp=document.getElementById('e-dir'); if(inp)inp.checked=!!empDirector; }
-function empSetDirector(checked){ empDirector=checked; if(checked){ empPM=true; const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=true; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.add('on'); permPreset('full'); } _dirRefresh(); renderPermGrid(); _renderPrjScope(); }
+function _dirRefresh(){ const c=document.getElementById('e-dir-card'); if(c)c.classList.toggle('on',!!empDirector); const s=document.getElementById('e-access-sub'); if(s)s.classList.toggle('dir-locked',!!empDirector); const inp=document.getElementById('e-dir'); if(inp)inp.checked=!!empDirector; _billRefresh(); }
+function empSetDirector(checked){ empDirector=checked; if(checked){ empPM=true; const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=true; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.add('on'); permPreset('full'); /* директор всегда видит биллинг */ _billSet(true); } _dirRefresh(); renderPermGrid(); _renderPrjScope(); }
+/* Тумблер «Оплаты и тарифы» → пишем в empPerms.billing.view. Директор — всегда on, disabled.
+   PM/обычный сотрудник — по умолчанию off, владелец включает вручную. */
+function _billSet(v){ empPerms.billing=empPerms.billing||{view:false,edit:false}; empPerms.billing.view=!!v; empPerms.billing.edit=!!v; }
+function empSetBilling(checked){ if(empDirector){ _billRefresh(); return; } _billSet(checked); _billRefresh(); }
+function _billRefresh(){
+  const inp=document.getElementById('e-bill'); const card=document.getElementById('e-bill-card');
+  if(!inp||!card) return;
+  const dir=!!empDirector;
+  const on = dir || !!(empPerms&&empPerms.billing&&empPerms.billing.view);
+  inp.checked=on; card.classList.toggle('on',on);
+  /* Директор — принудительно on и лочим переключатель, чтобы владелец не путался */
+  inp.disabled=dir; card.style.opacity=dir?'.85':''; card.style.pointerEvents=dir?'none':'';
+  const em=card.querySelector('em'); if(em) em.textContent = dir
+    ? 'Директор имеет полный доступ к биллингу автоматически — снять нельзя.'
+    : 'Видит статус подписки, напоминания об оплате и может открыть счёт в боте. По умолчанию — только у владельца и директора.';
+}
 /* тумблер «Проектный менеджер» — тоже даёт полный доступ, поэтому синхронизируем блок «Доступ к проектам» */
 document.addEventListener('change', function(ev){
   if(ev && ev.target && ev.target.id==='e-pm'){ empPM=!!ev.target.checked; if(typeof _renderPrjScope==='function') _renderPrjScope(); }
@@ -21651,6 +21679,7 @@ function openEmp(){
   empPerms={};
   _permKeys().forEach(k=>empPerms[k]={view:false,edit:false});
   empPerms.calendar={view:true,edit:false};                             // расписание для новых сотрудников доступно по умолчанию — можно снять галочку
+  empPerms.billing={view:false,edit:false};                             // биллинг по умолчанию выключен даже у PM — владелец сам решает
   empProjectScope='assigned'; empProjectIds=new Set();                  // новый сотрудник по умолчанию видит только проекты, где он назначен участником
   empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.remove('on'); } empDirector=false; _dirRefresh();
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
@@ -21670,6 +21699,7 @@ function openEmpEdit(i){
   empPerms = e.perms?JSON.parse(JSON.stringify(e.perms))
     :(()=>{const o={projects:{view:true,edit:false},calendar:{view:true,edit:false}};_permKeys().filter(k=>k!=='projects'&&k!=='calendar').forEach(k=>o[k]={view:false,edit:false});return o;})();
   if(!empPerms.calendar) empPerms.calendar={view:true,edit:false};       // миграция: у сотрудника в БД ещё нет ключа calendar — подставляем «включено» (раньше расписание было всем)
+  if(!empPerms.billing) empPerms.billing={view:false,edit:false};        // миграция: биллинг по умолчанию выключен (даже если сотрудник был PM — раньше PM видел биллинг автоматом, теперь только через явную галочку)
   empProjectScope=(empPerms.projects&&empPerms.projects.scope==='assigned')?'assigned':'all';   // миграция: ключа scope нет — сохраняем прежнее поведение «видит всё»
   empProjectIds=new Set();
   (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(function(p){                              // проекты, где сотрудник уже в команде
