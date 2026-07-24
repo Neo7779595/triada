@@ -7705,7 +7705,7 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
       <button class="tb-search ag-fs-btn" id="ag-fs-btn" onclick="agFullscreen()" title="Полный экран · Esc чтобы выйти"><svg id="ag-fs-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg><span id="ag-fs-lbl">Экран</span></button>
       <button class="tb-search" id="ag-stpl-btn" onclick="openTemplatesSettings()" title="Настройки шаблонов" style="display:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Настройки шаблонов</span></button>
       <button class="tb-search" id="ag-tg-btn" onclick="tgTeamModal()" title="Telegram-группа команды" style="display:none"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg><span>Telegram</span></button>
-      <button class="u-chip" id="ag-uchip" onclick="myProfileOpen()" title="Профиль и тариф" style="background:none;font-family:inherit"><span class="d"></span><span id="ag-uchip-av" style="width:22px;height:22px;border-radius:6px;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;overflow:hidden;flex:none"></span><span id="ag-uchip-nm">Менеджер агентства</span></button>
+      <button class="u-chip" id="ag-uchip" onclick="_uchipClick()" title="Профиль и тариф" style="background:none;font-family:inherit"><span class="d"></span><span id="ag-uchip-av" style="width:22px;height:22px;border-radius:6px;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;overflow:hidden;flex:none"></span><span id="ag-uchip-nm">Менеджер агентства</span></button>
     </header>
     <div class="content" id="content-ag"></div>
   </div>
@@ -10258,6 +10258,39 @@ function _syncUchip(){
      а не личное фото вошедшего. Берём логотип агентства; если не задан — буква названия. */
   if(sb){ const u=me.agencyLogo||''; sb.innerHTML = u?`<img src="${u.replace(/"/g,'&quot;')}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">`:((me.agencyName||'A')[0]||'A').toUpperCase(); }
 }
+/* ═══════════════════════════════════════════════════════════════════════
+   Умный клик по user-chip в топбаре (#ag-uchip).
+   Раньше клик всегда открывал профиль-модалку → пользователю приходилось
+   листать до тарифа и жать «Изменить тариф» (лишний шаг).
+   Теперь: если подписка ТРЕБУЕТ ВНИМАНИЯ (лимит достигнут/превышен, или
+   до конца оплаты ≤7 дней) — сразу открываем витрину тарифов / модалку
+   продления. Иначе — обычный myProfileOpen для настроек/паролей.
+   ═══════════════════════════════════════════════════════════════════════ */
+function _uchipClick(){
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me){ if(typeof myProfileOpen==='function') myProfileOpen(); return; }
+  /* Только те, кто видит биллинг (owner/director/PM с billing.view), могут менять тариф. */
+  const isPayViewer = (typeof agIsPayViewer==='function') ? agIsPayViewer() : false;
+  if(!isPayViewer){ myProfileOpen(); return; }
+  const chip = document.getElementById('ag-uchip');
+  const overLimit = chip && chip.classList.contains('plan-over');
+  const atLimit   = chip && chip.classList.contains('plan-warn');
+  /* Считаем «оплата поджимает» = paid_until в прошлом ИЛИ до конца ≤ 3 дней. */
+  let renewing = false;
+  try {
+    const dLeft = (typeof _agDaysLeft==='function' && me.agencyPaidUntil) ? _agDaysLeft(me.agencyPaidUntil) : null;
+    if(dLeft != null && dLeft <= 3) renewing = true;
+  } catch(_) {}
+  /* Логика роутинга:
+     – подписка истекает / просрочена → сразу «Продлить» (agRenewFlow)
+     – лимит проектов достигнут/превышен → сразу «Изменить тариф» (agChangePlanFlow)
+     – всё OK → обычный профиль (там есть кнопка «Изменить тариф» для upgrade по желанию) */
+  if(renewing && typeof agRenewFlow==='function'){ agRenewFlow(1); return; }
+  if((overLimit || atLimit) && typeof agChangePlanFlow==='function'){ agChangePlanFlow(); return; }
+  myProfileOpen();
+}
+window._uchipClick = _uchipClick;
+
 function myProfileOpen(){
   const me=(window.tMe&&window.tMe())||null;
   if(!me){ toast('Профиль ещё загружается'); return; }
