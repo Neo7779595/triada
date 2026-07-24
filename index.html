@@ -8981,6 +8981,13 @@ async function _agDemoLogin(){
     const nm = btn.querySelector('.tf-extra-n');
     if(nm && label) nm.textContent = label;
   };
+  /* Если пользователь уже залогинен в другом агентстве (не DETROYD) — сначала спросим,
+     чтобы случайный клик не выкинул из реального кабинета в демо. */
+  const me = (window.tMe&&window.tMe())||null;
+  if(me && me.agencySlug && me.agencySlug !== 'detroyd'){
+    const ok = confirm('Переключиться на демо-агентство «DETROYD»?\n\nТекущая сессия «' + (me.agencyName||me.agencySlug) + '» будет закрыта. Вернуться можно через обычный вход.');
+    if(!ok) return;
+  }
   setBusy(true, 'Входим в демо-кабинет…');
   try{
     if(typeof SB==='undefined' || !SB){ throw new Error('DB не готова'); }
@@ -9530,11 +9537,11 @@ function _agShowTariffsPage(opts){
           <div class="tf-extra-b"><div class="tf-extra-n">Служба поддержки DETROYD SMART</div><div class="tf-extra-s">Персональный менеджер в Telegram · среднее время ответа < 1 часа</div></div>
           <div class="tf-extra-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
         </button>
-        ${isPublic?`<button class="tf-extra tf-extra-demo" onclick="_agDemoLogin()" type="button">
+        <button class="tf-extra tf-extra-demo" onclick="_agDemoLogin()" type="button">
           <div class="tf-extra-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg></div>
-          <div class="tf-extra-b"><div class="tf-extra-n">Демо-аккаунт · посмотреть кабинет</div><div class="tf-extra-s">Войти в готовое агентство без регистрации — увидеть команду, проекты, финансы, аналитику</div></div>
+          <div class="tf-extra-b"><div class="tf-extra-n">${isPublic?'Демо-аккаунт · посмотреть кабинет':'Переключиться на демо-агентство'}</div><div class="tf-extra-s">${isPublic?'Войти в готовое агентство без регистрации — увидеть команду, проекты, финансы, аналитику':'Быстрый вход в тестовое агентство DETROYD для проверки функций и отладки'}</div></div>
           <div class="tf-extra-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
-        </button>`:''}
+        </button>
       </div>
 
       <div class="tf-faq">
