@@ -10447,28 +10447,61 @@ function _syncUchip(){
    Раньше клик всегда открывал профиль-модалку → пользователю приходилось
    листать до тарифа и жать «Изменить тариф» (лишний шаг).
    Теперь: если подписка ТРЕБУЕТ ВНИМАНИЯ (лимит достигнут/превышен, или
-   до конца оплаты ≤7 дней) — сразу открываем витрину тарифов / модалку
+   до конца оплаты ≤3 дней) — сразу открываем витрину тарифов / модалку
    продления. Иначе — обычный myProfileOpen для настроек/паролей.
+
+   ⚠ ВАЖНО: считаем состояние из source-of-truth (tMe + agPlanLimit + agProjUsed)
+   на момент клика, а не из CSS-классов чипа. Причина: раньше в первые
+   секунды после загрузки agRenderPlanChip ещё не успевал проставить классы
+   plan-warn/plan-over, и клик по «горящему» аккаунту всё равно открывал
+   профиль вместо тарифов. Прямой пересчёт устраняет race condition.
    ═══════════════════════════════════════════════════════════════════════ */
-function _uchipClick(){
-  const me=(window.tMe&&window.tMe())||null;
-  if(!me){ if(typeof myProfileOpen==='function') myProfileOpen(); return; }
-  /* Только те, кто видит биллинг (owner/director/PM с billing.view), могут менять тариф. */
+async function _uchipClick(){
+  /* 1. me может ещё грузиться после enter — коротко подождём до 600ms */
+  let me = (window.tMe&&window.tMe())||null;
+  if(!me){
+    for(let i=0;i<6;i++){
+      await new Promise(r=>setTimeout(r,100));
+      me = (window.tMe&&window.tMe())||null;
+      if(me) break;
+    }
+  }
+  if(!me){ myProfileOpen(); return; }
+
+  /* 2. Проверяем права на биллинг (owner/director/PM с billing.view) */
   const isPayViewer = (typeof agIsPayViewer==='function') ? agIsPayViewer() : false;
   if(!isPayViewer){ myProfileOpen(); return; }
-  const chip = document.getElementById('ag-uchip');
-  const overLimit = chip && chip.classList.contains('plan-over');
-  const atLimit   = chip && chip.classList.contains('plan-warn');
-  /* Считаем «оплата поджимает» = paid_until в прошлом ИЛИ до конца ≤ 3 дней. */
+
+  /* 3. Оплата поджимает? Считаем напрямую из me.agencyPaidUntil, а не из чипа. */
   let renewing = false;
   try {
-    const dLeft = (typeof _agDaysLeft==='function' && me.agencyPaidUntil) ? _agDaysLeft(me.agencyPaidUntil) : null;
-    if(dLeft != null && dLeft <= 3) renewing = true;
+    if(me.agencyPaidUntil){
+      const dLeft = (typeof _agDaysLeft==='function') ? _agDaysLeft(me.agencyPaidUntil) : null;
+      if(dLeft != null && dLeft <= 3) renewing = true;
+    }
   } catch(_) {}
-  /* Логика роутинга:
-     – подписка истекает / просрочена → сразу «Продлить» (agRenewFlow)
-     – лимит проектов достигнут/превышен → сразу «Изменить тариф» (agChangePlanFlow)
-     – всё OK → обычный профиль (там есть кнопка «Изменить тариф» для upgrade по желанию) */
+
+  /* 4. Лимит проектов достигнут/превышен? Считаем напрямую из agPlanLimit()+agProjUsed(). */
+  let overLimit = false, atLimit = false;
+  try {
+    const info = (typeof agPlanLimit==='function') ? agPlanLimit() : null;
+    const used = (typeof agProjUsed==='function')  ? agProjUsed()  : null;
+    if(info && info.limit && used != null){
+      overLimit = used >  info.limit;
+      atLimit   = used >= info.limit;
+    }
+  } catch(_) {}
+
+  /* Fallback на CSS-класс (на случай если agPlanLimit ещё не готов, а класс уже проставлен другим путём) */
+  if(!overLimit && !atLimit){
+    const chip = document.getElementById('ag-uchip');
+    if(chip){
+      overLimit = chip.classList.contains('plan-over');
+      atLimit   = chip.classList.contains('plan-warn');
+    }
+  }
+
+  /* 5. Роутинг: истекает → продлить, лимит → сменить тариф, иначе → профиль */
   if(renewing && typeof agRenewFlow==='function'){ agRenewFlow(1); return; }
   if((overLimit || atLimit) && typeof agChangePlanFlow==='function'){ agChangePlanFlow(); return; }
   myProfileOpen();
