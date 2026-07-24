@@ -9149,7 +9149,9 @@ function _regRenderSummary(){
   const isQ = (st.period==='quarter');
   const limit = (t.limits && t.limits.projects) || null;
   const monthly = Number(t.price)||0;
-  const qPrice = Number(t.quarterly_price)||(monthly*3);
+  /* Fallback синхронно с _regRenderTariffs: платит за 2 мес, получает 3 (бонус +1).
+     Раньше был monthly*3 — цена в summary не совпадала с ценой в карточке тарифа. */
+  const qPrice = Number(t.quarterly_price)||(monthly*2);
   const total = isQ ? qPrice : monthly;
   const bonusMon = t.quarterly_bonus_months||1;
   const numFmt = n => (n==null?'—':String(Math.round(Number(n))).replace(/\B(?=(\d{3})+(?!\d))/g,' '));
@@ -9170,7 +9172,37 @@ function _regOpenBot(){
   /* Тариф прокидываем через deep-link. Период (месяц/квартал) бот спросит на этапе оплаты —
      формат /start t_<key> уже поддерживается tg-pay. Незачем плодить варианты в бот-парсере. */
   const url = bot + '?start=t_' + encodeURIComponent(st.picked);
-  try{ window.open(url, '_blank', 'noopener'); }catch(_){}
+  /* Popup-blocker fallback: если window.open вернул null (Safari / iOS / строгая политика),
+     показываем модалку со ссылкой, которую пользователь может открыть вручную —
+     иначе клик по «Открыть Telegram-бот» просто ничего не делает, юзер застревает. */
+  let win = null;
+  try { win = window.open(url, '_blank', 'noopener'); } catch(_) {}
+  if(!win){
+    _regShowBotLinkFallback(url);
+    return;
+  }
+  /* Защита от двойного клика: блокируем кнопку на 2.5 сек. */
+  const btn = document.querySelector('#page-register .rg-btn-primary');
+  if(btn){ btn.disabled = true; setTimeout(()=>{ btn.disabled = false; }, 2500); }
+}
+/* Модалка с копируемой ссылкой на бот — fallback при заблокированных popup. */
+function _regShowBotLinkFallback(url){
+  const existing = document.getElementById('rg-bot-fallback');
+  if(existing) existing.remove();
+  const box = document.createElement('div');
+  box.id = 'rg-bot-fallback';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:rgSectionIn .3s ease both';
+  box.innerHTML = `<div style="max-width:420px;width:100%;background:var(--bg-2);border:1px solid var(--line-2);border-radius:14px;padding:22px 22px 18px;color:var(--txt);font-family:var(--font)">
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--txt)">Браузер заблокировал открытие Telegram</div>
+    <div style="font-size:13px;color:var(--txt-3);line-height:1.5;margin-bottom:14px">Откройте эту ссылку вручную:</div>
+    <a href="${url.replace(/"/g,'&quot;')}" target="_blank" rel="noopener" style="display:block;padding:10px 12px;background:color-mix(in oklab,var(--accent) 12%,transparent);border:1px solid color-mix(in oklab,var(--accent) 38%,var(--line));border-radius:9px;color:var(--accent);font-family:var(--font-mono,monospace);font-size:12px;text-decoration:none;word-break:break-all;margin-bottom:12px">${url.replace(/</g,'&lt;')}</a>
+    <div style="display:flex;gap:8px">
+      <button onclick="navigator.clipboard&&navigator.clipboard.writeText('${url.replace(/'/g,"\\'")}').then(()=>{this.textContent='Скопировано ✓';setTimeout(()=>this.textContent='Скопировать',1600)})" style="flex:1;padding:9px 14px;background:transparent;border:1px solid var(--line-2);color:var(--txt-2);border-radius:9px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500">Скопировать</button>
+      <button onclick="document.getElementById('rg-bot-fallback').remove()" style="padding:9px 16px;background:var(--accent);border:0;color:#06140f;border-radius:9px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600">Закрыть</button>
+    </div>
+  </div>`;
+  box.addEventListener('click', e => { if(e.target===box) box.remove(); });
+  document.body.appendChild(box);
 }
 /* Обратная совместимость: старый вызов _regRedirectBot из существующей витрины
    (её теперь никто не открывает, но на всякий случай). */
