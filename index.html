@@ -1399,10 +1399,42 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 /* team */
 .tabs-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:6px 0 16px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
 .team-tabs{display:flex;align-items:center;gap:26px;flex:1;min-width:0}
-.team-tab{background:none;border:0;padding:11px 2px;font-family:var(--font);font-size:13px;font-weight:600;letter-spacing:.045em;text-transform:uppercase;color:var(--txt-3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .16s var(--ease),border-color .16s var(--ease);white-space:nowrap}
+.team-tab{background:none;border:0;padding:11px 2px;font-family:var(--font);font-size:13px;font-weight:600;letter-spacing:.045em;text-transform:uppercase;color:var(--txt-3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .16s var(--ease),border-color .16s var(--ease);white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
 .team-tab:hover{color:var(--txt-2)}
 .team-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.team-tab-cnt{display:inline-block;min-width:18px;padding:0 6px;height:17px;line-height:17px;text-align:center;background:color-mix(in oklab, var(--txt-3) 22%, transparent);color:var(--txt-2);border-radius:9px;font-size:10.5px;font-weight:700;letter-spacing:.02em;text-transform:none;vertical-align:1px}
+.team-tab.on .team-tab-cnt{background:color-mix(in oklab, var(--accent) 22%, transparent);color:var(--accent)}
 .tabs-row .btn-add{margin-bottom:9px}
+/* ── Архив сотрудников ── */
+.arch-card{padding:0}
+.arch-empty{padding:60px 24px;text-align:center;color:var(--txt-3)}
+.arch-empty svg{width:44px;height:44px;margin-bottom:14px;color:var(--txt-3);opacity:.6}
+.arch-empty-t{font-size:15px;font-weight:600;color:var(--txt-2);margin-bottom:6px}
+.arch-empty-s{font-size:13px;line-height:1.5;max-width:440px;margin:0 auto;color:var(--txt-3)}
+.arch-list{display:flex;flex-direction:column}
+.arch-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:18px;padding:14px 20px;border-top:1px solid var(--line);transition:.14s}
+.arch-row:hover{background:color-mix(in oklab, var(--bg-2) 40%, transparent)}
+.arch-row:first-child{border-top:0}
+.arch-who{display:flex;align-items:center;gap:12px;min-width:0}
+.arch-av{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;color:#fff;font-weight:700;font-size:15px;flex:0 0 auto;filter:grayscale(.4);opacity:.85}
+.arch-meta{min-width:0}
+.arch-nm{font-size:14px;font-weight:600;color:var(--txt-2);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.arch-sub{font-size:12px;color:var(--txt-3);letter-spacing:.005em}
+.arch-tag{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.arch-tag.arch-dir{background:color-mix(in oklab, var(--accent) 16%, transparent);color:var(--accent)}
+.arch-tag.arch-pm{background:color-mix(in oklab, var(--violet) 16%, transparent);color:var(--violet)}
+.arch-when{text-align:right;font-family:var(--font);color:var(--txt-3);min-width:100px}
+.arch-when-d{font-size:12.5px;font-weight:600;color:var(--txt-2)}
+.arch-when-a{font-size:11.5px;color:var(--txt-3);margin-top:2px}
+.arch-restore-btn{display:inline-flex;align-items:center;gap:6px;background:color-mix(in oklab, var(--accent) 12%, transparent);color:var(--accent);border:1px solid color-mix(in oklab, var(--accent) 32%, var(--line));font-family:var(--font);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;transition:.14s;white-space:nowrap;letter-spacing:.01em}
+.arch-restore-btn:hover{background:color-mix(in oklab, var(--accent) 20%, transparent);border-color:var(--accent)}
+.arch-noperm{font-size:11.5px;color:var(--txt-3);font-style:italic}
+@media (max-width: 720px){
+  .arch-row{grid-template-columns:1fr auto;grid-template-areas:'who when' 'btn btn';gap:10px}
+  .arch-who{grid-area:who}
+  .arch-when{grid-area:when}
+  .arch-restore-btn,.arch-noperm{grid-area:btn;justify-self:start;width:auto}
+}
 .eff{display:inline-flex;flex-direction:column;align-items:flex-end;gap:4px}
 .eff .bar{width:54px;height:3px;border-radius:2px;background:var(--bg-3);overflow:hidden}
 .eff .bar i{display:block;height:100%}
@@ -22346,7 +22378,7 @@ function renderTeam(){
             </tr>`;}).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--txt-3);padding:28px">Нет данных</td></tr>'}</tbody>
         </table>
       </div>`;
-  } else {
+  } else if(teamTab==='depts'){
     const _ds=computeDeptScores();
     const depts=_ds.depts.slice().sort((a,b)=>{
       const av=(a.ops.score!=null?a.ops.score:-1), bv=(b.ops.score!=null?b.ops.score:-1); return bv-av;
@@ -22388,6 +22420,58 @@ function renderTeam(){
         </div>
         <div class="tcx-axg">${opsMod}${smmMod}</div>
       </div>`;}).join(''):'<div class="empty-mini">Нет команд</div>'}</div>`;
+  } else if(teamTab==='archived'){
+    /* ══════════════════════════════════════════════════════════════════
+       АРХИВ СОТРУДНИКОВ — просмотр уволенных с возможностью восстановления.
+       Только owner/director видят вкладку и могут восстанавливать. При восстановлении
+       tg_user_id НЕ возвращается (триггер очистил при архивации) — сотрудник заново
+       привязывает свой Telegram через код EMP-XXXX. Это осознанное действие: за время
+       увольнения TG-аккаунт мог смениться, а автопривязка старого — риск. */
+    const arch = (window.TEAM_ARCHIVED || []).slice();
+    const q = (_teamFilter.q||'').toLowerCase().trim();
+    const rows = q ? arch.filter(m => (m.name||'').toLowerCase().includes(q) || (m.dept||'').toLowerCase().includes(q) || (m.role||'').toLowerCase().includes(q)) : arch;
+    const canRestore = agIsOwner() || agIsDirector();
+    const _fmtArchDate = iso => { try{ const d=new Date(iso); if(isNaN(+d)) return '—'; const dd=String(d.getDate()).padStart(2,'0'), mm=String(d.getMonth()+1).padStart(2,'0'); return dd+'.'+mm+'.'+d.getFullYear(); }catch(_){ return '—'; } };
+    const _daysAgo = iso => { try{ const d=new Date(iso); if(isNaN(+d)) return ''; const days=Math.floor((Date.now()-d.getTime())/86400000); if(days===0) return 'сегодня'; if(days===1) return 'вчера'; return days+' '+_plural(days,'день','дня','дней')+' назад'; }catch(_){ return ''; } };
+    body = `<div class="card arch-card">
+      <div class="card-h"><div class="t">Архив сотрудников <span class="c">${rows.length}${arch.length!==rows.length?' из '+arch.length:''} · доступ к боту и кабинету отозван</span></div></div>
+      ${arch.length===0
+        ? `<div class="arch-empty">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a2 2 0 002 2h10a2 2 0 002-2V8M10 12h4"/></svg>
+             <div class="arch-empty-t">В архиве пусто</div>
+             <div class="arch-empty-s">Здесь будут появляться уволенные сотрудники — с возможностью вернуть в команду одним кликом.</div>
+           </div>`
+        : rows.length===0
+          ? `<div class="arch-empty"><div class="arch-empty-t">Никого не нашли по фильтру</div></div>`
+          : `<div class="arch-list">${rows.map(m => {
+              const av = `<span class="arch-av" style="background:${m.color||'var(--txt-3)'}">${logoFill(m.avatar,((m.name||'?')[0]||'?').toUpperCase())}</span>`;
+              const roleTag = m.is_director ? '<span class="arch-tag arch-dir">Директор</span>' : m.is_pm ? '<span class="arch-tag arch-pm">PM</span>' : '';
+              return `<div class="arch-row">
+                <div class="arch-who">
+                  ${av}
+                  <div class="arch-meta">
+                    <div class="arch-nm">${escH(m.name||'—')} ${roleTag}</div>
+                    <div class="arch-sub">${escH(m.role||'Сотрудник')} · ${escH(m.dept||'—')}${m.login?' · <span class="pm-mono">'+escH(m.login)+'</span>':''}</div>
+                  </div>
+                </div>
+                <div class="arch-when">
+                  <div class="arch-when-d">${_fmtArchDate(m.archived_at)}</div>
+                  <div class="arch-when-a">${_daysAgo(m.archived_at)}</div>
+                </div>
+                ${canRestore ? `<button class="arch-restore-btn" onclick="_tMemberRestoreConfirm('${_ddA(m._id)}','${_ddA(m.name||'сотрудник')}')" title="Восстановить в команду"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Вернуть в команду</button>` : `<span class="arch-noperm">Только владелец/директор</span>`}
+              </div>`;
+            }).join('')}</div>`
+      }
+    </div>`;
+  } else {
+    /* Fallback: неизвестная вкладка → показываем «Команды» */
+    const _ds=computeDeptScores();
+    const depts=_ds.depts.slice().sort((a,b)=>{
+      const av=(a.ops.score!=null?a.ops.score:-1), bv=(b.ops.score!=null?b.ops.score:-1); return bv-av;
+    });
+    body=`<div class="dept-grid">${depts.length?depts.map(d=>{
+      return `<div class="tcx-card"><div class="tcx-h"><div class="tcx-tt"><div class="tcx-nm">${escH(d.name)}</div></div></div></div>`;
+    }).join(''):'<div class="empty-mini">Нет команд</div>'}</div>`;
   }
   const _today=new Date().toISOString().slice(0,10);
   const _dirty=(_teamFilter.dept!=='all'||_teamFilter.q||_teamFilter.sort!=='tpi'||_teamPeriod.key!=='30d');
@@ -22421,6 +22505,9 @@ function renderTeam(){
         <button class="team-tab ${teamTab==='employees'?'on':''}" onclick="setTeamTab('employees')">Рейтинг</button>
         <button class="team-tab ${teamTab==='workload'?'on':''}" onclick="setTeamTab('workload')">Нагрузка</button>
         <button class="team-tab ${teamTab==='depts'?'on':''}" onclick="setTeamTab('depts')">Команды</button>
+        ${(agIsOwner()||agIsDirector())?`<button class="team-tab ${teamTab==='archived'?'on':''}" onclick="setTeamTab('archived')" title="Уволенные сотрудники — можно вернуть в команду">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a2 2 0 002 2h10a2 2 0 002-2V8M10 12h4"/></svg>Архив${(window.TEAM_ARCHIVED&&window.TEAM_ARCHIVED.length)?` <span class="team-tab-cnt">${window.TEAM_ARCHIVED.length}</span>`:''}
+        </button>`:''}
       </div>
       ${agIsOwner()?`<button class="btn-add" onclick="openEmp()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить сотрудника</button>`:''}
     </div>
@@ -23258,7 +23345,8 @@ function _pmOpenFullEdit(id){
 }
 function _pmArchive(id){
   const m=_pmMemberById(id); if(!m) return;
-  if(!confirm(`Архивировать «${m.name||'сотрудник'}»? Доступ будет закрыт.`)) return;
+  const msg = `Архивировать «${m.name||'сотрудник'}»?\n\n• Доступ в кабинет — закрыт (при следующей загрузке сотрудник будет автоматически выведен из системы).\n• Telegram-бот — отвязан (уведомления не приходят, бот не отвечает).\n• Задачи, оценки, история — сохраняются.\n\nВ любой момент можно вернуть в команду через вкладку «Архив».`;
+  if(!confirm(msg)) return;
   if(window.tMemberArchive){ window.tMemberArchive(id, m.name||'сотрудник'); pd2Close(); }
 }
 window.pmCardOpen=pmCardOpen; window.pmCardTab=pmCardTab; window._pmOpenFullEdit=_pmOpenFullEdit; window._pmArchive=_pmArchive;
@@ -34577,7 +34665,10 @@ window.tLoadAll = async (role, opts) => {
     } else if (role === 'agency_owner' || role === 'member'){
     const [pr, tm, tpl] = await Promise.all([
       SB.from('projects').select('*').order('created_at'),
-      SB.from('profiles').select('*').eq('role','member').is('archived_at', null).order('created_at'),
+      /* Загружаем И активных, И архивированных сотрудников одним запросом.
+         Далее разбиваем: TEAM = активные (для всех рабочих экранов),
+         TEAM_ARCHIVED = архивированные (для вкладки «Архив» с кнопкой «Восстановить»). */
+      SB.from('profiles').select('*').eq('role','member').order('created_at'),
       SB.from('stage_templates').select('service,tariff,stages') ]);
     { // слияние по id: сохраняем загруженные _tasks/_stages/_reports/_cp и identity объектов —
       // иначе каждая фоновая перезагрузка «ослепляла» открытый канбан (карточки переставали двигаться)
@@ -34587,7 +34678,19 @@ window.tLoadAll = async (role, opts) => {
         if(old){ Object.assign(old,np); PROJECTS.push(old); } else PROJECTS.push(np); });
       if (typeof pdIdx!=='undefined' && window._pdProj){ const _i=PROJECTS.findIndex(x=>x.id===window._pdProj); if(_i>=0) pdIdx=_i; }   // открытая модалка смотрит на тот же проект
     }
-    TEAM.length = 0; (tm.data||[]).forEach(m => TEAM.push(mapMember(m)));
+    /* Разбиваем на активных и архивированных. TEAM используется во всех рабочих экранах
+       (рейтинг/нагрузка/команды) — там архивные не нужны. window.TEAM_ARCHIVED — только
+       для вкладки «Архив» на странице «Команда». */
+    TEAM.length = 0;
+    if(!window.TEAM_ARCHIVED) window.TEAM_ARCHIVED = [];
+    window.TEAM_ARCHIVED.length = 0;
+    (tm.data||[]).forEach(m => {
+      const mapped = mapMember(m);
+      if(mapped.archived_at) window.TEAM_ARCHIVED.push(mapped);
+      else TEAM.push(mapped);
+    });
+    /* Сортируем архив по дате архивации: свежие сверху. */
+    window.TEAM_ARCHIVED.sort((a,b)=>String(b.archived_at||'').localeCompare(String(a.archived_at||'')));
     window.STAGE_TPL = {}; ((tpl&&tpl.data)||[]).forEach(r=>{ if(Array.isArray(r.stages)){ const _st=r.stages.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()); (window.STAGE_TPL[r.service]=window.STAGE_TPL[r.service]||{})[r.tariff||'']=_st; } });
     // загрузчики независимы — параллельно вместо 10 последовательных сетевых раундов (в разы быстрее)
     const _wave2=()=>Promise.all([ window.tLoadKB(), window.tLoadTools(), window.tLoadDeadlines(), window.tLoadProjectAggregates(), window.tLoadOverview(), window.tLoadCycles(), window.tLoadTeam(), window.tLoadFinance(), window.tLoadTags(), window.tLoadTariffTpl() ]);
@@ -34914,17 +35017,73 @@ window.tUpdateMember = async (id, perms, contact={}) => {
 };
 window.tMemberArchive = async (id, name) => {
   try {
+    /* Защита: нельзя архивировать самого себя (иначе тут же вылетишь из системы). */
+    const me=(window.tMe&&window.tMe())||null;
+    if(me && String(me.id)===String(id)){
+      toast('Нельзя архивировать себя. Пусть это сделает другой владелец или директор.');
+      return;
+    }
     /* Триггер БД profile_on_archive_revoke_tg автоматически обнуляет tg_user_id/
        tg_link_code/tg_linked_at при выставлении archived_at → сотрудник моментально
        теряет доступ к боту (уведомления не приходят, бот не отвечает на его команды,
        мини-апп не пускает в кабинет). Восстановление профиля НЕ восстанавливает связь —
-       для повторной привязки сотрудник заново отправляет /start EMP-XXXX в боте.
-       В кабинете (index.html:34716) при перезагрузке архивированный пользователь
-       автоматически signOut. */
-    const { error } = await SB.from('profiles').update({ archived_at: new Date().toISOString() }).eq('id', id);
+       для повторной привязки сотрудник заново отправляет /start EMP-XXXX в боту.
+       В кабинете (index.html при загрузке) архивированный пользователь автоматически signOut. */
+    const { data, error } = await SB.from('profiles')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id,archived_at,tg_user_id')
+      .maybeSingle();
     if (error){ toast('Не удалось удалить: ' + error.message); return; }
+    /* ★ Верификация: обновление могло молча провалиться из-за RLS
+       (profiles_team_update требует can_edit('team')) или триггера profile_self_guard.
+       Если archived_at не проставился — сообщаем явно, а не «успех». */
+    if (!data || !data.archived_at){
+      toast('Не удалось архивировать — недостаточно прав. Только владелец или директор могут архивировать сотрудников.');
+      return;
+    }
+    /* Sanity check: триггер должен был обнулить tg_user_id. Если нет — что-то не так с БД. */
+    if (data.tg_user_id){
+      console.warn('tMemberArchive: archived_at set, но tg_user_id не очищен — проверьте триггер profile_on_archive_revoke_tg', data);
+    }
     toast((name||'Сотрудник') + ' архивирован — доступ к боту и кабинету отозван');
     await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
+/* ═══════════════════════════════════════════════════════════════════════
+   ВОССТАНОВЛЕНИЕ УВОЛЕННОГО СОТРУДНИКА — обратная операция к архивации.
+   Просто снимаем archived_at → сотрудник снова видит кабинет и попадает
+   в все запросы TEAM. ВАЖНО: tg_user_id остаётся null (триггер очистил его
+   в момент архивации). Сотрудник заново привязывает свой TG через код
+   EMP-XXXX — это осознанное действие, защита от привязки чужого TG-аккаунта
+   в период его отсутствия.
+   ═══════════════════════════════════════════════════════════════════════ */
+window._tMemberRestoreConfirm = (id, name) => {
+  const nm = String(name||'сотрудник');
+  if(!confirm(`Вернуть «${nm}» в команду?\n\nСотрудник снова увидит кабинет. Пароль сохранился с момента увольнения — при необходимости смените его в PM-карточке.\n\nПривязка Telegram-бота НЕ восстанавливается: сотруднику нужно снова отправить свой код EMP-XXXX боту, чтобы получать задачи.`)) return;
+  if(window.tMemberRestore) window.tMemberRestore(id, nm);
+};
+window.tMemberRestore = async (id, name) => {
+  try {
+    const { data, error } = await SB.from('profiles')
+      .update({ archived_at: null })
+      .eq('id', id)
+      .select('id,archived_at,full_name')
+      .maybeSingle();
+    if (error){ toast('Не удалось восстановить: ' + error.message); return; }
+    if (!data){
+      toast('Не удалось восстановить — недостаточно прав. Только владелец или директор могут восстанавливать сотрудников.');
+      return;
+    }
+    if (data.archived_at){
+      toast('Не удалось восстановить — сотрудник по-прежнему архивирован. Проверьте права.');
+      return;
+    }
+    toast((name||data.full_name||'Сотрудник') + ' вернулся в команду · TG нужно привязать заново через EMP-XXXX');
+    await window.tLoadAll(ME.role);
+    /* Остаёмся на вкладке «Архив», чтобы было видно уменьшение списка. Если пусто — переходим на «Рейтинг». */
+    if(!window.TEAM_ARCHIVED || !window.TEAM_ARCHIVED.length) teamTab='employees';
+    renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tKbAdd = async (cat, title, ty, url) => {
