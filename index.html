@@ -8186,26 +8186,322 @@ function agPlanLimit(){
   return { key, name:(t&&t.name)||(key?key.charAt(0).toUpperCase()+key.slice(1):'—'), limit:(lim>0?lim:0) };
 }
 function agProjUsed(){ return (typeof PROJECTS!=='undefined')?PROJECTS.filter(p=>p&&p.status!=='done').length:0; }
-function agUpgrade(){
+/* Обновление тарифа. Backward-compat обёртка — вся логика в agUpgradeFlow (см. ниже). */
+function agUpgrade(){ return agUpgradeFlow(); }
+/* Лимит проектов исчерпан → показываем сравнительную модалку апгрейда с контекстом лимита */
+function agLimitModal(lim){ return agUpgradeFlow(null, {reason:'limit', limit:lim}); }
+
+/* ═══════════════════════ Тарифы: продление / апгрейд ═══════════════════════
+   1) Кабинет вставляет строку в pay_intents (RLS: только owner своего агентства).
+   2) Открывает deeplink t.me/<bot>?start=<code>.
+   3) Бот парсит code → создаёт order → показывает реквизиты оплаты.
+   4) После подтверждения бот обновляет agencies.plan+paid_until и pay_intents.status='paid'.
+   5) Кабинет получает realtime UPDATE → закрывает модалку + toast. */
+
+function _agTariffByKey(k){
+  if(!k) return null;
+  const list=(typeof TARIFFS!=='undefined' && TARIFFS)||[];
+  return list.find(t=>t.key===k)||null;
+}
+/* Следующий по sort тариф с ценой (Enterprise без цены исключён — обрабатывается отдельно). */
+function _agNextTariff(currentKey){
+  const list=(((typeof TARIFFS!=='undefined' && TARIFFS)||[])).slice().sort((a,b)=>(a.sort||0)-(b.sort||0));
+  const cur=_agTariffByKey(currentKey);
+  const idx=cur?list.findIndex(t=>t.key===cur.key):-1;
+  const rest=idx<0?list:list.slice(idx+1);
+  return rest.find(t=>t.price!=null)||rest[0]||null;
+}
+function _agFmtMoney(n){
+  if(n==null||n==='') return '—';
+  try{ return (typeof money==='function')?money(n):String(n).replace(/\B(?=(\d{3})+(?!\d))/g,' '); }catch(_){ return String(n); }
+}
+function _agFmtDate(iso){
+  if(!iso) return '—';
+  try{ const d=new Date(iso); if(isNaN(+d)) return String(iso); return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}); }catch(_){ return String(iso); }
+}
+function _agDaysLeft(iso){
+  if(!iso) return null;
+  const d=new Date(iso); if(isNaN(+d)) return null;
+  const now=new Date();
+  const ms=+new Date(d.getFullYear(),d.getMonth(),d.getDate()) - +new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  return Math.floor(ms/86400000);
+}
+/* Подписка активна: paid_until >= сегодня ИЛИ мы в 3-дневном grace-периоде.
+   Пустой paid_until (админ/detroyd) — считаем активным. */
+function agSubActive(){
   const me=(window.tMe&&window.tMe())||{};
+  if(!me.agencyPaidUntil) return true;
+  const d=_agDaysLeft(me.agencyPaidUntil);
+  return d!=null && d>=-3;
+}
+function agGateWrite(){
+  if(agSubActive()) return true;
+  toast('Подписка истекла · режим только чтения'); agRenewFlow(); return false;
+}
+/* Deeplink → бот. Базовый URL из PLATFORM_SETTINGS.pay_url; поддерживаем legacy-заготовку в виде голой ссылки. */
+function _agBotUrl(){
   const S=(window.PLATFORM_SETTINGS)||{};
-  let url=(S.pay_url||'').trim();
-  if(url){
-    url=url.replace(/\{slug\}/g,encodeURIComponent(me.agencySlug||'')).replace(/\{plan\}/g,encodeURIComponent(me.agencyPlan||''));
-    window.open(url,'_blank','noopener');
-  } else {
-    pd2Open(`<div class="modal" style="max-width:460px"><div class="modal-h"><h3>Обновление тарифа</h3><p>Ссылка на оплату ещё не настроена</p></div><div class="modal-b"><div style="font-size:14px;color:var(--txt-2);line-height:1.55">Чтобы поднять лимит проектов, свяжитесь с платформой DETROYD для перехода на старший тариф.</div></div><div class="modal-f"><button class="btn-add" onclick="pd2Close()">Понятно</button></div></div>`);
+  const raw=(S.pay_url||'').trim().replace(/[\?#].*$/,'').replace(/\/$/,'');
+  return raw||'https://t.me/DeTroyd_system_bot';
+}
+function _agIntentCode(){
+  const alph='0123456789abcdefghjkmnpqrstuvwxyz';
+  let s=''; for(let i=0;i<10;i++) s+=alph.charAt((Math.random()*alph.length)|0);
+  return s;
+}
+async function _agCreatePayIntent(kind, targetKey, months){
+  months=Math.max(1,Math.min(12, (months|0) || 1));
+  const me=(window.tMe&&window.tMe())||{};
+  if(!me.agency_id){ toast('Не могу определить агентство'); return null; }
+  if(typeof SB==='undefined' || !SB){ toast('Соединение с БД недоступно'); return null; }
+  const cur=_agTariffByKey(me.agencyPlan||'');
+  const tgt=(kind==='upgrade' && targetKey)?_agTariffByKey(targetKey):cur;
+  const base=(tgt && tgt.price!=null)?Number(tgt.price):null;
+  try{
+    /* Дедуп: не плодим intent'ы — если уже есть активный с тем же (kind,target) → возвращаем его */
+    const {data:existing}=await SB.from('pay_intents').select('*')
+      .eq('agency_id',me.agency_id).eq('kind',kind)
+      .in('status',['created','claimed'])
+      .gt('expires_at',new Date().toISOString());
+    if(existing && existing.length){
+      const match=existing.find(x => (kind==='renew') || (x.target_tariff_key===((tgt&&tgt.key)||null)));
+      if(match) return match;
+    }
+    const row={
+      code:_agIntentCode(),
+      agency_id:me.agency_id,
+      kind:kind,
+      from_tariff_key:(cur&&cur.key)||null,
+      target_tariff_key:(kind==='upgrade'?((tgt&&tgt.key)||null):((cur&&cur.key)||null)),
+      amount_expected:(base!=null?base*months:null),
+      months:months
+    };
+    const {data,error}=await SB.from('pay_intents').insert(row).select().single();
+    if(error) throw error;
+    return data;
+  }catch(e){
+    console.error('pay_intents insert', e);
+    toast('Не удалось создать оплату: '+((e&&e.message)||e));
+    return null;
   }
 }
-function agLimitModal(lim){
-  const used=agProjUsed();
-  const word=(typeof _plural==='function')?_plural(lim.limit,'проект','проекта','проектов'):'проектов';
-  pd2Open(`<div class="modal" style="max-width:480px">
-    <div class="modal-h"><h3>Достигнут лимит тарифа</h3><p>${_ddH(lim.name)} · ${used}/${lim.limit}</p></div>
-    <div class="modal-b"><div style="font-size:14px;color:var(--txt-2);line-height:1.55">Тариф <b>${_ddH(lim.name)}</b> включает <b>${lim.limit}</b> ${word}. Сейчас используется <b>${used}</b>. Чтобы добавить новый проект — перейдите на старший тариф или завершите один из текущих.</div></div>
-    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button><button class="btn-add" onclick="pd2Close();agUpgrade()">Перейти к оплате</button></div>
+function _agOpenBot(code){
+  try{ window.open(_agBotUrl()+'?start='+encodeURIComponent(code),'_blank','noopener'); }
+  catch(_){ toast('Не удалось открыть бот. Ссылка: '+_agBotUrl()+'?start='+code); }
+}
+/* Продление подписки на текущем тарифе (default 1 месяц) */
+async function agRenewFlow(months){
+  const me=(window.tMe&&window.tMe())||{};
+  const cur=_agTariffByKey(me.agencyPlan||'');
+  const intent=await _agCreatePayIntent('renew', cur&&cur.key, months||1);
+  if(!intent) return;
+  _agShowRenewModal(cur, intent);
+}
+/* Апгрейд на targetKey (или на следующий по sort). Enterprise → «связаться». */
+async function agUpgradeFlow(targetKey, ctx){
+  ctx=ctx||{};
+  const me=(window.tMe&&window.tMe())||{};
+  const cur=_agTariffByKey(me.agencyPlan||'');
+  let tgt=targetKey?_agTariffByKey(targetKey):_agNextTariff(cur&&cur.key);
+  if(!tgt){ _agShowEnterpriseModal(cur, null); return; }
+  if(tgt.key==='dtr_enterprise' || tgt.price==null){ _agShowEnterpriseModal(cur, tgt); return; }
+  const intent=await _agCreatePayIntent('upgrade', tgt.key, 1);
+  if(!intent) return;
+  _agShowUpgradeModal(cur, tgt, intent, ctx);
+}
+/* Модалка апгрейда: сравнение current vs target + CTA «оплатить в боте» */
+function _agShowUpgradeModal(cur, tgt, intent, ctx){
+  ctx=ctx||{};
+  const curName=(cur&&cur.name)||'—';
+  const curPrice=cur?_agFmtMoney(cur.price):'—';
+  const curLim=(cur&&cur.limits&&cur.limits.projects)?cur.limits.projects:'∞';
+  const tgtName=tgt.name, tgtPrice=_agFmtMoney(tgt.price), tgtLim=(tgt.limits&&tgt.limits.projects)?tgt.limits.projects:'∞';
+  const used=(typeof agProjUsed==='function')?agProjUsed():'';
+  const feats=(tgt.feats||[]).filter(f=>f&&f[0]).slice(0,6).map(f=>'<li>'+_ddH(f[1]||'')+'</li>').join('');
+  const title = (ctx.reason==='limit' && ctx.limit)
+    ? `Достигнут лимит · ${used}/${ctx.limit.limit}`
+    : `Переход на ${_ddH(tgtName)}`;
+  const subtitle = (ctx.reason==='limit') ? 'Расширьте лимит проектов — платите за возможность вести больше клиентов' : 'Больше проектов, шире возможности';
+  pd2Open(`<div class="modal" style="max-width:580px">
+    <div class="modal-h"><h3>${_ddH(title)}</h3><p>${_ddH(subtitle)}</p></div>
+    <div class="modal-b">
+      <div class="ag-up-grid">
+        <div class="ag-up-col ag-up-cur">
+          <div class="ag-up-ey">Сейчас</div>
+          <div class="ag-up-nm">${_ddH(curName)}</div>
+          <div class="ag-up-pr">${curPrice}<span> сум/мес</span></div>
+          <div class="ag-up-lim">${curLim} проектов</div>
+        </div>
+        <div class="ag-up-arr">→</div>
+        <div class="ag-up-col ag-up-tgt">
+          <div class="ag-up-ey">Новый</div>
+          <div class="ag-up-nm">${_ddH(tgtName)}</div>
+          <div class="ag-up-pr">${tgtPrice}<span> сум/мес</span></div>
+          <div class="ag-up-lim">${tgtLim} проектов</div>
+        </div>
+      </div>
+      ${feats?'<ul class="ag-up-feats">'+feats+'</ul>':''}
+      <div class="ag-up-note">Оплата через бот <b>@DeTroyd_system_bot</b>. Реквизиты, чек и подтверждение — там. Тариф активируется автоматически после подтверждения.</div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="pd2Close()">Позже</button>
+      <button class="btn-add" onclick="_agAfterOpenBot('${_ddA(intent.code)}','${_ddA(intent.id)}')">Оплатить в боте · ${tgtPrice} сум</button>
+    </div>
   </div>`);
 }
+/* Модалка продления */
+function _agShowRenewModal(cur, intent){
+  const me=(window.tMe&&window.tMe())||{};
+  const nm=(cur&&cur.name)||'—';
+  const pr=cur?_agFmtMoney(cur.price):'—';
+  const dLeft=_agDaysLeft(me.agencyPaidUntil);
+  const paidUntil=_agFmtDate(me.agencyPaidUntil);
+  const paidLbl = dLeft==null ? 'Тариф активен'
+    : dLeft>=0 ? `Действует до ${paidUntil} · осталось ${dLeft} ${_plural(dLeft,'день','дня','дней')}`
+    : `Истекла ${Math.abs(dLeft)} ${_plural(Math.abs(dLeft),'день','дня','дней')} назад`;
+  pd2Open(`<div class="modal" style="max-width:480px">
+    <div class="modal-h"><h3>Продление подписки</h3><p>${_ddH(paidLbl)}</p></div>
+    <div class="modal-b">
+      <div class="ag-rn">
+        <div><div class="ag-up-ey">Тариф</div><div class="ag-rn-nm">${_ddH(nm)}</div></div>
+        <div class="ag-rn-pr">${pr}<span> сум · 1 мес</span></div>
+      </div>
+      <div class="ag-up-note">Оплата через бот <b>@DeTroyd_system_bot</b>. Тариф и <code>paid_until</code> обновятся автоматически.</div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="pd2Close()">Позже</button>
+      <button class="btn-add" onclick="_agAfterOpenBot('${_ddA(intent.code)}','${_ddA(intent.id)}')">Оплатить в боте · ${pr} сум</button>
+    </div>
+  </div>`);
+}
+/* Enterprise (верхний тариф без цены) — контакт с DETROYD */
+function _agShowEnterpriseModal(cur, ent){
+  const S=(window.PLATFORM_SETTINGS)||{};
+  const admChat=String(S.pay_admin_chat||'').replace(/^\@/,'');
+  const botBase=_agBotUrl();
+  const tgUrl = admChat ? ('tg://user?id='+encodeURIComponent(admChat)) : botBase;
+  const nm=(ent&&ent.name)||'DTR ENTERPRISE';
+  pd2Open(`<div class="modal" style="max-width:480px">
+    <div class="modal-h"><h3>${_ddH(nm)}</h3><p>Индивидуальный тариф · цена по договору</p></div>
+    <div class="modal-b">
+      <div class="ag-up-note" style="border-style:solid">Расширенные лимиты проектов, свой домен, SLA 99.9%, выделенный менеджер, on-premise-опция и приоритетная поддержка. Обсудим условия под ваши задачи с командой DETROYD.</div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="pd2Close()">Позже</button>
+      <a class="btn-add" href="${_ddA(tgUrl)}" target="_blank" rel="noopener" onclick="pd2Close()">Связаться в Telegram</a>
+    </div>
+  </div>`);
+}
+/* Клик по CTA: открываем бот в новой вкладке + переключаем модалку в «ожидание оплаты» */
+window._agAfterOpenBot = function(code, intentId){
+  _agOpenBot(code);
+  window._agWaitingIntentId=intentId; window._agWaitingCode=code; window._agWaitingStep='opened';
+  _agShowWaitingModal(intentId, code);
+};
+/* Модалка ожидания. Шаги: opened → claimed (бот увидел intent) → paid (админ подтвердил чек) */
+function _agShowWaitingModal(intentId, code){
+  const step=window._agWaitingStep||'opened';
+  const rank={opened:0,claimed:1,paid:2};
+  const cur=rank[step]||0;
+  const steps=[
+    {k:'opened',  l:'Бот открыт'},
+    {k:'claimed', l:'Ожидаем чек оплаты'},
+    {k:'paid',    l:'Оплата подтверждена'}
+  ];
+  const li=steps.map(s=>{
+    const my=rank[s.k];
+    const cls = (my<cur)?'done':(my===cur?'act':'');
+    return `<li class="ag-w-li ${cls}">${_ddH(s.l)}</li>`;
+  }).join('');
+  pd2Open(`<div class="modal" style="max-width:440px">
+    <div class="modal-h"><h3>Ожидаем оплату</h3><p>Статус обновится сам — можно не следить</p></div>
+    <div class="modal-b">
+      <ul class="ag-w-steps">${li}</ul>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="_agAfterOpenBot('${_ddA(code)}','${_ddA(intentId)}')">Открыть бот повторно</button>
+      <button class="btn-ghost" style="color:var(--neg)" onclick="_agCancelIntent('${_ddA(intentId)}')">Отменить</button>
+    </div>
+  </div>`);
+}
+window._agCancelIntent = async function(id){
+  try{ if(typeof SB!=='undefined' && SB) await SB.from('pay_intents').update({status:'cancelled'}).eq('id',id); }catch(_){}
+  window._agWaitingIntentId=null; window._agWaitingStep=null; window._agWaitingCode=null;
+  pd2Close(); toast('Оплата отменена');
+};
+/* Обновить ME.agencyPlan/PaidUntil/Mrr без полной перезагрузки — вызывается после подтверждения оплаты */
+async function _agRefreshMe(){
+  try{
+    const me=(window.tMe&&window.tMe())||{};
+    if(!me.agency_id || typeof SB==='undefined' || !SB) return;
+    const {data:ag}=await SB.from('agencies').select('plan,paid_until,mrr').eq('id',me.agency_id).single();
+    if(ag){
+      me.agencyPlan = ag.plan||'';
+      me.agencyPaidUntil = ag.paid_until||null;
+      me.agencyMrr = Number(ag.mrr||0);
+    }
+  }catch(_){}
+}
+/* Realtime handler для pay_intents — двигаем шаги в модалке ожидания и закрываем на 'paid' */
+window._agOnPayIntentRt = function(payload){
+  try{
+    const me=(window.tMe&&window.tMe())||{};
+    const n=payload && payload.new;
+    if(!n || n.agency_id!==me.agency_id) return;
+    if(window._agWaitingIntentId && n.id===window._agWaitingIntentId){
+      if(n.status==='claimed'){
+        window._agWaitingStep='claimed';
+        if(document.querySelector('.ag-w-steps')) _agShowWaitingModal(n.id, n.code||window._agWaitingCode||'');
+      } else if(n.status==='paid'){
+        window._agWaitingStep='paid';
+        if(document.querySelector('.ag-w-steps')) _agShowWaitingModal(n.id, n.code||window._agWaitingCode||'');
+        _agRefreshMe().then(()=>{
+          setTimeout(()=>{
+            pd2Close();
+            toast('Оплата подтверждена. Тариф активирован ✓');
+            if(typeof agRenderPlanChip==='function') try{ agRenderPlanChip(); }catch(_){}
+            if(typeof myProfileOpen==='function' && document.querySelector('.pm2-plan')) try{ pd2Close(); myProfileOpen(); }catch(_){}
+          }, 800);
+        });
+        window._agWaitingIntentId=null; window._agWaitingCode=null;
+      } else if(n.status==='cancelled' || n.status==='expired'){
+        window._agWaitingIntentId=null; window._agWaitingStep=null; window._agWaitingCode=null;
+      }
+    }
+  }catch(_){}
+};
+/* CSS для новых модалок (инжектится один раз) */
+(function _agInjectCSS(){
+  if(typeof document==='undefined' || document.getElementById('ag-pay-css')) return;
+  const el=document.createElement('style'); el.id='ag-pay-css';
+  el.textContent = ''
+    +'.ag-up-grid{display:flex;align-items:stretch;gap:12px;margin:4px 0 14px}'
+    +'.ag-up-col{flex:1;background:var(--panel-3);border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px}'
+    +'.ag-up-tgt{border-color:color-mix(in oklab, var(--accent) 40%, var(--line));box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent) inset}'
+    +'.ag-up-arr{align-self:center;color:var(--accent);font-size:22px;font-weight:600;padding:0 2px}'
+    +'.ag-up-ey{font-size:11px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}'
+    +'.ag-up-nm{font-size:16px;font-weight:600;color:var(--txt);margin-bottom:8px}'
+    +'.ag-up-pr{font-size:18px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums}'
+    +'.ag-up-pr span{font-size:11px;color:var(--txt-3);font-family:var(--font);letter-spacing:0}'
+    +'.ag-up-lim{font-size:13px;color:var(--txt-2);margin-top:6px}'
+    +'.ag-up-feats{margin:12px 0 4px;padding-left:20px;color:var(--txt-2);font-size:13px;line-height:1.75}'
+    +'.ag-up-feats li{margin:2px 0}'
+    +'.ag-up-note{background:color-mix(in oklab, var(--panel-3) 60%, transparent);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--txt-3);line-height:1.55;margin-top:12px}'
+    +'.ag-up-note code{background:color-mix(in oklab, var(--accent) 15%, transparent);padding:1px 6px;border-radius:6px;color:var(--txt-2);font-size:11.5px}'
+    +'.ag-rn{display:flex;align-items:center;justify-content:space-between;background:var(--panel-3);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:6px;gap:12px}'
+    +'.ag-rn-nm{font-size:17px;font-weight:600;color:var(--txt)}'
+    +'.ag-rn-pr{font-size:18px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}'
+    +'.ag-rn-pr span{font-size:11px;color:var(--txt-3);font-family:var(--font);letter-spacing:0}'
+    +'.ag-w-steps{list-style:none;padding:0;margin:0}'
+    +'.ag-w-li{padding:12px 14px 12px 40px;margin:6px 0;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--txt-3);font-size:14px;position:relative;transition:border-color .18s, box-shadow .18s, color .18s}'
+    +'.ag-w-li::before{content:"○";position:absolute;left:14px;top:11px;color:var(--txt-3);font-size:15px;line-height:1}'
+    +'.ag-w-li.done{color:var(--pos);border-color:color-mix(in oklab, var(--pos) 30%, var(--line))}'
+    +'.ag-w-li.done::before{content:"✓";color:var(--pos)}'
+    +'.ag-w-li.act{color:var(--accent);border-color:color-mix(in oklab, var(--accent) 40%, var(--line));box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent)}'
+    +'.ag-w-li.act::before{content:"●";color:var(--accent);animation:agWpulse 1.4s ease-in-out infinite}'
+    +'@keyframes agWpulse{0%,100%{opacity:1}50%{opacity:.35}}';
+  (document.head||document.documentElement).appendChild(el);
+})();
 /* Тариф больше не рендерится в сайдбар — статус и апселл живут в профиль-модалке (myProfileOpen).
    Здесь остаётся только лёгкий сигнал: точка-алерт на чипе «● detroyd» при достижении/превышении лимита. */
 function agRenderPlanChip(){
@@ -32511,6 +32807,7 @@ function subscribeRealtime(){
       .on('postgres_changes',{event:'*',schema:'public',table:'project_briefs'},onBriefRt)
       .on('postgres_changes',{event:'*',schema:'public',table:'bookings'},        function(){ if(window.tLoadBookings) window.tLoadBookings(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'booking_members'}, function(){ if(window.tLoadBookings) window.tLoadBookings(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'pay_intents'},     function(p){ if(window._agOnPayIntentRt) window._agOnPayIntentRt(p); })
       .subscribe();
   }catch(e){ console.warn('realtime', e); }
 }
@@ -32530,8 +32827,8 @@ async function routeByProfile(userArg){
   const _jobs=[ window.tLoadAll(ME.role, {fast:true}) ];                              // ядро данных — параллельно с инфо агентства
   if(window.tLoadPlatformSettings) _jobs.push(window.tLoadPlatformSettings().catch(()=>{}));   // pay_url и настройки платформы — доступны всем ролям (RLS: read authenticated)
   if (ME.agency_id){ _jobs.push(
-    SB.from('agencies').select('slug,accent,name,logo_url,plan,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
-      .then(({data:ag})=>{ if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.agencyPlan = ag.plan||''; ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } })
+    SB.from('agencies').select('slug,accent,name,logo_url,plan,paid_until,mrr,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
+      .then(({data:ag})=>{ if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.agencyPlan = ag.plan||''; ME.agencyPaidUntil = ag.paid_until||null; ME.agencyMrr = Number(ag.mrr||0); ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } })
       .catch(()=>{}) ); }
   await Promise.all(_jobs);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
