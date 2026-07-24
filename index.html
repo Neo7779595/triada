@@ -184,6 +184,14 @@ button{font-family:inherit}
 .btn-primary:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 0 0 1px var(--accent-line),0 14px 38px -10px rgba(55,230,200,.75)}
 .btn-primary:active{transform:translateY(0) scale(.99)}
 .btn-primary:focus-visible{outline:2px solid #fff;outline-offset:2px}
+/* Разделитель + кнопка регистрации нового агентства */
+.lg-divider{display:flex;align-items:center;gap:12px;margin:22px 0 14px;color:var(--txt-3);font-size:12px;letter-spacing:.02em}
+.lg-divider::before,.lg-divider::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)}
+.lg-divider span{white-space:nowrap;font-style:italic}
+.lg-reg-btn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;background:transparent;border:1px dashed color-mix(in oklab,var(--accent) 40%,var(--line-2));color:var(--txt);font-size:13.5px;font-weight:600;border-radius:11px;cursor:pointer;transition:.18s cubic-bezier(.4,0,.2,1);letter-spacing:.005em;font-family:inherit}
+.lg-reg-btn:hover{background:color-mix(in oklab,var(--accent) 10%,transparent);border-color:var(--accent);border-style:solid;transform:translateY(-1px);box-shadow:0 8px 22px -10px rgba(55,230,200,.4)}
+.lg-reg-btn:active{transform:translateY(0)}
+.lg-reg-btn svg{width:14px;height:14px;color:var(--accent)}
 .login-demo{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
 .login-demo .lbl{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);margin-bottom:11px}
 .demo-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
@@ -7080,6 +7088,11 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
       <div class="field"><svg class="field-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><input id="lg-pass" type="password" placeholder="Пароль" aria-label="Пароль" autocomplete="current-password"></div>
       <button class="btn btn-primary" id="lg-btn" onclick="doLogin()"><span>Войти</span></button>
     </div>
+    <div class="lg-divider"><span>ещё нет аккаунта?</span></div>
+    <button class="btn lg-reg-btn" onclick="_regShowPublicTariffs()" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span>Открыть агентство</span>
+    </button>
     <div class="login-foot">© 2026 DETROYD SYSTEM GROUP</div>
   </div>
 </section>
@@ -8487,13 +8500,48 @@ function _agCloseTariffsPage(immediate){
     else { ov.classList.remove('on'); setTimeout(()=>ov.remove(), 260); }
   }
   document.body.style.overflow='';
+  window._agPublicMode = false;   /* сбрасываем публичный режим при закрытии витрины */
+}
+/* Публичная витрина для НЕЗАЛОГИНЕННЫХ пользователей — только тарифы, без hero/downgrade/dashboard.
+   Клик по тарифу → deep link в бот с параметром t_<key>, вся регистрация проходит там (verify, pay, provision).
+   Никаких прямых INSERT'ов в БД — вся логика создания агентства защищена service-role в edge function. */
+async function _regShowPublicTariffs(){
+  /* Тарифы читаем публично из tariffs (эта таблица SELECT доступна anon по RLS) */
+  let opts=[];
+  try{
+    if(typeof SB==='undefined' || !SB){ throw new Error('DB not ready'); }
+    const {data,error}=await SB.from('tariffs').select('*').lt('sort',99).order('sort');
+    if(error) throw error;
+    opts=(data||[]).map(t => ({
+      key:t.key, name:t.name, price:t.price, per:t.per, sort:t.sort,
+      projects_limit:(t.limits&&t.limits.projects)||null,
+      is_unlim:!t.limits||!t.limits.projects,
+      kind:'upgrade',   /* в публичной витрине все тарифы = "выбрать" (не renew/downgrade) */
+      allowed:t.price!=null,   /* платные тарифы кликабельны; Enterprise (price=null) — свой кейс */
+      reason:'', quarterly_price:t.quarterly_price, quarterly_bonus_months:t.quarterly_bonus_months,
+      is_trial:!!(t.limits&&t.limits.is_trial), features:t.features
+    }));
+  }catch(e){
+    if(typeof toast==='function') toast('Не удалось загрузить тарифы: '+(e.message||e));
+    else alert('Не удалось загрузить тарифы');
+    return;
+  }
+  window._agPublicMode = true;   /* переключает поведение _agPickPlan → deep-link в бот */
+  _agShowTariffsPage(opts);
+}
+/* Deep-link в бот с pre-selected тарифом. Бот распарсит start=t_<key> и запустит регистрацию. */
+function _regRedirectBot(tariffKey){
+  const bot = (typeof _agBotUrl==='function') ? _agBotUrl() : 'https://t.me/DeTroyd_system_bot';
+  const url = bot + '?start=t_' + encodeURIComponent(tariffKey);
+  window.open(url, '_blank', 'noopener');
 }
 function _agShowTariffsPage(opts){
   window._agPPOpts = opts;
   const period = window._agPPPeriod||'month';
   const isQ = (period==='quarter');
+  const isPublic = !!window._agPublicMode;   /* публичный режим — юзер ещё не залогинен */
   const me=(window.tMe&&window.tMe())||{};
-  const cur=_agTariffByKey(me.agencyPlan||'');
+  const cur = isPublic ? null : _agTariffByKey(me.agencyPlan||'');
   const curName=(cur&&cur.name)||'—';
   const curPriceN=(cur&&cur.price!=null)?Number(cur.price):null;
   const curLimN=(cur&&cur.limits&&cur.limits.projects)?Number(cur.limits.projects):null;
@@ -8571,7 +8619,9 @@ function _agShowTariffsPage(opts){
       : '';
     const cta = blocked
       ? `<button class="tf-cta" disabled>Недоступно</button>`
-      : `<button class="tf-cta ${isPop?'is-pop':''}" onclick="_agPickPlan('${_ddA(o.kind)}','${_ddA(o.key)}','${period}')">${o.kind==='upgrade'?'Перейти':'Снизить'} · ${_numFmt(totalPrice)} сум</button>`;
+      : isPublic
+        ? `<button class="tf-cta ${isPop?'is-pop':''}" onclick="_regRedirectBot('${_ddA(o.key)}')">Выбрать · ${_numFmt(totalPrice)} сум<svg viewBox="0 0 24 24" width="12" height="12" style="margin-left:6px" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>`
+        : `<button class="tf-cta ${isPop?'is-pop':''}" onclick="_agPickPlan('${_ddA(o.kind)}','${_ddA(o.key)}','${period}')">${o.kind==='upgrade'?'Перейти':'Снизить'} · ${_numFmt(totalPrice)} сум</button>`;
     return `<div class="tf-card ${cls}" data-key="${_ddA(o.key)}">
       ${badge}
       <div class="tf-name">${_ddH(o.name)}</div>
@@ -8614,8 +8664,9 @@ function _agShowTariffsPage(opts){
     <div class="tf-wrap">
 
       <div class="tf-page-h">
-        <div class="tf-eye">Тариф · подписка</div>
-        <h1 class="tf-h1">Плати только за <span>то, что нужно</span></h1>
+        <div class="tf-eye">${isPublic?'Регистрация · выбор тарифа':'Тариф · подписка'}</div>
+        <h1 class="tf-h1">${isPublic?'Выберите тариф для <span>вашего агентства</span>':'Плати только за <span>то, что нужно</span>'}</h1>
+        ${isPublic?'<div class="tf-page-sub">После выбора откроется бот <b>@DeTroyd_system_bot</b> — там оплата и создание кабинета. Все функции доступны на любом тарифе, разница только в лимите проектов.</div>':''}
       </div>
 
       ${heroHtml}
@@ -8640,7 +8691,7 @@ function _agShowTariffsPage(opts){
           <div class="tf-grid">${upgradeList.map(cardHtml).join('')}</div>
         </section>` : ''}
 
-      ${downgradeList.length ? `
+      ${!isPublic && downgradeList.length ? `
         <section class="tf-sec tf-sec-dn">
           <button class="tf-sec-toggle" onclick="_agToggleDowngradeSec(this)">
             <div class="tf-sec-toggle-l">
@@ -8659,9 +8710,9 @@ function _agShowTariffsPage(opts){
         </section>` : ''}
 
       <div class="tf-extras">
-        ${demoOpt?`<div class="tf-extra${demoOpt.allowed?'':' tf-extra-lock'}" ${demoOpt.allowed?`onclick="_agPickPlan('renew','${_ddA(demoOpt.key)}','month')"`:''}>
+        ${demoOpt && (isPublic || demoOpt.allowed)?`<div class="tf-extra" ${isPublic?`onclick="_regRedirectBot('${_ddA(demoOpt.key)}')"`:(demoOpt.allowed?`onclick="_agPickPlan('renew','${_ddA(demoOpt.key)}','month')"`:'')}>
           <div class="tf-extra-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
-          <div class="tf-extra-b"><div class="tf-extra-n">${_ddH(demoOpt.name)}</div><div class="tf-extra-s">${demoOpt.allowed?'Бесплатно 14 дней · 1 проект · все функции':'Доступен только новым агентствам'}</div></div>
+          <div class="tf-extra-b"><div class="tf-extra-n">${_ddH(demoOpt.name)}</div><div class="tf-extra-s">${isPublic?'Бесплатно 14 дней · 1 проект · все функции · без карты':'Бесплатно 14 дней · 1 проект · все функции'}</div></div>
         </div>`:''}
         ${entOpt?`<a class="tf-extra" href="https://t.me/DeTroyd_system_bot" target="_blank" rel="noopener">
           <div class="tf-extra-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20M4 21V7l8-4 8 4v14M9 9h.01M15 9h.01M9 14h.01M15 14h.01M9 19h6"/></svg></div>
@@ -8671,10 +8722,17 @@ function _agShowTariffsPage(opts){
 
       <div class="tf-faq">
         <div class="tf-faq-h">Частые вопросы</div>
-        <div class="tf-faq-item"><div class="tf-faq-q">Что даёт квартальная оплата?</div><div class="tf-faq-a">Оплачиваешь <b>2 месяца</b> — получаешь <b>3 месяца</b> доступа. Третий месяц бонусом. Экономия <b>33%</b> без обязательств.</div></div>
-        <div class="tf-faq-item"><div class="tf-faq-q">Как перейти на другой тариф?</div><div class="tf-faq-a">Кликни по нужному — создаётся счёт и открывается бот. После подтверждения оплаты тариф и <b>paid_until</b> обновятся автоматически.</div></div>
-        <div class="tf-faq-item"><div class="tf-faq-q">Могу ли я снизить тариф?</div><div class="tf-faq-a">Да, если количество активных проектов вписывается в лимит нового тарифа. Иначе — сначала закрой лишние проекты.</div></div>
-        <div class="tf-faq-item"><div class="tf-faq-q">Как работает оплата?</div><div class="tf-faq-a">Через бот <b>@DeTroyd_system_bot</b>. Реквизиты, чек и подтверждение — там. AI-верификация чека занимает секунды, доступ активируется realtime.</div></div>
+        ${isPublic ? `
+          <div class="tf-faq-item"><div class="tf-faq-q">Как открыть агентство?</div><div class="tf-faq-a">Кликни по нужному тарифу — откроется бот <b>@DeTroyd_system_bot</b>. Там укажешь название агентства, свои контакты и оплатишь. После подтверждения оплаты (AI-верификация чека + сверка с банком) кабинет создастся автоматически, логин и пароль придут в чат бота.</div></div>
+          <div class="tf-faq-item"><div class="tf-faq-q">Что если я передумаю?</div><div class="tf-faq-a">Тариф всегда можно поменять из кабинета (повысить/понизить) или продлить квартально с бонусом. Пробный <b>DTR DEMO</b> — 14 дней бесплатно, без карты. Enterprise — по договору.</div></div>
+          <div class="tf-faq-item"><div class="tf-faq-q">Что такое «квартальный бонус»?</div><div class="tf-faq-a">Оплачиваешь <b>2 месяца</b> — получаешь <b>3 месяца</b> доступа. Третий месяц бонусом. Экономия <b>33%</b> без обязательств.</div></div>
+          <div class="tf-faq-item"><div class="tf-faq-q">Насколько безопасна оплата?</div><div class="tf-faq-a">Оплата принимается только через официальный бот <b>@DeTroyd_system_bot</b>. Реквизиты, чек и подтверждение — там. Каждый чек проходит AI-верификацию и сверку с банковской транзакцией, кабинет создаётся только после подтверждения оплаты.</div></div>
+        ` : `
+          <div class="tf-faq-item"><div class="tf-faq-q">Что даёт квартальная оплата?</div><div class="tf-faq-a">Оплачиваешь <b>2 месяца</b> — получаешь <b>3 месяца</b> доступа. Третий месяц бонусом. Экономия <b>33%</b> без обязательств.</div></div>
+          <div class="tf-faq-item"><div class="tf-faq-q">Как перейти на другой тариф?</div><div class="tf-faq-a">Кликни по нужному — создаётся счёт и открывается бот. После подтверждения оплаты тариф и <b>paid_until</b> обновятся автоматически.</div></div>
+          <div class="tf-faq-item"><div class="tf-faq-q">Могу ли я снизить тариф?</div><div class="tf-faq-a">Да, если количество активных проектов вписывается в лимит нового тарифа. Иначе — сначала закрой лишние проекты.</div></div>
+          <div class="tf-faq-item"><div class="tf-faq-q">Как работает оплата?</div><div class="tf-faq-a">Через бот <b>@DeTroyd_system_bot</b>. Реквизиты, чек и подтверждение — там. AI-верификация чека занимает секунды, доступ активируется realtime.</div></div>
+        `}
       </div>
     </div>`;
   document.body.style.overflow='hidden';
@@ -9144,6 +9202,8 @@ function _agReadOnlyPeek(){
     +'.tf-eye{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:color-mix(in oklab, var(--accent) 80%, var(--txt-3));font-weight:600;margin-bottom:10px}'
     +'.tf-h1{font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1.08;margin:0 auto;max-width:900px;color:var(--txt)}'
     +'@media (min-width: 1600px){.tf-h1{font-size:48px;max-width:1100px}}'
+    +'.tf-page-sub{margin:14px auto 0;max-width:640px;font-size:14px;color:var(--txt-3);line-height:1.6;letter-spacing:.005em}'
+    +'.tf-page-sub b{color:var(--accent);font-weight:600}'
     +'.tf-h1 span{background:linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 55%, var(--violet)));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}'
     /* ─── HERO CARD «Ваш тариф» ─── */
     +'.tf-hero-card{display:grid;grid-template-columns:1.15fr 1fr;gap:0;background:linear-gradient(135deg, color-mix(in oklab, var(--accent) 6%, var(--bg-1)) 0%, var(--bg-1) 60%);border:1px solid color-mix(in oklab, var(--accent) 30%, var(--line));border-radius:20px;padding:0;overflow:hidden;margin-bottom:32px;box-shadow:0 20px 40px -20px color-mix(in oklab, var(--accent) 30%, transparent), inset 0 1px 0 rgba(255,255,255,.03)}'
