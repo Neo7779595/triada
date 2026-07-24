@@ -8217,12 +8217,13 @@ async function agReloadProjCount(){
   }catch(_){}
 }
 window.agReloadProjCount = agReloadProjCount;
-/* Обновление тарифа. Backward-compat обёртка — вся логика в agUpgradeFlow (см. ниже). */
-function agUpgrade(){ return agUpgradeFlow(); }
-/* Лимит проектов исчерпан → показываем сравнительную модалку апгрейда с контекстом лимита */
+/* Обновление тарифа — единая точка входа. Backward-compat: agUpgrade() → plan-picker. */
+function agUpgrade(){ return agChangePlanFlow(); }
+/* Лимит проектов исчерпан → открываем plan-picker (backend уже подсветит upgrade-опции
+   и заблокирует downgrade с превышением лимитов). */
 function agLimitModal(lim){
   if(!agIsPayViewer()){ toast('Обратитесь к владельцу — достигнут лимит тарифа'); return; }
-  return agUpgradeFlow(null, {reason:'limit', limit:lim});
+  return agChangePlanFlow();
 }
 /* Кто видит биллинг: owner + director + сотрудник с явным разрешением permissions.billing.view.
    PM больше НЕ получает биллинг автоматически — владелец сам включает.
@@ -8302,22 +8303,41 @@ function _agIntentCode(){
   let s=''; for(let i=0;i<10;i++) s+=alph.charAt((Math.random()*alph.length)|0);
   return s;
 }
+/* Перевод серверных BILLING_* ошибок в человеческие подсказки.
+   Синхронизировано с mini/tg-pay friendlyBillingError. */
+function _agFriendlyBillingError(msg){
+  const s=String(msg||'');
+  if(/BILLING_RENEW_TARIFF_MISMATCH/.test(s)) return 'Продлить можно только текущий тариф. Для смены — используйте «Изменить тариф».';
+  if(/BILLING_DOWNGRADE_LIMIT/.test(s)){
+    const m=s.match(/активных проектов[^—]*—[^\.]*/);
+    return 'Не удаётся спуститься: '+(m?m[0]:'у вас больше активных проектов, чем позволяет тариф')+'. Закройте лишние проекты или выберите тариф с большим лимитом.';
+  }
+  if(/BILLING_NOT_UPGRADE/.test(s)) return 'Это не апгрейд: у выбранного тарифа лимит проектов не выше текущего.';
+  if(/BILLING_NOT_DOWNGRADE/.test(s)) return 'Это не downgrade: у выбранного тарифа лимит проектов не ниже текущего.';
+  if(/BILLING_SAME_TARIFF/.test(s)) return 'Это тот же тариф — используйте «Продлить».';
+  if(/BILLING_INVALID/.test(s)) return 'Неверные параметры смены тарифа.';
+  return s;
+}
 async function _agCreatePayIntent(kind, targetKey, months){
   months=Math.max(1,Math.min(12, (months|0) || 1));
   const me=(window.tMe&&window.tMe())||{};
   if(!me.agency_id){ toast('Не могу определить агентство'); return null; }
   if(typeof SB==='undefined' || !SB){ toast('Соединение с БД недоступно'); return null; }
   const cur=_agTariffByKey(me.agencyPlan||'');
-  const tgt=(kind==='upgrade' && targetKey)?_agTariffByKey(targetKey):cur;
-  const base=(tgt && tgt.price!=null)?Number(tgt.price):null;
+  /* Правило: для renew target === current; для upgrade/downgrade — targetKey обязателен. */
+  const isRenew = (kind==='renew');
+  const tgt = isRenew ? cur : (targetKey ? _agTariffByKey(targetKey) : null);
+  if(!isRenew && !tgt){ toast('Не выбран целевой тариф'); return null; }
+  const targetFinal = isRenew ? ((cur&&cur.key)||null) : ((tgt&&tgt.key)||null);
+  const base = (tgt && tgt.price!=null) ? Number(tgt.price) : null;
   try{
-    /* Дедуп: не плодим intent'ы — если уже есть активный с тем же (kind,target) → возвращаем его */
+    /* Дедуп: активный intent с тем же (kind,target) → возвращаем его. */
     const {data:existing}=await SB.from('pay_intents').select('*')
       .eq('agency_id',me.agency_id).eq('kind',kind)
       .in('status',['created','claimed'])
       .gt('expires_at',new Date().toISOString());
     if(existing && existing.length){
-      const match=existing.find(x => (kind==='renew') || (x.target_tariff_key===((tgt&&tgt.key)||null)));
+      const match=existing.find(x => x.target_tariff_key===targetFinal);
       if(match) return match;
     }
     const row={
@@ -8325,7 +8345,7 @@ async function _agCreatePayIntent(kind, targetKey, months){
       agency_id:me.agency_id,
       kind:kind,
       from_tariff_key:(cur&&cur.key)||null,
-      target_tariff_key:(kind==='upgrade'?((tgt&&tgt.key)||null):((cur&&cur.key)||null)),
+      target_tariff_key:targetFinal,
       amount_expected:(base!=null?base*months:null),
       months:months
     };
@@ -8334,10 +8354,83 @@ async function _agCreatePayIntent(kind, targetKey, months){
     return data;
   }catch(e){
     console.error('pay_intents insert', e);
-    toast('Не удалось создать оплату: '+((e&&e.message)||e));
+    toast(_agFriendlyBillingError((e&&e.message)||e));
     return null;
   }
 }
+/* Опции смены плана из БД (RPC billing_options) — источник правды: определяет kind,
+   allowed и текст reason для каждого тарифа относительно текущего плана агентства.
+   Кэшируется на 60 сек, обновляется после успешной оплаты. */
+async function _agLoadPlanOptions(){
+  const me=(window.tMe&&window.tMe())||{};
+  if(!me.agency_id || typeof SB==='undefined' || !SB) return [];
+  const key='__agPO_'+me.agency_id;
+  const cached=window[key];
+  if(cached && (Date.now()-cached.ts)<60000) return cached.opts;
+  try{
+    const {data,error}=await SB.rpc('billing_options',{p_agency_id:me.agency_id});
+    if(error) throw error;
+    window[key]={ts:Date.now(), opts:data||[]};
+    return data||[];
+  }catch(e){ console.warn('billing_options', e); return []; }
+}
+/* Изменить тариф — модалка со списком доступных планов (upgrade/downgrade),
+   с индикаторами blocked/reason. Клик по allowed → создаёт pay_intent с правильным kind
+   и открывает бот. Для смены на current тариф — предлагает «Продлить». */
+async function agChangePlanFlow(){
+  if(!agIsPayViewer()){ toast('Нет доступа к биллингу. Владелец может включить галочку «Оплаты и тарифы» в вашей карточке сотрудника.'); return; }
+  const opts=await _agLoadPlanOptions();
+  if(!opts.length){ toast('Не удалось загрузить список тарифов'); return; }
+  _agShowPlanPickerModal(opts);
+}
+function _agShowPlanPickerModal(opts){
+  const me=(window.tMe&&window.tMe())||{};
+  const cur=_agTariffByKey(me.agencyPlan||'');
+  const curName=(cur&&cur.name)||'—';
+  const groups={renew:[],upgrade:[],downgrade:[]};
+  opts.forEach(o=>{ if(groups[o.kind]) groups[o.kind].push(o); });
+  const iconFor=k => k==='renew' ? '🔁' : k==='upgrade' ? '⬆️' : '⬇️';
+  const labelFor=k => k==='renew' ? 'Текущий · продлить' : k==='upgrade' ? 'Повысить' : 'Понизить';
+  const rowHtml=o=>{
+    const price = o.price!=null ? _agFmtMoney(o.price)+' сум/мес' : 'по договору';
+    const lim = o.is_unlim ? '∞ проектов' : ((o.projects_limit||'—')+' проектов');
+    const blocked = !o.allowed;
+    const cta = blocked ? '' : `<button class="btn-add ag-pp-btn" onclick="_agPickPlan('${_ddA(o.kind)}','${_ddA(o.key)}')">${o.kind==='renew'?'Продлить':(o.kind==='upgrade'?'Повысить':'Понизить')}</button>`;
+    return `<div class="ag-pp-row ${blocked?'is-blocked':''}">
+      <div class="ag-pp-row-h">
+        <span class="ag-pp-ic">${iconFor(o.kind)}</span>
+        <span class="ag-pp-nm">${_ddH(o.name)}</span>
+        <span class="ag-pp-pr">${_ddH(price)}</span>
+      </div>
+      <div class="ag-pp-row-b">
+        <span class="ag-pp-lim">${_ddH(lim)}</span>
+        ${blocked?`<span class="ag-pp-block">${_ddH(o.reason||'недоступно')}</span>`:''}
+        ${cta}
+      </div>
+    </div>`;
+  };
+  const secHtml=(k,list)=> list.length?`<div class="ag-pp-sec"><div class="ag-pp-sec-h">${labelFor(k)}</div>${list.map(rowHtml).join('')}</div>`:'';
+  pd2Open(`<div class="modal" style="max-width:560px">
+    <div class="modal-h"><h3>Изменить тариф</h3><p>Текущий: <b>${_ddH(curName)}</b></p></div>
+    <div class="modal-b ag-pp">
+      ${secHtml('renew',groups.renew)}
+      ${secHtml('upgrade',groups.upgrade)}
+      ${secHtml('downgrade',groups.downgrade)}
+      <div class="ag-up-note">Оплата через бот <b>@DeTroyd_system_bot</b>. После подтверждения тариф и <code>paid_until</code> обновятся автоматически.</div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div>
+  </div>`);
+}
+window._agPickPlan = async function(kind, targetKey){
+  const me=(window.tMe&&window.tMe())||{};
+  const cur=_agTariffByKey(me.agencyPlan||'');
+  const tgt=_agTariffByKey(targetKey);
+  if(!tgt){ toast('Тариф не найден'); return; }
+  const intent=await _agCreatePayIntent(kind, targetKey, 1);
+  if(!intent) return;   /* _agCreatePayIntent сам покажет toast с причиной */
+  if(kind==='renew') _agShowRenewModal(cur, intent);
+  else _agShowUpgradeModal(cur, tgt, intent, {reason:kind});
+};
 function _agOpenBot(code){
   try{ window.open(_agBotUrl()+'?start='+encodeURIComponent(code),'_blank','noopener'); }
   catch(_){ toast('Не удалось открыть бот. Ссылка: '+_agBotUrl()+'?start='+code); }
@@ -8497,6 +8590,9 @@ async function _agRefreshMe(){
       me.agencyPaidUntil = ag.paid_until||null;
       me.agencyMrr = Number(ag.mrr||0);
     }
+    /* Сбрасываем кэш plan_options — при следующем открытии plan-picker'а получим свежий список.
+       Актуально после смены плана или изменения active_projects. */
+    try{ delete window['__agPO_'+me.agency_id]; }catch(_){}
     await agReloadProjCount();
   }catch(_){}
 }
@@ -8619,6 +8715,20 @@ function _agReadOnlyPeek(){
     +'.ag-up-feats li{margin:2px 0}'
     +'.ag-up-note{background:color-mix(in oklab, var(--panel-3) 60%, transparent);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--txt-3);line-height:1.55;margin-top:12px}'
     +'.ag-up-note code{background:color-mix(in oklab, var(--accent) 15%, transparent);padding:1px 6px;border-radius:6px;color:var(--txt-2);font-size:11.5px}'
+    /* plan-picker: секции (renew/upgrade/downgrade) с индикаторами allowed/blocked */
+    +'.ag-pp{display:flex;flex-direction:column;gap:14px}'
+    +'.ag-pp-sec{display:flex;flex-direction:column;gap:6px}'
+    +'.ag-pp-sec-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);font-weight:600;margin:2px 4px}'
+    +'.ag-pp-row{display:flex;flex-direction:column;gap:6px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;padding:12px 14px}'
+    +'.ag-pp-row.is-blocked{opacity:.62;background:color-mix(in oklab, var(--neg) 5%, var(--panel-3))}'
+    +'.ag-pp-row-h{display:flex;align-items:center;gap:10px}'
+    +'.ag-pp-ic{font-size:16px;line-height:1;width:22px;text-align:center}'
+    +'.ag-pp-nm{font-size:15px;font-weight:600;color:var(--txt);flex:1}'
+    +'.ag-pp-pr{font-size:14px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums}'
+    +'.ag-pp-row-b{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}'
+    +'.ag-pp-lim{font-size:12.5px;color:var(--txt-3)}'
+    +'.ag-pp-block{font-size:12px;color:var(--neg);line-height:1.35;flex:1 1 100%;margin-top:2px}'
+    +'.ag-pp-btn{padding:6px 14px;font-size:13px;border-radius:8px;margin-left:auto}'
     +'.ag-rn{display:flex;align-items:center;justify-content:space-between;background:var(--panel-3);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:6px;gap:12px}'
     +'.ag-rn-nm{font-size:17px;font-weight:600;color:var(--txt)}'
     +'.ag-rn-pr{font-size:18px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}'
@@ -8727,8 +8837,8 @@ function myProfileOpen(){
         </div>
         <div class="pm2-plan-bar"><i style="width:${pct}%;background:${col}"></i></div>
         <div class="pm2-plan-foot"><span>проектов</span><span>${foot}</span></div>
-        ${full && payViewer
-          ? `<button class="pm2-up" onclick="agUpgrade()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>${over?'Лимит превышен — обновить':'Обновить тариф'}</button>`
+        ${payViewer
+          ? `<button class="pm2-up" onclick="agChangePlanFlow()" style="${full?'':'background:transparent;color:var(--txt-2);border:1px solid var(--line);box-shadow:none'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 6h16M4 18h10"/></svg>${full?(over?'Лимит превышен — сменить тариф':'Изменить тариф'):'Изменить тариф'}</button>`
           : ''}`;
     }
     planHTML=`<div class="pm2-hr"></div><div class="pm2-plan s-${planState}">${planInner}</div>`;
