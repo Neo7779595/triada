@@ -8453,7 +8453,9 @@ function _agShowWaitingModal(intentId, code){
   ];
   const li=steps.map(s=>{
     const my=rank[s.k];
-    const cls = (my<cur)?'done':(my===cur?'act':'');
+    /* Локальные модификаторы (не общий .done/.act) — глобальные .act/.done в теме
+       перебивают display/размеры <li> и ломают верстку шагов. */
+    const cls = (my<cur)?'is-done':(my===cur?'is-act':'');
     return `<li class="ag-w-li ${cls}">${_ddH(s.l)}</li>`;
   }).join('');
   pd2Open(`<div class="modal" style="max-width:440px">
@@ -8609,13 +8611,13 @@ function _agReadOnlyPeek(){
     +'.ag-rn-nm{font-size:17px;font-weight:600;color:var(--txt)}'
     +'.ag-rn-pr{font-size:18px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}'
     +'.ag-rn-pr span{font-size:11px;color:var(--txt-3);font-family:var(--font);letter-spacing:0}'
-    +'.ag-w-steps{list-style:none;padding:0;margin:0}'
-    +'.ag-w-li{padding:12px 14px 12px 40px;margin:6px 0;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--txt-3);font-size:14px;position:relative;transition:border-color .18s, box-shadow .18s, color .18s}'
-    +'.ag-w-li::before{content:"○";position:absolute;left:14px;top:11px;color:var(--txt-3);font-size:15px;line-height:1}'
-    +'.ag-w-li.done{color:var(--pos);border-color:color-mix(in oklab, var(--pos) 30%, var(--line))}'
-    +'.ag-w-li.done::before{content:"✓";color:var(--pos)}'
-    +'.ag-w-li.act{color:var(--accent);border-color:color-mix(in oklab, var(--accent) 40%, var(--line));box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent)}'
-    +'.ag-w-li.act::before{content:"●";color:var(--accent);animation:agWpulse 1.4s ease-in-out infinite}'
+    +'.ag-w-steps{list-style:none;padding:0;margin:0;display:block}'
+    +'.ag-w-li{display:block;width:100%;box-sizing:border-box;padding:12px 14px 12px 40px;margin:6px 0;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--txt-3);font-size:14px;line-height:1.35;position:relative;transition:border-color .18s, box-shadow .18s, color .18s;word-break:break-word}'
+    +'.ag-w-li::before{content:"○";position:absolute;left:14px;top:12px;color:var(--txt-3);font-size:15px;line-height:1;width:auto;height:auto;border:none;background:none;display:inline}'
+    +'.ag-w-li.is-done{color:var(--pos);border-color:color-mix(in oklab, var(--pos) 30%, var(--line))}'
+    +'.ag-w-li.is-done::before{content:"✓";color:var(--pos)}'
+    +'.ag-w-li.is-act{color:var(--accent);border-color:color-mix(in oklab, var(--accent) 40%, var(--line));box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent)}'
+    +'.ag-w-li.is-act::before{content:"●";color:var(--accent);animation:agWpulse 1.4s ease-in-out infinite}'
     +'@keyframes agWpulse{0%,100%{opacity:1}50%{opacity:.35}}'
     /* ═══ Баннер истечения + read-only оверлей ═══ */
     +'.ag-expiry-host{position:fixed;top:0;left:0;right:0;z-index:200;pointer-events:none}'
