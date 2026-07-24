@@ -8878,6 +8878,86 @@ function _agBotUrl(){
   const raw=(S.pay_url||'').trim().replace(/[\?#].*$/,'').replace(/\/$/,'');
   return raw||'https://t.me/DeTroyd_system_bot';
 }
+/* ═══════════════════════════════════════════════════════════════════════
+   ПОДДЕРЖКА DETROYD SMART — открытие Telegram-чата с контекстом агентства.
+   Стратегия: собираем «шапку» с ID/тарифом/сроком → копируем в буфер
+   обмена → открываем TG-чат с ?text= (Telegram Web/Desktop подтянут).
+   Пользователю остаётся только вставить (Ctrl+V) и описать вопрос —
+   служба поддержки моментально видит, какое агентство пишет и в каком
+   тарифе, без переспросов «а с какого агентства вы?».
+   ═══════════════════════════════════════════════════════════════════════ */
+function _agSupportOpen(){
+  const me=(window.tMe&&window.tMe())||{};
+  const supportUrl='https://t.me/detroyd_system';
+  /* Собираем «идентификационную шапку» — служба поддержки читает первую строку
+     и сразу знает контекст. Держим компактно, без бюрократии. */
+  const lines=[];
+  lines.push('👋 Здравствуйте! Пишу из кабинета DETROYD SMART.');
+  lines.push('');
+  lines.push('━━━━━━━━━━━━━━━');
+  if(me.agencyName) lines.push('🏢 Агентство: ' + me.agencyName);
+  if(me.agencySlug) lines.push('🆔 ID: ' + me.agencySlug);
+  if(me.agencyPlan){
+    let planLine = '📊 Тариф: ' + me.agencyPlan;
+    if(me.agencyPaidUntil) planLine += ' (до ' + String(me.agencyPaidUntil).slice(0,10) + ')';
+    lines.push(planLine);
+  }
+  if(me.full_name || me.role_title){
+    const who = (me.full_name||'Пользователь') + (me.role_title?' · '+me.role_title:'');
+    lines.push('👤 От: ' + who);
+  }
+  lines.push('━━━━━━━━━━━━━━━');
+  lines.push('');
+  lines.push('Вопрос: ');
+  const context = lines.join('\n');
+  /* 1) Пробуем скопировать в буфер обмена (надёжнее, чем ?text= для приватных чатов). */
+  let copied=false;
+  const doCopy = () => {
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(context).then(()=>{copied=true;}).catch(()=>{});
+    }
+    return Promise.resolve();
+  };
+  /* 2) Открываем чат ПАРАЛЛЕЛЬНО (Safari требует, чтобы window.open был в user-gesture стеке). */
+  const url = supportUrl + '?text=' + encodeURIComponent(context);
+  let win = null;
+  try { win = window.open(url, '_blank', 'noopener'); } catch(_) {}
+  /* 3) После открытия асинхронно копируем и показываем toast. */
+  doCopy().finally(() => {
+    if(!win){
+      /* Popup blocker → показываем модалку с готовой ссылкой и текстом. */
+      _agSupportShowFallback(supportUrl, context, copied);
+      return;
+    }
+    if(typeof toast==='function'){
+      toast(copied
+        ? 'Ваши данные скопированы. Вставьте в чат (⌘V / Ctrl+V) и опишите вопрос.'
+        : 'Откройте чат и представьтесь — упомяните название агентства.');
+    }
+  });
+}
+/* Fallback-модалка если popup заблокирован. */
+function _agSupportShowFallback(url, text, copied){
+  const existing = document.getElementById('ag-support-fallback');
+  if(existing) existing.remove();
+  const box=document.createElement('div');
+  box.id='ag-support-fallback';
+  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)';
+  const escH = s => String(s||'').replace(/[<>&"']/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+  box.innerHTML=`<div style="max-width:480px;width:100%;background:var(--bg-2);border:1px solid var(--line-2);border-radius:14px;padding:22px;color:var(--txt);font-family:var(--font)">
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Служба поддержки DETROYD SMART</div>
+    <div style="font-size:13px;color:var(--txt-3);margin-bottom:14px;line-height:1.5">${copied?'Данные скопированы. Откройте чат и вставьте (⌘V / Ctrl+V):':'Откройте чат и вставьте это сообщение:'}</div>
+    <textarea readonly style="width:100%;min-height:140px;padding:10px 12px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px;color:var(--txt-2);font-family:var(--font-mono,monospace);font-size:12px;line-height:1.5;resize:none;margin-bottom:12px" onclick="this.select()">${escH(text)}</textarea>
+    <div style="display:flex;gap:8px">
+      <a href="${escH(url)}" target="_blank" rel="noopener" style="flex:1;padding:10px 16px;background:var(--accent);color:#06140f;border-radius:9px;text-align:center;text-decoration:none;font-weight:600;font-size:13px">Открыть Telegram</a>
+      <button onclick="document.getElementById('ag-support-fallback').remove()" style="padding:10px 16px;background:transparent;border:1px solid var(--line-2);color:var(--txt-2);border-radius:9px;cursor:pointer;font-family:inherit;font-size:13px">Закрыть</button>
+    </div>
+  </div>`;
+  box.addEventListener('click', e => { if(e.target===box) box.remove(); });
+  document.body.appendChild(box);
+}
+window._agSupportOpen = _agSupportOpen;
+window._agSupportShowFallback = _agSupportShowFallback;
 function _agIntentCode(){
   const alph='0123456789abcdefghjkmnpqrstuvwxyz';
   let s=''; for(let i=0;i<10;i++) s+=alph.charAt((Math.random()*alph.length)|0);
@@ -9401,10 +9481,11 @@ function _agShowTariffsPage(opts){
           <div class="tf-extra-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
           <div class="tf-extra-b"><div class="tf-extra-n">${_ddH(demoOpt.name)}</div><div class="tf-extra-s">${isPublic?'Бесплатно 14 дней · 1 проект · все функции · без карты':'Бесплатно 14 дней · 1 проект · все функции'}</div></div>
         </div>`:''}
-        ${entOpt?`<a class="tf-extra" href="https://t.me/DeTroyd_system_bot" target="_blank" rel="noopener">
-          <div class="tf-extra-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20M4 21V7l8-4 8 4v14M9 9h.01M15 9h.01M9 14h.01M15 14h.01M9 19h6"/></svg></div>
-          <div class="tf-extra-b"><div class="tf-extra-n">${_ddH(entOpt.name)}</div><div class="tf-extra-s">По договору · White-label + свой домен · SLA 99.9%</div></div>
-        </a>`:''}
+        <button class="tf-extra tf-extra-support" onclick="_agSupportOpen()" type="button">
+          <div class="tf-extra-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+          <div class="tf-extra-b"><div class="tf-extra-n">Служба поддержки DETROYD SMART</div><div class="tf-extra-s">Персональный менеджер в Telegram · среднее время ответа < 1 часа</div></div>
+          <div class="tf-extra-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        </button>
       </div>
 
       <div class="tf-faq">
@@ -10034,9 +10115,16 @@ function _agReadOnlyPeek(){
     +'.tf-extra.tf-extra-lock:hover{border-style:dashed;border-color:var(--line-2);background:color-mix(in oklab, var(--bg-1) 90%, transparent)}'
     +'.tf-extra-ic{width:44px;height:44px;border-radius:12px;background:var(--bg-3);color:var(--txt-2);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--line)}'
     +'.tf-extra-ic svg{width:20px;height:20px}'
-    +'.tf-extra-b{flex:1;min-width:0}'
+    +'.tf-extra-b{flex:1;min-width:0;text-align:left}'
     +'.tf-extra-n{font-size:13px;font-weight:700;letter-spacing:.11em;font-family:var(--mono);color:var(--txt);margin-bottom:3px}'
     +'.tf-extra-s{font-size:12px;color:var(--txt-3);line-height:1.45}'
+    /* Support-кнопка: премиальный accent-стиль (акцентный градиент, стрелка справа) */
+    +'.tf-extra-support{background:linear-gradient(135deg,color-mix(in oklab,var(--accent) 12%,var(--bg-1)),color-mix(in oklab,var(--accent) 4%,var(--bg-1)));border:1px solid color-mix(in oklab,var(--accent) 34%,var(--line-2));cursor:pointer;font-family:inherit;width:100%}'
+    +'.tf-extra-support:hover{border-style:solid;border-color:var(--accent);background:linear-gradient(135deg,color-mix(in oklab,var(--accent) 18%,var(--bg-1)),color-mix(in oklab,var(--accent) 8%,var(--bg-1)));transform:translateY(-1px);box-shadow:0 12px 32px -14px rgba(55,230,200,.45)}'
+    +'.tf-extra-support .tf-extra-ic{background:color-mix(in oklab,var(--accent) 18%,transparent);border-color:color-mix(in oklab,var(--accent) 40%,transparent);color:var(--accent)}'
+    +'.tf-extra-support .tf-extra-n{letter-spacing:.005em;font-family:inherit;font-size:14px;font-weight:600;color:var(--txt);text-transform:none}'
+    +'.tf-extra-arrow{flex:0 0 auto;color:var(--accent);opacity:.6;transition:.24s}'
+    +'.tf-extra-support:hover .tf-extra-arrow{opacity:1;transform:translateX(3px)}'
     /* FAQ — полноширочная сетка с иконками, вместо узкой колонки в центре */
     +'.tf-faq{max-width:1240px;margin:64px auto 0;padding-top:56px;border-top:1px solid color-mix(in oklab,var(--line-2) 60%,transparent);position:relative}'
     +'.tf-faq::before{content:"";position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:60px;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.6}'
