@@ -8191,7 +8191,19 @@ function agProjUsed(){ return (typeof PROJECTS!=='undefined')?PROJECTS.filter(p=
 /* Обновление тарифа. Backward-compat обёртка — вся логика в agUpgradeFlow (см. ниже). */
 function agUpgrade(){ return agUpgradeFlow(); }
 /* Лимит проектов исчерпан → показываем сравнительную модалку апгрейда с контекстом лимита */
-function agLimitModal(lim){ return agUpgradeFlow(null, {reason:'limit', limit:lim}); }
+function agLimitModal(lim){
+  if(!agIsPayViewer()){ toast('Обратитесь к владельцу — достигнут лимит тарифа'); return; }
+  return agUpgradeFlow(null, {reason:'limit', limit:lim});
+}
+/* Кто видит биллинг: owner + director + PM. Обычный сотрудник → false.
+   Совпадает с can_manage_billing() на стороне БД (RLS). */
+function agIsPayViewer(){
+  const me=(window.tMe&&window.tMe())||null;
+  if(!me) return false;
+  if(me.role==='agency_owner' || me.role==='superadmin') return true;
+  if(me.role==='member' && (me.is_director || me.is_pm)) return true;
+  return false;
+}
 
 /* ═══════════════════════ Тарифы: продление / апгрейд ═══════════════════════
    1) Кабинет вставляет строку в pay_intents (RLS: только owner своего агентства).
@@ -8238,7 +8250,13 @@ function agSubActive(){
 }
 function agGateWrite(){
   if(agSubActive()) return true;
-  toast('Подписка истекла · режим только чтения'); agRenewFlow(); return false;
+  if(agIsPayViewer()){
+    toast('Подписка истекла · режим только чтения');
+    agRenewFlow();
+  } else {
+    toast('Подписка истекла — обратитесь к руководителю');
+  }
+  return false;
 }
 /* Deeplink → бот. Базовый URL из PLATFORM_SETTINGS.pay_url; поддерживаем legacy-заготовку в виде голой ссылки. */
 function _agBotUrl(){
@@ -8293,6 +8311,7 @@ function _agOpenBot(code){
 }
 /* Продление подписки на текущем тарифе (default 1 месяц) */
 async function agRenewFlow(months){
+  if(!agIsPayViewer()){ toast('Оплату может провести владелец, директор или PM'); return; }
   const me=(window.tMe&&window.tMe())||{};
   const cur=_agTariffByKey(me.agencyPlan||'');
   const intent=await _agCreatePayIntent('renew', cur&&cur.key, months||1);
@@ -8302,6 +8321,7 @@ async function agRenewFlow(months){
 /* Апгрейд на targetKey (или на следующий по sort). Enterprise → «связаться». */
 async function agUpgradeFlow(targetKey, ctx){
   ctx=ctx||{};
+  if(!agIsPayViewer()){ toast('Оплату может провести владелец, директор или PM'); return; }
   const me=(window.tMe&&window.tMe())||{};
   const cur=_agTariffByKey(me.agencyPlan||'');
   let tgt=targetKey?_agTariffByKey(targetKey):_agNextTariff(cur&&cur.key);
@@ -8479,6 +8499,7 @@ function _agBannerRender(){
   try{
     const app=document.getElementById('app-ag');
     if(!app || !app.classList.contains('on')){ _agBannerRemove(); return; }
+    if(typeof agIsPayViewer==='function' && !agIsPayViewer()){ _agBannerRemove(); return; }   // обычный сотрудник — не видит биллинг
     const me=(window.tMe&&window.tMe())||{};
     if(!me.agencyPaidUntil){ _agBannerRemove(); return; }
     const d=_agDaysLeft(me.agencyPaidUntil);
@@ -8642,10 +8663,10 @@ function myProfileOpen(){
   const role=me.role_title||roleNames[me.role]||'Сотрудник';
 
   /* ——— слой 2 · тариф (перенесён из сайдбара) ——— */
-  const owner=(typeof agIsOwner==='function')?agIsOwner():true;   // владелец/директор — полный доступ, обычный сотрудник тариф не видит
+  const payViewer=(typeof agIsPayViewer==='function')?agIsPayViewer():true;   // владелец/директор/PM — видят тариф; обычный сотрудник — нет
   const hasPlan=!!(me.agency_id||me.agencyPlan);
   let planHTML='';
-  if(hasPlan && owner){                                            // данные тарифа — только у основателя и директора
+  if(hasPlan && payViewer){                                        // данные тарифа — у основателя, директора и PM
     const info=agPlanLimit(); const used=agProjUsed();
     const CROWN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h18M5 17l-2-9 5.5 4L12 5l3.5 7L21 8l-2 9"/></svg>';
     let planState='ok', planInner;
@@ -8670,7 +8691,7 @@ function myProfileOpen(){
         </div>
         <div class="pm2-plan-bar"><i style="width:${pct}%;background:${col}"></i></div>
         <div class="pm2-plan-foot"><span>проектов</span><span>${foot}</span></div>
-        ${full && owner
+        ${full && payViewer
           ? `<button class="pm2-up" onclick="agUpgrade()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>${over?'Лимит превышен — обновить':'Обновить тариф'}</button>`
           : ''}`;
     }
