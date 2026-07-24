@@ -6528,6 +6528,28 @@ button:active{transform:translateY(.5px) scale(.99)}
 .pm2-save-hint.is-loading{color:var(--txt-3)}
 .pm2-save-hint.is-ok{color:var(--pos)}
 .pm2-save-hint.is-err{color:var(--neg)}
+/* Смена пароля — в «Мой профиль» */
+.pm2-me-pwd{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:12px;padding:12px 14px;background:color-mix(in oklab, var(--bg-2) 60%, transparent);border:1px solid var(--line);border-radius:12px;transition:.14s}
+.pm2-me-pwd:hover{border-color:color-mix(in oklab, var(--accent) 32%, var(--line-2))}
+.pm2-me-pwd-l{flex:1;min-width:0}
+.pm2-me-pwd-h{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--txt);margin-bottom:3px;letter-spacing:.005em}
+.pm2-me-pwd-h svg{width:14px;height:14px;color:var(--accent)}
+.pm2-me-pwd-s{font-size:11.5px;color:var(--txt-3);line-height:1.42;letter-spacing:.005em}
+.pm2-pwd-btn{background:color-mix(in oklab, var(--accent) 14%, transparent);color:var(--accent);border:1px solid color-mix(in oklab, var(--accent) 38%, var(--line));font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;transition:.14s;font-family:inherit;white-space:nowrap;letter-spacing:.01em}
+.pm2-pwd-btn:hover{background:color-mix(in oklab, var(--accent) 24%, transparent);border-color:var(--accent)}
+/* Кнопка «Сгенерировать новый пароль» в PM Card settings */
+.pm-btn-pwd{display:inline-flex;align-items:center;justify-content:center;background:color-mix(in oklab, var(--accent) 8%, transparent);color:var(--accent);border:1px dashed color-mix(in oklab, var(--accent) 40%, var(--line-2))}
+.pm-btn-pwd:hover{background:color-mix(in oklab, var(--accent) 15%, transparent);border-style:solid;border-color:var(--accent)}
+/* Модалка показа нового пароля — большой моно код + copy button */
+.ag-cp-pwbox{background:color-mix(in oklab, var(--accent) 6%, var(--bg-2));border:1px solid color-mix(in oklab, var(--accent) 28%, var(--line));border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.ag-cp-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:color-mix(in oklab, var(--accent) 85%, var(--txt-3));font-weight:600;margin-bottom:8px}
+.ag-cp-vw{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.ag-cp-code{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--txt);letter-spacing:.02em;user-select:all;-webkit-user-select:all;flex:1;word-break:break-all;background:none;padding:0}
+.ag-cp-copy{background:color-mix(in oklab, var(--accent) 16%, transparent);color:var(--accent);border:1px solid color-mix(in oklab, var(--accent) 32%, transparent);width:38px;height:38px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:.14s;flex-shrink:0}
+.ag-cp-copy:hover{background:color-mix(in oklab, var(--accent) 26%, transparent);border-color:var(--accent)}
+.ag-cp-copy.is-ok{background:var(--pos);color:var(--bg);border-color:var(--pos)}
+.ag-cp-copy svg{width:15px;height:15px}
+.ag-cp-hint{font-size:12.5px;color:var(--txt-3);line-height:1.55;letter-spacing:.005em;padding:0 2px}
 @media (max-width:440px){.pm2-me-grid{grid-template-columns:1fr}}
 /* ——— слой 2 · тариф — оформлен как важный блок-карточка со статусом ——— */
 .pm2-plan{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:14px;padding:14px 15px 15px}
@@ -9637,6 +9659,13 @@ function myProfileOpen(){
         <span class="pm2-me-lbl">Ваш цвет</span>
         <div class="pm2-me-swatches">${colorSwatches}</div>
       </div>
+      <div class="pm2-me-pwd">
+        <div class="pm2-me-pwd-l">
+          <div class="pm2-me-pwd-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Пароль</div>
+          <div class="pm2-me-pwd-s">Сгенерировать новый пароль для входа в кабинет. Старый перестанет работать.</div>
+        </div>
+        <button type="button" class="pm2-pwd-btn" onclick="_agMyChangePwd()">Сменить пароль</button>
+      </div>
       <div class="pm2-save-hint" id="pm2-save-hint"></div>
     </div>` : '';
 
@@ -9657,8 +9686,18 @@ function myProfileOpen(){
           <div class="pm2-id-rl">${role}${me.dept?(' · '+me.dept):''}</div>
         </div>
       </div>
-      <!-- слой 2 · мои личные данные (self-edit) -->
+      <!-- слой 2 · мои личные данные (self-edit, только member — у owner нет self-editable полей) -->
       ${editHTML}
+      <!-- слой 2.5 · пароль (доступно для ЛЮБОЙ роли — каждый может сменить свой пароль) -->
+      ${!isMember ? `
+        <div class="pm2-hr"></div>
+        <div class="pm2-me-pwd" style="margin-top:4px">
+          <div class="pm2-me-pwd-l">
+            <div class="pm2-me-pwd-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Мой пароль</div>
+            <div class="pm2-me-pwd-s">Сгенерировать новый пароль для входа в кабинет владельца. Старый перестанет работать.</div>
+          </div>
+          <button type="button" class="pm2-pwd-btn" onclick="_agMyChangePwd()">Сменить</button>
+        </div>` : ''}
       <!-- слой 3 · тариф (перенос из сайдбара) -->
       ${planHTML}
       <!-- слой 4 · Telegram -->
@@ -23060,8 +23099,12 @@ function _pmRender(m){
         <div class="pm-s-block">
           <div class="pm-s-h">Доступы к системе</div>
           <div class="pm-s-row"><span class="pm-s-l">Логин</span><span class="pm-s-v pm-mono">${_ddH(m.login||'—')}</span></div>
-          <div class="pm-s-row"><span class="pm-s-l">Пароль</span><span class="pm-s-v">— сгенерируется при первом входе или через полный редактор</span></div>
+          <div class="pm-s-row"><span class="pm-s-l">Пароль</span><span class="pm-s-v pm-mono" style="color:var(--txt-3)">•••••••••</span></div>
           <div class="pm-s-row"><span class="pm-s-l">TG-аккаунт</span><span class="pm-s-v">${m.tg_user_id?('привязан · <span class="pm-mono">'+_ddH(m.tg_user_id)+'</span>'):'не привязан'}</span></div>
+          <button class="btn-ghost pm-btn-pwd" style="width:100%;margin-top:8px" onclick="_pmChangePwd('${_ddA(m._id)}')">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Сгенерировать новый пароль
+          </button>
         </div>
         <div class="pm-s-block">
           <div class="pm-s-h">Роль, права, проекты</div>
@@ -23176,6 +23219,86 @@ function _pmArchive(id){
   if(window.tMemberArchive){ window.tMemberArchive(id, m.name||'сотрудник'); pd2Close(); }
 }
 window.pmCardOpen=pmCardOpen; window.pmCardTab=pmCardTab; window._pmOpenFullEdit=_pmOpenFullEdit; window._pmArchive=_pmArchive;
+
+/* ═══════════════════════════════════════════════════════════════════════
+   СМЕНА ПАРОЛЯ — единая точка вызова edge function change-password.
+   Клиент НЕ передаёт свой пароль — генерирует сервер (сильный, читаемый).
+   Права проверяются на сервере (owner/director/self), клиент не может обойти.
+   ═══════════════════════════════════════════════════════════════════════ */
+async function _agChangePwdRun(targetUserId, targetName){
+  if(typeof SB==='undefined' || !SB){ toast('Соединение с БД недоступно'); return; }
+  try{
+    /* Берём текущий JWT — Supabase JS SDK хранит его в session; вызываем через .functions */
+    const { data, error } = await SB.functions.invoke('change-password', {
+      body: targetUserId ? { target_user_id: targetUserId } : {}
+    });
+    if(error) throw error;
+    if(!data || data.error) throw new Error((data&&data.error)||'Не удалось сменить пароль');
+    _agChangePwdShow(data.target_name || targetName || 'Пользователь', data.password, !!data.is_self);
+  }catch(e){
+    const msg = e && (e.message||String(e)) || 'Неизвестная ошибка';
+    toast('Ошибка смены пароля: '+msg);
+    console.error('change-password', e);
+  }
+}
+/* Модалка успеха — показывает пароль один раз и предлагает скопировать.
+   Пароль на клиент возвращается только в этой RESPONSE и нигде не сохраняется. */
+function _agChangePwdShow(name, password, isSelf){
+  const nm = _ddH(name||'Пользователь');
+  const pw = String(password||'');
+  const pwEsc = _ddH(pw);
+  /* Экранируем для JS-строки в onclick */
+  const pwJs = pw.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const title = isSelf ? 'Ваш пароль обновлён' : `Пароль обновлён для «${nm}»`;
+  const hint = isSelf
+    ? 'Запомните или сохраните новый пароль. При следующем входе используйте его.'
+    : 'Передайте сотруднику новый пароль через безопасный канал. Мы больше не будем показывать его — он не хранится в открытом виде.';
+  pd2Open(`<div class="modal" style="max-width:460px">
+    <div class="modal-h"><h3>${_ddH(title)}</h3><p>Пароль обновлён в auth.users, применится при следующем входе.</p></div>
+    <div class="modal-b">
+      <div class="ag-cp-pwbox">
+        <div class="ag-cp-l">Новый пароль</div>
+        <div class="ag-cp-vw"><code class="ag-cp-code" id="ag-cp-code">${pwEsc}</code>
+          <button class="ag-cp-copy" type="button" onclick="_agCpCopy('${pwJs}',this)" title="Скопировать">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="ag-cp-hint">${_ddH(hint)}</div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-add" style="width:100%" onclick="_agCpCopy('${pwJs}',this);setTimeout(pd2Close,900)">Скопировать и закрыть</button>
+    </div>
+  </div>`);
+}
+function _agCpCopy(pw, btn){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(pw);
+    } else {
+      const ta=document.createElement('textarea'); ta.value=pw; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    if(btn && btn.classList){ btn.classList.add('is-ok'); setTimeout(()=>btn.classList.remove('is-ok'),1200); }
+    if(typeof toast==='function') toast('Пароль скопирован');
+  }catch(_){ if(typeof toast==='function') toast('Не удалось скопировать — выделите пароль вручную'); }
+}
+/* Смена пароля сотрудника из PM Card. Требует подтверждения (пароль сотрудника
+   инвалидируется — он не сможет войти со старым). */
+async function _pmChangePwd(memberId){
+  const m = (typeof _pmMemberById==='function') ? _pmMemberById(memberId) : null;
+  if(!m){ toast('Сотрудник не найден'); return; }
+  const nm = m.name || 'сотрудник';
+  if(!confirm(`Сгенерировать новый пароль для «${nm}»?\n\nСтарый пароль перестанет работать. Новый пароль будет показан один раз — передайте его сотруднику.`)) return;
+  await _agChangePwdRun(String(memberId), nm);
+}
+/* Смена своего пароля из «Мой профиль». */
+async function _agMyChangePwd(){
+  const me=(window.tMe&&window.tMe())||null; if(!me){ toast('Профиль ещё загружается'); return; }
+  if(!confirm(`Сгенерировать новый пароль для вашего аккаунта?\n\nВы будете автоматически перелогинены. Новый пароль будет показан один раз — сохраните его.`)) return;
+  await _agChangePwdRun(String(me.id), me.full_name||'Мой аккаунт');
+}
+window._pmChangePwd=_pmChangePwd; window._agMyChangePwd=_agMyChangePwd; window._agCpCopy=_agCpCopy;
 
 function openCostDrill(i){
   const F=(typeof FINANCE!=='undefined'?FINANCE:null); if(!F||!F.breakdown) return;
