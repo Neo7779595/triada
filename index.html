@@ -9672,6 +9672,10 @@ function myProfileOpen(){
   /* Личные данные, доступные для самостоятельного редактирования (self-update).
      Триггер profile_self_guard в БД защищает от подмены роли/прав/логина. */
   const isMember = me.role==='member' || me.role==='agency_owner';   /* superadmin/client — не редактируют */
+  /* Кнопка «Сменить пароль» — только для владельца, директора, суперадмина.
+     Обычный сотрудник свой пароль сменить НЕ может (сервер тоже отклонит) —
+     чтобы при захвате сессии атакующий не запер аккаунт. Пусть обращается к руководителю. */
+  const canChangeOwnPwd = me.role==='agency_owner' || me.role==='superadmin' || (me.role==='member' && !!me.is_director);
   const bday = me.birthday ? String(me.birthday).slice(0,10) : '';
   const meAgeStr = (function(){ if(!bday) return ''; const b=new Date(bday); if(isNaN(+b)) return ''; const n=new Date(); let a=n.getFullYear()-b.getFullYear(); const md=n.getMonth()-b.getMonth(); if(md<0||(md===0&&n.getDate()<b.getDate())) a--; return a>=0?(a+' '+_plural(a,'год','года','лет')):''; })();
   const PALETTE=(typeof ACCENTS!=='undefined'?ACCENTS:['#37E6C8','#E3B567','#7B8CDE','#E37AA0','#67C6E3','#B567E3','#A6D96A','#F58C50','#5AC8FA','#FF6B6B']);
@@ -9691,13 +9695,20 @@ function myProfileOpen(){
         <span class="pm2-me-lbl">Ваш цвет</span>
         <div class="pm2-me-swatches">${colorSwatches}</div>
       </div>
+      ${canChangeOwnPwd ? `
       <div class="pm2-me-pwd">
         <div class="pm2-me-pwd-l">
           <div class="pm2-me-pwd-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Пароль</div>
           <div class="pm2-me-pwd-s">Сгенерировать новый пароль для входа в кабинет. Старый перестанет работать.</div>
         </div>
         <button type="button" class="pm2-pwd-btn" onclick="_agMyChangePwd()">Сменить пароль</button>
-      </div>
+      </div>` : `
+      <div class="pm2-me-pwd" style="opacity:.75">
+        <div class="pm2-me-pwd-l">
+          <div class="pm2-me-pwd-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Пароль</div>
+          <div class="pm2-me-pwd-s">Смена пароля доступна только владельцу и директору. Обратитесь к руководителю, если нужен новый пароль.</div>
+        </div>
+      </div>`}
       <div class="pm2-save-hint" id="pm2-save-hint"></div>
     </div>` : '';
 
@@ -9720,13 +9731,13 @@ function myProfileOpen(){
       </div>
       <!-- слой 2 · мои личные данные (self-edit, только member — у owner нет self-editable полей) -->
       ${editHTML}
-      <!-- слой 2.5 · пароль (доступно для ЛЮБОЙ роли — каждый может сменить свой пароль) -->
-      ${!isMember ? `
+      <!-- слой 2.5 · пароль для суперадмина (owner/director/member увидели блок выше, внутри editHTML) -->
+      ${(!isMember && canChangeOwnPwd) ? `
         <div class="pm2-hr"></div>
         <div class="pm2-me-pwd" style="margin-top:4px">
           <div class="pm2-me-pwd-l">
             <div class="pm2-me-pwd-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Мой пароль</div>
-            <div class="pm2-me-pwd-s">Сгенерировать новый пароль для входа в кабинет владельца. Старый перестанет работать.</div>
+            <div class="pm2-me-pwd-s">Сгенерировать новый пароль для входа в кабинет. Старый перестанет работать.</div>
           </div>
           <button type="button" class="pm2-pwd-btn" onclick="_agMyChangePwd()">Сменить</button>
         </div>` : ''}
@@ -23436,8 +23447,15 @@ async function _agCpSubmit(targetUserId, targetName, isSelfFlag){
     console.error('change-password submit', e);
   }
 }
+/* Проверка права смены пароля (владелец / директор / суперадмин).
+   Клиентский guard — сервер всё равно валидирует, но так вернём понятное сообщение сразу. */
+function _agCanChangePwd(){
+  const me=(window.tMe&&window.tMe())||null; if(!me) return false;
+  return me.role==='agency_owner' || me.role==='superadmin' || (me.role==='member' && !!me.is_director);
+}
 /* Смена пароля сотрудника из PM Card — открывает модалку выбора пароля. */
 function _pmChangePwd(memberId){
+  if(!_agCanChangePwd()){ toast('Смена пароля доступна только владельцу и директору'); return; }
   const m = (typeof _pmMemberById==='function') ? _pmMemberById(memberId) : null;
   if(!m){ toast('Сотрудник не найден'); return; }
   _agShowPwdInputModal(String(memberId), m.name||'сотрудник', false);
@@ -23445,6 +23463,7 @@ function _pmChangePwd(memberId){
 /* Смена своего пароля из «Мой профиль». */
 function _agMyChangePwd(){
   const me=(window.tMe&&window.tMe())||null; if(!me){ toast('Профиль ещё загружается'); return; }
+  if(!_agCanChangePwd()){ toast('Смена пароля доступна только владельцу и директору. Обратитесь к руководителю.'); return; }
   _agShowPwdInputModal(String(me.id), me.full_name||'Мой аккаунт', true);
 }
 window._pmChangePwd=_pmChangePwd; window._agMyChangePwd=_agMyChangePwd; window._agCpCopy=_agCpCopy;
