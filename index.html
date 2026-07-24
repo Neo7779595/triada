@@ -8480,7 +8480,14 @@ function _agSetPPPeriod(p){
 }
 /* Backward-compat: старое имя ссылок на модалку → редирект на полностраничную витрину */
 function _agShowPlanPickerModal(opts){ return _agShowTariffsPage(opts); }
-function _agCloseTariffsPage(){ const ov=document.getElementById('ov-tariffs'); if(ov){ ov.classList.remove('on'); setTimeout(()=>ov.remove(), 260); } document.body.style.overflow=''; }
+function _agCloseTariffsPage(immediate){
+  const ov=document.getElementById('ov-tariffs');
+  if(ov){
+    if(immediate){ ov.remove(); }
+    else { ov.classList.remove('on'); setTimeout(()=>ov.remove(), 260); }
+  }
+  document.body.style.overflow='';
+}
 function _agShowTariffsPage(opts){
   window._agPPOpts = opts;
   const period = window._agPPPeriod||'month';
@@ -8698,7 +8705,11 @@ function _agTagFor(key){
   return tags[key] || '';
 }
 window._agPickPlan = async function(kind, targetKey, period){
-  /* period='quarter' → months=3 (плати за 2 — получи 3). period='month' → 1. */
+  /* period='quarter' → months=3 (плати за 2 — получи 3). period='month' → 1.
+     ⚠️ ВАЖНО: закрываем полностраничную витрину (.tf-ov z-index:1000) СРАЗУ (без fade)
+     до открытия модалки #ov-pd2 (z-index:60), иначе модалка окажется под витриной
+     и пользователь подумает что кнопка не сработала. */
+  _agCloseTariffsPage(true);
   const months = (period==='quarter') ? 3 : 1;
   const me=(window.tMe&&window.tMe())||{};
   const cur=_agTariffByKey(me.agencyPlan||'');
@@ -8760,10 +8771,17 @@ function _agShowUpgradeModal(cur, tgt, intent, ctx){
   /* Бонус-строка для квартала: считаем стоимость одного месяца из quarterly_price/3 vs из price — экономия */
   const bonusHtml = (isQuarter && tgt && tgt.price!=null && tgt.quarterly_price!=null)
     ? `<div class="ag-up-save-row">+1 месяц бонусом · экономия ${_agFmtMoney(Number(tgt.price)*3 - Number(tgt.quarterly_price))} сум за квартал</div>` : '';
+  const isDowngrade = (ctx.reason==='downgrade');
   const title = (ctx.reason==='limit' && ctx.limit)
     ? `Достигнут лимит · ${used}/${ctx.limit.limit}`
-    : `Переход на ${_ddH(tgtName)}`;
-  const subtitle = (ctx.reason==='limit') ? 'Расширьте лимит проектов — платите за возможность вести больше клиентов' : 'Больше проектов, шире возможности';
+    : isDowngrade
+      ? `Снизить до ${_ddH(tgtName)}`
+      : `Переход на ${_ddH(tgtName)}`;
+  const subtitle = (ctx.reason==='limit')
+    ? 'Расширьте лимит проектов — платите за возможность вести больше клиентов'
+    : isDowngrade
+      ? 'Меньше проектов — меньше подписка. Ваши текущие данные и настройки останутся.'
+      : 'Больше проектов, шире возможности';
   pd2Open(`<div class="modal" style="max-width:580px">
     <div class="modal-h"><h3>${_ddH(title)}</h3><p>${_ddH(subtitle)}</p></div>
     <div class="modal-b">
