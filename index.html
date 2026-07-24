@@ -10853,10 +10853,27 @@ function applyAgencyPerms(){
   const me=(window.tMe&&window.tMe())||null;
   const nav=document.querySelectorAll('#app-ag .nav-i');
   const np=document.querySelector('[onclick="openNewProject()"]');
-  if(!me || me.role!=='member' || me.is_director){ nav.forEach(n=>n.style.display=''); if(np)np.style.display=''; return null; }
+  /* Умная адаптация групповых заголовков: если ВСЕ пункты группы скрыты,
+     скрываем и заголовок «Работа/Аналитика/Ресурсы» — иначе торчит пустой лейбл. */
+  const _syncGroupHeaders = () => {
+    document.querySelectorAll('#app-ag .nav-group').forEach(g => {
+      const items = g.querySelectorAll('.nav-i');
+      let anyVisible = false;
+      items.forEach(it => { if(it.style.display !== 'none') anyVisible = true; });
+      const gh = g.querySelector('.nav-gh');
+      if(gh) gh.style.display = anyVisible ? '' : 'none';
+      g.style.display = anyVisible ? '' : 'none';
+    });
+  };
+  if(!me || me.role!=='member' || me.is_director){
+    nav.forEach(n=>n.style.display=''); if(np)np.style.display='';
+    _syncGroupHeaders();   // на полных правах — тоже вызовем на случай если пункт был скрыт другой логикой
+    return null;
+  }
   const perms=me.permissions||{}; let first=null;
   nav.forEach(n=>{ const m=n.dataset.m; const ok = (m==='calendar' && !perms.calendar) ? true : !!(perms[m]&&perms[m].view); n.style.display=ok?'':'none'; if(ok&&!first)first=m; });
   if(np)np.style.display=(perms.projects&&perms.projects.edit)?'':'none';
+  _syncGroupHeaders();
   return first;
 }
 function agOpenLearning(){
