@@ -8958,6 +8958,50 @@ function _agSupportShowFallback(url, text, copied){
 }
 window._agSupportOpen = _agSupportOpen;
 window._agSupportShowFallback = _agSupportShowFallback;
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ДЕМО-АККАУНТ — вход в живой кабинет DETROYD без регистрации, чтобы
+   потенциальный клиент сразу увидел работающий продукт.
+
+   ⚠ ВРЕМЕННОЕ РЕШЕНИЕ: пока DETROYD — рабочее тестовое агентство. Позже
+   этот доступ заменяется на статичный demo-мок с fake-данными (по команде
+   пользователя). Пока живой — все действия демо-юзера пишутся в реальную
+   БД, но это ок для отладки.
+   ═══════════════════════════════════════════════════════════════════════ */
+const _DEMO_EMAIL = 'detroyd@detroyd.triada.app';
+const _DEMO_PASS = 'fU6bcvWMafdm';
+async function _agDemoLogin(){
+  const btn = document.querySelector('.tf-extra-demo');
+  const origLabel = btn ? btn.querySelector('.tf-extra-n')?.textContent : '';
+  const setBusy = (busy, label) => {
+    if(!btn) return;
+    btn.disabled = busy;
+    btn.style.opacity = busy ? '.7' : '';
+    btn.style.pointerEvents = busy ? 'none' : '';
+    const nm = btn.querySelector('.tf-extra-n');
+    if(nm && label) nm.textContent = label;
+  };
+  setBusy(true, 'Входим в демо-кабинет…');
+  try{
+    if(typeof SB==='undefined' || !SB){ throw new Error('DB не готова'); }
+    /* Чистим локальную сессию — фикс интермиттент "Invalid credentials"
+       из-за старого токена в localStorage (см. tLogin для контекста). */
+    try{ await SB.auth.signOut({ scope: 'local' }); }catch(_){}
+    const { data, error } = await SB.auth.signInWithPassword({ email: _DEMO_EMAIL, password: _DEMO_PASS });
+    if(error) throw error;
+    /* Закрываем оверлей тарифов, потом роутим в кабинет. */
+    if(typeof _agCloseTariffsPage==='function') _agCloseTariffsPage(true);
+    if(typeof _regClose==='function') _regClose();
+    /* routeByProfile определяет по роли куда открыть (owner → app-ag). */
+    if(typeof routeByProfile==='function') await routeByProfile(data && data.user);
+    if(typeof toast==='function') toast('Добро пожаловать в демо-кабинет DETROYD · это живое тестовое агентство');
+  }catch(e){
+    console.error('_agDemoLogin', e);
+    if(typeof toast==='function') toast('Не удалось войти в демо: ' + ((e&&e.message)||e));
+    setBusy(false, origLabel || 'Демо-аккаунт · посмотреть кабинет');
+  }
+}
+window._agDemoLogin = _agDemoLogin;
 function _agIntentCode(){
   const alph='0123456789abcdefghjkmnpqrstuvwxyz';
   let s=''; for(let i=0;i<10;i++) s+=alph.charAt((Math.random()*alph.length)|0);
@@ -9486,6 +9530,11 @@ function _agShowTariffsPage(opts){
           <div class="tf-extra-b"><div class="tf-extra-n">Служба поддержки DETROYD SMART</div><div class="tf-extra-s">Персональный менеджер в Telegram · среднее время ответа < 1 часа</div></div>
           <div class="tf-extra-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
         </button>
+        ${isPublic?`<button class="tf-extra tf-extra-demo" onclick="_agDemoLogin()" type="button">
+          <div class="tf-extra-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg></div>
+          <div class="tf-extra-b"><div class="tf-extra-n">Демо-аккаунт · посмотреть кабинет</div><div class="tf-extra-s">Войти в готовое агентство без регистрации — увидеть команду, проекты, финансы, аналитику</div></div>
+          <div class="tf-extra-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        </button>`:''}
       </div>
 
       <div class="tf-faq">
@@ -10124,7 +10173,13 @@ function _agReadOnlyPeek(){
     +'.tf-extra-support .tf-extra-ic{background:color-mix(in oklab,var(--accent) 18%,transparent);border-color:color-mix(in oklab,var(--accent) 40%,transparent);color:var(--accent)}'
     +'.tf-extra-support .tf-extra-n{letter-spacing:.005em;font-family:inherit;font-size:14px;font-weight:600;color:var(--txt);text-transform:none}'
     +'.tf-extra-arrow{flex:0 0 auto;color:var(--accent);opacity:.6;transition:.24s}'
-    +'.tf-extra-support:hover .tf-extra-arrow{opacity:1;transform:translateX(3px)}'
+    +'.tf-extra-support:hover .tf-extra-arrow,.tf-extra-demo:hover .tf-extra-arrow{opacity:1;transform:translateX(3px)}'
+    /* Demo-кнопка: фиолетовый акцент (отличается от support-мятного), чтобы визуально разделить */
+    +'.tf-extra-demo{background:linear-gradient(135deg,color-mix(in oklab,#8a8fff 10%,var(--bg-1)),color-mix(in oklab,#8a8fff 3%,var(--bg-1)));border:1px solid color-mix(in oklab,#8a8fff 32%,var(--line-2));cursor:pointer;font-family:inherit;width:100%}'
+    +'.tf-extra-demo:hover{border-style:solid;border-color:#8a8fff;background:linear-gradient(135deg,color-mix(in oklab,#8a8fff 16%,var(--bg-1)),color-mix(in oklab,#8a8fff 6%,var(--bg-1)));transform:translateY(-1px);box-shadow:0 12px 32px -14px rgba(138,143,255,.45)}'
+    +'.tf-extra-demo .tf-extra-ic{background:color-mix(in oklab,#8a8fff 18%,transparent);border-color:color-mix(in oklab,#8a8fff 40%,transparent);color:#8a8fff}'
+    +'.tf-extra-demo .tf-extra-n{letter-spacing:.005em;font-family:inherit;font-size:14px;font-weight:600;color:var(--txt);text-transform:none}'
+    +'.tf-extra-demo .tf-extra-arrow{color:#8a8fff}'
     /* FAQ — полноширочная сетка с иконками, вместо узкой колонки в центре */
     +'.tf-faq{max-width:1240px;margin:64px auto 0;padding-top:56px;border-top:1px solid color-mix(in oklab,var(--line-2) 60%,transparent);position:relative}'
     +'.tf-faq::before{content:"";position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:60px;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.6}'
