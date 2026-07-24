@@ -8996,12 +8996,16 @@ async function _agDemoLogin(){
     try{ await SB.auth.signOut({ scope: 'local' }); }catch(_){}
     const { data, error } = await SB.auth.signInWithPassword({ email: _DEMO_EMAIL, password: _DEMO_PASS });
     if(error) throw error;
-    /* Закрываем оверлей тарифов, потом роутим в кабинет. */
-    if(typeof _agCloseTariffsPage==='function') _agCloseTariffsPage(true);
-    if(typeof _regClose==='function') _regClose();
-    /* routeByProfile определяет по роли куда открыть (owner → app-ag). */
-    if(typeof routeByProfile==='function') await routeByProfile(data && data.user);
-    if(typeof toast==='function') toast('Добро пожаловать в демо-кабинет DETROYD · это живое тестовое агентство');
+    /* ★ Полная перезагрузка страницы — единственный надёжный способ переключить
+       контекст агентства. Раньше просто вызывали routeByProfile → app-ag уже был
+       .on, agNav не пересобирал sidebar, ME обновлялся но TEAM/PROJECTS в памяти
+       оставались от предыдущего агентства → пользователь видел старые данные
+       под новым тарифом. Перезагрузка гарантирует чистое состояние.
+
+       Сессия сохранена в localStorage через signInWithPassword — после reload
+       supabase-js её подхватит и routeByProfile отработает как обычный логин. */
+    if(typeof toast==='function') toast('Входим в демо-кабинет DETROYD…');
+    setTimeout(() => { location.reload(); }, 120);
   }catch(e){
     console.error('_agDemoLogin', e);
     if(typeof toast==='function') toast('Не удалось войти в демо: ' + ((e&&e.message)||e));
