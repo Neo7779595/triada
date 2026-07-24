@@ -9415,6 +9415,21 @@ function _agReadOnlyPeek(){
     +'}'
     +'.ag-rn{display:flex;align-items:center;justify-content:space-between;background:var(--panel-3);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:6px;gap:12px}'
     +'.ag-rn-nm{font-size:17px;font-weight:600;color:var(--txt)}'
+    /* ═══ Модалка «возврат из архива превысит лимит» ═══ */
+    +'.ag-rlim-viz{display:flex;align-items:stretch;gap:10px;padding:16px;background:color-mix(in oklab, var(--warn) 6%, var(--bg-2));border:1px solid color-mix(in oklab, var(--warn) 22%, var(--line));border-radius:12px;margin-bottom:14px}'
+    +'.ag-rlim-cur,.ag-rlim-next,.ag-rlim-lim{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px}'
+    +'.ag-rlim-arr,.ag-rlim-vs{display:flex;align-items:center;font-size:14px;color:var(--txt-3);font-weight:700;padding:0 2px}'
+    +'.ag-rlim-vs{font-family:var(--mono);font-size:11px;color:var(--warn);text-transform:uppercase;letter-spacing:.1em}'
+    +'.ag-rlim-n{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--txt);line-height:1;margin-bottom:4px;font-family:var(--font)}'
+    +'.ag-rlim-next .ag-rlim-n{color:var(--warn)}'
+    +'.ag-rlim-lim .ag-rlim-n{color:var(--accent);opacity:.85}'
+    +'.ag-rlim-l{font-size:10.5px;color:var(--txt-3);text-align:center;letter-spacing:.02em;line-height:1.3}'
+    +'.ag-rlim-note{font-size:13px;color:var(--txt-2);line-height:1.55;margin-bottom:14px}'
+    +'.ag-rlim-note b{color:var(--txt);font-weight:700}'
+    +'.ag-rlim-opts{display:flex;flex-direction:column;gap:8px}'
+    +'.ag-rlim-opt{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:color-mix(in oklab, var(--bg-2) 60%, transparent);border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--txt-2);line-height:1.5}'
+    +'.ag-rlim-opt b{color:var(--txt);font-weight:600}'
+    +'.ag-rlim-opt .d{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:color-mix(in oklab, var(--accent) 22%, transparent);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:700;margin-top:1px}'
     +'.ag-rn-pr{font-size:18px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}'
     +'.ag-rn-pr span{font-size:11px;color:var(--txt-3);font-family:var(--font);letter-spacing:0}'
     +'.ag-w-steps{list-style:none;padding:0;margin:0;display:block}'
@@ -9883,6 +9898,17 @@ async function pjSaveSettings(i){
   const selTeam=(typeof npSelectedTeam==='function'?npSelectedTeam():null);
   const ctTerm={start:_v('np-cstart')||null, end:_v('np-cend')||null};
   if(window.LIVE && p.status==='done' && status==='active'){
+    /* ⚠️ ПРЕВЕНТИВНАЯ ПРОВЕРКА ЛИМИТА: не даём открыть confirm возврата, если после
+       активации станет превышение. Триггер БД check_project_reactivate_limit — вторая
+       линия защиты (на случай race condition или прямого API-запроса). */
+    try{
+      const _info=(typeof agPlanLimit==='function')?agPlanLimit():null;
+      const _used=(typeof agProjUsed==='function')?agProjUsed():0;
+      if(_info && _info.limit && (_used + 1 > _info.limit)){
+        _agShowReactivateLimitModal(p.name, _used, _info);
+        return;
+      }
+    }catch(_e){ /* если хелперы не готовы — просто пропускаем, БД защитит */ }
     window._reactData={ id:p.id, patch, selTeam, ctTerm, oldContract:(p._contract||null), svcs:svcsArr };
     pd2Open(`<div class="modal"><div class="modal-h"><h3>Вернуть проект в работу</h3><p>${_ddH(p.name)} · новый цикл</p></div>`
       +`<div class="modal-b"><div style="font-size:14px;color:var(--txt-2);line-height:1.55">Проект возвращается в работу как <b>новый цикл</b>. Прошлый цикл (этапы и задачи) будет заархивирован в «Прошлые периоды», а текущие этапы и задачи — <b>обнулены</b>: первый этап в работу, остальные в очередь. Срок договора возьмётся из формы настроек.</div></div>`
@@ -9903,6 +9929,9 @@ async function pjSaveSettings(i){
 function pjDoReactivate(){
   const d=window._reactData; if(!d) return; window._reactData=null;
   (async()=>{
+    /* Готовим имя проекта на случай если сервер вернёт PROJECT_LIMIT_REACHED_REACTIVATE
+       (race condition: между превентивной проверкой и UPDATE кто-то создал ещё проект) */
+    const _projName = (d.patch && d.patch.name) || (function(){ const pp=(PROJECTS||[]).find(x=>x.id===d.id); return pp?pp.name:'проект'; })();
     try{
       if(d.selTeam){ await SB.from('project_members').delete().eq('project_id',d.id); if(d.selTeam.length){ const {error}=await SB.from('project_members').insert(d.selTeam.map(mid=>({project_id:d.id,member_id:mid}))); if(error) console.error('react team',error); } }
       await SB.from('projects').update({name:d.patch.name, logo_url:d.patch.logo_url, category:d.patch.category, service:d.patch.service, tariff:d.patch.tariff, mrr:d.patch.mrr, cost:d.patch.cost, lead_id:d.patch.lead_id}).eq('id',d.id);
@@ -9911,8 +9940,46 @@ function pjDoReactivate(){
     const ns=d.ctTerm.start || (d.oldContract&&d.oldContract.start) || (typeof npToday==='function'?npToday():null);
     const ne=d.ctTerm.end || (typeof npAddMonths==='function'?npAddMonths(ns,1):null);
     pd2Close();
-    if(window.tProjectRenew) window.tProjectRenew(d.id, ns, ne);
+    if(window.tProjectRenew) window.tProjectRenew(d.id, ns, ne, _projName);
   })();
+}
+/* ═══════════════════════════════════════════════════════════════════
+   МОДАЛКА «Возврат из архива превысит лимит тарифа»
+   Показывается ДО confirm возврата (превентивно), а также при 500
+   от БД (PROJECT_LIMIT_REACHED_REACTIVATE) — тогда race condition.
+   CTA — открывает витрину тарифов с фокусом на upgrade.
+   ═══════════════════════════════════════════════════════════════════ */
+function _agShowReactivateLimitModal(projectName, used, info){
+  const limit = (info&&info.limit) || used;
+  const tariffName = (info&&info.name) || (info&&info.key) || 'текущий';
+  const _proj = _ddH(projectName||'проект');
+  const _tf = _ddH(tariffName);
+  const canPay = (typeof agIsPayViewer==='function') ? agIsPayViewer() : true;
+  pd2Open(`<div class="modal" style="max-width:500px">
+    <div class="modal-h"><h3>Не влезает в лимит тарифа</h3><p>Возврат <b>«${_proj}»</b> из архива</p></div>
+    <div class="modal-b">
+      <div class="ag-rlim">
+        <div class="ag-rlim-viz">
+          <div class="ag-rlim-cur"><span class="ag-rlim-n">${used}</span><span class="ag-rlim-l">сейчас</span></div>
+          <div class="ag-rlim-arr">→</div>
+          <div class="ag-rlim-next"><span class="ag-rlim-n">${used+1}</span><span class="ag-rlim-l">после возврата</span></div>
+          <div class="ag-rlim-vs">vs</div>
+          <div class="ag-rlim-lim"><span class="ag-rlim-n">${limit}</span><span class="ag-rlim-l">лимит ${_tf}</span></div>
+        </div>
+        <div class="ag-rlim-note">
+          После возврата проекта у вас станет <b>${used+1}</b> активных проектов, а тариф <b>${_tf}</b> позволяет только <b>${limit}</b>. Есть 2 варианта:
+        </div>
+        <div class="ag-rlim-opts">
+          <div class="ag-rlim-opt"><span class="d">1</span><div><b>Закрыть какой-то из текущих активных проектов</b> и вернуть архивный на его место.</div></div>
+          <div class="ag-rlim-opt"><span class="d">2</span><div><b>Повысить тариф</b> — на следующем уровне вернуть проект и запустить новый.</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="pd2Close()">Понятно</button>
+      ${canPay ? `<button class="btn-add" onclick="pd2Close();setTimeout(function(){agChangePlanFlow()},80)">Повысить тариф</button>` : ''}
+    </div>
+  </div>`);
 }
 function pjDeleteProject(i){ const p=PROJECTS[i];
   if(!agIsPM()){ toast('Удаление проектов доступно только PM'); return; }
@@ -29301,7 +29368,7 @@ window.tProjectComplete = async (pid) => { try {
   const {error}=await SB.from('projects').update({status:'done'}).eq('id',pid); if(error)throw error;
   if(typeof cmClose==='function')cmClose(); toast('Проект завершён'); await window.tLoadAll(ME.role);
 } catch(e){ toast('Ошибка: '+(e.message||e)); } };
-window.tProjectRenew = async (pid, ns, ne) => { try {
+window.tProjectRenew = async (pid, ns, ne, _projName) => { try {
   // 1. снимок текущего цикла + старый период договора + номер следующего цикла
   const [stRes, tkRes, ctRes, cyRes] = await Promise.all([
     SB.from('project_stages').select('id,name,status,idx').eq('project_id',pid).order('idx',{ascending:true}),
@@ -29330,9 +29397,23 @@ window.tProjectRenew = async (pid, ns, ne) => { try {
   }
   // 5. новый период договора + проект активен
   const {error:ce}=await SB.from('project_contracts').upsert({project_id:pid, start_date:ns, end_date:ne, updated_at:new Date().toISOString()}, {onConflict:'project_id'}); if(ce)throw ce;
-  await SB.from('projects').update({status:'active', closed_at:null}).eq('id',pid);
+  const {error:ue}=await SB.from('projects').update({status:'active', closed_at:null}).eq('id',pid);
+  if(ue) throw ue;   // ← критично: если триггер вернёт PROJECT_LIMIT_REACHED_REACTIVATE, ловим здесь
   if(typeof cmClose==='function')cmClose(); toast('Новый цикл запущен · прошлый в архиве'); await window.tLoadAll(ME.role);
-} catch(e){ toast('Ошибка продления: '+(e.message||e)); } };
+} catch(e){
+  const msg = String(e&&e.message||e);
+  /* Триггер БД check_project_reactivate_limit: возврат превышает лимит тарифа.
+     Race condition: между превентивной клиент-проверкой и UPDATE кто-то добавил проект. */
+  if(/PROJECT_LIMIT_REACHED_REACTIVATE/.test(msg)){
+    if(typeof cmClose==='function')cmClose(); pd2Close();
+    try{ if(typeof agReloadProjCount==='function') await agReloadProjCount(); }catch(_){}
+    const info=(typeof agPlanLimit==='function')?agPlanLimit():null;
+    const used=(typeof agProjUsed==='function')?agProjUsed():0;
+    _agShowReactivateLimitModal(_projName||'проект', used, info);
+    return;
+  }
+  toast('Ошибка продления: '+msg);
+} };
 window.tSaveStageTemplate = async (service, stages, tariff) => { try {
   const me=(window.tMe&&window.tMe())||null; if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
   tariff=tariff||'';
