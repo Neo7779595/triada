@@ -34914,9 +34914,17 @@ window.tUpdateMember = async (id, perms, contact={}) => {
 };
 window.tMemberArchive = async (id, name) => {
   try {
+    /* Триггер БД profile_on_archive_revoke_tg автоматически обнуляет tg_user_id/
+       tg_link_code/tg_linked_at при выставлении archived_at → сотрудник моментально
+       теряет доступ к боту (уведомления не приходят, бот не отвечает на его команды,
+       мини-апп не пускает в кабинет). Восстановление профиля НЕ восстанавливает связь —
+       для повторной привязки сотрудник заново отправляет /start EMP-XXXX в боте.
+       В кабинете (index.html:34716) при перезагрузке архивированный пользователь
+       автоматически signOut. */
     const { error } = await SB.from('profiles').update({ archived_at: new Date().toISOString() }).eq('id', id);
     if (error){ toast('Не удалось удалить: ' + error.message); return; }
-    toast((name||'Сотрудник') + ' удалён'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
+    toast((name||'Сотрудник') + ' архивирован — доступ к боту и кабинету отозван');
+    await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
 window.tKbAdd = async (cat, title, ty, url) => {
