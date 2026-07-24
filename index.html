@@ -9442,15 +9442,20 @@ function _agShowTariffsPage(opts){
     const cta = blocked
       ? `<button class="tf-cta" disabled>Недоступно</button>`
       : isPublic
-        ? `<button class="tf-cta ${isPop?'is-pop':''}" onclick="_regRedirectBot('${_ddA(o.key)}')">Выбрать · ${_numFmt(totalPrice)} сум<svg viewBox="0 0 24 24" width="12" height="12" style="margin-left:6px" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>`
-        : `<button class="tf-cta ${isPop?'is-pop':''}" onclick="_agPickPlan('${_ddA(o.kind)}','${_ddA(o.key)}','${period}')">${o.kind==='upgrade'?'Перейти':'Снизить'} · ${_numFmt(totalPrice)} сум</button>`;
+        ? `<button class="tf-cta ${isPop?'is-pop':''}" onclick="_regRedirectBot('${_ddA(o.key)}')">Выбрать<svg viewBox="0 0 24 24" width="12" height="12" style="margin-left:6px" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>`
+        : `<button class="tf-cta ${isPop?'is-pop':''}" onclick="_agPickPlan('${_ddA(o.kind)}','${_ddA(o.key)}','${period}')">${o.kind==='upgrade'?'Перейти':'Снизить'}</button>`;
+    /* ★ Иерархия цен — как в окне регистрации:
+       БОЛЬШИМ отображаем сумму, КОТОРАЯ РЕАЛЬНО СПИСЫВАЕТСЯ (месяц/квартал),
+       мелким контекстом — «во сколько выходит проект» (для сравнения тарифов).
+       Раньше per-project цена была акцентной → пользователь думал что платит
+       её, а на счёте видел в 10 раз больше — казалось мошенничеством. */
     return `<div class="tf-card ${cls}" data-key="${_ddA(o.key)}">
       ${badge}
       <div class="tf-name">${_ddH(o.name)}</div>
       <div class="tf-lim-h">до <b>${projN}</b> ${_plural(projN,'проекта','проектов','проектов')}${projDelta?`<span class="tf-delta">+${projDelta}</span>`:''}</div>
-      <div class="tf-hero-p"><span class="v">${_numFmt(perProj)}</span><span class="u">сум</span></div>
-      <div class="tf-hero-c">за <b>1 проект</b>${isQ?' <em class="tf-with-bonus">· с бонусом</em>':''}</div>
-      <div class="tf-total">${_numFmt(totalPrice)} сум ${isQ?'за квартал':'в месяц'}${priceDelta?`<span class="tf-delta">+${_numFmt(priceDelta)}</span>`:''}</div>
+      <div class="tf-hero-p"><span class="v">${_numFmt(totalPrice)}</span><span class="u">сум/${isQ?'квартал':'мес'}</span></div>
+      <div class="tf-hero-c">&#8776; <b>${_numFmt(perProj)}</b> сум за проект${isQ?' в квартал':' в месяц'}${priceDelta?` <span class="tf-delta">+${_numFmt(priceDelta)}</span>`:''}</div>
+      ${isQ?`<div class="tf-bonus-pill">+1 месяц в подарок</div>`:''}
       ${cta}
     </div>`;
   };
@@ -10154,13 +10159,15 @@ function _agReadOnlyPeek(){
     +'.tf-lim-h b{color:var(--txt);font-weight:700}'
     +'.tf-delta{font-size:10.5px;font-weight:700;color:var(--pos);background:color-mix(in oklab, var(--pos) 14%, transparent);padding:2px 6px;border-radius:5px;letter-spacing:.02em;font-family:var(--mono);font-variant-numeric:tabular-nums}'
     /* Hero price (внутри карточки) */
-    +'.tf-hero-p{display:flex;align-items:baseline;gap:5px;margin-bottom:2px}'
-    +'.tf-hero-p .v{font-size:32px;font-weight:800;letter-spacing:-.028em;color:var(--txt);font-variant-numeric:tabular-nums;line-height:1}'
-    +'.tf-hero-p .u{font-size:14px;color:var(--txt-2);font-weight:700}'
-    +'.tf-hero-c{font-size:10.5px;color:var(--txt-3);letter-spacing:.02em;margin-bottom:12px;font-weight:500}'
-    +'.tf-hero-c b{color:var(--txt-2);font-weight:600}'
+    +'.tf-hero-p{display:flex;align-items:baseline;gap:5px;margin-bottom:4px;padding-top:10px;border-top:1px solid color-mix(in oklab,var(--line-2) 65%,transparent);flex-wrap:wrap}'
+    +'.tf-hero-p .v{font-size:26px;font-weight:800;letter-spacing:-.02em;color:var(--txt);font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap}'
+    +'.tf-hero-p .u{font-size:12px;color:var(--txt-3);font-weight:600;letter-spacing:.005em}'
+    +'.tf-hero-c{font-size:11px;color:var(--txt-3);letter-spacing:.005em;margin-bottom:10px;font-weight:500;line-height:1.4;display:flex;align-items:center;gap:8px;flex-wrap:wrap}'
+    +'.tf-hero-c b{color:var(--txt-2);font-weight:600;font-variant-numeric:tabular-nums}'
     +'.tf-with-bonus{color:#F5C542;font-style:normal;font-weight:600}'
-    +'.tf-total{font-size:11.5px;color:var(--txt-3);margin-bottom:14px;letter-spacing:.005em;font-family:var(--mono);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:8px;flex-wrap:wrap}'
+    +'.tf-bonus-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;margin-bottom:10px;background:color-mix(in oklab,#F5C542 14%,transparent);border:1px solid color-mix(in oklab,#F5C542 32%,transparent);color:#F5C542;font-size:10.5px;font-weight:600;border-radius:99px;letter-spacing:.005em;align-self:flex-start}'
+    +'.tf-card.tf-pop.on .tf-hero-p .v,.tf-card.on .tf-hero-p .v{color:var(--accent)}'
+    +'.tf-total{display:none}'   /* больше не используется — сумма и per-project теперь в .tf-hero-p / .tf-hero-c */
     /* CTA */
     +'.tf-cta{margin-top:auto;width:100%;padding:11px 12px;background:transparent;border:1px solid var(--line-2);color:var(--txt);font-size:12px;font-weight:600;border-radius:9px;cursor:pointer;transition:.16s;letter-spacing:.02em;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;line-height:1.2}'
     +'.tf-cta:hover:not(:disabled){background:color-mix(in oklab, var(--accent) 8%, transparent);border-color:color-mix(in oklab, var(--accent) 45%, var(--line-2))}'
