@@ -6474,12 +6474,23 @@ button:active{transform:translateY(.5px) scale(.99)}
 .pm2-dp-nav{width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--txt-3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:.14s;flex-shrink:0;padding:0}
 .pm2-dp-nav svg{width:12px;height:12px}
 .pm2-dp-nav:hover{color:var(--accent);border-color:color-mix(in oklab, var(--accent) 40%, var(--line-2));background:color-mix(in oklab, var(--accent) 8%, transparent)}
-.pm2-dp-title{flex:1;display:flex;gap:6px;justify-content:center}
-.pm2-dp-sel{appearance:none;-webkit-appearance:none;background:transparent;border:1px solid transparent;border-radius:8px;padding:5px 22px 5px 10px;font-size:13.5px;font-weight:600;color:var(--txt);font-family:inherit;cursor:pointer;transition:.14s;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%23888' stroke-width='1.5'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center}
-.pm2-dp-sel:hover{background-color:color-mix(in oklab, var(--accent) 8%, transparent);border-color:color-mix(in oklab, var(--accent) 30%, var(--line))}
-.pm2-dp-sel:focus{outline:none;border-color:var(--accent);background-color:color-mix(in oklab, var(--accent) 10%, transparent)}
-.pm2-dp-sel option{background:var(--panel-2);color:var(--txt);font-weight:500}
-.pm2-dp-selyr{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--accent)}
+.pm2-dp-title-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:1px solid transparent;border-radius:9px;padding:6px 12px;font-size:14px;font-weight:600;color:var(--txt);font-family:inherit;cursor:pointer;transition:.14s;letter-spacing:.01em}
+.pm2-dp-title-btn:hover{background:color-mix(in oklab, var(--accent) 8%, transparent);border-color:color-mix(in oklab, var(--accent) 26%, var(--line))}
+.pm2-dp-title-btn:active{transform:scale(.97)}
+.pm2-dp-title-btn > span{line-height:1.2}
+.pm2-dp-title-yr{color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:.02em}
+.pm2-dp-chev{width:12px;height:12px;color:var(--txt-3);transition:transform .18s ease}
+.pm2-dp-title-btn:hover .pm2-dp-chev{color:var(--accent)}
+/* Grid месяцев / годов */
+.pm2-dp-mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:2px 0 4px}
+.pm2-dp-mc{padding:14px 10px;border:none;background:transparent;border-radius:10px;color:var(--txt);font-size:13.5px;font-weight:600;cursor:pointer;transition:.12s;font-family:inherit;letter-spacing:.01em}
+.pm2-dp-mc:hover{background:color-mix(in oklab, var(--accent) 12%, transparent);color:var(--accent)}
+.pm2-dp-mc.is-mute{color:var(--txt-3);opacity:.4}
+.pm2-dp-mc.is-today{color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--accent) 40%, transparent)}
+.pm2-dp-mc.is-sel{background:var(--accent);color:var(--bg);font-weight:700;box-shadow:0 4px 12px -4px color-mix(in oklab, var(--accent) 60%, transparent)}
+.pm2-dp-mc.is-sel:hover{background:var(--accent);color:var(--bg);filter:brightness(1.08)}
+/* Grid годов — mono для чисел */
+.pm2-dp-mgrid .pm2-dp-mc:not(:nth-child(-n+12 of :is(.pm2-dp-mc[data-mo])))~.pm2-dp-mc{font-family:var(--mono)}
 .pm2-dp-wd{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px}
 .pm2-dp-wd span{font-size:10.5px;font-weight:600;color:var(--txt-3);text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:4px 0}
 .pm2-dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
@@ -9321,7 +9332,7 @@ function pm2OpenDate(ev){
   const btn=document.getElementById('pm2-bday-btn'); if(!btn) return;
   if(_pm2Dp){ pm2CloseDate(); return; }
   const cur=_pm2ParseIso(btn.dataset.value||'') || new Date(Date.UTC(new Date().getUTCFullYear()-25, 0, 1));
-  window.__pm2DpView = { y: cur.getUTCFullYear(), m: cur.getUTCMonth(), selISO: btn.dataset.value||'' };
+  window.__pm2DpView = { y: cur.getUTCFullYear(), m: cur.getUTCMonth(), selISO: btn.dataset.value||'', view: 'days' };
   const dp=document.createElement('div');
   dp.className='pm2-dp';
   dp.onclick=e=>e.stopPropagation();
@@ -9351,51 +9362,74 @@ function pm2CloseDate(){
 function _pm2RenderDate(){
   if(!_pm2Dp) return;
   const v=window.__pm2DpView; const y=v.y, m=v.m; const sel=v.selISO;
+  const view=v.view||'days';
   const MO=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const MO_SHORT=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
   const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-  const first=new Date(Date.UTC(y,m,1));
-  const startWd=(first.getUTCDay()+6)%7; /* Пн=0 */
-  const daysInMonth=new Date(Date.UTC(y,m+1,0)).getUTCDate();
-  const prevDays=new Date(Date.UTC(y,m,0)).getUTCDate();
-  const cells=[];
-  for(let i=0;i<startWd;i++){ const d=prevDays-startWd+1+i; cells.push({d, y:m===0?y-1:y, mo:m===0?11:m-1, muted:true}); }
-  for(let d=1; d<=daysInMonth; d++){ cells.push({d, y, mo:m, muted:false}); }
-  while(cells.length%7!==0){ const d=cells.length - startWd - daysInMonth + 1; cells.push({d, y:m===11?y+1:y, mo:m===11?0:m+1, muted:true}); }
   const today=new Date(); const tISO=_pm2ToIso(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  const cellHtml=cells.map(c=>{
-    const iso=_pm2ToIso(c.y, c.mo, c.d);
-    const cls=[];
-    if(c.muted) cls.push('is-mute');
-    if(iso===sel) cls.push('is-sel');
-    if(iso===tISO) cls.push('is-today');
-    return `<button type="button" class="pm2-dp-c ${cls.join(' ')}" onclick="_pm2PickDate('${iso}')">${c.d}</button>`;
-  }).join('');
-  /* Быстрый селект года: диапазон [today-90 .. today-14] — реалистичные для сотрудников */
   const nowY=today.getUTCFullYear();
-  const yearsBack=nowY-14, yearsFwd=nowY-90;
-  const years=[]; for(let yy=yearsBack; yy>=yearsFwd; yy--) years.push(yy);
+
+  const headBtns = `<button type="button" class="pm2-dp-nav" onclick="_pm2NavStep(-1)" title="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button type="button" class="pm2-dp-title-btn" onclick="_pm2ToggleView()">${view==='days'?`<span>${MO[m]}</span><span class="pm2-dp-title-yr">${y}</span>`:view==='months'?`<span>${y}</span>`:`<span>${v.decadeStart||(Math.floor(y/12)*12)} – ${(v.decadeStart||(Math.floor(y/12)*12))+11}</span>`}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pm2-dp-chev"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button type="button" class="pm2-dp-nav" onclick="_pm2NavStep(1)" title="Вперёд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>`;
+
+  let bodyHtml='';
+  if(view==='days'){
+    const first=new Date(Date.UTC(y,m,1));
+    const startWd=(first.getUTCDay()+6)%7;
+    const daysInMonth=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+    const prevDays=new Date(Date.UTC(y,m,0)).getUTCDate();
+    const cells=[];
+    for(let i=0;i<startWd;i++){ const d=prevDays-startWd+1+i; cells.push({d, y:m===0?y-1:y, mo:m===0?11:m-1, muted:true}); }
+    for(let d=1; d<=daysInMonth; d++){ cells.push({d, y, mo:m, muted:false}); }
+    while(cells.length%7!==0){ const d=cells.length - startWd - daysInMonth + 1; cells.push({d, y:m===11?y+1:y, mo:m===11?0:m+1, muted:true}); }
+    bodyHtml = `<div class="pm2-dp-wd">${WD.map(w=>`<span>${w}</span>`).join('')}</div>
+      <div class="pm2-dp-grid">${cells.map(c=>{
+        const iso=_pm2ToIso(c.y, c.mo, c.d);
+        const cls=[]; if(c.muted) cls.push('is-mute'); if(iso===sel) cls.push('is-sel'); if(iso===tISO) cls.push('is-today');
+        return `<button type="button" class="pm2-dp-c ${cls.join(' ')}" onclick="_pm2PickDate('${iso}')">${c.d}</button>`;
+      }).join('')}</div>`;
+  } else if(view==='months'){
+    bodyHtml = `<div class="pm2-dp-mgrid">${MO.map((n,i)=>{
+      const cls=[]; if(i===m) cls.push('is-sel'); if(y===today.getUTCFullYear() && i===today.getUTCMonth()) cls.push('is-today');
+      return `<button type="button" class="pm2-dp-mc ${cls.join(' ')}" onclick="_pm2PickMonth(${i})">${MO_SHORT[i]}</button>`;
+    }).join('')}</div>`;
+  } else if(view==='years'){
+    const start = v.decadeStart != null ? v.decadeStart : (Math.floor(y/12)*12);
+    v.decadeStart = start;
+    const years=[]; for(let i=0;i<12;i++) years.push(start+i);
+    bodyHtml = `<div class="pm2-dp-mgrid">${years.map(yy=>{
+      const cls=[]; if(yy===y) cls.push('is-sel'); if(yy===nowY) cls.push('is-today');
+      if(yy<1900 || yy>nowY-5) cls.push('is-mute');
+      return `<button type="button" class="pm2-dp-mc ${cls.join(' ')}" onclick="_pm2PickYear(${yy})">${yy}</button>`;
+    }).join('')}</div>`;
+  }
+
   _pm2Dp.innerHTML = `
-    <div class="pm2-dp-hd">
-      <button type="button" class="pm2-dp-nav" onclick="_pm2NavYear(-1)" title="Год ←"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M11 5l-7 7 7 7M20 5l-7 7 7 7"/></svg></button>
-      <button type="button" class="pm2-dp-nav" onclick="_pm2NavMonth(-1)" title="Месяц ←"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
-      <div class="pm2-dp-title">
-        <select class="pm2-dp-sel" onchange="_pm2SetMonth(this.value)">${MO.map((n,i)=>`<option value="${i}" ${i===m?'selected':''}>${n}</option>`).join('')}</select>
-        <select class="pm2-dp-sel pm2-dp-selyr" onchange="_pm2SetYear(this.value)">${years.map(yy=>`<option value="${yy}" ${yy===y?'selected':''}>${yy}</option>`).join('')}</select>
-      </div>
-      <button type="button" class="pm2-dp-nav" onclick="_pm2NavMonth(1)" title="Месяц →"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
-      <button type="button" class="pm2-dp-nav" onclick="_pm2NavYear(1)" title="Год →"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg></button>
-    </div>
-    <div class="pm2-dp-wd">${WD.map(w=>`<span>${w}</span>`).join('')}</div>
-    <div class="pm2-dp-grid">${cellHtml}</div>
+    <div class="pm2-dp-hd">${headBtns}</div>
+    ${bodyHtml}
     <div class="pm2-dp-ft">
       <button type="button" class="pm2-dp-act pm2-dp-clr" onclick="_pm2ClearDate()">Очистить</button>
       <button type="button" class="pm2-dp-act pm2-dp-tdy" onclick="_pm2PickDate('${tISO}')">Сегодня</button>
     </div>`;
 }
-function _pm2NavMonth(delta){ const v=window.__pm2DpView; let nm=v.m+delta, ny=v.y; while(nm<0){ nm+=12; ny--; } while(nm>11){ nm-=12; ny++; } v.m=nm; v.y=ny; _pm2RenderDate(); }
-function _pm2NavYear(delta){ window.__pm2DpView.y += delta; _pm2RenderDate(); }
-function _pm2SetMonth(m){ window.__pm2DpView.m=parseInt(m,10)||0; _pm2RenderDate(); }
-function _pm2SetYear(y){ window.__pm2DpView.y=parseInt(y,10)||new Date().getUTCFullYear(); _pm2RenderDate(); }
+/* Клик по заголовку переключает view: days → months → years → days */
+function _pm2ToggleView(){
+  const v=window.__pm2DpView;
+  v.view = v.view==='days' ? 'months' : v.view==='months' ? 'years' : 'days';
+  if(v.view==='years') v.decadeStart = Math.floor(v.y/12)*12;
+  _pm2RenderDate();
+}
+/* Стрелки: в days → месяц; в months → год; в years → декада (±12 лет) */
+function _pm2NavStep(delta){
+  const v=window.__pm2DpView;
+  if(v.view==='days'){ let nm=v.m+delta, ny=v.y; while(nm<0){ nm+=12; ny--; } while(nm>11){ nm-=12; ny++; } v.m=nm; v.y=ny; }
+  else if(v.view==='months'){ v.y += delta; }
+  else if(v.view==='years'){ v.decadeStart = (v.decadeStart!=null?v.decadeStart:Math.floor(v.y/12)*12) + delta*12; }
+  _pm2RenderDate();
+}
+function _pm2PickMonth(mo){ window.__pm2DpView.m = mo; window.__pm2DpView.view='days'; _pm2RenderDate(); }
+function _pm2PickYear(yy){ window.__pm2DpView.y = yy; window.__pm2DpView.view='months'; _pm2RenderDate(); }
 function _pm2PickDate(iso){
   const btn=document.getElementById('pm2-bday-btn'); if(btn){ btn.dataset.value=iso; btn.innerHTML=_pm2FmtDate(iso)+'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'; }
   pm2CloseDate();
@@ -9407,8 +9441,8 @@ function _pm2ClearDate(){
   pm2Save('birthday', null);
 }
 window.pm2OpenDate=pm2OpenDate; window.pm2CloseDate=pm2CloseDate;
-window._pm2NavMonth=_pm2NavMonth; window._pm2NavYear=_pm2NavYear;
-window._pm2SetMonth=_pm2SetMonth; window._pm2SetYear=_pm2SetYear;
+window._pm2ToggleView=_pm2ToggleView; window._pm2NavStep=_pm2NavStep;
+window._pm2PickMonth=_pm2PickMonth; window._pm2PickYear=_pm2PickYear;
 window._pm2PickDate=_pm2PickDate; window._pm2ClearDate=_pm2ClearDate;
 function applyAgencyPerms(){
   const me=(window.tMe&&window.tMe())||null;
