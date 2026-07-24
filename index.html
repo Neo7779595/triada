@@ -8387,36 +8387,114 @@ function _agShowPlanPickerModal(opts){
   const me=(window.tMe&&window.tMe())||{};
   const cur=_agTariffByKey(me.agencyPlan||'');
   const curName=(cur&&cur.name)||'—';
+  const curPriceN=(cur&&cur.price!=null)?Number(cur.price):null;
+  const curLimN=(cur&&cur.limits&&cur.limits.projects)?Number(cur.limits.projects):null;
+  const used=(typeof agProjUsed==='function')?agProjUsed():0;
+  const dLeft=_agDaysLeft(me.agencyPaidUntil);
+  const paidLbl = dLeft==null ? '' : (dLeft>=0 ? 'до '+_agFmtDate(me.agencyPaidUntil) : 'истекла '+Math.abs(dLeft)+' '+_plural(Math.abs(dLeft),'день','дня','дней')+' назад');
   const groups={renew:[],upgrade:[],downgrade:[]};
   opts.forEach(o=>{ if(groups[o.kind]) groups[o.kind].push(o); });
-  const iconFor=k => k==='renew' ? '🔁' : k==='upgrade' ? '⬆️' : '⬇️';
-  const labelFor=k => k==='renew' ? 'Текущий · продлить' : k==='upgrade' ? 'Повысить' : 'Понизить';
-  const rowHtml=o=>{
-    const price = o.price!=null ? _agFmtMoney(o.price)+' сум/мес' : 'по договору';
-    const lim = o.is_unlim ? '∞ проектов' : ((o.projects_limit||'—')+' проектов');
+  /* Сортировка внутри секций по лимиту (upgrade — ↑, downgrade — ↓, чтобы ближайший к текущему был вверху) */
+  groups.upgrade.sort((a,b)=> (a.is_unlim?1e9:a.projects_limit||0)-(b.is_unlim?1e9:b.projects_limit||0));
+  groups.downgrade.sort((a,b)=> (b.projects_limit||0)-(a.projects_limit||0));
+
+  const _numFmt = n => (n==null?'—':String(Math.round(Number(n))).replace(/\B(?=(\d{3})+(?!\d))/g,' '));
+  const iconFor = key => {
+    /* Уникальная иконка для каждого тарифа. Цветовая тональность — accent gradient. */
+    const ico = {
+      'tariff':      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5l1.5-6a2 2 0 011.9-1.5H12l1.5-4 2 2-1 2.5 3.6-.5a2 2 0 012 2.5l-1.5 6a2 2 0 01-2 1.5H6.5a2 2 0 01-2-2z"/></svg>',
+      'dtr_starter': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+      'dtr_wolf':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 3l6-2 6 2 3 5-9 15L3 8z"/><path d="M6 3l6 8M18 3l-6 8M3 8l9 3M21 8l-9 3"/></svg>',
+      'dtr_enterprise':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h18M5 17l-2-9 5.5 4L12 5l3.5 6.5L20 8l-1.5 9H5.5z"/></svg>',
+      'prooo':       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 4h12l-1 6a5 5 0 01-10 0z"/><path d="M6 4H4v2a2 2 0 002 2M18 4h2v2a2 2 0 01-2 2M10 15h4v3h2v3H8v-3h2z"/></svg>',
+    };
+    return ico[key] || ico['tariff'];
+  };
+  const kindArrow = k => k==='renew'
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>'
+    : k==='upgrade'
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+
+  const rowHtml = o => {
+    const price   = o.price!=null ? _numFmt(o.price) : null;
+    const lim     = o.is_unlim ? '∞' : String(o.projects_limit||'—');
     const blocked = !o.allowed;
-    const cta = blocked ? '' : `<button class="btn-add ag-pp-btn" onclick="_agPickPlan('${_ddA(o.kind)}','${_ddA(o.key)}')">${o.kind==='renew'?'Продлить':(o.kind==='upgrade'?'Повысить':'Понизить')}</button>`;
-    return `<div class="ag-pp-row ${blocked?'is-blocked':''}">
-      <div class="ag-pp-row-h">
-        <span class="ag-pp-ic">${iconFor(o.kind)}</span>
-        <span class="ag-pp-nm">${_ddH(o.name)}</span>
-        <span class="ag-pp-pr">${_ddH(price)}</span>
+    const isEnt   = (o.price==null);
+    /* Дельты относительно текущего тарифа. */
+    const priceDelta = (o.price!=null && curPriceN!=null && o.kind!=='renew') ? (Number(o.price)-curPriceN) : null;
+    const limDelta   = (!o.is_unlim && o.projects_limit!=null && curLimN!=null && o.kind!=='renew') ? (Number(o.projects_limit)-curLimN) : null;
+    const priceDeltaTxt = priceDelta==null ? '' : (priceDelta>0?'+':'')+_numFmt(priceDelta)+' сум/мес';
+    const limDeltaTxt   = limDelta==null ? '' : (limDelta>0?'+':'')+limDelta+' '+_plural(Math.abs(limDelta),'проект','проекта','проектов');
+    const dcls = (priceDelta==null) ? '' : (priceDelta>0 ? 'is-up' : 'is-dn');
+
+    const ctaLabel = o.kind==='renew' ? 'Продлить · 1 мес'
+                  : o.kind==='upgrade' ? 'Повысить'
+                  : 'Понизить';
+    const cta = blocked
+      ? (isEnt
+          ? `<a class="ag-pp-cta is-ghost" href="https://t.me/DeTroyd_system_bot" target="_blank" rel="noopener">Связаться</a>`
+          : `<button class="ag-pp-cta is-dis" disabled>Недоступно</button>`)
+      : `<button class="ag-pp-cta ${o.kind==='renew'?'is-cur':''}" onclick="_agPickPlan('${_ddA(o.kind)}','${_ddA(o.key)}')">${_ddH(ctaLabel)}</button>`;
+
+    return `<div class="ag-pp-card ${o.kind==='renew'?'is-cur':''} ${blocked?'is-blocked':''}">
+      <div class="ag-pp-badge ag-pp-bg-${o.kind}">${kindArrow(o.kind)}</div>
+      <div class="ag-pp-ic">${iconFor(o.key)}</div>
+      <div class="ag-pp-body">
+        <div class="ag-pp-nm">${_ddH(o.name)}${o.kind==='renew'?' <span class="ag-pp-tag">ваш</span>':''}</div>
+        <div class="ag-pp-lim">до <b>${_ddH(lim)}</b> проектов${limDeltaTxt?` <span class="ag-pp-dlt ${dcls}">${_ddH(limDeltaTxt)}</span>`:''}</div>
       </div>
-      <div class="ag-pp-row-b">
-        <span class="ag-pp-lim">${_ddH(lim)}</span>
-        ${blocked?`<span class="ag-pp-block">${_ddH(o.reason||'недоступно')}</span>`:''}
+      <div class="ag-pp-pricebox">
+        ${isEnt
+          ? `<div class="ag-pp-pr">по договору</div>`
+          : `<div class="ag-pp-pr"><b>${price}</b><em>сум/мес</em></div>${priceDeltaTxt?`<div class="ag-pp-dlt ${dcls}">${_ddH(priceDeltaTxt)}</div>`:''}`}
         ${cta}
       </div>
+      ${blocked&&!isEnt?`<div class="ag-pp-block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>${_ddH(o.reason||'недоступно')}</span></div>`:''}
+      ${isEnt?`<div class="ag-pp-block is-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg><span>${_ddH(o.reason||'Индивидуальный тариф — свяжитесь с DETROYD')}</span></div>`:''}
     </div>`;
   };
-  const secHtml=(k,list)=> list.length?`<div class="ag-pp-sec"><div class="ag-pp-sec-h">${labelFor(k)}</div>${list.map(rowHtml).join('')}</div>`:'';
-  pd2Open(`<div class="modal" style="max-width:560px">
-    <div class="modal-h"><h3>Изменить тариф</h3><p>Текущий: <b>${_ddH(curName)}</b></p></div>
+
+  const secHtml = (k, list, title, sub) => list.length ? `
+    <section class="ag-pp-sec">
+      <header class="ag-pp-sec-h"><span class="ag-pp-sec-t">${title}</span>${sub?`<span class="ag-pp-sec-s">${sub}</span>`:''}</header>
+      <div class="ag-pp-list">${list.map(rowHtml).join('')}</div>
+    </section>` : '';
+
+  const usedPct = (curLimN && curLimN>0) ? Math.min(100, Math.round(used/curLimN*100)) : 0;
+  const usedCls = curLimN ? (used>curLimN?'is-over':(used>=curLimN?'is-full':'is-ok')) : 'is-ok';
+
+  pd2Open(`<div class="modal ag-pp-modal" style="max-width:640px">
+    <div class="ag-pp-hero">
+      <div class="ag-pp-hero-top">
+        <div class="ag-pp-hero-t">
+          <div class="ag-pp-eyebrow">Тариф · подписка</div>
+          <h3>Изменить тариф</h3>
+        </div>
+        <button class="ag-pp-x" onclick="pd2Close()" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="ag-pp-hero-b">
+        <div class="ag-pp-hero-plan">
+          <div class="ag-pp-hero-ic">${iconFor((cur&&cur.key)||'tariff')}</div>
+          <div>
+            <div class="ag-pp-hero-nm">${_ddH(curName)}</div>
+            <div class="ag-pp-hero-sub">${curPriceN!=null?_numFmt(curPriceN)+' сум/мес':'—'}${paidLbl?' · '+_ddH(paidLbl):''}</div>
+          </div>
+        </div>
+        ${curLimN?`<div class="ag-pp-hero-meter ${usedCls}">
+          <div class="ag-pp-hero-mh"><span>Использование</span><span><b>${used}</b> / ${curLimN}</span></div>
+          <div class="ag-pp-hero-bar"><i style="width:${usedPct}%"></i></div>
+        </div>`:''}
+      </div>
+    </div>
     <div class="modal-b ag-pp">
-      ${secHtml('renew',groups.renew)}
-      ${secHtml('upgrade',groups.upgrade)}
-      ${secHtml('downgrade',groups.downgrade)}
-      <div class="ag-up-note">Оплата через бот <b>@DeTroyd_system_bot</b>. После подтверждения тариф и <code>paid_until</code> обновятся автоматически.</div>
+      ${secHtml('renew', groups.renew, 'Продлить текущий', 'без смены плана')}
+      ${secHtml('upgrade', groups.upgrade, 'Повысить план', 'больше проектов, больше возможностей')}
+      ${secHtml('downgrade', groups.downgrade, 'Понизить план', 'если проектов стало меньше')}
+      <div class="ag-pp-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg>
+        <div>Оплата через бот <b>@DeTroyd_system_bot</b>. После подтверждения платежа тариф и дата <code>paid_until</code> обновятся автоматически — realtime.</div>
+      </div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div>
   </div>`);
@@ -8715,20 +8793,84 @@ function _agReadOnlyPeek(){
     +'.ag-up-feats li{margin:2px 0}'
     +'.ag-up-note{background:color-mix(in oklab, var(--panel-3) 60%, transparent);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--txt-3);line-height:1.55;margin-top:12px}'
     +'.ag-up-note code{background:color-mix(in oklab, var(--accent) 15%, transparent);padding:1px 6px;border-radius:6px;color:var(--txt-2);font-size:11.5px}'
-    /* plan-picker: секции (renew/upgrade/downgrade) с индикаторами allowed/blocked */
-    +'.ag-pp{display:flex;flex-direction:column;gap:14px}'
-    +'.ag-pp-sec{display:flex;flex-direction:column;gap:6px}'
-    +'.ag-pp-sec-h{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);font-weight:600;margin:2px 4px}'
-    +'.ag-pp-row{display:flex;flex-direction:column;gap:6px;background:var(--panel-3);border:1px solid var(--line);border-radius:12px;padding:12px 14px}'
-    +'.ag-pp-row.is-blocked{opacity:.62;background:color-mix(in oklab, var(--neg) 5%, var(--panel-3))}'
-    +'.ag-pp-row-h{display:flex;align-items:center;gap:10px}'
-    +'.ag-pp-ic{font-size:16px;line-height:1;width:22px;text-align:center}'
-    +'.ag-pp-nm{font-size:15px;font-weight:600;color:var(--txt);flex:1}'
-    +'.ag-pp-pr{font-size:14px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums}'
-    +'.ag-pp-row-b{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}'
-    +'.ag-pp-lim{font-size:12.5px;color:var(--txt-3)}'
-    +'.ag-pp-block{font-size:12px;color:var(--neg);line-height:1.35;flex:1 1 100%;margin-top:2px}'
-    +'.ag-pp-btn{padding:6px 14px;font-size:13px;border-radius:8px;margin-left:auto}'
+    /* ═══ plan-picker · премиальная модалка «Изменить тариф» ═══ */
+    +'.ag-pp-modal{overflow:hidden;padding:0;background:linear-gradient(180deg, color-mix(in oklab, var(--panel) 96%, var(--accent) 4%) 0%, var(--panel) 40%);border:1px solid color-mix(in oklab, var(--accent) 18%, var(--line-2))}'
+    +'#ov-pd2 .ag-pp-modal .modal-b{padding:14px 22px 4px}'
+    +'#ov-pd2 .ag-pp-modal .modal-f{padding:12px 22px 18px;border-top:none}'
+    +'.ag-pp-hero{position:relative;padding:22px 24px 20px;background:radial-gradient(120% 100% at 100% 0%, color-mix(in oklab, var(--accent) 18%, transparent) 0%, transparent 55%),radial-gradient(80% 70% at 0% 100%, color-mix(in oklab, var(--accent) 10%, transparent) 0%, transparent 60%),color-mix(in oklab, var(--panel-3) 60%, transparent);border-bottom:1px solid color-mix(in oklab, var(--accent) 12%, var(--line))}'
+    +'.ag-pp-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}'
+    +'.ag-pp-hero-t h3{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em;color:var(--txt)}'
+    +'.ag-pp-eyebrow{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:color-mix(in oklab, var(--accent) 80%, var(--txt-3));font-weight:600;margin-bottom:6px}'
+    +'.ag-pp-x{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--txt-3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}'
+    +'.ag-pp-x svg{width:14px;height:14px}'
+    +'.ag-pp-x:hover{color:var(--txt);border-color:var(--txt-3);background:var(--bg-2)}'
+    +'.ag-pp-hero-b{display:flex;align-items:center;gap:16px;flex-wrap:wrap}'
+    +'.ag-pp-hero-plan{display:flex;align-items:center;gap:14px;flex:1;min-width:220px}'
+    +'.ag-pp-hero-ic{width:46px;height:46px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg, color-mix(in oklab, var(--accent) 28%, transparent), color-mix(in oklab, var(--accent) 8%, transparent));border:1px solid color-mix(in oklab, var(--accent) 30%, var(--line));color:var(--accent);flex-shrink:0;box-shadow:0 4px 14px -6px color-mix(in oklab, var(--accent) 40%, transparent)}'
+    +'.ag-pp-hero-ic svg{width:22px;height:22px}'
+    +'.ag-pp-hero-nm{font-size:17px;font-weight:700;color:var(--txt);letter-spacing:.01em}'
+    +'.ag-pp-hero-sub{font-size:12.5px;color:var(--txt-3);margin-top:2px}'
+    +'.ag-pp-hero-meter{min-width:180px;flex:0 1 220px}'
+    +'.ag-pp-hero-mh{display:flex;justify-content:space-between;font-size:11px;color:var(--txt-3);margin-bottom:6px;letter-spacing:.03em}'
+    +'.ag-pp-hero-mh b{color:var(--txt);font-family:var(--mono);font-variant-numeric:tabular-nums}'
+    +'.ag-pp-hero-bar{height:6px;border-radius:99px;background:color-mix(in oklab, var(--panel-3) 70%, transparent);overflow:hidden;border:1px solid var(--line)}'
+    +'.ag-pp-hero-bar i{display:block;height:100%;border-radius:inherit;background:var(--pos);transition:width .35s ease}'
+    +'.ag-pp-hero-meter.is-full .ag-pp-hero-bar i{background:var(--warn)}'
+    +'.ag-pp-hero-meter.is-over .ag-pp-hero-bar i{background:var(--neg)}'
+    +'.ag-pp{display:flex;flex-direction:column;gap:18px}'
+    +'.ag-pp-sec{display:flex;flex-direction:column;gap:8px}'
+    +'.ag-pp-sec-h{display:flex;align-items:baseline;gap:10px;padding:0 4px}'
+    +'.ag-pp-sec-t{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:color-mix(in oklab, var(--accent) 75%, var(--txt-2));font-weight:700}'
+    +'.ag-pp-sec-s{font-size:11.5px;color:var(--txt-3);letter-spacing:.02em}'
+    +'.ag-pp-list{display:flex;flex-direction:column;gap:8px}'
+    +'.ag-pp-card{position:relative;display:grid;grid-template-columns:auto 40px 1fr auto;grid-template-areas:"badge ic body price";align-items:center;gap:14px;background:color-mix(in oklab, var(--panel-3) 80%, transparent);border:1px solid var(--line);border-radius:14px;padding:14px 16px 14px 16px;transition:border-color .16s, transform .16s, box-shadow .16s}'
+    +'.ag-pp-card:hover{border-color:color-mix(in oklab, var(--accent) 40%, var(--line-2));transform:translateY(-1px);box-shadow:0 10px 24px -14px color-mix(in oklab, var(--accent) 40%, transparent)}'
+    +'.ag-pp-card.is-cur{background:linear-gradient(135deg, color-mix(in oklab, var(--accent) 10%, transparent), color-mix(in oklab, var(--accent) 3%, var(--panel-3)));border-color:color-mix(in oklab, var(--accent) 45%, var(--line));box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent), 0 8px 20px -12px color-mix(in oklab, var(--accent) 40%, transparent)}'
+    +'.ag-pp-card.is-blocked{opacity:.85;background:color-mix(in oklab, var(--neg) 3%, var(--panel-3));border-color:color-mix(in oklab, var(--neg) 22%, var(--line))}'
+    +'.ag-pp-card.is-blocked:hover{transform:none;box-shadow:none;border-color:color-mix(in oklab, var(--neg) 26%, var(--line))}'
+    +'.ag-pp-badge{grid-area:badge;width:26px;height:26px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}'
+    +'.ag-pp-badge svg{width:14px;height:14px}'
+    +'.ag-pp-bg-renew{background:color-mix(in oklab, var(--accent) 22%, transparent);color:var(--accent)}'
+    +'.ag-pp-bg-upgrade{background:color-mix(in oklab, var(--pos) 22%, transparent);color:var(--pos)}'
+    +'.ag-pp-bg-downgrade{background:color-mix(in oklab, var(--warn) 20%, transparent);color:var(--warn)}'
+    +'.ag-pp-card .ag-pp-ic{grid-area:ic;width:40px;height:40px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in oklab, var(--panel-2) 80%, transparent);border:1px solid var(--line);color:var(--txt-2);flex-shrink:0}'
+    +'.ag-pp-card .ag-pp-ic svg{width:20px;height:20px}'
+    +'.ag-pp-card.is-cur .ag-pp-ic{background:linear-gradient(135deg, color-mix(in oklab, var(--accent) 22%, transparent), color-mix(in oklab, var(--accent) 6%, transparent));border-color:color-mix(in oklab, var(--accent) 32%, var(--line));color:var(--accent)}'
+    +'.ag-pp-body{grid-area:body;min-width:0}'
+    +'.ag-pp-card .ag-pp-nm{font-size:15px;font-weight:600;color:var(--txt);letter-spacing:.005em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}'
+    +'.ag-pp-tag{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);background:color-mix(in oklab, var(--accent) 15%, transparent);padding:2px 7px;border-radius:99px;font-weight:600;line-height:1.3}'
+    +'.ag-pp-card .ag-pp-lim{font-size:12.5px;color:var(--txt-3);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}'
+    +'.ag-pp-card .ag-pp-lim b{color:var(--txt-2);font-family:var(--mono);font-variant-numeric:tabular-nums}'
+    +'.ag-pp-dlt{font-size:11.5px;font-weight:600;padding:1px 6px;border-radius:6px;font-variant-numeric:tabular-nums;font-family:var(--mono)}'
+    +'.ag-pp-dlt.is-up{color:var(--pos);background:color-mix(in oklab, var(--pos) 14%, transparent)}'
+    +'.ag-pp-dlt.is-dn{color:var(--warn);background:color-mix(in oklab, var(--warn) 14%, transparent)}'
+    +'.ag-pp-pricebox{grid-area:price;display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right;min-width:120px}'
+    +'.ag-pp-card .ag-pp-pr{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--txt);font-size:14px;letter-spacing:.01em}'
+    +'.ag-pp-card .ag-pp-pr b{font-size:17px;font-weight:700;color:var(--txt);letter-spacing:.01em}'
+    +'.ag-pp-card .ag-pp-pr em{display:block;font-style:normal;font-size:10.5px;color:var(--txt-3);font-family:var(--font);letter-spacing:.04em;text-transform:uppercase;margin-top:1px;font-variant-numeric:normal}'
+    +'.ag-pp-cta{padding:8px 16px;font-size:13px;font-weight:600;border-radius:9px;border:none;background:var(--accent);color:var(--bg);cursor:pointer;transition:.14s;letter-spacing:.01em;white-space:nowrap;box-shadow:0 4px 12px -4px color-mix(in oklab, var(--accent) 55%, transparent)}'
+    +'.ag-pp-cta:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 6px 14px -4px color-mix(in oklab, var(--accent) 60%, transparent)}'
+    +'.ag-pp-cta:active{transform:translateY(0) scale(.98)}'
+    +'.ag-pp-cta.is-cur{background:color-mix(in oklab, var(--accent) 18%, transparent);color:var(--accent);border:1px solid color-mix(in oklab, var(--accent) 40%, var(--line));box-shadow:none}'
+    +'.ag-pp-cta.is-cur:hover{background:color-mix(in oklab, var(--accent) 28%, transparent);filter:none}'
+    +'.ag-pp-cta.is-dis{background:transparent;color:var(--txt-3);border:1px dashed var(--line);cursor:not-allowed;box-shadow:none}'
+    +'.ag-pp-cta.is-dis:hover{filter:none;transform:none;box-shadow:none}'
+    +'.ag-pp-cta.is-ghost{background:transparent;color:var(--txt-2);border:1px solid var(--line-2);box-shadow:none;text-decoration:none;display:inline-flex;align-items:center;gap:6px}'
+    +'.ag-pp-cta.is-ghost:hover{color:var(--txt);border-color:var(--txt-3);filter:none;background:var(--bg-2)}'
+    +'.ag-pp-block{grid-column:1/-1;display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--neg);line-height:1.4;padding:8px 10px;background:color-mix(in oklab, var(--neg) 6%, transparent);border-radius:9px;margin-top:2px;border:1px solid color-mix(in oklab, var(--neg) 15%, transparent)}'
+    +'.ag-pp-block svg{width:14px;height:14px;flex-shrink:0;margin-top:1px}'
+    +'.ag-pp-block.is-info{color:var(--txt-2);background:color-mix(in oklab, var(--accent) 4%, transparent);border-color:color-mix(in oklab, var(--accent) 15%, var(--line))}'
+    +'.ag-pp-note{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--txt-3);line-height:1.55;padding:12px 14px;background:color-mix(in oklab, var(--panel-3) 50%, transparent);border:1px dashed var(--line);border-radius:11px;margin-top:6px}'
+    +'.ag-pp-note svg{width:16px;height:16px;flex-shrink:0;margin-top:1px;color:var(--txt-3)}'
+    +'.ag-pp-note code{background:color-mix(in oklab, var(--accent) 15%, transparent);padding:1px 6px;border-radius:5px;color:var(--txt-2);font-size:11px}'
+    +'@media (max-width: 560px){'
+    +' .ag-pp-card{grid-template-columns:auto 36px 1fr;grid-template-areas:"badge ic body" ". . price";padding:12px 14px}'
+    +' .ag-pp-pricebox{align-items:stretch;text-align:left}'
+    +' .ag-pp-cta{width:100%;text-align:center}'
+    +' .ag-pp-hero{padding:18px 16px}'
+    +' #ov-pd2 .ag-pp-modal .modal-b{padding:14px 14px 4px}'
+    +' #ov-pd2 .ag-pp-modal .modal-f{padding:12px 14px 16px}'
+    +'}'
     +'.ag-rn{display:flex;align-items:center;justify-content:space-between;background:var(--panel-3);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:6px;gap:12px}'
     +'.ag-rn-nm{font-size:17px;font-weight:600;color:var(--txt)}'
     +'.ag-rn-pr{font-size:18px;color:var(--accent);font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}'
