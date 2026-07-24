@@ -6572,6 +6572,11 @@ button:active{transform:translateY(.5px) scale(.99)}
 /* Кнопка «Сгенерировать новый пароль» в PM Card settings */
 .pm-btn-pwd{display:inline-flex;align-items:center;justify-content:center;background:color-mix(in oklab, var(--accent) 8%, transparent);color:var(--accent);border:1px dashed color-mix(in oklab, var(--accent) 40%, var(--line-2))}
 .pm-btn-pwd:hover{background:color-mix(in oklab, var(--accent) 15%, transparent);border-style:solid;border-color:var(--accent)}
+/* Кнопка «Отвязать Telegram» — оранжевая (менее опасно чем удаление, но всё же обрубает связь) */
+.pm-btn-tgunlink{display:inline-flex;align-items:center;justify-content:center;background:color-mix(in oklab, var(--warn) 8%, transparent);color:var(--warn);border:1px dashed color-mix(in oklab, var(--warn) 40%, var(--line-2))}
+.pm-btn-tgunlink:hover{background:color-mix(in oklab, var(--warn) 16%, transparent);border-style:solid;border-color:var(--warn)}
+.pm-tg-hint{margin-top:10px;padding:9px 12px;background:color-mix(in oklab, var(--bg-2) 60%, transparent);border:1px dashed var(--line-2);border-radius:10px;font-size:12px;line-height:1.5;color:var(--txt-3)}
+.pm-tg-hint .pm-mono{color:var(--txt-2);background:color-mix(in oklab, var(--accent) 10%, transparent);padding:1px 6px;border-radius:5px}
 /* Модалка показа нового пароля — большой моно код + copy button */
 .ag-cp-pwbox{background:color-mix(in oklab, var(--accent) 6%, var(--bg-2));border:1px solid color-mix(in oklab, var(--accent) 28%, var(--line));border-radius:12px;padding:16px 18px;margin-bottom:14px}
 .ag-cp-l{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:color-mix(in oklab, var(--accent) 85%, var(--txt-3));font-weight:600;margin-bottom:8px}
@@ -23230,11 +23235,15 @@ function _pmRender(m){
           <div class="pm-s-h">Доступы к системе</div>
           <div class="pm-s-row"><span class="pm-s-l">Логин</span><span class="pm-s-v pm-mono">${_ddH(m.login||'—')}</span></div>
           <div class="pm-s-row"><span class="pm-s-l">Пароль</span><span class="pm-s-v pm-mono" style="color:var(--txt-3)">•••••••••</span></div>
-          <div class="pm-s-row"><span class="pm-s-l">TG-аккаунт</span><span class="pm-s-v">${m.tg_user_id?('привязан · <span class="pm-mono">'+_ddH(m.tg_user_id)+'</span>'):'не привязан'}</span></div>
+          <div class="pm-s-row"><span class="pm-s-l">TG-аккаунт</span><span class="pm-s-v">${m.tg_user_id?('<span style="color:var(--pos)">● привязан</span> · <span class="pm-mono">'+_ddH(m.tg_user_id)+'</span>'):'<span style="color:var(--txt-3)">не привязан</span>'}</span></div>
           <button class="btn-ghost pm-btn-pwd" style="width:100%;margin-top:8px" onclick="_pmChangePwd('${_ddA(m._id)}')">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
             Сгенерировать новый пароль
           </button>
+          ${m.tg_user_id ? `<button class="btn-ghost pm-btn-tgunlink" style="width:100%;margin-top:8px" onclick="_pmUnlinkTg('${_ddA(m._id)}','${_ddA(m.name||'сотрудник')}')" title="Разорвать связь с Telegram-ботом. Сотрудник останется в кабинете, но не будет получать уведомления, пока не привяжет заново.">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/><path d="M4 4l16 16" stroke-width="2.4"/></svg>
+            Отвязать Telegram
+          </button>` : `<div class="pm-tg-hint">Сотрудник не привязал Telegram. Скиньте ему код <span class="pm-mono">${_ddH(m.tg_link_code||'EMP-XXXX')}</span> — пусть отправит боту.</div>`}
         </div>
         <div class="pm-s-block">
           <div class="pm-s-h">Роль, права, проекты</div>
@@ -23554,8 +23563,53 @@ function _agMyChangePwd(){
   if(!_agCanChangePwd()){ toast('Смена пароля доступна только владельцу и директору. Обратитесь к руководителю.'); return; }
   _agShowPwdInputModal(String(me.id), me.full_name||'Мой аккаунт', true);
 }
+/* ══════════════════════════════════════════════════════════════════
+   ОТВЯЗАТЬ TELEGRAM у сотрудника (руками, без архивации).
+   Кейсы: сотрудник поменял телефон, потерял старый TG, руководитель хочет
+   принудительно разлогинить его из бота (не увольняя).
+   Обнуляем tg_user_id + tg_linked_at, оставляем tg_link_code — сотрудник
+   заново привяжет свой (возможно новый) TG-аккаунт через тот же EMP-XXXX.
+   Отдельная функция от tMemberArchive — тут сотрудник ОСТАЁТСЯ в команде,
+   продолжает пользоваться кабинетом, просто TG-канал закрыт до re-link.
+   ══════════════════════════════════════════════════════════════════ */
+function _pmUnlinkTg(memberId, name){
+  if(!(agIsOwner() || agIsDirector())){ toast('Отвязка Telegram доступна только владельцу и директору'); return; }
+  const nm = String(name||'сотрудник');
+  const msg = `Отвязать Telegram у «${nm}»?\n\n• Сотрудник ОСТАЁТСЯ в кабинете — просто теряет TG-связь.\n• Бот перестанет отвечать на его сообщения и слать уведомления.\n• Код EMP-XXXX сохранится: сотрудник может привязать свой (или новый) TG-аккаунт обратно, отправив этот код боту.\n\nПродолжить?`;
+  if(!confirm(msg)) return;
+  if(window.tMemberUnlinkTg) window.tMemberUnlinkTg(memberId, nm);
+}
+window.tMemberUnlinkTg = async (id, name) => {
+  try{
+    const { data, error } = await SB.from('profiles')
+      .update({ tg_user_id: null, tg_linked_at: null })
+      .eq('id', id)
+      .select('id,tg_user_id,tg_link_code,full_name')
+      .maybeSingle();
+    if (error){ toast('Не удалось отвязать: ' + error.message); return; }
+    if (!data){
+      toast('Не удалось отвязать — недостаточно прав или профиль не найден.');
+      return;
+    }
+    if (data.tg_user_id){
+      toast('Не удалось отвязать — Telegram по-прежнему связан. Проверьте права.');
+      return;
+    }
+    toast((name||data.full_name||'Сотрудник') + ' отвязан от Telegram · код ' + (data.tg_link_code||'EMP-XXXX') + ' сохранён для повторной привязки');
+    /* Обновляем локально + перерисовываем открытую PM-карточку */
+    const m = (typeof _pmMemberById==='function') ? _pmMemberById(id) : null;
+    if(m){ m.tg_user_id=null; }
+    if(window.__pmCurrentMember && String(window.__pmCurrentMember._id)===String(id)){
+      window.__pmCurrentMember.tg_user_id=null;
+      if(typeof _pmRender==='function') _pmRender(window.__pmCurrentMember);
+    }
+    /* На всякий случай перегружаем TEAM — на случай если админ параллельно менял. */
+    await window.tLoadAll(ME.role);
+  }catch(e){ toast('Ошибка: ' + (e.message||e)); }
+};
 window._pmChangePwd=_pmChangePwd; window._agMyChangePwd=_agMyChangePwd; window._agCpCopy=_agCpCopy;
 window._agCpGenerate=_agCpGenerate; window._agCpValidate=_agCpValidate; window._agCpToggleVisible=_agCpToggleVisible; window._agCpSubmit=_agCpSubmit;
+window._pmUnlinkTg=_pmUnlinkTg;
 
 function openCostDrill(i){
   const F=(typeof FINANCE!=='undefined'?FINANCE:null); if(!F||!F.breakdown) return;
@@ -29592,7 +29646,7 @@ const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудни
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
   login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, is_director:!!m.is_director, perms:m.permissions||{}, _seenTs:(m.last_seen_at?Date.parse(m.last_seen_at):0), archived_at:m.archived_at||null, _id:m.id,
   /* passport card fields */
-  birthday:m.birthday||null, hire_date:m.hire_date||null, created_at:m.created_at||null, tg_user_id:m.tg_user_id||null });
+  birthday:m.birthday||null, hire_date:m.hire_date||null, created_at:m.created_at||null, tg_user_id:m.tg_user_id||null, tg_link_code:m.tg_link_code||null });
 
 async function loadTariffs(){
   const { data } = await SB.from('tariffs').select('*').order('sort');
