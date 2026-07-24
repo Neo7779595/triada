@@ -5997,8 +5997,20 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .px-ov-cell{background:var(--bg-1);padding:22px 24px 18px;display:flex;flex-direction:column;min-height:152px}
 .px-ov-fchip{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--accent-dim);color:var(--accent);padding:2px 7px;border-radius:5px;border:1px solid var(--accent-line);margin-left:6px;vertical-align:middle;font-family:var(--mono)}
 .px-ov-l{font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--txt-3);font-weight:600}
-.px-ov-v{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.04em;line-height:1;margin-top:14px;display:flex;align-items:baseline;gap:6px}
+.px-ov-v{font-family:var(--mono);font-size:44px;font-weight:600;letter-spacing:-.04em;line-height:1;margin-top:14px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 .px-ov-v small{font-size:18px;font-weight:500;color:var(--txt-3)}
+/* «Срок удержания» и другие метрики где _lifeDur возвращает 1<u>мес</u>2<u>дн»:
+   раньше числа и «мес/дн» сливались в кашу «1мес2дн» — теперь единицы измерения
+   явно меньше цифр, покрашены серым и с воздухом справа для читаемости. */
+.px-ov-v .u{font-size:.42em;font-weight:500;color:var(--txt-3);letter-spacing:.02em;margin:0 4px 0 2px;font-family:var(--font);text-transform:lowercase;line-height:1}
+.px-ov-v .u:last-child{margin-right:0}
+/* Мини-метрики «мин / макс» в контексте карточки — сегментированно, а не одной строкой */
+.px-ov-ctx-mm{display:flex;align-items:center;gap:12px;font-family:var(--font)}
+.px-ov-ctx-mm .mm-i{display:inline-flex;align-items:baseline;gap:5px}
+.px-ov-ctx-mm .mm-i b{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-3);font-weight:700;opacity:.75}
+.px-ov-ctx-mm .mm-i span{font-family:var(--mono);font-size:12px;color:var(--txt-2);font-weight:600;font-variant-numeric:tabular-nums}
+.px-ov-ctx-mm .mm-i span .u{font-size:.78em;color:var(--txt-3);font-weight:500;margin:0 2px 0 1px;font-family:var(--font);text-transform:lowercase}
+.px-ov-ctx-mm .mm-sep{width:1px;align-self:stretch;background:color-mix(in oklab,var(--line-2) 60%,transparent);margin:1px 0}
 .px-ov-comp{display:none}
 .px-ov-comp i{height:100%;transform-origin:left;animation:growBar .8s var(--ease-out) both;min-width:4px}
 .px-ov-ctx{font-size:13px;color:var(--txt-3);font-family:var(--mono);margin-top:auto;padding-top:14px;border-top:1px solid var(--line);letter-spacing:.01em}
@@ -12231,6 +12243,10 @@ function renderProjects(){
   const _queue=_act.reduce((s,p)=>s+((p._pipeline&&p._pipeline.wait)||0),0);
   const _stTot=_act.reduce((s,p)=>s+(parseInt((p.stages||'0 / 0').split('/')[1])||0),0);
   const _maxMo=_act.reduce((m,p)=>Math.max(m,_ltvOf(p).months||0),0);
+  /* min-удержание: смотрим только проекты с ненулевым сроком (только запущенные,
+     иначе минимум всегда 0 у новых проектов и метрика бесполезна). */
+  const _monthsList=_act.map(p=>_ltvOf(p).months||0).filter(m=>m>0);
+  const _minMo=_monthsList.length?Math.min.apply(null,_monthsList):0;
   // сайдбар — всегда полный счёт
   const _nb=document.getElementById('ag-proj-ct'); if(_nb){ _nb.classList.remove('skel'); _nb.textContent=_actAll.length; }
   const _mA=document.getElementById('m-proj-act'); if(_mA)_mA.textContent=_actAll.length;
@@ -12262,7 +12278,7 @@ function renderProjects(){
       <div class="px-ov-cell">
         <div class="px-ov-l">Срок удержания</div>
         <div class="px-ov-v">${_lifeDur(_tenAvg)}</div>
-        <div class="px-ov-ctx">макс · ${_lifeDur(_maxMo)}</div>
+        <div class="px-ov-ctx px-ov-ctx-mm"><span class="mm-i"><b>мин</b><span>${_lifeDur(_minMo)}</span></span><span class="mm-sep"></span><span class="mm-i"><b>макс</b><span>${_lifeDur(_maxMo)}</span></span></div>
       </div>
     </div>
 
