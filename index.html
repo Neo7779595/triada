@@ -8187,7 +8187,28 @@ function agPlanLimit(){
   const lim=(t&&t.limits)?Number(t.limits.projects||0):0;
   return { key, name:(t&&t.name)||(key?key.charAt(0).toUpperCase()+key.slice(1):'—'), limit:(lim>0?lim:0) };
 }
-function agProjUsed(){ return (typeof PROJECTS!=='undefined')?PROJECTS.filter(p=>p&&p.status!=='done').length:0; }
+/* Реальное число активных проектов агентства. У PM/директора PROJECTS содержит только назначенные,
+   поэтому локальный count врёт — берём агрегат me.agencyActiveProjects (RPC my_agency_active_projects,
+   SECURITY DEFINER). Фолбэк — локальные PROJECTS (superadmin/owner видят всё). */
+function agProjUsed(){
+  const me=(window.tMe&&window.tMe())||{};
+  if(typeof me.agencyActiveProjects==='number' && isFinite(me.agencyActiveProjects)) return me.agencyActiveProjects;
+  return (typeof PROJECTS!=='undefined')?PROJECTS.filter(p=>p&&p.status!=='done').length:0;
+}
+/* Обновить me.agencyActiveProjects через RPC. Вызывается после создания/удаления проекта
+   и после подтверждения оплаты. Не роняет UI, если RPC недоступна. */
+async function agReloadProjCount(){
+  try{
+    const me=(window.tMe&&window.tMe())||{};
+    if(!me.agency_id || typeof SB==='undefined' || !SB) return;
+    const {data,error}=await SB.rpc('my_agency_active_projects');
+    if(error) throw error;
+    if(typeof data==='number') me.agencyActiveProjects = data;
+    else if(data && typeof data.my_agency_active_projects==='number') me.agencyActiveProjects = data.my_agency_active_projects;
+    if(typeof agRenderPlanChip==='function') try{ agRenderPlanChip(); }catch(_){}
+  }catch(_){}
+}
+window.agReloadProjCount = agReloadProjCount;
 /* Обновление тарифа. Backward-compat обёртка — вся логика в agUpgradeFlow (см. ниже). */
 function agUpgrade(){ return agUpgradeFlow(); }
 /* Лимит проектов исчерпан → показываем сравнительную модалку апгрейда с контекстом лимита */
@@ -8462,6 +8483,7 @@ async function _agRefreshMe(){
       me.agencyPaidUntil = ag.paid_until||null;
       me.agencyMrr = Number(ag.mrr||0);
     }
+    await agReloadProjCount();
   }catch(_){}
 }
 /* Realtime handler для pay_intents — двигаем шаги в модалке ожидания и закрываем на 'paid' */
@@ -32838,7 +32860,7 @@ function refreshActive(){
 }
 let _rtT;
 function onRt(){ if (window._localTaskWriteTs && (Date.now()-window._localTaskWriteTs)<4000){ clearTimeout(_rtT); _rtT=setTimeout(onRt,1500); return; }   // идёт локальный буст правок задач — это эхо наших изменений; не перезагружаем (без шторма и гонок), синхронизируемся после паузы
-  clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); }catch(_e){} await window.tLoadAll(ME.role); refreshActive(); if (window._pdProj && document.getElementById('ov-proj').classList.contains('on')){ await _pwReload(window._pdProj); } } }, 350); }
+  clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); }catch(_e){} await window.tLoadAll(ME.role); try{ if(typeof agReloadProjCount==='function') await agReloadProjCount(); }catch(_){} refreshActive(); if (window._pdProj && document.getElementById('ov-proj').classList.contains('on')){ await _pwReload(window._pdProj); } } }, 350); }
 /* ---- realtime брифа: мгновенная доставка правок агентства клиенту ---- */
 function briefApplyRemote(pid){
   if(window.CLP && window.CLP.id===pid){
@@ -32952,7 +32974,16 @@ async function routeByProfile(userArg){
   if (ME.agency_id){ _jobs.push(
     SB.from('agencies').select('slug,accent,name,logo_url,plan,paid_until,mrr,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
       .then(({data:ag})=>{ if (ag){ ME.agencySlug = ag.slug; ME.agencyName = ag.name||''; ME.agencyLogo = ag.logo_url||''; ME.agencyPlan = ag.plan||''; ME.agencyPaidUntil = ag.paid_until||null; ME.agencyMrr = Number(ag.mrr||0); ME.tg_team_code = ag.tg_team_code||''; ME.tg_team_chat_id = ag.tg_team_chat_id||null; ME.tg_banner_url = ag.tg_banner_url||''; } })
-      .catch(()=>{}) ); }
+      .catch(()=>{}) );
+    /* Точный count активных проектов агентства (обходит RLS — PM/директор видят не все проекты,
+       но лимит применяется по всему агентству). Не блокирует загрузку кабинета. */
+    _jobs.push(
+      SB.rpc('my_agency_active_projects')
+        .then(({data,error})=>{ if(!error){ if(typeof data==='number') ME.agencyActiveProjects=data;
+          else if(data && typeof data.my_agency_active_projects==='number') ME.agencyActiveProjects=data.my_agency_active_projects; } })
+        .catch(()=>{})
+    );
+  }
   await Promise.all(_jobs);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
   if (ME.role === 'superadmin') enter('general');
@@ -33015,7 +33046,18 @@ window.tProvisionClient = async (c) => {
       login:c.login, full_name:c.full_name, project:c.project }});
     let _pvMsg = _pvErr ? (_pvErr.message||String(_pvErr)) : ((_pv&&_pv.error)?(_pv.error.message||_pv.error):null);
     if(_pvErr && _pvErr.context){ try{ const raw=await _pvErr.context.clone().text(); if(raw){ try{ const b=JSON.parse(raw); _pvMsg=b.error||b.message||b.msg||_pvMsg; }catch(_){ _pvMsg=raw; } } }catch(_){} }
-    if(_pvMsg){ console.error('provision-client failed', _pvErr||_pv); toast('Не удалось создать: '+_pvMsg); return; }
+    if(_pvMsg){
+      console.error('provision-client failed', _pvErr||_pv);
+      /* Триггер БД enforce_project_limit → серверная защита от переполнения даже при рассинхроне UI.
+         Ловим и переводим в красивую модалку апгрейда, синхронизируем локальный счётчик. */
+      if(/PROJECT_LIMIT_REACHED/i.test(_pvMsg)){
+        try{ await agReloadProjCount(); }catch(_){}
+        if(typeof agLimitModal==='function'){ agLimitModal((typeof agPlanLimit==='function')?agPlanLimit():{limit:0,name:''}); }
+        else toast('Достигнут лимит проектов — обновите тариф');
+        return;
+      }
+      toast('Не удалось создать: '+_pvMsg); return;
+    }
     await window.tLoadAll(ME.role);
     // найти созданный проект (последний с таким именем); при гонке — одна повторная загрузка
     let np=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.name===c.project.name).pop();
@@ -33052,6 +33094,7 @@ window.tProvisionClient = async (c) => {
       catch(e){ console.error('services insert',e); toast('Проект создан, но услуги не сохранились'); }
     }
     await window.tLoadAll(ME.role);
+    try{ if(typeof agReloadProjCount==='function') await agReloadProjCount(); }catch(_){}
     toast('Проект и клиентский доступ созданы');
     if (typeof agFilter !== 'undefined') agFilter='active'; renderProjects();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
