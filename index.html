@@ -8088,6 +8088,8 @@ function enterAgency(){
     const ne=document.getElementById('ag-name'); if(ne) ne.textContent=nm; })();
   const _first=applyAgencyPerms(); agNav(_first||'projects');   // меню по правам сотрудника
   try{agRenderPlanChip();}catch(_){}
+  try{ if(typeof _agBannerRender==='function') _agBannerRender(); }catch(_){}
+  if(!window._agBannerTick){ window._agBannerTick=setInterval(function(){ try{ if(typeof _agBannerRender==='function') _agBannerRender(); }catch(_){} }, 30000); }
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-ag .side')));
 }
 /* ——— единый механизм прав: используется навигацией, поиском И модулями ——— */
@@ -8460,7 +8462,7 @@ window._agOnPayIntentRt = function(payload){
             pd2Close();
             toast('Оплата подтверждена. Тариф активирован ✓');
             if(typeof agRenderPlanChip==='function') try{ agRenderPlanChip(); }catch(_){}
-            if(typeof myProfileOpen==='function' && document.querySelector('.pm2-plan')) try{ pd2Close(); myProfileOpen(); }catch(_){}
+            if(typeof _agBannerRender==='function') try{ _agBannerRender(); }catch(_){}
           }, 800);
         });
         window._agWaitingIntentId=null; window._agWaitingCode=null;
@@ -8470,6 +8472,78 @@ window._agOnPayIntentRt = function(payload){
     }
   }catch(_){}
 };
+/* ═══ Баннер истечения подписки + read-only оверлей после grace ═══
+   Триггеры: enterAgency (init), setInterval 30s, после _agOnPayIntentRt(paid).
+   Показывается только внутри агентского кабинета (app-ag.on). */
+function _agBannerRender(){
+  try{
+    const app=document.getElementById('app-ag');
+    if(!app || !app.classList.contains('on')){ _agBannerRemove(); return; }
+    const me=(window.tMe&&window.tMe())||{};
+    if(!me.agencyPaidUntil){ _agBannerRemove(); return; }
+    const d=_agDaysLeft(me.agencyPaidUntil);
+    if(d==null || d>7){ _agBannerRemove(); return; }
+    let host=document.getElementById('ag-expiry-host');
+    if(!host){
+      host=document.createElement('div');
+      host.id='ag-expiry-host';
+      document.body.appendChild(host);
+    }
+    let cls, text, ico;
+    if(d>=4){       cls='warn';   ico='⏳'; text='Подписка истекает через '+d+' '+_plural(d,'день','дня','дней'); }
+    else if(d>=1){  cls='urgent'; ico='⚠'; text='Осталось '+d+' '+_plural(d,'день','дня','дней')+' — продлите подписку'; }
+    else if(d===0){ cls='urgent'; ico='⚠'; text='Подписка истекает сегодня — продлите'; }
+    else if(d>=-3){ cls='neg';    ico='!'; text='Подписка истекла '+Math.abs(d)+' '+_plural(Math.abs(d),'день','дня','дней')+' назад · доступ ограничен, grace '+Math.abs(d)+'/3'; }
+    else {          cls='neg';    ico='!'; text='Подписка истекла '+Math.abs(d)+' '+_plural(Math.abs(d),'день','дня','дней')+' назад · режим только чтения'; }
+    host.className='ag-expiry-host';
+    host.innerHTML = '<div class="ag-expiry ag-expiry-'+cls+'">'
+      +'<span class="ag-expiry-ic">'+ico+'</span>'
+      +'<span class="ag-expiry-t">'+_ddH(text)+'</span>'
+      +'<button class="ag-expiry-cta" onclick="agRenewFlow(1)">Продлить</button>'
+      +'</div>';
+    document.body.classList.add('has-ag-banner');
+    /* Grace истёк (d<-3) → показать read-only оверлей поверх всего */
+    if(d<-3){ _agReadOnlyOverlayOn(d); }
+    else{ _agReadOnlyOverlayOff(); }
+  }catch(_){}
+}
+function _agBannerRemove(){
+  const h=document.getElementById('ag-expiry-host'); if(h) h.remove();
+  document.body.classList.remove('has-ag-banner');
+  _agReadOnlyOverlayOff();
+}
+function _agReadOnlyOverlayOn(daysExpired){
+  let ov=document.getElementById('ag-ro-overlay');
+  if(ov) return; /* уже есть */
+  ov=document.createElement('div'); ov.id='ag-ro-overlay'; ov.className='ag-ro-overlay';
+  const me=(window.tMe&&window.tMe())||{};
+  const paidUntil=_agFmtDate(me.agencyPaidUntil);
+  const abs=Math.abs(daysExpired);
+  ov.innerHTML =
+    '<div class="ag-ro-card">'
+    +'<div class="ag-ro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>'
+    +'<h3>Подписка истекла</h3>'
+    +'<p>Действовала до <b>'+_ddH(paidUntil)+'</b>. Grace-период (3 дня) закончился — кабинет в режиме только чтения. Все данные на месте, ничего не потерялось.</p>'
+    +'<p class="ag-ro-hint">Продлите подписку, чтобы вернуть создание проектов, изменения и другие действия.</p>'
+    +'<button class="ag-ro-cta" onclick="agRenewFlow(1)">Продлить сейчас</button>'
+    +'<button class="ag-ro-cta-ghost" onclick="_agReadOnlyPeek()">Посмотреть в режиме чтения</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  document.body.classList.add('ag-readonly');
+}
+function _agReadOnlyOverlayOff(){
+  const ov=document.getElementById('ag-ro-overlay'); if(ov) ov.remove();
+  document.body.classList.remove('ag-readonly','ag-ro-peek');
+}
+/* «Посмотреть» — временно свернуть оверлей (баннер сверху остаётся + agGateWrite всё равно блокирует mutating actions) */
+function _agReadOnlyPeek(){
+  const ov=document.getElementById('ag-ro-overlay'); if(ov) ov.style.display='none';
+  document.body.classList.add('ag-ro-peek');
+  toast('Режим просмотра. Создание/изменения заблокированы до продления.');
+  /* через 60 сек оверлей вернём — чтобы не забыли */
+  setTimeout(()=>{ if(document.body.classList.contains('ag-ro-peek') && !agSubActive()){ const o=document.getElementById('ag-ro-overlay'); if(o) o.style.display=''; document.body.classList.remove('ag-ro-peek'); } }, 60000);
+}
+
 /* CSS для новых модалок (инжектится один раз) */
 (function _agInjectCSS(){
   if(typeof document==='undefined' || document.getElementById('ag-pay-css')) return;
@@ -8499,7 +8573,34 @@ window._agOnPayIntentRt = function(payload){
     +'.ag-w-li.done::before{content:"✓";color:var(--pos)}'
     +'.ag-w-li.act{color:var(--accent);border-color:color-mix(in oklab, var(--accent) 40%, var(--line));box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent)}'
     +'.ag-w-li.act::before{content:"●";color:var(--accent);animation:agWpulse 1.4s ease-in-out infinite}'
-    +'@keyframes agWpulse{0%,100%{opacity:1}50%{opacity:.35}}';
+    +'@keyframes agWpulse{0%,100%{opacity:1}50%{opacity:.35}}'
+    /* ═══ Баннер истечения + read-only оверлей ═══ */
+    +'.ag-expiry-host{position:fixed;top:0;left:0;right:0;z-index:200;pointer-events:none}'
+    +'.ag-expiry{display:flex;align-items:center;gap:12px;padding:10px 20px;font-size:13.5px;font-weight:500;border-bottom-left-radius:14px;border-bottom-right-radius:14px;margin:0 12px;box-shadow:0 8px 26px rgba(0,0,0,.22);backdrop-filter:blur(6px);pointer-events:auto}'
+    +'.ag-expiry-ic{font-family:var(--mono);font-size:14px;font-weight:700;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;flex-shrink:0}'
+    +'.ag-expiry-t{color:var(--txt);flex:1;letter-spacing:.01em}'
+    +'.ag-expiry-cta{background:var(--accent);color:var(--bg);border:none;padding:7px 16px;border-radius:9px;font-weight:600;cursor:pointer;font-size:13px;transition:filter .15s;flex-shrink:0;letter-spacing:.01em}'
+    +'.ag-expiry-cta:hover{filter:brightness(1.12)}'
+    +'.ag-expiry-warn{background:color-mix(in oklab, var(--warn) 18%, color-mix(in oklab, var(--panel-3) 94%, transparent));border:1px solid color-mix(in oklab, var(--warn) 45%, var(--line));border-top:none}'
+    +'.ag-expiry-warn .ag-expiry-ic{background:color-mix(in oklab, var(--warn) 35%, transparent);color:var(--warn)}'
+    +'.ag-expiry-urgent{background:color-mix(in oklab, var(--warn) 28%, color-mix(in oklab, var(--panel-3) 90%, transparent));border:1px solid var(--warn);border-top:none;animation:agBannerPulse 2.2s ease-in-out infinite}'
+    +'.ag-expiry-urgent .ag-expiry-ic{background:var(--warn);color:var(--bg)}'
+    +'.ag-expiry-neg{background:color-mix(in oklab, var(--neg) 22%, color-mix(in oklab, var(--panel-3) 90%, transparent));border:1px solid var(--neg);border-top:none;animation:agBannerPulse 2.2s ease-in-out infinite}'
+    +'.ag-expiry-neg .ag-expiry-ic{background:var(--neg);color:var(--txt)}'
+    +'@keyframes agBannerPulse{0%,100%{box-shadow:0 8px 26px rgba(0,0,0,.22)}50%{box-shadow:0 8px 26px rgba(0,0,0,.22),0 0 0 3px color-mix(in oklab, currentColor 18%, transparent)}}'
+    +'body.has-ag-banner .app.on{padding-top:52px}'
+    +'.ag-ro-overlay{position:fixed;inset:0;background:color-mix(in oklab, var(--bg) 86%, transparent);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;z-index:1500;animation:agRoFade .28s ease-out}'
+    +'.ag-ro-card{background:var(--panel-3);border:1px solid var(--line);border-radius:20px;padding:32px 28px 26px;max-width:460px;width:calc(100% - 40px);text-align:center;box-shadow:0 22px 62px rgba(0,0,0,.55)}'
+    +'.ag-ro-ic{width:58px;height:58px;margin:0 auto 14px;background:color-mix(in oklab, var(--neg) 14%, var(--panel-2));border:1px solid color-mix(in oklab, var(--neg) 32%, var(--line));border-radius:16px;display:flex;align-items:center;justify-content:center;color:var(--neg)}'
+    +'.ag-ro-ic svg{width:26px;height:26px}'
+    +'.ag-ro-card h3{color:var(--txt);margin:0 0 10px;font-size:22px;font-weight:600;letter-spacing:-.005em}'
+    +'.ag-ro-card p{color:var(--txt-2);font-size:14px;line-height:1.55;margin:0 0 8px}'
+    +'.ag-ro-hint{color:var(--txt-3) !important;font-size:13px !important;margin-bottom:18px !important}'
+    +'.ag-ro-cta{display:block;width:100%;margin:8px 0 0;padding:12px 22px;font-size:15px;font-weight:600;background:var(--accent);color:var(--bg);border:none;border-radius:11px;cursor:pointer;transition:filter .15s}'
+    +'.ag-ro-cta:hover{filter:brightness(1.12)}'
+    +'.ag-ro-cta-ghost{display:block;width:100%;margin:8px 0 0;padding:11px 22px;font-size:13px;font-weight:500;background:transparent;color:var(--txt-3);border:1px solid var(--line);border-radius:11px;cursor:pointer;transition:color .15s, border-color .15s}'
+    +'.ag-ro-cta-ghost:hover{color:var(--txt-2);border-color:var(--txt-3)}'
+    +'@keyframes agRoFade{from{opacity:0}to{opacity:1}}';
   (document.head||document.documentElement).appendChild(el);
 })();
 /* Тариф больше не рендерится в сайдбар — статус и апселл живут в профиль-модалке (myProfileOpen).
@@ -8967,7 +9068,8 @@ function openNewProject(){
   setTimeout(()=>{svcReset([{service:'SMM',tariff:'',mrr:0,cost:0}]);npStagesReload();npTeamReset();npContractInit();const n=document.getElementById('np-name');if(n)n.focus();},30);
 }
 function npSaveProject(){
-  if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } 
+  if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; }
+  if(typeof agGateWrite==='function' && !agGateWrite()) return;    // подписка истекла + grace вышел → блок
   const _lim=agPlanLimit(); if(_lim.limit>0 && agProjUsed()>=_lim.limit){ agLimitModal(_lim); return; }   // плановый лимит — жёсткий стоп
   const name=_v('np-name'); if(!name){toast('Введи название проекта');return;}
   const svcsArr=svcCollect(); if(!svcsArr.length){toast('Добавь хотя бы одну услугу');return;}
