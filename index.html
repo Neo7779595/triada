@@ -283,7 +283,17 @@ button{font-family:inherit}
 .rg-per-btn.is-on .rg-per-badge{background:rgba(6,20,15,.28);color:#06140f}
 
 .rg-tariffs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:8px}
-.rg-empty{grid-column:1/-1;padding:40px 20px;text-align:center;color:var(--txt-3);font-size:13.5px}
+.rg-empty{grid-column:1/-1;padding:40px 20px;text-align:center;color:var(--txt-3);font-size:13.5px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+/* Скелетон-заглушки, пока грузятся тарифы — вместо ошибки/пустоты. */
+.rg-tf-skel{padding:16px 16px 14px;background:color-mix(in oklab,var(--bg-2) 45%,transparent);border:1px solid var(--line-2);border-radius:14px;min-height:170px;position:relative;overflow:hidden}
+.rg-tf-skel::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in oklab,var(--accent) 5%,transparent),transparent);animation:rgSkel 1.4s linear infinite}
+@keyframes rgSkel{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.rg-tf-skel-l1,.rg-tf-skel-l2,.rg-tf-skel-l3{background:color-mix(in oklab,var(--line-2) 80%,transparent);border-radius:6px}
+.rg-tf-skel-l1{width:60%;height:11px;margin-bottom:14px}
+.rg-tf-skel-l2{width:45%;height:20px;margin-bottom:24px}
+.rg-tf-skel-l3{width:80%;height:22px;margin-top:auto}
+.rg-tf-skel .rg-tf-skel-l3{margin-top:0}
+@media(prefers-reduced-motion:reduce){.rg-tf-skel::after{animation:none}}
 
 /* Карточка тарифа: премиальный, чёткая иерархия — БОЛЬШАЯ месячная цена сверху, лимит и per-project справочно. */
 .rg-tf{position:relative;padding:16px 16px 14px;background:linear-gradient(180deg,color-mix(in oklab,var(--bg-2) 55%,transparent),color-mix(in oklab,var(--bg-2) 30%,transparent));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line-2);border-radius:14px;cursor:pointer;transition:.22s cubic-bezier(.4,0,.2,1);overflow:hidden;text-align:left;font-family:inherit;min-height:0;display:flex;flex-direction:column;gap:0}
@@ -293,17 +303,22 @@ button{font-family:inherit}
 .rg-tf.is-picked{border-color:var(--accent);background:linear-gradient(180deg,color-mix(in oklab,var(--accent) 10%,var(--bg-2)),color-mix(in oklab,var(--accent) 4%,var(--bg-2)));box-shadow:0 0 0 1px var(--accent),0 14px 40px -14px rgba(55,230,200,.55)}
 .rg-tf.is-picked::before{opacity:1}
 
-/* Популярный: премиальная золотая обводка + пилюля с иконкой звезды */
+/* Популярный: премиальная золотая обводка + маленькая иконка-звезда в правом верхнем углу.
+   Раньше была подписанная «пилюля» сверху, но её съедал overflow:hidden карточки —
+   торчала только половинка. Иконка внутри рамки надёжнее и не требует overflow:visible. */
 .rg-tf.is-pop{border-color:color-mix(in oklab,#f5b942 55%,var(--line));background:linear-gradient(180deg,color-mix(in oklab,#f5b942 6%,var(--bg-2)),color-mix(in oklab,var(--bg-2) 35%,transparent))}
 .rg-tf.is-pop.is-picked{border-color:var(--accent);background:linear-gradient(180deg,color-mix(in oklab,var(--accent) 10%,var(--bg-2)),color-mix(in oklab,var(--accent) 4%,var(--bg-2)))}
-.rg-tf-pop{position:absolute;top:-9px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:4px;padding:3px 10px 3px 8px;border-radius:99px;background:linear-gradient(135deg,#ffcb5b,#f5911e);color:#241300;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 6px 16px -4px rgba(245,185,66,.55),0 0 0 3px var(--bg,#020407),inset 0 1px 0 rgba(255,255,255,.35);white-space:nowrap;z-index:3;line-height:1.4}
+/* Маленькая иконка звезды в правом верхнем углу — знак «популярного». */
+.rg-tf-pop{position:absolute;top:11px;right:12px;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#ffcb5b,#f5911e);color:#241300;box-shadow:0 4px 14px -4px rgba(245,185,66,.55),inset 0 1px 0 rgba(255,255,255,.35);z-index:2;transition:.22s cubic-bezier(.34,1.56,.64,1)}
 .rg-tf-pop svg{color:#241300;flex:none}
+.rg-tf-pop::after{content:"Популярный";position:absolute;bottom:calc(100% + 6px);right:-4px;padding:4px 9px;border-radius:6px;background:#241300;color:#ffcb5b;font-size:10px;font-weight:600;letter-spacing:.04em;white-space:nowrap;opacity:0;pointer-events:none;transform:translateY(3px);transition:.16s;box-shadow:0 6px 18px -6px rgba(0,0,0,.7);border:1px solid color-mix(in oklab,#ffcb5b 30%,transparent)}
+.rg-tf:hover .rg-tf-pop::after{opacity:1;transform:translateY(0)}
 
-/* Чекмарк выбора — в правом верхнем углу */
-.rg-tf-check{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.5);transition:.24s cubic-bezier(.34,1.56,.64,1);z-index:2;box-shadow:0 4px 14px -4px rgba(55,230,200,.55)}
+/* Чекмарк выбора — в правом верхнем углу. Если карточка и популярная, и выбранная —
+   чекмарк побеждает и показывается вместо звезды (более важное состояние). */
+.rg-tf-check{position:absolute;top:11px;right:12px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.5);transition:.24s cubic-bezier(.34,1.56,.64,1);z-index:3;box-shadow:0 4px 14px -4px rgba(55,230,200,.55)}
 .rg-tf.is-picked .rg-tf-check{opacity:1;transform:scale(1)}
-.rg-tf.is-pop .rg-tf-check{background:#f5b942;color:#241300;box-shadow:0 4px 14px -4px rgba(245,185,66,.55)}
-.rg-tf.is-pop.is-picked .rg-tf-check{background:var(--accent);color:#06140f;box-shadow:0 4px 14px -4px rgba(55,230,200,.55)}
+.rg-tf.is-picked .rg-tf-pop{opacity:0;transform:scale(.5)}
 
 /* Верхний блок: ключ тарифа + лимит проектов (справочно) */
 .rg-tf-head{position:relative;margin-bottom:14px;padding-right:26px}
@@ -324,28 +339,45 @@ button{font-family:inherit}
 .rg-tf-per{font-size:10.5px;color:var(--txt-3);letter-spacing:.005em;line-height:1.35}
 .rg-tf-bonus{margin-top:6px;display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:99px;background:color-mix(in oklab,#f5b942 14%,transparent);border:1px solid color-mix(in oklab,#f5b942 30%,transparent);color:#f5b942;font-size:10px;font-weight:600;letter-spacing:.005em;line-height:1.3}
 
-/* ── Шаг 3: готово ── */
-.rg-ready{max-width:720px;margin:0 auto;text-align:center;padding-top:8px}
-.rg-ready-check{width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:color-mix(in oklab,var(--accent) 16%,transparent);border:2px solid color-mix(in oklab,var(--accent) 55%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px -10px rgba(55,230,200,.6);animation:rgReadyPop .55s cubic-bezier(.34,1.56,.64,1) both}
+/* ══════════════════════════════════════════════════════════════════
+   ШАГ 3 «Готово» — чистый, воздушный экран подтверждения.
+   Идея: минимум рамок, много воздуха, чёткая вертикальная иерархия.
+   ══════════════════════════════════════════════════════════════════ */
+.rg-ready{max-width:560px;margin:0 auto;text-align:center;padding-top:8px}
+.rg-ready-check{width:64px;height:64px;margin:0 auto 20px;border-radius:50%;background:radial-gradient(circle at 50% 40%,color-mix(in oklab,var(--accent) 24%,transparent),color-mix(in oklab,var(--accent) 8%,transparent) 70%);border:1.5px solid color-mix(in oklab,var(--accent) 55%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px -8px rgba(55,230,200,.5);animation:rgReadyPop .55s cubic-bezier(.34,1.56,.64,1) both;position:relative}
+.rg-ready-check::before{content:"";position:absolute;inset:-8px;border-radius:50%;background:radial-gradient(circle,color-mix(in oklab,var(--accent) 22%,transparent),transparent 55%);animation:rgReadyGlow 3s ease-in-out infinite;z-index:-1;pointer-events:none}
 @keyframes rgReadyPop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
-.rg-summary{margin:16px 0 20px;padding:16px 20px;background:color-mix(in oklab,var(--accent) 6%,var(--bg-2));border:1px solid color-mix(in oklab,var(--accent) 34%,var(--line));border-radius:12px;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:0 12px 36px -14px rgba(55,230,200,.35)}
-.rg-summary-l{flex:1;min-width:220px}
-.rg-summary-lbl{font-size:10px;color:var(--accent);letter-spacing:.2em;text-transform:uppercase;font-weight:700;margin-bottom:4px}
-.rg-summary-nm{font-size:19px;font-weight:600;color:var(--txt);letter-spacing:-.005em;margin-bottom:3px}
+@keyframes rgReadyGlow{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.15)}}
+
+.rg-ready .rg-eyebrow{margin-bottom:12px}
+.rg-ready .rg-title{font-size:26px;margin-bottom:8px;font-weight:500}
+.rg-ready-lead{font-size:14px;color:var(--txt-3);line-height:1.55;margin:0 auto 28px;max-width:460px}
+
+/* Компактная summary-строка — тариф + цена в одной ровной пилюле, без «двухэтажных» надписей. */
+.rg-summary{margin:0 auto 28px;max-width:520px;padding:16px 22px;background:color-mix(in oklab,var(--accent) 5%,color-mix(in oklab,var(--bg-2) 30%,transparent));border:1px solid color-mix(in oklab,var(--accent) 28%,var(--line));border-radius:14px;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:0 12px 40px -18px rgba(55,230,200,.4),inset 0 1px 0 color-mix(in oklab,var(--accent) 8%,transparent)}
+.rg-summary-l{flex:1;min-width:0}
+.rg-summary-lbl{font-size:9.5px;color:var(--accent);letter-spacing:.22em;text-transform:uppercase;font-weight:700;margin-bottom:5px}
+.rg-summary-nm{font-size:18px;font-weight:600;color:var(--txt);letter-spacing:-.005em;margin-bottom:3px;line-height:1.2}
 .rg-summary-desc{font-size:12px;color:var(--txt-3);line-height:1.45}
-.rg-summary-r{text-align:right}
-.rg-summary-price{font-size:22px;font-weight:600;color:var(--txt);letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1}
-.rg-summary-per{font-size:11px;color:var(--txt-3);margin-top:3px}
-.rg-plan-steps{margin:0 0 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.rg-plan-step{display:flex;align-items:flex-start;gap:12px;padding:10px 14px;background:color-mix(in oklab,var(--bg-2) 40%,transparent);border:1px solid color-mix(in oklab,var(--line-2) 70%,transparent);border-radius:10px;text-align:left;transition:.24s}
-.rg-plan-step:hover{border-color:color-mix(in oklab,var(--accent) 22%,var(--line));background:color-mix(in oklab,var(--bg-2) 55%,transparent)}
-.rg-plan-n{flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:color-mix(in oklab,var(--accent) 14%,transparent);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:1px solid color-mix(in oklab,var(--accent) 32%,transparent);letter-spacing:0}
-.rg-plan-tx{flex:1;line-height:1.4;min-width:0}
-.rg-plan-tx b{display:block;font-size:12.5px;color:var(--txt);font-weight:600;margin-bottom:1px}
-.rg-plan-tx span{display:block;font-size:11.5px;color:var(--txt-3)}
-.rg-safe{margin-top:14px;display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:99px;background:color-mix(in oklab,var(--bg-2) 55%,transparent);border:1px dashed var(--line-2);font-size:11px;color:var(--txt-3);letter-spacing:.005em}
-.rg-safe svg{color:var(--accent);flex:none}
-@media(max-width:640px){ .rg-plan-steps{grid-template-columns:1fr} }
+.rg-summary-r{text-align:right;white-space:nowrap;flex:none}
+.rg-summary-price{font-size:22px;font-weight:700;color:var(--accent);letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1.1}
+.rg-summary-price sup{font-size:.55em;color:var(--txt-3);font-weight:500;letter-spacing:0;margin-left:3px;vertical-align:baseline}
+.rg-summary-per{font-size:11px;color:var(--txt-3);margin-top:2px;letter-spacing:.005em}
+
+/* Список шагов — единственная колонка, минимум рамок, много воздуха. */
+.rg-plan-steps{margin:0 auto 32px;max-width:520px;display:flex;flex-direction:column;gap:14px;position:relative}
+.rg-plan-steps::before{content:"";position:absolute;left:15px;top:20px;bottom:20px;width:1px;background:linear-gradient(180deg,transparent,color-mix(in oklab,var(--accent) 30%,transparent) 15%,color-mix(in oklab,var(--accent) 30%,transparent) 85%,transparent);pointer-events:none}
+.rg-plan-step{display:flex;align-items:flex-start;gap:14px;padding:0;background:transparent;border:0;text-align:left;position:relative}
+.rg-plan-n{flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:color-mix(in oklab,var(--bg-2) 90%,var(--bg));color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:12.5px;border:1px solid color-mix(in oklab,var(--accent) 34%,var(--line-2));letter-spacing:0;position:relative;z-index:1;font-family:var(--font-mono,'JetBrains Mono',monospace)}
+.rg-plan-step:last-child .rg-plan-n{background:color-mix(in oklab,var(--accent) 20%,var(--bg-2));border-color:var(--accent);color:var(--accent)}
+.rg-plan-tx{flex:1;line-height:1.45;min-width:0;padding-top:4px}
+.rg-plan-tx b{display:block;font-size:13.5px;color:var(--txt);font-weight:500;margin-bottom:2px;letter-spacing:.005em}
+.rg-plan-tx span{display:block;font-size:12px;color:var(--txt-3);letter-spacing:.005em}
+.rg-mono{font-family:var(--font-mono,'JetBrains Mono',monospace);color:var(--accent);font-size:.94em;background:color-mix(in oklab,var(--accent) 10%,transparent);padding:1px 6px;border-radius:5px;letter-spacing:.005em}
+
+/* Safe-строка внизу — только текст, без пилюли, без рамки. Ничего лишнего. */
+.rg-safe{margin-top:24px;display:inline-flex;align-items:center;gap:8px;font-size:11.5px;color:var(--txt-3);letter-spacing:.005em;opacity:.75;line-height:1.4}
+.rg-safe svg{color:var(--accent);flex:none;opacity:.85}
 
 /* Футер визарда — просто текст на общем фоне, без border/background, чтобы не «отделялся». */
 .rg-foot{position:relative;z-index:1;text-align:center;font-size:10.5px;color:color-mix(in oklab,var(--txt-3) 70%,transparent);letter-spacing:.13em;text-transform:uppercase;padding:12px 20px 16px;background:transparent}
@@ -7503,10 +7535,11 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
     <div class="rg-screen" data-screen="3">
       <div class="rg-ready">
         <div class="rg-ready-check">
-          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
-        <div class="rg-eyebrow">Шаг 2 из 2 · Готово</div>
-        <h2 class="rg-title">Отлично! Осталось оплатить в Telegram</h2>
+        <div class="rg-eyebrow">Тариф выбран</div>
+        <h2 class="rg-title">Осталось оплатить в Telegram</h2>
+        <p class="rg-ready-lead">Всё готово: откроем бот, вы оплачиваете за 3 минуты, кабинет создаётся автоматически.</p>
 
         <div class="rg-summary" id="rg-summary">
           <!-- заполняется JS: _regRenderSummary() -->
@@ -7516,30 +7549,30 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
           <div class="rg-plan-step">
             <div class="rg-plan-n">1</div>
             <div class="rg-plan-tx">
-              <b>Открывается бот <span class="rg-mono">@DeTroyd_system_bot</span></b>
-              <span>Автоматически с уже выбранным тарифом</span>
+              <b>Открываем бот <span class="rg-mono">@DeTroyd_system_bot</span></b>
+              <span>Тариф уже выбран — сразу к оплате</span>
             </div>
           </div>
           <div class="rg-plan-step">
             <div class="rg-plan-n">2</div>
             <div class="rg-plan-tx">
-              <b>Заполняете название агентства и владельца</b>
-              <span>2 короткие анкеты — имя, телефон, email</span>
+              <b>Пара коротких анкет</b>
+              <span>Название агентства, имя владельца, телефон</span>
             </div>
           </div>
           <div class="rg-plan-step">
             <div class="rg-plan-n">3</div>
             <div class="rg-plan-tx">
-              <b>Оплачиваете по реквизитам, присылаете чек</b>
-              <span>AI-верификация чека · доступ активируется через секунды</span>
+              <b>Оплата и AI-верификация чека</b>
+              <span>Доступ активируется через секунды после проверки</span>
             </div>
           </div>
           <div class="rg-plan-step">
             <div class="rg-plan-n">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
             </div>
             <div class="rg-plan-tx">
-              <b>Кабинет создан — логин и пароль приходят в чат бота</b>
+              <b>Кабинет готов, логин и пароль в чате</b>
               <span>Возвращайтесь на detroyd.com и заходите</span>
             </div>
           </div>
@@ -7558,7 +7591,7 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
 
         <div class="rg-safe">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-          <span>Никаких карт или паролей в форме — оплата и создание аккаунта строго через бот. Все данные передаются по HTTPS.</span>
+          <span>Оплата и создание аккаунта — только в боте. Никаких карт в форме, всё по HTTPS.</span>
         </div>
       </div>
     </div>
@@ -9025,19 +9058,45 @@ function _regGoStep(n){
   const sec = document.getElementById('page-register');
   if(sec){ try{ sec.scrollTo({top:0, behavior:'smooth'}); }catch(_){ sec.scrollTop = 0; } }
 }
+/* Ждём инициализации Supabase-клиента (module-скрипт грузится с esm.sh асинхронно —
+   при клике «Открыть агентство» сразу после загрузки страницы SB может ещё быть null). */
+function _regWaitForSB(timeoutMs){
+  const start = performance && performance.now ? performance.now() : Date.now();
+  const now = () => (performance && performance.now ? performance.now() : Date.now());
+  return new Promise((resolve) => {
+    if(window.SB){ resolve(window.SB); return; }
+    const iv = setInterval(() => {
+      if(window.SB){ clearInterval(iv); resolve(window.SB); }
+      else if(now()-start > (timeoutMs||8000)){ clearInterval(iv); resolve(null); }
+    }, 60);
+  });
+}
 async function _regLoadTariffs(){
   const host = document.getElementById('rg-tariffs'); if(!host) return;
   const st = window._regState;
   if(st.tariffs.length){ _regRenderTariffs(); return; }
+  /* Скелетон-состояние: 10 карточек-заглушек с shimmer-анимацией, чтобы не мигать пустотой. */
+  host.innerHTML = Array.from({length:10}).map(()=>`<div class="rg-tf-skel"><div class="rg-tf-skel-l1"></div><div class="rg-tf-skel-l2"></div><div class="rg-tf-skel-l3"></div></div>`).join('');
+  const sb = window.SB || await _regWaitForSB(8000);
+  if(!sb){
+    /* Если совсем не удалось — тихая заглушка без пугающего красного, с кнопкой повторить. */
+    host.innerHTML = `<div class="rg-empty" style="grid-column:1/-1"><div style="margin-bottom:14px;color:var(--txt-3)">Тарифы загружаются медленнее обычного</div><button class="rg-btn rg-btn-ghost" onclick="_regLoadTariffs()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Обновить</button></div>`;
+    return;
+  }
   try{
-    if(typeof SB==='undefined' || !SB){ throw new Error('DB not ready'); }
-    const {data,error}=await SB.from('tariffs').select('*').lt('sort',99).order('sort');
+    const {data,error}=await sb.from('tariffs').select('*').lt('sort',99).order('sort');
     if(error) throw error;
     /* Фильтруем только платные видимые тарифы (Enterprise/trial отдельно, тут не показываем) */
     st.tariffs = (data||[]).filter(t => t.price!=null && !(t.limits&&t.limits.is_trial));
+    if(!st.tariffs.length){
+      host.innerHTML = `<div class="rg-empty" style="grid-column:1/-1"><div style="color:var(--txt-3)">Тарифы пока не настроены. Мы уже в курсе — попробуйте позже.</div></div>`;
+      return;
+    }
     _regRenderTariffs();
   }catch(e){
-    host.innerHTML = `<div class="rg-empty" style="color:var(--neg)">Не удалось загрузить тарифы: ${(e&&e.message)||e}. <button class="rg-btn rg-btn-ghost" style="margin-top:12px" onclick="_regLoadTariffs()">Повторить</button></div>`;
+    /* Не пугаем пользователя техническими деталями — просто «попробуйте ещё раз». */
+    console.error('_regLoadTariffs', e);
+    host.innerHTML = `<div class="rg-empty" style="grid-column:1/-1"><div style="margin-bottom:14px;color:var(--txt-3)">Не получилось загрузить тарифы. Обычно помогает обновить страницу.</div><button class="rg-btn rg-btn-ghost" onclick="_regLoadTariffs()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Попробовать ещё раз</button></div>`;
   }
 }
 function _regSetPeriod(p){
@@ -9071,7 +9130,7 @@ function _regRenderTariffs(){
     const isPop = t===_findPop;
     const isPicked = st.picked === t.key;
     return `<button class="rg-tf ${isPop?'is-pop':''} ${isPicked?'is-picked':''}" onclick="_regPickTariff('${t.key.replace(/'/g,"\\'")}')" type="button">
-      ${isPop?`<span class="rg-tf-pop"><svg viewBox="0 0 24 24" width="9" height="9" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z"/></svg>Популярный</span>`:''}
+      ${isPop?`<span class="rg-tf-pop" title="Популярный тариф"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z"/></svg></span>`:''}
       <span class="rg-tf-check" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
       </span>
@@ -9113,10 +9172,10 @@ function _regRenderSummary(){
     <div class="rg-summary-l">
       <div class="rg-summary-lbl">Ваш тариф</div>
       <div class="rg-summary-nm">${(t.name||t.key||'').replace(/</g,'&lt;')}</div>
-      <div class="rg-summary-desc">${limit?`до ${limit} ${limit===1?'проекта':(limit<5?'проектов':'проектов')}`:'безлимит проектов'} · все функции платформы${isQ?` · оплата за 3 мес + <span style="color:#f5b942;font-weight:600">${bonusMon} мес бонус</span>`:''}</div>
+      <div class="rg-summary-desc">${limit?`до ${limit} ${limit===1?'проекта':'проектов'}`:'безлимит проектов'}${isQ?` · +${bonusMon} мес в подарок`:''}</div>
     </div>
     <div class="rg-summary-r">
-      <div class="rg-summary-price">${numFmt(total)} <span style="font-size:.65em;color:var(--txt-3);font-weight:500">сум</span></div>
+      <div class="rg-summary-price">${numFmt(total)}<sup>сум</sup></div>
       <div class="rg-summary-per">за ${isQ?'квартал':'месяц'}</div>
     </div>`;
 }
