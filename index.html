@@ -8794,7 +8794,9 @@ function _agReadOnlyPeek(){
     +'.ag-up-note{background:color-mix(in oklab, var(--panel-3) 60%, transparent);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--txt-3);line-height:1.55;margin-top:12px}'
     +'.ag-up-note code{background:color-mix(in oklab, var(--accent) 15%, transparent);padding:1px 6px;border-radius:6px;color:var(--txt-2);font-size:11.5px}'
     /* ═══ plan-picker · премиальная модалка «Изменить тариф» ═══ */
-    +'.ag-pp-modal{overflow:hidden;padding:0;background:linear-gradient(180deg, color-mix(in oklab, var(--panel) 96%, var(--accent) 4%) 0%, var(--panel) 40%);border:1px solid color-mix(in oklab, var(--accent) 18%, var(--line-2))}'
+    /* Оверлей — сильный blur+scrim, чтобы фон-кабинет не отвлекал */
+    +'#ov-pd2:has(.ag-pp-modal),#ov-pd2.ov-plan{background:rgba(3,4,6,.72);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%)}'
+    +'.ag-pp-modal{overflow:hidden;padding:0;background:linear-gradient(180deg, color-mix(in oklab, var(--panel) 98%, var(--accent) 2%) 0%, var(--panel) 45%);border:1px solid color-mix(in oklab, var(--accent) 22%, var(--line-2));box-shadow:0 60px 120px -30px rgba(0,0,0,.85), 0 20px 44px -12px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.045)}'
     +'#ov-pd2 .ag-pp-modal .modal-b{padding:14px 22px 4px}'
     +'#ov-pd2 .ag-pp-modal .modal-f{padding:12px 22px 18px;border-top:none}'
     +'.ag-pp-hero{position:relative;padding:22px 24px 20px;background:radial-gradient(120% 100% at 100% 0%, color-mix(in oklab, var(--accent) 18%, transparent) 0%, transparent 55%),radial-gradient(80% 70% at 0% 100%, color-mix(in oklab, var(--accent) 10%, transparent) 0%, transparent 60%),color-mix(in oklab, var(--panel-3) 60%, transparent);border-bottom:1px solid color-mix(in oklab, var(--accent) 12%, var(--line))}'
@@ -11324,7 +11326,13 @@ function renderPd(){
 
 /* ——— project secondary modals ——— */
 let pd2St='active', pd2Rep='PERF';
-function pd2Open(html){document.getElementById('ov-pd2').innerHTML=html;document.getElementById('ov-pd2').classList.add('on');}
+function pd2Open(html){
+  const ov=document.getElementById('ov-pd2');
+  ov.innerHTML=html;
+  ov.classList.add('on');
+  /* Отдельный маркер для plan-picker — усиленный blur/scrim в браузерах без :has() */
+  ov.classList.toggle('ov-plan', !!ov.querySelector('.ag-pp-modal'));
+}
 
 function pd2SetStatus(k){ pd2St=k; document.querySelectorAll('#pd2-stseg button').forEach(b=>b.classList.toggle('on', b.dataset.st===k)); }
 
@@ -11533,7 +11541,7 @@ function _drGrid(){
     +`<div class="dp-dow">${DP_DOW.map(d=>'<span>'+d+'</span>').join('')}</div><div class="dp-grid dr-grid">${cells}</div>`
     +`<div class="dr-foot"><div class="dr-presets"><button type="button" onclick="drPreset('today')">Сегодня</button><button type="button" onclick="drPreset('week')">7 дней</button><button type="button" onclick="drPreset('month')">Месяц</button></div><button type="button" class="clr" onclick="drClear()">Очистить</button></div>`;
 }
-function pd2Close(){document.getElementById('ov-pd2').classList.remove('on');document.getElementById('ov-pd2').innerHTML='';}
+function pd2Close(){const ov=document.getElementById('ov-pd2');ov.classList.remove('on','ov-plan');ov.innerHTML='';}
 
 /* ===================== КОНТЕНТ-ПЛАН (v1) ===================== */
 const CP_TYPES=[['text','Текст'],['long','Текст +'],['num','Число'],['money','Деньги'],['date','Дата'],['select','Статус'],['check','Чек'],['link','Ссылка']];
