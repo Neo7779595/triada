@@ -35644,7 +35644,19 @@ function refreshActive(){
   }catch(e){ console.warn('refresh', e); }
 }
 let _rtT;
-function onRt(){ if (window._localTaskWriteTs && (Date.now()-window._localTaskWriteTs)<4000){ clearTimeout(_rtT); _rtT=setTimeout(onRt,1500); return; }   // идёт локальный буст правок задач — это эхо наших изменений; не перезагружаем (без шторма и гонок), синхронизируемся после паузы
+/* ═══════════════════════════════════════════════════════════════════════
+   ANTI-FLASH: подавляем realtime-события в первые 4 секунды после subscribe.
+   Причина: сразу после subscribeRealtime приходит пачка catch-up событий
+   (own heartbeat, недавние апдейты чужих сессий), и каждое вызывало
+   полный tLoadAll → полный перерендер → пользователь видит 2-3 «моргания»
+   при загрузке. За эти 4 секунды первичный tLoadAll всё равно уже загрузит
+   свежие данные, а RT после cooldown продолжит работать штатно.
+   Флаг window._rtSubscribedAt устанавливается в subscribeRealtime. */
+window._RT_STARTUP_COOLDOWN_MS = 4000;
+function onRt(){
+  /* Startup cooldown: игнорируем ранние события, чтобы не моргать во время первичной загрузки */
+  if (window._rtSubscribedAt && (Date.now() - window._rtSubscribedAt) < (window._RT_STARTUP_COOLDOWN_MS||4000)) return;
+  if (window._localTaskWriteTs && (Date.now()-window._localTaskWriteTs)<4000){ clearTimeout(_rtT); _rtT=setTimeout(onRt,1500); return; }   // идёт локальный буст правок задач — это эхо наших изменений; не перезагружаем (без шторма и гонок), синхронизируемся после паузы
   clearTimeout(_rtT); _rtT = setTimeout(async () => { if (ME){ try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); }catch(_e){} await window.tLoadAll(ME.role); try{ if(typeof agReloadProjCount==='function') await agReloadProjCount(); }catch(_){} refreshActive(); if (window._pdProj && document.getElementById('ov-proj').classList.contains('on')){ await _pwReload(window._pdProj); } } }, 350); }
 /* ---- realtime брифа: мгновенная доставка правок агентства клиенту ---- */
 function briefApplyRemote(pid){
@@ -35699,6 +35711,8 @@ async function _rtWorkSync(){
   }catch(e){ console.warn('rt-work', e); }
 }
 function onRtWork(){
+  /* Startup cooldown (см. onRt): не моргаем при первичной загрузке */
+  if (window._rtSubscribedAt && (Date.now() - window._rtSubscribedAt) < (window._RT_STARTUP_COOLDOWN_MS||4000)) return;
   if (window._localTaskWriteTs && (Date.now()-window._localTaskWriteTs)<4000){ clearTimeout(_rtWT); _rtWT=setTimeout(onRtWork,1500); return; }   // эхо своих правок — не дёргаем сеть
   clearTimeout(_rtWT); _rtWT=setTimeout(_rtWorkSync,350);
 }
@@ -35722,6 +35736,9 @@ function onProfileRt(payload){
 window._isOnline=_isOnline; window._presLabel=_presLabel; window._presencePaint=_presencePaint; window._presenceUpdateOne=_presenceUpdateOne; window.onProfileRt=onProfileRt;   // renderTeam живёт в classic-скрипте — даём доступ через global
 if(!window._presTick){ window._presTick=setInterval(function(){ try{ _presencePaint(); }catch(_){} }, 20000); }
 function subscribeRealtime(){
+  /* Стартовый таймстамп — используется onRt/onRtWork для подавления первых 4 сек событий,
+     чтобы не моргать перерендерами во время первичной загрузки. См. onRt комментарий. */
+  window._rtSubscribedAt = Date.now();
   try{
     SB.channel('triada-rt')
       .on('postgres_changes',{event:'*',schema:'public',table:'agencies'},onRt)
