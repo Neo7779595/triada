@@ -6550,6 +6550,38 @@ button:active{transform:translateY(.5px) scale(.99)}
 .ag-cp-copy.is-ok{background:var(--pos);color:var(--bg);border-color:var(--pos)}
 .ag-cp-copy svg{width:15px;height:15px}
 .ag-cp-hint{font-size:12.5px;color:var(--txt-3);line-height:1.55;letter-spacing:.005em;padding:0 2px}
+/* Модалка ввода пароля — input + генератор + индикатор сложности */
+.ag-cp-inp-block{margin-bottom:14px}
+.ag-cp-inp-lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:color-mix(in oklab, var(--accent) 85%, var(--txt-3));font-weight:600;margin-bottom:8px}
+.ag-cp-inp-row{display:flex;align-items:stretch;gap:8px}
+.ag-cp-inp{flex:1;min-width:0;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;color:var(--txt);font-size:16px;font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:.02em;transition:.14s;outline:none}
+.ag-cp-inp:focus{border-color:color-mix(in oklab, var(--accent) 55%, var(--line));box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 15%, transparent);background:color-mix(in oklab, var(--accent) 3%, var(--bg-2))}
+.ag-cp-inp::placeholder{color:var(--txt-4);font-family:var(--font);letter-spacing:0}
+.ag-cp-eye{background:var(--bg-2);border:1px solid var(--line);color:var(--txt-3);width:42px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:.14s;flex-shrink:0}
+.ag-cp-eye:hover{color:var(--txt);border-color:var(--txt-3);background:var(--bg-3)}
+.ag-cp-eye svg{width:16px;height:16px}
+.ag-cp-gen{display:inline-flex;align-items:center;gap:7px;background:color-mix(in oklab, var(--accent) 12%, transparent);border:1px solid color-mix(in oklab, var(--accent) 36%, var(--line-2));color:var(--accent);padding:0 14px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;transition:.14s;font-family:inherit;white-space:nowrap;flex-shrink:0;letter-spacing:.005em}
+.ag-cp-gen:hover{background:color-mix(in oklab, var(--accent) 22%, transparent);border-color:var(--accent)}
+.ag-cp-gen svg{width:13px;height:13px}
+/* Индикатор сложности */
+.ag-cp-strength{margin-top:10px;display:flex;align-items:center;gap:10px}
+.ag-cp-str-bar{flex:1;height:5px;background:var(--bg-3);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.ag-cp-str-bar i{display:block;height:100%;border-radius:inherit;transition:width .25s ease, background .25s ease}
+.ag-cp-str-bar i.lv-empty{background:var(--txt-4)}
+.ag-cp-str-bar i.lv-weak{background:var(--neg)}
+.ag-cp-str-bar i.lv-ok{background:var(--warn)}
+.ag-cp-str-bar i.lv-good{background:var(--accent)}
+.ag-cp-str-bar i.lv-strong{background:var(--pos)}
+.ag-cp-str-lbl{font-size:11px;letter-spacing:.02em;font-weight:600;color:var(--txt-3);white-space:nowrap;min-width:100px;text-align:right;font-variant-numeric:tabular-nums}
+.ag-cp-str-lbl.lv-weak{color:var(--neg)}
+.ag-cp-str-lbl.lv-ok{color:var(--warn)}
+.ag-cp-str-lbl.lv-good{color:var(--accent)}
+.ag-cp-str-lbl.lv-strong{color:var(--pos)}
+/* Предупреждение под инпутом */
+.ag-cp-warn{display:flex;align-items:flex-start;gap:9px;padding:11px 13px;background:color-mix(in oklab, var(--warn) 7%, transparent);border:1px solid color-mix(in oklab, var(--warn) 22%, var(--line));border-radius:10px;font-size:12.5px;color:var(--txt-2);line-height:1.5;letter-spacing:.005em}
+.ag-cp-warn svg{width:16px;height:16px;color:var(--warn);flex-shrink:0;margin-top:1px}
+.ag-cp-warn b{color:var(--txt);font-weight:700}
+@media (max-width:440px){.ag-cp-gen span{display:none} .ag-cp-gen{padding:0;width:42px;justify-content:center}}
 @media (max-width:440px){.pm2-me-grid{grid-template-columns:1fr}}
 /* ——— слой 2 · тариф — оформлен как важный блок-карточка со статусом ——— */
 .pm2-plan{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:14px;padding:14px 15px 15px}
@@ -23283,22 +23315,140 @@ function _agCpCopy(pw, btn){
     if(typeof toast==='function') toast('Пароль скопирован');
   }catch(_){ if(typeof toast==='function') toast('Не удалось скопировать — выделите пароль вручную'); }
 }
-/* Смена пароля сотрудника из PM Card. Требует подтверждения (пароль сотрудника
-   инвалидируется — он не сможет войти со старым). */
-async function _pmChangePwd(memberId){
+/* Модалка ВЫБОРА пароля — пользователь может ввести свой или сгенерировать. */
+function _agShowPwdInputModal(targetUserId, targetName, isSelf){
+  const nm = _ddH(targetName||'пользователь');
+  const title = isSelf ? 'Сменить свой пароль' : `Сменить пароль «${nm}»`;
+  const warn = isSelf
+    ? 'После смены пароля вы будете <b>перелогинены</b> — используйте новый пароль при следующем входе.'
+    : `Старый пароль сотрудника перестанет работать. Передайте новый через безопасный канал.`;
+  pd2Open(`<div class="modal" style="max-width:480px">
+    <div class="modal-h"><h3>${_ddH(title)}</h3><p>Введите свой пароль или сгенерируйте сильный автоматически</p></div>
+    <div class="modal-b">
+      <div class="ag-cp-inp-block">
+        <div class="ag-cp-inp-lbl">Новый пароль</div>
+        <div class="ag-cp-inp-row">
+          <input type="text" id="ag-cp-inp" class="ag-cp-inp" placeholder="Минимум 6 символов" maxlength="128" autocomplete="new-password" spellcheck="false" oninput="_agCpValidate(this.value)">
+          <button type="button" class="ag-cp-eye" onclick="_agCpToggleVisible(this)" title="Показать / скрыть" aria-label="Показать пароль">
+            <svg class="_eye_on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="_eye_off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M14.12 14.12A3 3 0 119.88 9.88"/><path d="M1 1l22 22"/></svg>
+          </button>
+          <button type="button" class="ag-cp-gen" onclick="_agCpGenerate()" title="Сгенерировать сильный пароль">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-6.219-8.56M21 3v6h-6"/></svg>
+            <span>Сгенерировать</span>
+          </button>
+        </div>
+        <div class="ag-cp-strength" id="ag-cp-strength">
+          <span class="ag-cp-str-bar"><i class="lv-empty" style="width:0%"></i></span>
+          <span class="ag-cp-str-lbl">начните ввод…</span>
+        </div>
+      </div>
+      <div class="ag-cp-warn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        <span>${warn}</span>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button class="btn-ghost" onclick="pd2Close()">Отмена</button>
+      <button class="btn-add" id="ag-cp-save" disabled onclick="_agCpSubmit('${_ddA(targetUserId||'')}','${_ddA(targetName||'')}',${isSelf?'true':'false'})">Сохранить</button>
+    </div>
+  </div>`);
+  setTimeout(()=>{ const inp=document.getElementById('ag-cp-inp'); if(inp) inp.focus(); }, 60);
+}
+/* Показать / скрыть символы пароля */
+function _agCpToggleVisible(btn){
+  const inp=document.getElementById('ag-cp-inp'); if(!inp) return;
+  const isVis = (inp.type==='text');
+  inp.type = isVis ? 'password' : 'text';
+  const on=btn.querySelector('._eye_on'); const off=btn.querySelector('._eye_off');
+  if(on&&off){ on.style.display = isVis?'none':''; off.style.display = isVis?'':'none'; }
+  inp.focus();
+}
+/* Генератор — 12 символов, без похожих (0/O, 1/l/I) */
+function _agCpGenerate(){
+  const abc = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let pw = '';
+  const buf = new Uint8Array(12); crypto.getRandomValues(buf);
+  for(let i=0;i<12;i++) pw += abc[buf[i]%abc.length];
+  const inp=document.getElementById('ag-cp-inp'); if(inp){ inp.type='text'; inp.value=pw; _agCpValidate(pw); }
+}
+/* Валидация: обновляет бар сложности и кнопку Save */
+function _agCpValidateErr(v){
+  if(!v) return { code:'empty', msg:'начните ввод…' };
+  if(v.length < 6) return { code:'short', msg:`ещё ${6-v.length} символ${6-v.length===1?'':(6-v.length>=2&&6-v.length<=4?'а':'ов')}` };
+  if(v.length > 128) return { code:'long', msg:'слишком длинный (максимум 128)' };
+  if(/\s/.test(v)) return { code:'space', msg:'пробелы недопустимы' };
+  return null;
+}
+function _agCpStrength(v){
+  let score = 0;
+  if(v.length >= 8) score++;
+  if(v.length >= 12) score++;
+  if(/[a-z]/.test(v) && /[A-Z]/.test(v)) score++;
+  if(/[0-9]/.test(v)) score++;
+  if(/[^A-Za-z0-9]/.test(v)) score++;
+  const M = [
+    {level:'weak',   label:'слабый',        pct:20},
+    {level:'weak',   label:'слабый',        pct:32},
+    {level:'ok',     label:'нормальный',    pct:55},
+    {level:'good',   label:'хороший',       pct:78},
+    {level:'strong', label:'сильный',       pct:92},
+    {level:'strong', label:'очень сильный', pct:100},
+  ];
+  return M[Math.min(score,5)];
+}
+function _agCpValidate(v){
+  const st = document.getElementById('ag-cp-strength');
+  const btn= document.getElementById('ag-cp-save');
+  if(!st) return;
+  const err = _agCpValidateErr(v);
+  if(err){
+    st.innerHTML = `<span class="ag-cp-str-bar"><i class="lv-empty" style="width:${err.code==='empty'?0:12}%"></i></span><span class="ag-cp-str-lbl lv-empty">${_ddH(err.msg)}</span>`;
+    if(btn) btn.disabled = true;
+  } else {
+    const s = _agCpStrength(v);
+    st.innerHTML = `<span class="ag-cp-str-bar"><i class="lv-${s.level}" style="width:${s.pct}%"></i></span><span class="ag-cp-str-lbl lv-${s.level}">${_ddH(s.label)}</span>`;
+    if(btn) btn.disabled = false;
+  }
+}
+/* Отправка на сервер: собирает pw из input, передаёт в edge function с явным паролем.
+   Если сервер валидацию не пройдёт — покажет toast и не закроет модалку. */
+async function _agCpSubmit(targetUserId, targetName, isSelfFlag){
+  const inp = document.getElementById('ag-cp-inp'); if(!inp) return;
+  const pw = inp.value;
+  const errObj = _agCpValidateErr(pw);
+  if(errObj){ toast(errObj.msg); return; }
+  const btn = document.getElementById('ag-cp-save'); const orig = btn?btn.textContent:'Сохранить';
+  if(btn){ btn.disabled = true; btn.textContent = 'Сохраняем…'; }
+  const isSelf = (isSelfFlag===true || isSelfFlag==='true');
+  const body = { new_password: pw };
+  if(targetUserId && !isSelf) body.target_user_id = targetUserId;
+  try{
+    if(typeof SB==='undefined' || !SB) throw new Error('Соединение с БД недоступно');
+    const { data, error } = await SB.functions.invoke('change-password', { body });
+    if(error) throw error;
+    if(!data || data.error) throw new Error((data&&data.error)||'Ошибка');
+    /* Успех — показываем «пароль обновлён» с копированием */
+    _agChangePwdShow(data.target_name || targetName || 'Пользователь', data.password, !!data.is_self);
+  }catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = orig; }
+    toast('Ошибка: '+(e&&(e.message||String(e))||'неизвестная'));
+    console.error('change-password submit', e);
+  }
+}
+/* Смена пароля сотрудника из PM Card — открывает модалку выбора пароля. */
+function _pmChangePwd(memberId){
   const m = (typeof _pmMemberById==='function') ? _pmMemberById(memberId) : null;
   if(!m){ toast('Сотрудник не найден'); return; }
-  const nm = m.name || 'сотрудник';
-  if(!confirm(`Сгенерировать новый пароль для «${nm}»?\n\nСтарый пароль перестанет работать. Новый пароль будет показан один раз — передайте его сотруднику.`)) return;
-  await _agChangePwdRun(String(memberId), nm);
+  _agShowPwdInputModal(String(memberId), m.name||'сотрудник', false);
 }
 /* Смена своего пароля из «Мой профиль». */
-async function _agMyChangePwd(){
+function _agMyChangePwd(){
   const me=(window.tMe&&window.tMe())||null; if(!me){ toast('Профиль ещё загружается'); return; }
-  if(!confirm(`Сгенерировать новый пароль для вашего аккаунта?\n\nВы будете автоматически перелогинены. Новый пароль будет показан один раз — сохраните его.`)) return;
-  await _agChangePwdRun(String(me.id), me.full_name||'Мой аккаунт');
+  _agShowPwdInputModal(String(me.id), me.full_name||'Мой аккаунт', true);
 }
 window._pmChangePwd=_pmChangePwd; window._agMyChangePwd=_agMyChangePwd; window._agCpCopy=_agCpCopy;
+window._agCpGenerate=_agCpGenerate; window._agCpValidate=_agCpValidate; window._agCpToggleVisible=_agCpToggleVisible; window._agCpSubmit=_agCpSubmit;
 
 function openCostDrill(i){
   const F=(typeof FINANCE!=='undefined'?FINANCE:null); if(!F||!F.breakdown) return;
