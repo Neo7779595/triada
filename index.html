@@ -199,6 +199,12 @@ button{font-family:inherit}
    ══════════════════════════════════════════════════════════════════ */
 #page-register{position:fixed;inset:0;background:var(--bg,#020407);z-index:200;overflow-y:auto;overflow-x:hidden;color:var(--txt,#e5edea);font-family:var(--font,'Inter',system-ui,sans-serif);animation:rgSectionIn .5s cubic-bezier(.2,.9,.3,1) both}
 @keyframes rgSectionIn{from{opacity:0}to{opacity:1}}
+/* Фон-анимация НЕ должна обрываться при скролле: делаем её fixed на viewport,
+   чтобы grid/aurora/particles всегда были видны на всей странице визарда,
+   а не только в первом экране (обрезалось при прокрутке до тарифов). */
+#page-register .lg-bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+/* Мягкое затухание внизу — контент плавно уходит в бекграунд, а не «упирается в стену». */
+#page-register .rg-stage::after{content:"";display:block;height:60px;background:linear-gradient(180deg,transparent,color-mix(in oklab,var(--bg,#020407) 60%,transparent));margin-bottom:-40px;pointer-events:none}
 
 /* Топбар: бренд · шаги · закрыть */
 .rg-topbar{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 28px;border-bottom:1px solid color-mix(in oklab,var(--line-2,#1a2028) 60%,transparent)}
@@ -282,8 +288,8 @@ button{font-family:inherit}
 .rg-tf.is-picked{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 8%,var(--bg-2));box-shadow:0 0 0 1px var(--accent),0 12px 40px -14px rgba(55,230,200,.55)}
 .rg-tf.is-picked::before{opacity:1}
 .rg-tf.is-pop{border-color:color-mix(in oklab,#f5b942 40%,var(--line))}
-.rg-tf-pop{position:absolute;top:-9px;right:14px;padding:2px 9px;border-radius:99px;background:linear-gradient(135deg,#f5b942,#ff8a3d);color:#111;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 4px 12px -4px rgba(245,185,66,.55)}
-.rg-tf-check{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.6);transition:.22s cubic-bezier(.34,1.56,.64,1)}
+.rg-tf-pop{position:absolute;top:-11px;left:50%;transform:translateX(-50%);padding:3px 13px;border-radius:99px;background:linear-gradient(135deg,#f5b942,#ff8a3d);color:#111;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 6px 16px -4px rgba(245,185,66,.6),0 0 0 3px var(--bg,#020407);white-space:nowrap;z-index:2}
+.rg-tf-check{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#06140f;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.6);transition:.22s cubic-bezier(.34,1.56,.64,1);z-index:2}
 .rg-tf.is-picked .rg-tf-check{opacity:1;transform:scale(1)}
 .rg-tf-key{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin-bottom:10px;position:relative;font-family:var(--font-mono,'JetBrains Mono',monospace)}
 .rg-tf-lim{display:flex;align-items:baseline;gap:6px;margin-bottom:16px;position:relative}
@@ -7417,8 +7423,8 @@ select.ddx-native{position:absolute!important;width:1px!important;height:1px!imp
             <div class="rg-feat-ic">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="M9 12l2 2 4-4"/></svg>
             </div>
-            <div class="rg-feat-t">Ваши данные</div>
-            <div class="rg-feat-s">Изолированный кабинет · RLS на всех таблицах</div>
+            <div class="rg-feat-t">Конфиденциальность</div>
+            <div class="rg-feat-s">Данные вашего агентства защищены и недоступны другим клиентам платформы</div>
           </div>
         </div>
 
@@ -8970,7 +8976,16 @@ function _regGoStep(n){
   if(n===3 && !st.picked){ if(typeof toast==='function') toast('Сначала выберите тариф'); return; }
   st.step = n;
   document.querySelectorAll('#page-register .rg-screen').forEach(el => {
-    el.classList.toggle('is-active', String(el.dataset.screen)===String(n));
+    const active = String(el.dataset.screen)===String(n);
+    if(active){
+      el.classList.add('is-active');
+      /* Перезапускаем slide-in анимацию при показе (иначе она играет только 1 раз) */
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.animation = '';
+    } else {
+      el.classList.remove('is-active');
+    }
   });
   document.querySelectorAll('#page-register .rg-step').forEach(el => {
     const s = Number(el.dataset.step);
@@ -8979,9 +8994,9 @@ function _regGoStep(n){
   });
   if(n===2 && st.tariffs.length) _regRenderTariffs();
   if(n===3) _regRenderSummary();
-  /* Скроллим наверх при переходе */
-  const stage = document.getElementById('rg-stage'); if(stage) stage.scrollTop = 0;
-  try{ window.scrollTo({top:0, behavior:'smooth'}); }catch(_){}
+  /* Скроллим страницу визарда наверх — #page-register скроллится внутри, а не body. */
+  const sec = document.getElementById('page-register');
+  if(sec){ try{ sec.scrollTo({top:0, behavior:'smooth'}); }catch(_){ sec.scrollTop = 0; } }
 }
 async function _regLoadTariffs(){
   const host = document.getElementById('rg-tariffs'); if(!host) return;
