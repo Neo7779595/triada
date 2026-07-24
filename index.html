@@ -9900,10 +9900,14 @@ async function pjSaveSettings(i){
   if(window.LIVE && p.status==='done' && status==='active'){
     /* ⚠️ ПРЕВЕНТИВНАЯ ПРОВЕРКА ЛИМИТА: не даём открыть confirm возврата, если после
        активации станет превышение. Триггер БД check_project_reactivate_limit — вторая
-       линия защиты (на случай race condition или прямого API-запроса). */
+       линия защиты (на случай race condition или прямого API-запроса).
+       Используем СВЕЖИЙ count через RPC — me.agencyActiveProjects мог протухнуть. */
     try{
       const _info=(typeof agPlanLimit==='function')?agPlanLimit():null;
-      const _used=(typeof agProjUsed==='function')?agProjUsed():0;
+      let _used=(typeof agProjUsed==='function')?agProjUsed():0;
+      if(_info && _info.limit && typeof agReloadProjCount==='function'){
+        try{ await agReloadProjCount(); _used=(typeof agProjUsed==='function')?agProjUsed():_used; }catch(_){}
+      }
       if(_info && _info.limit && (_used + 1 > _info.limit)){
         _agShowReactivateLimitModal(p.name, _used, _info);
         return;
