@@ -8607,7 +8607,23 @@ function _initCounters(){
 }
 
 function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
-function doLogin(){ if(window.LIVE&&window.tLogin) return window.tLogin(); toast('Supabase не настроен: вставь публичный ключ в SUPA_KEY (внизу файла)'); }
+async function doLogin(){
+  if(window.LIVE&&window.tLogin) return window.tLogin();
+  if(window.__SB_FAIL){ toast('Не удалось загрузить библиотеку сервера — проверьте интернет и обновите страницу'); return; }
+  /* module-скрипт с Supabase грузится асинхронно: сразу после открытия страницы
+     window.LIVE ещё не выставлен — ждём вместо мгновенной ошибки */
+  const btn=document.getElementById('lg-btn'), lbl=btn?btn.querySelector('span'):null;
+  const old=lbl?lbl.textContent:'';
+  if(btn) btn.disabled=true;
+  if(lbl) lbl.textContent='Подключаемся…';
+  const sb=await _regWaitForSB(15000);
+  if(btn) btn.disabled=false;
+  if(lbl) lbl.textContent=old||'Войти';
+  if(sb&&window.tLogin) return window.tLogin();
+  toast(window.__SB_FAIL
+    ? 'Не удалось загрузить библиотеку сервера — проверьте интернет и обновите страницу'
+    : 'Сервер ещё подключается — попробуйте ещё раз через пару секунд');
+}
 /* Интерактивный свет за курсором на карточке входа — GPU-friendly, срабатывает только при движении */
 (function lgParallax(){
   const mq=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)');
@@ -9783,8 +9799,10 @@ function _regWaitForSB(timeoutMs){
   const now = () => (performance && performance.now ? performance.now() : Date.now());
   return new Promise((resolve) => {
     if(window.SB){ resolve(window.SB); return; }
+    if(window.__SB_FAIL){ resolve(null); return; }
     const iv = setInterval(() => {
       if(window.SB){ clearInterval(iv); resolve(window.SB); }
+      else if(window.__SB_FAIL){ clearInterval(iv); resolve(null); }
       else if(now()-start > (timeoutMs||8000)){ clearInterval(iv); resolve(null); }
     }, 60);
   });
@@ -31135,7 +31153,20 @@ window.ddxScanAll=ddxScanAll; window.ddxClose=ddxClose; window.ddxUpgrade=ddxUpg
 
 </script>
 <script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+/* Динамический импорт с запасным CDN: при статическом import падение esm.sh
+   роняло весь модуль — приложение молча оставалось «не настроенным». */
+let createClient = null;
+for (const _src of ['https://esm.sh/@supabase/supabase-js@2',
+                    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+                    'https://cdn.skypack.dev/@supabase/supabase-js@2']) {
+  try { const _m = await import(/* @vite-ignore */ _src); if (_m && _m.createClient){ createClient = _m.createClient; break; } }
+  catch(_e){ console.warn('supabase cdn failed:', _src, _e && _e.message); }
+}
+if (!createClient) {
+  window.__SB_FAIL = true;
+  try { window.dispatchEvent(new Event('sb-failed')); } catch(_e){}
+  throw new Error('Supabase SDK не загрузился ни с одного CDN');
+}
 
 /* ===== TRIADA · live Supabase layer (live-only, real-time) ===== */
 const SUPA_URL = 'https://frotqycnpnrsgncdylbq.supabase.co';
@@ -39543,7 +39574,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.03-kb-period';
+window.__BUILD='2026-07-25.04-sb-boot';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
