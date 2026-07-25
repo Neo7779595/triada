@@ -8772,6 +8772,7 @@ body.m-lock{overflow:hidden}
       <div class="pd-ct" id="pd-ct"></div>
       <div class="pd-right">
         <button class="pd-hdr-rep" id="pd-hdr-rep" style="display:none" onclick="pdNewReport('SMM')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Отчёт</button>
+        <button class="pd-hdr-rep" id="pd-hdr-cal" style="display:none" onclick="pdOpenCalendar()" title="Обновить и открыть календарь проекта в Google"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Календарь</button>
         <div class="pd-agency"><span class="d"></span><span id="pd-agency">detroyd</span></div>
       </div>
     </div>
@@ -9608,7 +9609,7 @@ function agCanView(m){
   const p=me.permissions||{};
   if(m==='calendar' && !p.calendar) return true;                        // миграция: у старых сотрудников без ключа calendar — доступ по-прежнему есть
   /* Раздел интеграций сотрудник видит, только если владелец дал право явно.
-     Само подключение всё равно остаётся за владельцем — и в интерфейсе, и на сервере. */ агентства
+     Само подключение всё равно остаётся за владельцем — и в интерфейсе, и на сервере. */
   return !!(p[m]&&p[m].view);
 }
 function agCanEdit(m){
@@ -13656,6 +13657,13 @@ function openProject(i){
   { const _pdc=document.getElementById('pd-ct'); if(_pdc) _pdc.innerHTML=(typeof contractBadgeHTML==='function'?contractBadgeHTML(p):''); }
   {const _pe=document.getElementById('pd-pct'); if(_pe)_pe.textContent=p.pct+'%';}
   {const _hr=document.getElementById('pd-hdr-rep'); if(_hr)_hr.style.display=(pdTabCur==='smm'||pdTabCur==='reports')?'':'none';}
+  /* Кнопка календаря появляется, только если Google подключён — иначе она
+     обещала бы то, чего система пока не может. Статус тянем один раз за сессию. */
+  { const _hc=document.getElementById('pd-hdr-cal');
+    if(_hc){ _hc.style.display='none';
+      if(typeof giEnsureStatus==='function') giEnsureStatus().then(function(g){
+        if(window._pdProj===p.id && g && g.status==='active') _hc.style.display='';
+      }).catch(function(){}); } }
   document.getElementById('pd-agency').textContent=(document.getElementById('ag-name')?.textContent||'detroyd').toLowerCase();
   document.getElementById('pd-tabbar').innerHTML=pdTabbar(p);
   document.getElementById('ov-proj').classList.add('on');
@@ -27164,6 +27172,55 @@ async function renderIntegrations(){
     </div></div>`;
 
   await giLoad();
+}
+
+/* Статус подключения нужен и вне раздела интеграций — например, чтобы решить,
+   показывать ли кнопку календаря в карточке проекта. Тянем один раз за сессию. */
+async function giEnsureStatus(){
+  if(GI._loaded) return GI.google;
+  GI._loaded = 1;
+  try{
+    if(window.LIVE && window.SB){
+      const { data } = await SB.from('google_status').select('*').limit(1);
+      GI.google = (data&&data[0]) || null;
+    }
+  }catch(_){ GI.google = null; }
+  return GI.google;
+}
+
+/** Кнопка «Календарь» в карточке проекта: досинхронизировать и открыть. */
+async function pdOpenCalendar(){
+  const p = (typeof PROJECTS!=='undefined' && PROJECTS[pdIdx]) || null;
+  if(!p){ toast('Проект не найден'); return; }
+  const btn = document.getElementById('pd-hdr-cal');
+  /* Вкладку открываем сразу, пока браузер считает это реакцией на клик:
+     если открыть её после запроса, всплывающее окно будет заблокировано. */
+  const tab = window.open('', '_blank');
+  if(btn){ btn.disabled = true; btn.style.opacity = '.6'; }
+  try{
+    const { status, data } = await _giFetch('google-cal', { action:'sync_project' }, { project_id: p.id });
+    if(status===503 || (data && data.error === 'not_configured')){
+      if(tab) tab.close();
+      toast('Google ещё не подключён — раздел «Интеграции»');
+      return;
+    }
+    if(!data || data.ok === false || !data.subscribe){
+      if(tab) tab.close();
+      toast((data && (data.error||data.message)) || 'Не удалось открыть календарь');
+      return;
+    }
+    const parts = [];
+    if(data.created) parts.push('создано ' + data.created);
+    if(data.updated) parts.push('обновлено ' + data.updated);
+    if(data.removed) parts.push('убрано ' + data.removed);
+    toast(parts.length ? ('Календарь обновлён: ' + parts.join(', ')) : 'Календарь актуален');
+    if(tab) tab.location = data.subscribe; else window.open(data.subscribe, '_blank', 'noopener');
+  }catch(e){
+    if(tab) tab.close();
+    toast(String(e.message||e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 async function giLoad(){
