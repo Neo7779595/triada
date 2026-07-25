@@ -9346,6 +9346,11 @@ function agVisibleProjects(){                                            // от
   return list.filter(function(p){ return s.has(p.id); });
 }
 function agHasProjectScope(){ return agProjectAccessMode()==='assigned'; }
+/* Архив = завершённый/закрытый проект. Аналитика и статистика считают только живые проекты. */
+const AG_ARCHIVED_ST = { done:1, archived:1, closed:1 };
+function agIsArchivedProject(p){ return !!(p && AG_ARCHIVED_ST[String(p.status||'')]); }
+function agActiveProjects(){ return agVisibleProjects().filter(function(p){ return !agIsArchivedProject(p); }); }
+function agActiveProjectIds(){ const s=new Set(); agActiveProjects().forEach(function(p){ if(p&&p.id) s.add(p.id); }); return s; }
 /* Права на задачи проверяет сервер (RPC). Клиентская копия permissions грузится
    при входе и может устареть — например, владелец выдал права уже после логина.
    Поэтому НЕ гадаем: доска активна по умолчанию, и запирается только после того,
@@ -21019,7 +21024,7 @@ let _smmLbData=null, _smmLbMetric='er', _smmLbLoading=false, _smmLbSortDir='desc
    window._smmProjLoaded, из-за которого пустой кеш залипал до перезагрузки страницы. */
 let _smmLbSig='', _smmLbErrAt=0;
 const _SMM_LB_ERR_TTL=15000;
-function _smmIds(){ const _src=(typeof agVisibleProjects==='function')?agVisibleProjects():((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]); return _src.map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }   // scope=member → берём только видимые проекты, тогда весь SMM-Лидерборд идёт по ним
+function _smmIds(){ const _src=(typeof agActiveProjects==='function')?agActiveProjects():((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]).filter(p=>p.status!=='done'); return _src.map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }   // scope сотрудника + без архива: лидерборд ранжирует живые проекты
 function _smmLbStale(){ const s=_smmIds(); return !!s && s!==_smmLbSig && !(_smmLbErrAt && Date.now()-_smmLbErrAt<_SMM_LB_ERR_TTL); }
 function smmLbReset(){ _smmLbAll=null; _smmLbData=null; _smmLbPeriods=[]; _smmLbSig=''; _smmLbErrAt=0; _smmLbLoading=false; }
 /* total_* — то, что реально ввели в отчёте. Раньше охват считался как
@@ -22334,7 +22339,7 @@ function ovOpen(id){ const i=(typeof PROJECTS!=='undefined'?PROJECTS:[]).findInd
 const OV_MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 function _ovDue(due){ if(!due) return '—'; const d=new Date(due+'T00:00:00'); return d.getDate()+' '+OV_MON[d.getMonth()]; }
 function ovCompositionHTML(){
-  const PJ=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const PJ=(typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.status!=='done');
   const total=PJ.length;
   if(!total) return '';
   const dist=(getter,fallback)=>{
@@ -22362,7 +22367,7 @@ function ovCompositionHTML(){
   const cc = conc>=50?{c:'var(--neg)',b:'rgba(229,90,90,.14)',t:'Высокая концентрация'} : conc>=35?{c:'var(--warn)',b:'rgba(227,181,103,.15)',t:'Умеренная концентрация'} : {c:'var(--accent)',b:'var(--accent-dim)',t:'Диверсифицирован'};
   const lead = `Ведущая услуга — <b>${_ddH(bySvc[0].k)}</b> (${bySvc[0].pct}%); крупнейшая сфера — <b>${_ddH(byCat[0].k)}</b> (${byCat[0].pct}% портфеля).`;
   return `<div class="card ov-comp" style="margin-top:16px">
-    <div class="card-h"><div class="t">Структура портфеля <span class="c">${total} ${_plural(total,'проект','проекта','проектов')} · по направлениям</span></div>
+    <div class="card-h"><div class="t">Структура портфеля <span class="c">${total} ${_plural(total,'проект','проекта','проектов')} в работе · по направлениям</span></div>
       <span style="font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:${cc.b};color:${cc.c};white-space:nowrap">${cc.t}</span></div>
     <div class="ovc-body">
       <div class="ovc-lead">${lead}</div>
@@ -31616,8 +31621,8 @@ function dlBucket(due, status){
 window.tLoadDeadlines = async () => {
   if (!SB) return;
   const [st, tk, hist] = await Promise.all([
-    SB.from('project_stages').select('id,name,status,due_date,due_time,project_id, projects(name,logo,logo_url)').not('due_date','is',null),
-    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,project_id, projects(name,logo,logo_url)').not('due_date','is',null),
+    SB.from('project_stages').select('id,name,status,due_date,due_time,project_id, projects(name,logo,logo_url,status)').not('due_date','is',null),
+    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,project_id, projects(name,logo,logo_url,status)').not('due_date','is',null),
     SB.from('stage_history').select('stage_name,old_status,new_status,created_at,changed_by,project_id, projects(name)').order('created_at',{ascending:false}).limit(60)
   ]);
   const _push = (label, status, due, projObj, id, type, assignee, dueTime, doneAt, pid, spent) => {
@@ -31635,8 +31640,9 @@ window.tLoadDeadlines = async () => {
     try { const td = await SB.from('project_tasks').select('id,completed_at'); if(!td.error && td.data) td.data.forEach(r=>{ if(r.completed_at) _tkDone[r.id]=r.completed_at; }); } catch(_){}
     let _tkSpent={}, _stSpent={};
     try { const _tsp = await SB.from('project_tasks').select('id,stage_id,time_spent,timer_started,status'); if(!_tsp.error && _tsp.data) _tsp.data.forEach(r=>{ let sec=(r.time_spent||0); if(r.timer_started && r.status==='active') sec+=Math.max(0,Math.round((Date.now()-new Date(r.timer_started).getTime())/1000)); _tkSpent[r.id]=sec; if(r.stage_id) _stSpent[r.stage_id]=(_stSpent[r.stage_id]||0)+sec; }); } catch(_){}
-    (st.data||[]).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id], r.project_id, _stSpent[r.id]||0));
-    (tk.data||[]).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, _tkDone[r.id], r.project_id, _tkSpent[r.id]||0));
+    const _liveP = r => !(r && r.projects && AG_ARCHIVED_ST[String(r.projects.status||'')]);   // дедлайны завершённых проектов не нужны
+    (st.data||[]).filter(_liveP).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id], r.project_id, _stSpent[r.id]||0));
+    (tk.data||[]).filter(_liveP).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, _tkDone[r.id], r.project_id, _tkSpent[r.id]||0));
   }
   if (typeof DL_ACT !== 'undefined'){
     DL_ACT.length = 0;
@@ -32325,13 +32331,17 @@ window.tLoadOverview = async () => {
   const isoMon = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
   const MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-  const [sr, tr, hr, thr, pmr] = await Promise.all([
+  const [sr, tr, hr, thr, pmr, pjr] = await Promise.all([
     SB.from('project_stages').select('id,project_id,name,status,due_date,due_time'),
     SB.from('project_tasks').select('id,project_id,status,due_date,due_time'),
     SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at'),
     SB.from('task_history').select('task_id,project_id,old_status,new_status,created_at'),  // может ещё не существовать
-    SB.from('project_members').select('project_id,member_id')
+    SB.from('project_members').select('project_id,member_id'),
+    SB.from('projects').select('id,status')
   ]);
+  /* архив (завершённые проекты) не должен попадать в агрегаты: просрочка, velocity, откаты, on-time */
+  const _arch = new Set(); ((pjr&&pjr.data)||[]).forEach(r => { if(AG_ARCHIVED_ST[String(r.status||'')]) _arch.add(r.id); });
+  const _live = x => !_arch.has(x.project_id);
   /* scope сотрудника строим из project_members НАПРЯМУЮ: agVisibleProjectIds() читает p._team,
      который заполняет параллельный загрузчик — при гонке scope оказывался пустым и вся сводка обнулялась */
   let _vis = null;
@@ -32392,13 +32402,14 @@ window.tLoadOverview = async () => {
     });
     return o;
   };
-  const S = tally(hist,     dueOfStage, dueTimeOfStage, 'stage_id');   // этапы
-  const T = tally(taskHist, dueOfTask,  dueTimeOfTask,  'task_id');    // задачи
+  const S = tally(hist.filter(_live),     dueOfStage, dueTimeOfStage, 'stage_id');   // этапы живых проектов
+  const T = tally(taskHist.filter(_live),  dueOfTask,  dueTimeOfTask,  'task_id');    // задачи живых проектов
 
   /* последняя активность по проекту — из обоих журналов */
   const lastAct = {};
-  [S.lastAct, T.lastAct].forEach(m => Object.keys(m).forEach(pid => {
-    if (!(pid in lastAct) || m[pid] > lastAct[pid]) lastAct[pid] = m[pid]; }));
+  [].concat(hist, taskHist).forEach(h => { const t = new Date(h.created_at).getTime();
+    if (isNaN(t)) return;
+    if (!(h.project_id in lastAct) || t > lastAct[h.project_id]) lastAct[h.project_id] = t; });
 
   /* per-project rollup: done / total / nearest deadline / overdue flag */
   const roll = {};
@@ -32413,8 +32424,8 @@ window.tLoadOverview = async () => {
   /* просрочка — раздельно этапы и задачи (точечное состояние, журнал не нужен) */
   const isOver = (status, due) => status!=='done' && !!due && new Date(due+'T00:00:00') < today;
   let overdueStages = 0, overdueTasks = 0;
-  stages.forEach(s => { if (isOver(s.status, s.due_date)) overdueStages++; });
-  tasks.forEach(t  => { if (isOver(t.status, t.due_date)) overdueTasks++; });
+  stages.forEach(s => { if (_live(s) && isOver(s.status, s.due_date)) overdueStages++; });
+  tasks.forEach(t  => { if (_live(t) && isOver(t.status, t.due_date)) overdueTasks++; });
   const overdueItems = overdueStages + overdueTasks;
 
   /* открытые / в работе / ожидание — раздельно (точечное состояние) */
@@ -32434,9 +32445,8 @@ window.tLoadOverview = async () => {
   });
 
   /* stage load grouped by stage name across the whole portfolio */
-  const _doneProj = new Set(); (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ if(p.status==='done') _doneProj.add(p.id); });
   const lm = {}, lo = [];
-  stages.forEach(s => { if(_doneProj.has(s.project_id)) return;        // завершённые проекты не отражают текущую загрузку
+  stages.forEach(s => { if(!_live(s)) return;                          // завершённые проекты не отражают текущую загрузку
     const nm = s.name || '—'; if (!lm[nm]){ lm[nm] = { name:nm, done:0, total:0 }; lo.push(nm); }
     lm[nm].total++; if (s.status==='done') lm[nm].done++; });
   const stageLoad = lo.map(n => lm[n]).sort((a,b)=> (b.total-a.total) || a.name.localeCompare(b.name,'ru'));
@@ -32477,12 +32487,15 @@ window.tLoadCycles = async () => {
     }
     return out;
   };
-  const [histAll, sr, tasksAll, pmr] = await Promise.all([
+  const [histAll, sr, tasksAll, pmr, pjr] = await Promise.all([
     _pageAll(() => SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true})),
     SB.from('project_stages').select('id,name,project_id'),
     _pageAll(() => SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at,completed_at').order('created_at',{ascending:true})),
-    SB.from('project_members').select('project_id,member_id')
+    SB.from('project_members').select('project_id,member_id'),
+    SB.from('projects').select('id,status')
   ]);
+  /* завершённые проекты в аналитику циклов не идут — метрики должны описывать живой портфель */
+  const _archCy = new Set(); ((pjr&&pjr.data)||[]).forEach(r => { if(AG_ARCHIVED_ST[String(r.status||'')]) _archCy.add(r.id); });
   /* scope сотрудника — из project_members напрямую, без зависимости от параллельного загрузчика */
   let _visCy = null;
   if (typeof agProjectAccessMode==='function' && agProjectAccessMode()!=='all'){
@@ -32492,11 +32505,12 @@ window.tLoadCycles = async () => {
     const _s2 = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
     if(_s2) _s2.forEach(id => _visCy.add(id));
   }
-  const hist = histAll.filter(h => !_visCy || _visCy.has(h.project_id));
-  const tr = { data: _visCy ? tasksAll.filter(t => _visCy.has(t.project_id)) : tasksAll };
-  if (_visCy && sr.data) sr.data = sr.data.filter(x => _visCy.has(x.project_id));   // имена этапов чужих проектов не должны утекать на график
+  const _okCy = pid => !_archCy.has(pid) && (!_visCy || _visCy.has(pid));
+  const hist = histAll.filter(h => _okCy(h.project_id));
+  const tr = { data: tasksAll.filter(t => _okCy(t.project_id)) };
+  if (sr.data) sr.data = sr.data.filter(x => _okCy(x.project_id));   // чужие и архивные этапы не должны утекать на график
   const nameById={}, mrrById={}, logoById={};
-  const _visPrjSrc = (typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const _visPrjSrc = (typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.status!=='done');
   _visPrjSrc.forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; logoById[p.id]={url:p.logoUrl||'', letter:(p.logo||(p.name?p.name[0]:'?'))}; });
 
   // TRIADA-статусы → семантика цикла: done=закрытие инстанса, active=работа, wait=возврат (откат).
@@ -32693,7 +32707,7 @@ window.tLoadTeam = async () => {
     SB.from('time_logs').select('member_id,seconds,started_at,kind').gte('started_at',iso365)
   ]);
   window._timeLogs = (tl && !tl.error && tl.data) ? tl.data : [];   // журнал может ещё не существовать (до миграции)
-  const _doneProj = new Set(((pr&&pr.data)||[]).filter(x=>x.status==='done').map(x=>x.id));
+  const _doneProj = new Set(((pr&&pr.data)||[]).filter(x=>AG_ARCHIVED_ST[String(x.status||'')]).map(x=>x.id));
   const _projName={}; ((pr&&pr.data)||[]).forEach(x=>{ _projName[x.id]=x.name||''; });
   const _td={};   // детальная статистика задач по исполнителю (реальные данные)
   let tr2=await SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started,difficulty,priority');
@@ -33639,8 +33653,8 @@ window.kpiComputePortfolioAll = async (sc, id, from, to) => {
 /* Здоровье портфеля — как в Сводке: не просроченные И не застойные (14+ дней без активности) */
 window.kpiComputePortfolioHealth = async (sc, id) => {
   if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
-  const P = (typeof agVisibleProjects==='function') ? agVisibleProjects() : (typeof PROJECTS!=='undefined' ? PROJECTS : []);   // scope=member → только видимые
-  const active = P.filter(p => p.status !== 'done');
+  const active = (typeof agActiveProjects==='function') ? agActiveProjects()
+               : ((typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done'));   // scope сотрудника + без архива
   if (!active.length) return { value:null, sample_size:0, confidence:null };
   const STALE_DAYS = 14;
   const isStale = p => p._lastActDays != null && p._lastActDays >= STALE_DAYS;
@@ -33686,8 +33700,8 @@ window.kpiComputeMRR = async (sc, id) => {
   const F = (typeof FINANCE!=='undefined' ? FINANCE : {}) || {};
   if (F.totalMrr == null){
     // Fallback: сумма mrr из PROJECTS
-    const P = (typeof agVisibleProjects==='function') ? agVisibleProjects() : (typeof PROJECTS!=='undefined' ? PROJECTS : []);   // scope=member → только видимые
-    const active = P.filter(p => p.status !== 'done' && p.status !== 'blocked');
+    const active = ((typeof agActiveProjects==='function') ? agActiveProjects()
+                  : (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done')).filter(p => p.status !== 'blocked');
     const sum = active.reduce((s,p) => s + (+p.mrr || 0), 0);
     return { value: sum, sample_size: active.length, confidence: _kpiConfidence('mrr', active.length) };
   }
@@ -39778,7 +39792,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.08-cycles-filters';
+window.__BUILD='2026-07-25.09-no-archive-in-stats';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
