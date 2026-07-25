@@ -27223,6 +27223,52 @@ async function pdOpenCalendar(){
   }
 }
 
+/* ═══════════ ПЕРЕХОД ПО ССЫЛКЕ ИЗ КАЛЕНДАРЯ ═══════════
+   Событие в Google ведёт на /?project=…&task=… или &stage=… — открываем
+   не просто проект, а именно ту задачу или этап, ради которых человек нажал. */
+function _pdDeepClearURL(){ try{ history.replaceState(null,'',location.pathname); }catch(_){} }
+
+function _pdFlashStage(id){
+  const safe=String(id).replace(/["\\]/g,'');
+  const el=document.querySelector('.pd-st[data-stid="'+safe+'"]');
+  if(!el) return;
+  try{ el.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ el.scrollIntoView(); }
+  el.style.transition='box-shadow .35s var(--ease)';
+  el.style.boxShadow='0 0 0 2px var(--accent)';
+  setTimeout(function(){ el.style.boxShadow=''; }, 2600);
+}
+
+function _pdDeepLink(){
+  const q=new URLSearchParams(location.search);
+  const pid=q.get('project'); if(!pid) return;
+  const list=(typeof PROJECTS!=='undefined' && PROJECTS) || [];
+  const idx=list.findIndex(function(p){ return String(p.id)===String(pid); });
+  _pdDeepClearURL();                       // адрес чистим сразу, чтобы не сработало при обновлении
+  if(idx<0){ toast('Проект не найден или к нему нет доступа'); return; }
+  openProject(idx);
+  const task=q.get('task'), stage=q.get('stage');
+  if(task){
+    pdTab('kanban');
+    setTimeout(function(){ try{ pdTaskEdit(task); }catch(_){ } }, 350);
+  } else if(stage){
+    pdTab('stages');
+    setTimeout(function(){ _pdFlashStage(stage); }, 420);
+  }
+}
+
+/* Ждём, пока кабинет поднимется и проекты загрузятся, — иначе открывать нечего. */
+(function(){
+  if(!/[?&]project=/.test(location.search)) return;
+  let tries=0;
+  const t=setInterval(function(){
+    tries++;
+    const ag=document.getElementById('app-ag');
+    const ready=(typeof PROJECTS!=='undefined' && PROJECTS && PROJECTS.length) && ag && ag.offsetParent!==null;
+    if(ready){ clearInterval(t); try{ _pdDeepLink(); }catch(e){ console.error('deep link', e); } }
+    else if(tries>60) clearInterval(t);     // 30 секунд ожидания — дальше смысла нет
+  }, 500);
+})();
+
 async function giLoad(){
   GI.loading=true;
   try{
