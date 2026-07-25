@@ -7422,8 +7422,9 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
 /* Тач-устройства: без залипающих hover, мгновенный отклик нажатия */
 @media (hover:none){
   *{-webkit-tap-highlight-color:transparent}
-  .kpi3-tile:hover,.kpi-ovtile:hover,.tool-card:hover,.smm-fc:hover{transform:none}
+  .kpi3-tile:hover,.kpi-ovtile:hover,.tool-card:hover,.smm-fc:hover,.pjh:hover{transform:none}
   .nav-i:active,.btn:active,.kpi3-btn:active,.kpi3-tab:active,.kpi3-cat:active,.stpl-tab:active,.tool-card:active,.m-tab:active,.m-more-it:active,.kb-act:active{transform:scale(.97);transition:transform .08s}
+  .pjh:active{transform:scale(.988);transition:transform .09s}
 }
 @media(max-width:860px){
   .side{height:100dvh}
@@ -7464,7 +7465,7 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   #cmdk-fab{display:none !important}
 
   /* ── нижний таб-бар ── */
-  #m-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:62;display:none;align-items:stretch;justify-content:space-around;height:var(--mtab-h);padding:0 6px env(safe-area-inset-bottom,0px);background:rgba(11,13,17,.92);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);border-top:1px solid var(--line-2)}
+  #m-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:62;display:none;align-items:stretch;justify-content:space-around;height:var(--mtab-h);padding:0 max(6px,env(safe-area-inset-left,0px)) env(safe-area-inset-bottom,0px) max(6px,env(safe-area-inset-right,0px));background:rgba(11,13,17,.92);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);border-top:1px solid var(--line-2)}
   body.has-mtab #m-tabbar{display:flex}
   body.kb-open #m-tabbar{display:none}
   .m-tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:transparent;border:none;color:var(--txt-3);cursor:pointer;font-family:var(--font);padding:6px 2px 7px;transition:color .16s}
@@ -7567,7 +7568,14 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   .tb-fbtn i{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:10.5px;font-weight:800;font-style:normal;display:flex;align-items:center;justify-content:center;padding:0 4px;font-family:var(--mono)}
   .tb-proj .segm{width:100%;display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:6px;padding-bottom:2px}
   .tb-proj .segm::-webkit-scrollbar{display:none}
-  .tb-proj .segm button{white-space:nowrap;flex:none}
+  .tb-proj .segm button{white-space:nowrap;flex:none;min-height:40px}
+  /* тач-цели сегментов и чипов ≥40px */
+  .card-h .segm button{min-height:40px;white-space:nowrap}
+  .sched-seg{height:auto;min-height:42px}
+  .sched-seg button{min-height:34px}
+  .kpi-tab,.kpi-blk,.kpi-catchip{min-height:38px;display:inline-flex;align-items:center}
+  /* календарь-пикер и dd-меню поверх таб-бара */
+  .dp-pop,.dr-pop,.kbp-pop,.dd-menu.dd-portal{z-index:90 !important}
   .tb-adv-scrim.on{display:block;position:fixed;inset:0;z-index:75;background:rgba(5,6,8,.6)}
   .tb-adv{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:76;flex-direction:column;gap:8px;background:var(--bg-1);border:1px solid var(--line-2);border-bottom:none;border-radius:20px 20px 0 0;padding:8px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -30px 80px -20px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.04);transform:translateY(105%);transition:transform .28s var(--ease-out),visibility .28s;max-height:calc(100dvh - 60px);overflow-y:auto;visibility:hidden}
   .tb-adv.on{transform:none;visibility:visible}
@@ -7728,6 +7736,10 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   body.m-app .fin-hero{padding:20px 18px 18px;border-radius:16px}
   body.m-app .fin-hero .fh-v{font-size:clamp(26px,8vw,34px)}
   body.m-app .fin-b{gap:10px}
+}
+body.m-lock{overflow:hidden}
+@media(max-width:380px){
+  .m-tab span{font-size:9.5px}
 }
 @media(max-width:480px){
   .login-card{padding:30px 20px 24px;border-radius:18px}
@@ -39373,7 +39385,9 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
   window.mMoreToggle=function(open){
     ensureNodes();
     var will=(open===undefined)?!more.classList.contains('on'):open;
+    if(will){ if(window._tbAdvOpen&&window._tbAdvSet) _tbAdvSet(false); if(typeof mPsClose==='function') mPsClose(); }
     more.classList.toggle('on',will);
+    setTimeout(mLockSync,0);
   };
 
   function sync(){
@@ -39439,6 +39453,7 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
   /* ── sheet фильтров «Проекты»: портал в body (fixed внутри .content ломается) ── */
   window._tbAdvSet=function(open){
     window._tbAdvOpen=!!open;
+    if(open){ if(typeof mPsClose==='function') mPsClose(); if(more) more.classList.remove('on'); }
     var adv=document.querySelector('.tb-adv'), scrim=document.querySelector('.tb-adv-scrim');
     /* убрать осиротевшие порталы прошлых рендеров */
     document.querySelectorAll('body > .tb-adv, body > .tb-adv-scrim').forEach(function(n){
@@ -39454,6 +39469,7 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
       adv.classList.remove('on');
       if(scrim) scrim.classList.remove('on');
     }
+    setTimeout(mLockSync,0);
   };
   /* после каждого рендера модуля с фильтрами восстановить состояние sheet */
   (function(){
@@ -39468,12 +39484,20 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
   })();
 
   /* ── DETROYD Mobile: шторка проекта (внутрь проектов приложение не заходит) ── */
+  function mLockSync(){
+    var open=!!(document.querySelector('#m-psheet.on')||document.querySelector('.tb-adv.on')||(more&&more.classList.contains('on')));
+    document.body.classList.toggle('m-lock',open);
+  }
   function mPsClose(){
     var s=document.getElementById('m-psheet'); if(!s) return;
     s.classList.remove('on');
-    setTimeout(function(){ s.remove(); },320);
+    setTimeout(function(){ s.remove(); mLockSync(); },320);
+    setTimeout(mLockSync,0);
   }
   window.mProjSheet=function(idx){
+    /* одна шторка за раз: закрываем фильтры и «Ещё» */
+    if(window._tbAdvOpen&&window._tbAdvSet) _tbAdvSet(false);
+    if(more) more.classList.remove('on');
     var list=(typeof PROJECTS!=='undefined'&&PROJECTS)||window.PROJECTS||[];
     var p=list[idx]; if(!p) return;
     var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
@@ -39526,7 +39550,7 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
       +'</div>';
     document.body.appendChild(s);
     s.querySelector('.m-psheet-scrim').addEventListener('click',mPsClose);
-    requestAnimationFrame(function(){ requestAnimationFrame(function(){ s.classList.add('on'); }); });
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ s.classList.add('on'); mLockSync(); }); });
   };
   /* на телефоне карточка проекта открывает шторку, а не десктопное окно */
   (function(){
