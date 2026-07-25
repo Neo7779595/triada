@@ -7435,10 +7435,10 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
 
 /* Мобильные компоненты — на десктопе полностью скрыты (база, вне media) */
 .pjm,.tb-fbtn,.tb-adv-hd,.tb-adv-apply,.tb-adv-scrim{display:none}
-#m-tabbar,#m-more,#m-head,.m-psheet{display:none}
+#m-tabbar,#m-more,#m-head,.m-psheet,.m-prof{display:none}
 .tb-adv{display:contents}
 @media(max-width:768px){
-  .m-psheet{display:block}
+  .m-psheet,.m-prof{display:block}
 }
 /* десктоп: в «Дедлайнах» сегмент справа, дропдауны слева — как раньше */
 @media(min-width:769px){
@@ -7736,6 +7736,18 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   .m-ps-tm .av{width:24px;height:24px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#04201b;flex:none}
   .m-ps-tm .av img{width:100%;height:100%;object-fit:cover;display:block}
   .m-ps-note{margin-top:16px;padding:10px 12px;border:1px dashed var(--line-2);border-radius:10px;font-size:11.5px;color:var(--txt-3);text-align:center}
+
+  /* шторка профиля */
+  .m-prof{position:fixed;inset:0;z-index:78}
+  .m-prof-scrim{position:absolute;inset:0;background:rgba(5,6,8,.62);backdrop-filter:blur(3px);opacity:0;transition:opacity .24s}
+  .m-prof.on .m-prof-scrim{opacity:1}
+  .m-prof-panel{position:absolute;left:0;right:0;bottom:0;background:var(--bg-1);border:1px solid var(--line-2);border-bottom:none;border-radius:22px 22px 0 0;padding:8px 20px calc(22px + env(safe-area-inset-bottom,0px));text-align:center;transform:translateY(102%);transition:transform .3s var(--ease-out);box-shadow:0 -30px 80px -20px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.04)}
+  .m-prof.on .m-prof-panel{transform:none}
+  .m-prof-av{width:76px;height:76px;border-radius:22px;overflow:hidden;margin:14px auto 0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;color:var(--accent-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .m-prof-av img{width:100%;height:100%;object-fit:cover;display:block}
+  .m-prof-nm{font-size:18px;font-weight:800;letter-spacing:-.01em;margin-top:12px}
+  .m-prof-sub{font-size:12.5px;color:var(--txt-3);margin-top:3px}
+  .m-prof-exit{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:50px;margin-top:20px;background:var(--neg-dim);border:1px solid color-mix(in srgb,var(--neg) 28%,transparent);border-radius:13px;color:var(--neg);font-family:var(--font);font-size:14.5px;font-weight:700;cursor:pointer}
 
   /* ══ KPI · только просмотр: минимум кнопок, аккуратные переключатели ══ */
   body.m-app .kpi3-title{font-size:19px}
@@ -39355,11 +39367,44 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
       +'</div>';
     document.body.appendChild(mhead);
     mhead.querySelector('#m-head-bell').addEventListener('click',function(){ if(typeof window.ntfToggle==='function') window.ntfToggle(); });
-    mhead.querySelector('#m-head-av').addEventListener('click',function(){
-      if(typeof window._uchipClick==='function') window._uchipClick();
-      else if(typeof window.myProfileOpen==='function') window.myProfileOpen();
-    });
+    mhead.querySelector('#m-head-av').addEventListener('click',function(){ mProfileSheet(); });
   }
+
+  /* ── профиль в приложении: имя, аватар, выход — без тарифов и продлений ── */
+  function mProfClose(){
+    var s=document.getElementById('m-prof'); if(!s) return;
+    s.classList.remove('on');
+    setTimeout(function(){ s.remove(); mLockSync(); },320);
+    setTimeout(mLockSync,0);
+  }
+  window.mProfileSheet=function(){
+    if(window._tbAdvOpen&&window._tbAdvSet) _tbAdvSet(false);
+    if(more) more.classList.remove('on');
+    if(typeof mPsClose==='function') mPsClose();
+    var old=document.getElementById('m-prof'); if(old) old.remove();
+    var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var me=(typeof window.tMe==='function'?(window.tMe()||{}):{});
+    var nm=me.full_name||(me.role==='agency_owner'?'Владелец агентства':'Сотрудник');
+    var role=me.role==='agency_owner'?'Владелец':(me.role==='director'?'Директор':'Сотрудник');
+    var avHTML=me.avatar_url
+      ?'<img src="'+String(me.avatar_url).replace(/"/g,'&quot;')+'" alt="">'
+      :esc((nm||'D')[0]||'D').toUpperCase();
+    var s=document.createElement('div'); s.id='m-prof'; s.className='m-prof';
+    s.innerHTML='<div class="m-prof-scrim"></div><div class="m-prof-panel">'
+      +'<div class="m-sheet-handle"></div>'
+      +'<div class="m-prof-av" style="background:'+(me.color||'var(--accent)')+'">'+avHTML+'</div>'
+      +'<div class="m-prof-nm">'+esc(nm)+'</div>'
+      +'<div class="m-prof-sub">'+esc(role)+' · '+esc(me.agencyName||'DETROYD')+'</div>'
+      +'<button type="button" class="m-prof-exit"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4H5v16h4M14 8l4 4-4 4M18 12H9"/></svg>Выйти из аккаунта</button>'
+      +'</div>';
+    document.body.appendChild(s);
+    s.querySelector('.m-prof-scrim').addEventListener('click',mProfClose);
+    s.querySelector('.m-prof-exit').addEventListener('click',function(){
+      mProfClose();
+      if(typeof window.logout==='function') window.logout();
+    });
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ s.classList.add('on'); mLockSync(); }); });
+  };
 
   function mHeadUpdate(){
     if(!mhead) return;
@@ -39592,7 +39637,7 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
 
   /* ── DETROYD Mobile: шторка проекта (внутрь проектов приложение не заходит) ── */
   function mLockSync(){
-    var open=!!(document.querySelector('#m-psheet.on')||document.querySelector('.tb-adv.on')||(more&&more.classList.contains('on')));
+    var open=!!(document.querySelector('#m-psheet.on')||document.querySelector('#m-prof.on')||document.querySelector('.tb-adv.on')||(more&&more.classList.contains('on')));
     document.body.classList.toggle('m-lock',open);
   }
   function mPsClose(){
@@ -39602,9 +39647,10 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
     setTimeout(mLockSync,0);
   }
   window.mProjSheet=function(idx){
-    /* одна шторка за раз: закрываем фильтры и «Ещё» */
+    /* одна шторка за раз: закрываем фильтры, «Ещё» и профиль */
     if(window._tbAdvOpen&&window._tbAdvSet) _tbAdvSet(false);
     if(more) more.classList.remove('on');
+    if(typeof mProfClose==='function') mProfClose();
     var list=(typeof PROJECTS!=='undefined'&&PROJECTS)||window.PROJECTS||[];
     var p=list[idx]; if(!p) return;
     var esc=function(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
@@ -39696,7 +39742,7 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
     var target=null,startY=0,dy=0,dragging=false;
     document.addEventListener('touchstart',function(e){
       if(window.innerWidth>MQ) return;
-      var t=e.target.closest&&e.target.closest('.ov .modal, .kpi3-modal, .m-more-panel, .hk-box, .tb-adv, .m-psheet-panel');
+      var t=e.target.closest&&e.target.closest('.ov .modal, .kpi3-modal, .m-more-panel, .hk-box, .tb-adv, .m-psheet-panel, .m-prof-panel');
       if(!t||t.scrollTop>2) return;
       target=t; startY=e.touches[0].clientY; dy=0; dragging=true;
     },{passive:true});
@@ -39713,6 +39759,7 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
         if(t.classList.contains('m-more-panel')){ mMoreToggle(false); return; }
         if(t.classList.contains('tb-adv')){ if(window._tbAdvSet) _tbAdvSet(false); return; }
         if(t.classList.contains('m-psheet-panel')){ mPsClose(); return; }
+        if(t.classList.contains('m-prof-panel')){ mProfClose(); return; }
         var ovl=t.closest('.ov, .kpi3-scrim, .hk-ov');
         if(ovl&&ovl.id!=='cmdk') ovl.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
       }
