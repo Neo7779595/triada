@@ -9607,7 +9607,8 @@ function agCanView(m){
   if(!me || me.role!=='member' || me.is_director) return true;          // владелец/админ/директор видят всё
   const p=me.permissions||{};
   if(m==='calendar' && !p.calendar) return true;                        // миграция: у старых сотрудников без ключа calendar — доступ по-прежнему есть
-  if(m==='integrations') return false;                                  // подключение внешних сервисов — только владелец агентства
+  /* Раздел интеграций сотрудник видит, только если владелец дал право явно.
+     Само подключение всё равно остаётся за владельцем — и в интерфейсе, и на сервере. */ агентства
   return !!(p[m]&&p[m].view);
 }
 function agCanEdit(m){
@@ -25146,7 +25147,11 @@ function stplTariffDel(service,name){ const u=_stplUsedTariff(name);
 
 /* employee creation with permission grid + login */
 function pickEmpColor(c,el){empColor=c;[...el.parentNode.children].forEach(s=>s.classList.remove('on'));el.classList.add('on');}
-function _permKeys(){ return ['projects','deadlines','calendar','overview','cycles','finance','team','kpi','leaderboard','kb','tools']; }
+function _permKeys(){ return ['projects','deadlines','calendar','overview','cycles','finance','team','kpi','leaderboard','kb','tools','integrations']; }
+/* Право «редактировать» для интеграций не выдаётся никому: подключить и отключить
+   внешний аккаунт может только владелец агентства — это действие на всё агентство
+   сразу, и проверка стоит не только здесь, но и на сервере. */
+const PERM_VIEW_ONLY = { integrations: 'Подключение и отключение — только у владельца агентства' };
 function renderPermGrid(){
   const keys=_permKeys();
   const CK='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
@@ -25157,7 +25162,9 @@ function renderPermGrid(){
     return `<div class="perm-row ${p.view?'v-on':''}" onclick="togglePerm('${k}','view',${!p.view})" title="Клик по строке — ${p.view?'убрать доступ':'дать доступ к просмотру'}">`+
       `<div class="perm-name">${AG_MODULES[k]}</div>`+
       `<div class="perm-cell"><span class="perm-tg ${p.view?'on':''}" aria-hidden="true">${CK}</span></div>`+
-      `<div class="perm-cell"><button type="button" class="perm-tg edit ${p.edit?'on':''} ${p.view?'':'locked'}" ${p.view?'':'disabled'} onclick="event.stopPropagation();togglePerm('${k}','edit',${!p.edit})" title="${p.view?'Право на редактирование':'Сначала дайте просмотр'}">${editIcon}</button></div>`+
+      (PERM_VIEW_ONLY[k]
+        ? `<div class="perm-cell"><button type="button" class="perm-tg edit locked" disabled title="${PERM_VIEW_ONLY[k]}">${LK}</button></div>`
+        : `<div class="perm-cell"><button type="button" class="perm-tg edit ${p.edit?'on':''} ${p.view?'':'locked'}" ${p.view?'':'disabled'} onclick="event.stopPropagation();togglePerm('${k}','edit',${!p.edit})" title="${p.view?'Право на редактирование':'Сначала дайте просмотр'}">${editIcon}</button></div>`)+
     `</div>`;
   }).join('');
   const v=keys.filter(k=>empPerms[k]&&empPerms[k].view).length;
@@ -27147,7 +27154,7 @@ async function _giFetch(fn, params, body){
 
 async function renderIntegrations(){
   const el=document.getElementById('content-ag'); if(!el) return;
-  if(!agIsOwner()){ el.innerHTML='<div style="padding:40px;text-align:center;opacity:.6">Раздел доступен владельцу агентства.</div>'; return; }
+  if(!agCanView('integrations')){ el.innerHTML='<div style="padding:40px;text-align:center;opacity:.6">Нет доступа к этому разделу.</div>'; return; }
 
   el.innerHTML=`<div style="padding:clamp(14px,2vw,26px) 0">
     <div style="max-width:860px">
@@ -27174,6 +27181,7 @@ async function giLoad(){
 function giPaint(){
   const box=document.getElementById('gi-google'); if(!box) return;
   const g=GI.google;
+  const owner=agIsOwner();          // подключать и отключать вправе только владелец
   const card=(inner,tone)=>`<div style="border:1px solid ${tone||'var(--line)'};border-radius:var(--r);background:var(--panel);padding:20px 22px">${inner}</div>`;
   const logo=`<div style="width:38px;height:38px;border-radius:10px;background:#fff;display:grid;place-items:center;flex:none;font-weight:700;font-size:17px;font-family:var(--mono);color:#1a73e8">G</div>`;
 
@@ -27184,10 +27192,11 @@ function giPaint(){
         <div style="flex:1;min-width:0">
           <div style="font-weight:620;font-size:15px">Google Workspace</div>
           <div style="opacity:.6;font-size:13px;margin-top:5px;line-height:1.6">Календарь со сроками проектов, документы из шаблонов, папки и отчёты. Подключается один раз на всё агентство — сотрудникам и клиентам ничего подключать не нужно.</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          ${owner?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
             <button class="btn-add" onclick="giConnect()" id="gi-connect">Подключить Google</button>
           </div>
-          <div style="opacity:.45;font-size:12px;margin-top:12px;line-height:1.6">Запрашиваем минимум: календари, созданные самой системой, и файлы, которые она создала или которые вы выбрали. Доступа ко всему вашему Диску у неё нет.</div>
+          <div style="opacity:.45;font-size:12px;margin-top:12px;line-height:1.6">Запрашиваем минимум: календари, созданные самой системой, и файлы, которые она создала или которые вы выбрали. Доступа ко всему вашему Диску у неё нет.</div>`
+          :`<div style="margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:13px;opacity:.7;line-height:1.6">Google пока не подключён. Подключить его может владелец агентства — попросите его зайти в этот раздел.</div>`}
         </div>
       </div>`);
     return;
@@ -27208,8 +27217,8 @@ function giPaint(){
         ${broken&&g.last_error?`<div style="margin-top:10px;font-size:12.5px;color:var(--neg);opacity:.9">${escH(g.last_error)}</div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
           <button class="btn-add" onclick="giSyncAll()" id="gi-sync">Синхронизировать календари</button>
-          ${broken?'<button class="btn-ghost" onclick="giConnect()">Переподключить</button>':''}
-          <button class="btn-ghost" onclick="giDisconnect()">Отключить</button>
+          ${owner&&broken?'<button class="btn-ghost" onclick="giConnect()">Переподключить</button>':''}
+          ${owner?'<button class="btn-ghost" onclick="giDisconnect()">Отключить</button>':''}
         </div>
         <div id="gi-log" style="margin-top:14px"></div>
       </div>
