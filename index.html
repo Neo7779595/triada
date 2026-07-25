@@ -7432,9 +7432,18 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   .main,.content{min-width:0;max-width:100vw}
 }
 
-/* Проекты: мобильные компоненты — на десктопе выключены, обёртка фильтров прозрачна */
+/* Мобильные компоненты — на десктопе полностью скрыты (база, вне media) */
 .pjm,.tb-fbtn,.tb-adv-hd,.tb-adv-apply,.tb-adv-scrim{display:none}
+#m-tabbar,#m-more,#m-head,.m-psheet{display:none}
 .tb-adv{display:contents}
+@media(max-width:768px){
+  .m-psheet{display:block}
+}
+/* десктоп: в «Дедлайнах» сегмент справа, дропдауны слева — как раньше */
+@media(min-width:769px){
+  .dl-controls .segm{order:3;margin-left:auto}
+  .dl-controls .flex1{display:none}
+}
 
 @media(max-width:768px){
   :root{--mtab-h:calc(58px + env(safe-area-inset-bottom,0px))}
@@ -7568,6 +7577,10 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   .tb-adv .dd-btn{width:100%;min-height:46px;justify-content:flex-start}
   .tb-adv .dd-btn .dd-v{margin-left:auto;text-align:right}
   .tb-adv .pk-fclear{width:100%;min-height:44px;justify-content:center}
+  /* период (Дедлайны) второй строкой на всю ширину */
+  .tb-proj .dl-range{width:100%}
+  .tb-proj .dl-range .dpick,.tb-proj .dl-range .dp-trigger{width:100%}
+  .dl-controls .flex1{display:none}
   .tb-adv-apply{display:block;width:100%;min-height:48px;background:var(--accent);color:var(--accent-ink);border:none;border-radius:12px;font-family:var(--font);font-size:14.5px;font-weight:700;cursor:pointer;margin-top:4px}
 
   /* карточка проекта: компактный мобильный блок вместо десктопной сетки */
@@ -22000,17 +22013,23 @@ function renderDeadlines(){
 
     <div class="toolbar tb-proj" style="position:relative;z-index:40">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="dl-q" placeholder="Поиск по этапу, задаче или проекту…" value="${(agDlSearch||'').replace(/"/g,'&quot;')}" oninput="setDlSearch(this.value)"></div>
+      <button class="tb-fbtn" onclick="window._tbAdvSet&&_tbAdvSet(!window._tbAdvOpen)" title="Фильтры"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 5h18M7 12h10M10 19h4"/></svg>${((agDlFilter!=='all')+(agDlType!=='all')+(agDlResp!=='all')+(agDlProj!=='all')+((agDlFrom||agDlTo)?1:0))?`<i>${(agDlFilter!=='all')+(agDlType!=='all')+(agDlResp!=='all')+(agDlProj!=='all')+((agDlFrom||agDlTo)?1:0)}</i>`:''}</button>
       <div class="dl-range">${dlRangeField()}</div>
     </div>
 
     <div class="toolbar dl-controls tb-proj" style="margin-top:-4px">
-      ${agDlView==='deadlines'?_dd('dlstatus','Срок',statusLbl,statusOpts,agDlFilter,'setDlFilter'):''}
-      ${_dd('dltype','Тип', (agDlType==='all'?'Все':agDlType==='stage'?'Этапы':'Задачи'), [['all','Все типы'],['stage','Этапы'],['task','Задачи']], agDlType, 'setDlType')}
-      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
-      <div class="flex1"></div>
       <div class="segm">
         <button class="${onV('deadlines')}" onclick="setDlView('deadlines')">Дедлайны</button>
         <button class="${onV('activity')}" onclick="setDlView('activity')">Активность</button>
+      </div>
+      <div class="flex1"></div>
+      <div class="tb-adv-scrim" onclick="window._tbAdvSet&&_tbAdvSet(false)"></div>
+      <div class="tb-adv">
+      <div class="tb-adv-hd"><div class="m-sheet-handle"></div><span>Фильтры</span></div>
+      ${agDlView==='deadlines'?_dd('dlstatus','Срок',statusLbl,statusOpts,agDlFilter,'setDlFilter'):''}
+      ${_dd('dltype','Тип', (agDlType==='all'?'Все':agDlType==='stage'?'Этапы':'Задачи'), [['all','Все типы'],['stage','Этапы'],['task','Задачи']], agDlType, 'setDlType')}
+      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
+      <button class="tb-adv-apply" onclick="window._tbAdvSet&&_tbAdvSet(false)">Готово</button>
       </div>
     </div>
 
@@ -39403,6 +39422,8 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
     ['agNav','clNav'].forEach(function(fn){
       var o=window[fn];
       if(typeof o==='function') window[fn]=function(){
+        /* смена модуля закрывает открытую шторку фильтров */
+        if(window._tbAdvOpen&&window._tbAdvSet) window._tbAdvSet(false);
         var r=o.apply(this,arguments);
         /* мягкий переход экрана в мобильном приложении */
         if(document.body.classList.contains('m-app')){
@@ -39434,14 +39455,16 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
       if(scrim) scrim.classList.remove('on');
     }
   };
-  /* после каждого рендера «Проектов» восстановить состояние sheet */
+  /* после каждого рендера модуля с фильтрами восстановить состояние sheet */
   (function(){
-    var o=window.renderProjects;
-    if(typeof o==='function') window.renderProjects=function(){
-      var r=o.apply(this,arguments);
-      if(window._tbAdvOpen) setTimeout(function(){ window._tbAdvSet(true); },0);
-      return r;
-    };
+    ['renderProjects','renderDeadlines'].forEach(function(fn){
+      var o=window[fn];
+      if(typeof o==='function') window[fn]=function(){
+        var r=o.apply(this,arguments);
+        if(window._tbAdvOpen) setTimeout(function(){ window._tbAdvSet(true); },0);
+        return r;
+      };
+    });
   })();
 
   /* ── DETROYD Mobile: шторка проекта (внутрь проектов приложение не заходит) ── */
