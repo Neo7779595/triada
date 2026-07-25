@@ -11611,6 +11611,15 @@ function myProfileOpen(){
         <label class="pm2-fld"><span>Телефон</span><input type="tel" id="pm2-ph" value="${escH(me.phone||'')}" placeholder="+998 90 000 00 00" maxlength="30" onblur="pm2Save('phone', this.value)"></label>
         <label class="pm2-fld"><span>Telegram</span><input type="text" id="pm2-tg" value="${escH(me.tg_username||'')}" placeholder="@username" maxlength="60" onblur="pm2Save('tg_username', this.value)"></label>
       </div>
+      <div class="pm2-me-pwd" style="margin-top:12px">
+        <div class="pm2-me-pwd-l">
+          <div class="pm2-me-pwd-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M4 7l8 6 8-6"/></svg>Рабочая почта Google</div>
+          <div class="pm2-me-pwd-s" id="pm2-gm-s">${me.google_email
+            ? ('Доступы к папкам и календарям проектов приходят на <b style="color:var(--txt)">'+escH(me.google_email)+'</b>.')
+            : 'Нажмите — и система сама возьмёт адрес из вашего аккаунта Google. Вводить вручную ничего не нужно.'}</div>
+        </div>
+        <button type="button" class="pm2-pwd-btn" id="pm2-gm-btn" onclick="pm2GoogleMail()">${me.google_email?'Сменить':'Подключить'}</button>
+      </div>
       <div class="pm2-me-color">
         <span class="pm2-me-lbl">Ваш цвет</span>
         <div class="pm2-me-swatches">${colorSwatches}</div>
@@ -11706,6 +11715,44 @@ async function pm2Save(field, rawVal){
     _pm2Hint('Ошибка: '+((e&&e.message)||e),'err');
   }
 }
+/* Рабочая почта Google одной кнопкой: сотрудник выбирает аккаунт, Google
+   сообщает нам только его адрес — ни диска, ни календаря мы не просим,
+   а выданный токен функция сразу аннулирует. Руками вводить нечего,
+   и опечататься в адресе невозможно. */
+async function pm2GoogleMail(){
+  const btn=document.getElementById('pm2-gm-btn');
+  const was=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='Открываю Google…'; }
+  try{
+    const { status, data } = await _giFetch('google-auth', { action:'me_start' });
+    if(status===503){ toast((data&&data.message)||'Интеграция с Google ещё не настроена'); return; }
+    if(!data||!data.url) throw new Error((data&&data.message)||'Не удалось получить ссылку на Google');
+    const w=window.open(data.url,'google-mail','width=520,height=680');
+    if(!w){ location.href=data.url; return; }
+    const finish=async()=>{
+      window.removeEventListener('message',onMsg);
+      const me=(window.tMe&&window.tMe())||null;
+      if(!me||!window.SB) return;
+      try{
+        const { data:pr } = await SB.from('profiles').select('google_email').eq('id', me.id).maybeSingle();
+        const mail=pr&&pr.google_email;
+        if(mail){
+          me.google_email=mail;
+          const s=document.getElementById('pm2-gm-s');
+          if(s) s.innerHTML='Доступы к папкам и календарям проектов приходят на <b style="color:var(--txt)">'+escH(mail)+'</b>.';
+          if(btn) btn.textContent='Сменить';
+          toast('Рабочая почта: '+mail);
+        }
+      }catch(_){ }
+    };
+    const onMsg=(e)=>{ if(e.data&&e.data.google) setTimeout(finish,400); };
+    window.addEventListener('message',onMsg);
+    const t=setInterval(()=>{ if(w.closed){ clearInterval(t); finish(); } },900);
+  }catch(e){ toast(String(e.message||e)); }
+  finally{ if(btn){ btn.disabled=false; if(btn.textContent==='Открываю Google…') btn.textContent=was; } }
+}
+window.pm2GoogleMail=pm2GoogleMail;
+
 function pm2SaveColor(c){
   const btns=document.querySelectorAll('.pm2-sw'); btns.forEach(b=>b.classList.toggle('on', b.dataset.c===c));
   const av=document.querySelector('.pm2-avpv'); if(av) av.style.background=c;

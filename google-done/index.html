@@ -36,16 +36,23 @@ a{display:inline-block;background:var(--accent);color:#08090B;text-decoration:no
   var ok = q.get('ok') !== '0';
   var email = q.get('email') || '';
   var msg = q.get('msg') || '';
+  var what = q.get('what') || 'agency';          // agency — аккаунт агентства, identity — почта сотрудника
 
   var card = document.getElementById('card');
+  var safeMail = email.replace(/[<>&]/g, '');
   if(!ok){
     card.className = 'c err';
     document.getElementById('ic').textContent = '!';
-    document.getElementById('ttl').textContent = 'Подключить не получилось';
+    document.getElementById('ttl').textContent = what==='identity' ? 'Почту подтвердить не вышло' : 'Подключить не получилось';
     document.getElementById('msg').textContent = msg || 'Google не подтвердил доступ. Попробуйте ещё раз.';
+  } else if(what==='identity'){
+    document.getElementById('ttl').textContent = 'Рабочая почта сохранена';
+    document.getElementById('msg').innerHTML = email
+      ? ('Теперь доступы к папкам и календарям проектов будут приходить на <b>' + safeMail + '</b>.')
+      : 'Теперь доступы к папкам и календарям проектов будут приходить на вашу почту Google.';
   } else if(email){
     document.getElementById('msg').innerHTML =
-      'Аккаунт <b>' + email.replace(/[<>&]/g, '') + '</b> подключён. Возвращайтесь в систему — интеграции доступны в разделе «Интеграции».';
+      'Аккаунт <b>' + safeMail + '</b> подключён. Возвращайтесь в систему — интеграции доступны в разделе «Интеграции».';
   }
 
   /* Окно открыто из системы — сообщаем ей результат и закрываемся сами.
@@ -53,7 +60,7 @@ a{display:inline-block;background:var(--accent);color:#08090B;text-decoration:no
      тогда просто показываем карточку с кнопкой возврата. */
   try{
     if(window.opener && !window.opener.closed){
-      window.opener.postMessage({ google: ok ? 'connected' : 'error', email: email }, '*');
+      window.opener.postMessage({ google: ok ? 'connected' : 'error', what: what, email: email }, '*');
       document.getElementById('hint').textContent = 'Окно закроется само…';
       setTimeout(function(){ try{ window.close(); }catch(e){} }, 1400);
     }
