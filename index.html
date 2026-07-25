@@ -27130,10 +27130,15 @@ async function _giFetch(fn, params, body){
   if(!(window.LIVE && window.SB)) throw new Error('Интеграции работают только в онлайн-режиме');
   const { data:{ session } } = await SB.auth.getSession();
   if(!session) throw new Error('Сессия истекла — войдите заново');
-  const url = SUPA_URL + '/functions/v1/' + fn + '?' + new URLSearchParams(params||{}).toString();
+  /* SUPA_URL объявлен в модульном блоке и в глобальную область не попадает —
+     берём его с window, куда он выставлен рядом с window.SB */
+  const base = window.SUPA_URL || (SB && SB.supabaseUrl) || '';
+  const key = window.SUPA_KEY || (SB && SB.supabaseKey) || '';
+  if(!base) throw new Error('Не найден адрес Supabase — обновите страницу');
+  const url = base + '/functions/v1/' + fn + '?' + new URLSearchParams(params||{}).toString();
   const r = await fetch(url, {
     method:'POST',
-    headers:{ 'Authorization':'Bearer '+session.access_token, 'apikey':SUPA_KEY, 'Content-Type':'application/json' },
+    headers:{ 'Authorization':'Bearer '+session.access_token, 'apikey':key, 'Content-Type':'application/json' },
     body: body ? JSON.stringify(body) : undefined
   });
   let j=null; try{ j=await r.json(); }catch(_){ j={ error:'bad_response' }; }
@@ -31869,6 +31874,9 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const configured = !!createClient && SUPA_KEY && SUPA_KEY.indexOf('__') !== 0;
 const SB = configured ? createClient(SUPA_URL, SUPA_KEY) : null;
 window.SB = SB; window.LIVE = !!SB;
+/* адрес и публичный ключ нужны обычным (немодульным) скриптам — например,
+   разделу интеграций, который дёргает edge-функции напрямую с query-параметрами */
+window.SUPA_URL = SUPA_URL; window.SUPA_KEY = SUPA_KEY;
 
 /* ===== TRIADA · Telegram-уведомления (клиент) ===== */
 const TG_FN = SUPA_URL + '/functions/v1';
