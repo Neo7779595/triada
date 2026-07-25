@@ -12165,11 +12165,12 @@ function cycleCardHTML(c,i){
   const fmt=d=>d?String(d).split('-').reverse().join('.'):'—';
   const period=(c.period_start||c.period_end)?(fmt(c.period_start)+' — '+fmt(c.period_end)):'период не указан';
   const stDone=stages.filter(s=>s.status==='done').length;
-  const names=new Set(stages.map(s=>s.name));
-  const byStage={}; tasks.forEach(t=>{ const k=names.has(t.stage)?t.stage:'__orphan'; (byStage[k]=byStage[k]||[]).push(t); });
+  const _stKey=(s,i)=>String(s.id!=null?s.id:(s.name+'#'+i));
+  const _byName={}; stages.forEach((s,i)=>{ const n=s.name||'—'; if(_byName[n]==null) _byName[n]=_stKey(s,i); });   // тёзки: задачи уходят в первый такой этап
+  const byStage={}; tasks.forEach(t=>{ const k=(t.stage_id!=null&&stages.some((s,i)=>_stKey(s,i)===String(t.stage_id)))?String(t.stage_id):(_byName[t.stage]||'__orphan'); (byStage[k]=byStage[k]||[]).push(t); });
   const taskRow=t=>`<div class="cy-task"><span class="cy-tk-dot ${t.status==='done'?'done':''}"></span><span class="cy-tk-nm">${_ddH(t.title||'Задача')}</span>${t.time_spent?'<span class="cy-tk-tm">'+pkFmtDur(t.time_spent)+'</span>':''}</div>`;
   const stageBlock=(name,status,list)=>`<div class="cy-stage"><div class="cy-st-h"><span class="cy-st-dot ${status==='done'?'done':''}"></span><b>${_ddH(name)}</b>${list.length?`<span class="cy-st-ct">${list.length}</span>`:''}</div>${list.length?`<div class="cy-tasks">${list.map(taskRow).join('')}</div>`:''}</div>`;
-  let inner=stages.map(s=>stageBlock(s.name,s.status,byStage[s.name]||[])).join('');
+  let inner=stages.map((s,i)=>stageBlock(s.name,s.status,byStage[_stKey(s,i)]||[])).join('');
   if(byStage.__orphan&&byStage.__orphan.length) inner+=stageBlock('Без этапа','',byStage.__orphan);
   if(!inner) inner='<div class="cy-empty" style="padding:10px 0">Цикл без этапов и задач.</div>';
   return `<div class="cy-card">
@@ -13605,7 +13606,13 @@ function avatarField(id,url,letter){
     <div style="font-size:13.5px;color:var(--txt-3);line-height:1.4">Нажми на фото,<br>чтобы загрузить или заменить</div>
   </div>`;
 }
-function _who(id){ const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?{n:m.name||'—',c:m.color||'var(--txt-3)',avatar:m.avatar||null}:{n:'—',c:'var(--txt-3)',avatar:null}; }
+function _who(id){
+  const _all=[].concat((typeof TEAM!=='undefined'?TEAM:[]),(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]));   // архивных тоже показываем, а не «—»
+  const m=_all.find(x=>String(x._id)===String(id));
+  if(!m) return {n:'—',c:'var(--txt-3)',avatar:null};
+  const arc=(typeof TEAM!=='undefined'?TEAM:[]).every(x=>String(x._id)!==String(id));
+  return {n:(m.name||'—')+(arc?' · в архиве':''),c:m.color||'var(--txt-3)',avatar:m.avatar||null};
+}
 function pkFmtDur(sec){ sec=Math.max(0,Math.floor(sec||0)); const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),ss=sec%60; return h>0?(h+'ч '+String(m).padStart(2,'0')+'м'):(m+':'+String(ss).padStart(2,'0')); }
 function _taskElapsed(t){ let s=(t&&t.time_spent)||0; if(t&&t.timer_started&&t.status==='active'){ s+=Math.max(0,Math.round((Date.now()-new Date(t.timer_started).getTime())/1000)); } return s; }
 function _taskReviewElapsed(t){ let s=(t&&t.review_spent)||0; if(t&&t.review_started&&t.status==='review'){ s+=Math.max(0,Math.round((Date.now()-new Date(t.review_started).getTime())/1000)); } return s; }
@@ -22416,11 +22423,6 @@ function renderOverview(){
   const IC_ST = '<path d="M3 12h4l2 6 4-14 2 8h6"/>';
   const IC_TK = '<rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="14" y="4" width="6" height="10" rx="1.5"/>';
   const _svg = ic => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">${ic}</svg>`;
-  const split = (sv,tv,needJ,suf) => { suf=suf||'';
-    const st = `<span class="ov-tok st">${_svg(IC_ST)}${sv}${suf}</span>`;
-    const tk = (needJ && !TH) ? `<span class="ov-tok tk dim">${_svg(IC_TK)}нет журнала</span>`
-                              : `<span class="ov-tok tk">${_svg(IC_TK)}${tv}${suf}</span>`;
-    return `<div class="ov-split">${st}${tk}</div>`; };
   /* уникально завершённые vs повторно завершённые (вернули и закрыли заново) */
   const uniq30C = O.uniq30 + O.tUniq30, uniq7C = O.uniq7 + O.tUniq7, uniqMonC = O.uniqMonth + O.tUniqMonth;
   const redo30C = O.redo30 + O.tRedo30;
@@ -22470,7 +22472,7 @@ function renderOverview(){
         <div class="ov-hero-cell">
           <div class="l">On-time delivery</div>
           <div class="v" style="color:${otPctC==null?'var(--txt-2)':otPctC>=80?'var(--pos)':otPctC>=50?'var(--warn)':'var(--neg)'}">${otPctC==null?'—':otPctC+'%'}</div>
-          <div class="s">${otPctC==null?'нет доставок с сроком':(otOkC+' в срок из '+otDoneC)}</div>
+          <div class="s">${otPctC==null?'нет доставок с сроком':(otOkC+' в срок из '+otDoneC+(TH?'':' · только этапы'))}</div>
         </div>
         <div class="ov-hero-cell">
           <div class="l">Просрочено сейчас</div>
@@ -22509,7 +22511,7 @@ function renderOverview(){
       #content-ag .ovc-val i{font-size:12.5px;color:var(--txt-3);font-style:normal;font-variant-numeric:tabular-nums}
     </style>
     <div class="ov-quick">
-      <div class="ov-quick-item"><span class="l">Velocity 30 дней</span><span class="v">${uniq30C}</span><span class="s">7д: ${uniq7C}${redo30C?(' · '+redo30C+' повторно'):''}</span></div>
+      <div class="ov-quick-item"><span class="l">Velocity 30 дней</span><span class="v">${uniq30C}</span><span class="s">7д: ${uniq7C}${redo30C?(' · '+redo30C+' повторно'):''}${TH?'':' · только этапы'}</span></div>
       <div class="ov-quick-item"><span class="l">Концентрация выручки</span><span class="v" style="color:${mrrSum<=0?'var(--txt-3)':concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${mrrSum>0?concentration+'%':'—'}</span><span class="s">${mrrSum>0?(escH(concTop)+' · крупнейший'):'бюджеты не заданы'}</span></div>
       <div class="ov-quick-item" title="Проекты без событий в журнале ≥ ${STALE} дн, включая просроченные"><span class="l">Риск оттока</span><span class="v" style="color:${stale?'var(--warn)':'var(--pos)'}">${stale}</span><span class="s">${stale?('без активности ≥ '+STALE+' дн'):'активность в норме'}</span></div>
       <div class="ov-quick-item"><span class="l">Откаты · rework</span><span class="v" style="color:${reworkPctC==null?'var(--txt-3)':reworkPctC>=20?'var(--neg)':reworkPctC>=8?'var(--warn)':'var(--txt)'}">${reworkC}</span><span class="s">${reworkPctC==null?'нет смен статуса':reworkPctC+'% переходов назад'}</span></div>
@@ -22610,13 +22612,14 @@ function svgCycleBars(stages){
     const lbl=escH(s.name.length>16?s.name.slice(0,15)+'…':s.name);
     xl+=`<text x="${cx.toFixed(1)}" y="${H-padB+14}" text-anchor="end" fill="${s.unmeasured?'#474C54':'#8A929C'}" font-size="9" transform="rotate(-32 ${cx.toFixed(1)} ${H-padB+14})">${lbl}</text>`;
   });
-  let p90l='',p90d='',prev=null;
+  /* p90 — отдельная метка над своим столбцом. Соединять их линией нельзя:
+     этапы отсортированы по p50 и не образуют последовательности во времени. */
+  let p90l='',p90d='';
   stages.forEach((s,i)=>{
-    if(s.p90Ms==null){ prev=null; return; }
-    const cx=padL+gW*i+gW/2, y=yOf(s.p90Ms/ax.div);
+    if(s.p90Ms==null) return;
+    const cx=padL+gW*i+gW/2, y=yOf(s.p90Ms/ax.div), w=bW*0.75;
+    p90l+=`<line x1="${(cx-w/2).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(cx+w/2).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--violet)" stroke-width="2" stroke-linecap="round"/>`;
     p90d+=`<circle cx="${cx.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--violet)"/>`;
-    if(prev) p90l+=`<line x1="${prev.x.toFixed(1)}" y1="${prev.y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--violet)" stroke-width="1.8"/>`;
-    prev={x:cx,y};
   });
   let hz='';
   stages.forEach((s,i)=>{ const x0=padL+gW*i; hz+=`<rect class="cyc-hz" x="${x0.toFixed(1)}" y="${padT}" width="${gW.toFixed(1)}" height="${iH}" fill="transparent" onmouseenter="_cycTipShow(event,${i})" onmousemove="_cycTipMove(event)" onmouseleave="_cycTipHide()"/>`; });
@@ -22693,7 +22696,7 @@ function _cycFilterTasks(list,period,q,sort,asg,proj){
   let r=(list||[]).filter(t=>{
     if(cut && t.date && new Date(t.date).getTime()<cut) return false;
     if(asg && asg!=='all'){ if(asg==='__none'){ if(t.asg) return false; } else if(String(t.asg||'')!==String(asg)) return false; }
-    if(proj && proj!=='all'){ if(String(t.project||'')!==String(proj)) return false; }
+    if(proj && proj!=='all'){ if(String(t.pid||'')!==String(proj) && String(t.project||'')!==String(proj)) return false; }
     if(q){ const s=q.toLowerCase().trim(); if(s && !(((t.title||'')+' '+(t.stage||'')+' '+(t.project||'')).toLowerCase().includes(s))) return false; }
     return true;
   });
@@ -22712,9 +22715,11 @@ const _cycPeriodOpts=[['all','Всё время'],['7','7 дней'],['30','30 �
 const _cycSortOpts=[['desc','Дольше сверху'],['asc','Короче сверху']];
 const _cycLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
 function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA,reset,proj,setPr){
-  const asgOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
-  const _prNames=[...new Set((typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>p.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
-  const projOpts=[['all','Все проекты']].concat(_prNames.map(n=>[n,n]));
+  const _tmAll=[].concat((typeof TEAM!=='undefined'?TEAM:[]),(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]));   // архивных тоже надо фильтровать
+  const asgOpts=[['all','Все исполнители'],['__none','Не назначен']].concat(_tmAll.map(m=>[m._id,m.name]));
+  const _prList=(typeof agVisibleProjects==='function'?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]))
+    .filter(p=>p&&p.id).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
+  const projOpts=[['all','Все проекты']].concat(_prList.map(p=>[p.id,p.name||'—']));
   const _active=(sort!=='desc')||!!q||(period!=='all')||(asg!=='all')||(proj&&proj!=='all');
   return `<div class="cyc-filters">`
     +`<div class="search cyc-search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="${pfx}-q" placeholder="Поиск по задаче или этапу…" value="${(q||'').replace(/"/g,'&quot;')}" oninput="${setQ}(this.value)" autocomplete="off" spellcheck="false"></div>`
@@ -22725,12 +22730,40 @@ function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA,reset,proj,setP
     +(_active?`<button class="pk-fclear" onclick="${reset}()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:'')
     +`</div>`;
 }
+/* сводные цифры считаем по ТОМУ ЖЕ набору, что и списки под фильтрами */
+function _cycAgg(tasks){
+  const secs=(tasks||[]).map(t=>t.sec).filter(v=>v>0).sort((a,b)=>a-b);
+  const q=(p)=>{ if(!secs.length) return 0; if(secs.length===1) return secs[0];
+    const i=(secs.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i);
+    return Math.round(lo===hi?secs[lo]:secs[lo]+(secs[hi]-secs[lo])*(i-lo)); };
+  const total=secs.reduce((a,b)=>a+b,0), count=secs.length;
+  const done=(tasks||[]).filter(t=>t.done);
+  const doneTot=done.reduce((a,t)=>a+t.sec,0);
+  let cum=0,p80=0; const desc=secs.slice().reverse(), tgt=total*0.8;
+  for(const v of desc){ cum+=v; p80++; if(cum>=tgt) break; }
+  return { count, total, avg:count?Math.round(total/count):0, median:q(0.5), p90:q(0.9),
+           doneCount:done.length, doneAvg:done.length?Math.round(doneTot/done.length):0,
+           paretoPct:count?Math.round(100*p80/count):0,
+           onReview:(tasks||[]).filter(t=>t.onReview).length };
+}
+/* разрез по исполнителям — данные были, а на экран не выводились */
+function _cycByAsg(tasks){
+  const g={}, tot=(tasks||[]).reduce((a,t)=>a+t.sec,0);
+  const _all=[].concat((typeof TEAM!=='undefined'?TEAM:[]),(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]));
+  const nm=id=>{ if(!id) return 'Не назначен'; const m=_all.find(x=>String(x._id)===String(id)); return m?m.name:'—'; };
+  (tasks||[]).forEach(t=>{ const k=t.asg||'__none'; (g[k]||(g[k]={id:k,name:nm(t.asg),total:0,count:0})); g[k].total+=t.sec; g[k].count++; });
+  return Object.values(g).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:tot?Math.round(100*x.total/tot):0}))
+    .sort((a,b)=>b.total-a.total);
+}
 function renderCycles(){
   const C = CYCLES; window._cycChart = C.chartStages;
   const _revTasksF=_cycFilterTasks(C.reviewTasks,REV_PERIOD,REV_Q,REV_SORT,REV_ASG,REV_PROJ);
   const _revStagesF=_cycStagesFromTasks(_revTasksF,REV_SORT);
   const _workTasksF=_cycFilterTasks(C.workTopTasks,WORK_PERIOD,WORK_Q,WORK_SORT,WORK_ASG,WORK_PROJ);
   const _workStagesF=_cycStagesFromTasks(_workTasksF,WORK_SORT);
+  const _revA=_cycAgg(_revTasksF), _workA=_cycAgg(_workTasksF), _workAsgF=_cycByAsg(_workTasksF);
+  const _revFiltered=(REV_PERIOD!=='all'||REV_Q||REV_ASG!=='all'||(REV_PROJ&&REV_PROJ!=='all'));
+  const _workFiltered=(WORK_PERIOD!=='all'||WORK_Q||WORK_ASG!=='all'||(WORK_PROJ&&WORK_PROJ!=='all'));
   if(!document.getElementById('cyc-tip')){ const _t=document.createElement('div'); _t.id='cyc-tip'; document.body.appendChild(_t); }
   const has = C.stages.length>0;
   const bn = C.bottleneck;
@@ -22755,7 +22788,7 @@ function renderCycles(){
         <div class="px-ov-l">Покрытие данными</div>
         <div class="px-ov-v">${C.coveragePct}<small>%</small></div>
         <div class="px-ov-comp">${C.coverageTotal>0?`${C.coverageDone>0?`<i style="flex:${C.coverageDone};background:var(--accent)"></i>`:''}<i style="flex:${Math.max(C.coverageTotal-C.coverageDone,0)||1};background:var(--bg-3)"></i>`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
-        <div class="px-ov-ctx">${C.coverageDone} из ${C.coverageTotal} завершённых</div>
+        <div class="px-ov-ctx">${C.coverageDone} из ${C.coverageTotal} этапов с историей</div>
       </div>
       <div class="px-ov-cell">
         <div class="px-ov-l">Застряло сейчас</div>
@@ -22769,7 +22802,7 @@ function renderCycles(){
       <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
         ${aging.slice(0,12).map((a,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--neg-dim);border:1px solid var(--neg-dim);border-radius:10px;animation:cycRow .4s var(--ease-out) both;animation-delay:${i*55}ms">
           <div style="min-width:0"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(a.client)}</div><div style="font-size:12.5px;color:var(--txt-2);font-family:var(--mono);margin-top:2px">${escH(a.stage)}</div></div>
-          <div style="text-align:right;flex-shrink:0"><div class="num" style="font-weight:800;font-size:16px;color:var(--neg)">${_cycDur(a.sinceMs)}</div><div style="font-size:11.5px;color:var(--warn);font-family:var(--mono);margin-top:2px">+${a.overPct}% к норме${a.byOwn?'':' (общая)'}${a.frozen!=null?' · ~'+money(a.frozen)+' заморож.':''}</div></div>
+          <div style="text-align:right;flex-shrink:0"><div class="num" style="font-weight:800;font-size:16px;color:var(--neg)">${_cycDur(a.startMs?(Date.now()-a.startMs):a.sinceMs)}</div><div style="font-size:11.5px;color:var(--warn);font-family:var(--mono);margin-top:2px">+${a.overPct}% к норме${a.byOwn?'':' (общая)'}${a.frozen!=null?' · ~'+money(a.frozen)+' заморож.':''}</div></div>
         </div>`).join('')}
         ${aging.length>12?`<div style="text-align:center;color:var(--txt-3);font-size:12.5px;font-family:var(--mono);padding:4px 0">и ещё ${aging.length-12}</div>`:''}
       </div>
@@ -22792,7 +22825,7 @@ function renderCycles(){
     <div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">Детализация по этапам</div></div>
       <table class="ctbl">
-        <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th>Доля</th><th>% возвратов</th><th>Простой</th></tr></thead>
+        <thead><tr><th>Этап</th><th>N</th><th>Медиана</th><th>p90</th><th title="Доля медианы этапа в сумме медиан всех этапов — не доля календарного цикла">Доля p50</th><th>% возвратов</th><th>Простой</th></tr></thead>
         <tbody>${C.stages.map((s,i)=>`<tr style="animation-delay:${i*45}ms">
           <td>${s.bn?'<span style="color:var(--neg)">●</span> ':''}${escH(s.name)}${s.lowSample?' <span style="color:var(--warn);font-size:11.5px;font-family:var(--mono)">мало данных</span>':''}</td>
           <td class="num">${s.n}</td>
@@ -22834,10 +22867,10 @@ function renderCycles(){
       <div class="card-body">
       ${C.reviewCount?`
         <div class="px-ov cyc-hero-strip" style="margin-bottom:16px">
-          <div class="px-ov-cell"><div class="px-ov-l">Сейчас на утверждении</div><div class="px-ov-v" style="color:${C.reviewNow?'#8A8FFF':'var(--txt-3)'}">${C.reviewNow}</div><div class="px-ov-ctx">задач ждут согласования</div></div>
-          <div class="px-ov-cell"><div class="px-ov-l">Среднее время</div><div class="px-ov-v">${_cycDur(C.reviewAvgSec*1000)}</div><div class="px-ov-ctx">на одну задачу</div></div>
-          <div class="px-ov-cell"><div class="px-ov-l">Суммарно</div><div class="px-ov-v">${_cycDur(C.reviewTotalSec*1000)}</div><div class="px-ov-ctx">всего на согласовании</div></div>
-          <div class="px-ov-cell"><div class="px-ov-l">Задач проходило</div><div class="px-ov-v">${C.reviewCount}</div><div class="px-ov-ctx">через утверждение</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Сейчас на утверждении</div><div class="px-ov-v" style="color:${_revA.onReview?'#8A8FFF':'var(--txt-3)'}">${_revA.onReview}</div><div class="px-ov-ctx">задач ждут согласования</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Среднее время</div><div class="px-ov-v">${_cycDur(_revA.avg*1000)}</div><div class="px-ov-ctx">на одну задачу${_revFiltered?' · по фильтру':''}</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Суммарно</div><div class="px-ov-v">${_cycDur(_revA.total*1000)}</div><div class="px-ov-ctx">${_revFiltered?('из '+_cycDur(C.reviewTotalSec*1000)+' всего'):'всего на согласовании'}</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Задач проходило</div><div class="px-ov-v">${_revA.count}</div><div class="px-ov-ctx">${_revFiltered?('из '+C.reviewCount+' всего'):'через утверждение'}</div></div>
         </div>
         ${_cycFilterBar('rev',REV_PERIOD,REV_SORT,REV_Q,REV_ASG,'revSetPeriod','revSetSort','revSearch','revSetAsg','revResetFilters',REV_PROJ,'revSetProj')}
         <div class="rev-grid">
@@ -22871,14 +22904,14 @@ function renderCycles(){
       <div class="card-body">
       ${C.workCount?`
         <div class="px-ov cyc-hero-strip" style="margin-bottom:14px">
-          <div class="px-ov-cell"><div class="px-ov-l">Медиана на задачу</div><div class="px-ov-v">${_cycDur(C.workMedianSec*1000)}</div><div class="px-ov-ctx">типичная задача · p50</div></div>
-          <div class="px-ov-cell"><div class="px-ov-l">Среднее на задачу</div><div class="px-ov-v">${_cycDur(C.workMeanSec*1000)}</div><div class="px-ov-ctx">${C.workCount} задач с трекингом</div></div>
-          <div class="px-ov-cell"><div class="px-ov-l">Худшие 10% · p90</div><div class="px-ov-v" style="color:var(--warn)">${_cycDur(C.workP90Sec*1000)}</div><div class="px-ov-ctx">самые долгие задачи</div></div>
-          <div class="px-ov-cell"><div class="px-ov-l">Средняя завершённая</div><div class="px-ov-v" style="color:var(--pos)">${C.workDoneCount?_cycDur(C.workDoneAvgSec*1000):'—'}</div><div class="px-ov-ctx">${C.workDoneCount} завершено · бенчмарк</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Медиана на задачу</div><div class="px-ov-v">${_cycDur(_workA.median*1000)}</div><div class="px-ov-ctx">типичная задача · p50 · вкл. незавершённые</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Среднее на задачу</div><div class="px-ov-v">${_cycDur(_workA.avg*1000)}</div><div class="px-ov-ctx">${_workA.count} задач с трекингом${_workFiltered?(' из '+C.workCount):''}</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Худшие 10% · p90</div><div class="px-ov-v" style="color:var(--warn)">${_cycDur(_workA.p90*1000)}</div><div class="px-ov-ctx">самые долгие задачи</div></div>
+          <div class="px-ov-cell"><div class="px-ov-l">Средняя завершённая</div><div class="px-ov-v" style="color:var(--pos)">${_workA.doneCount?_cycDur(_workA.doneAvg*1000):'—'}</div><div class="px-ov-ctx">${_workA.doneCount} завершено · бенчмарк</div></div>
         </div>
         <div class="cyc-insight">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
-          <div>Концентрация: <b>${C.workParetoPct}%</b> задач забирают <b>80%</b> рабочего времени${C.workParetoPct>0&&C.workParetoPct<=25?' — высокая концентрация, крупные задачи стоит дробить на подзадачи':(C.workParetoPct>=50?' — нагрузка распределена равномерно':'')}</div>
+          <div>Концентрация: <b>${_workA.paretoPct}%</b> задач забирают <b>80%</b> рабочего времени${_workA.paretoPct>0&&_workA.paretoPct<=25?' — высокая концентрация, крупные задачи стоит дробить на подзадачи':(_workA.paretoPct>=50?' — нагрузка распределена равномерно':'')}</div>
         </div>
         ${_cycFilterBar('work',WORK_PERIOD,WORK_SORT,WORK_Q,WORK_ASG,'workSetPeriod','workSetSort','workSearch','workSetAsg','workResetFilters',WORK_PROJ,'workSetProj')}
         <div class="rev-grid">
@@ -22893,6 +22926,14 @@ function renderCycles(){
             </div>
           </div>
           <div>
+            <div class="eyebrow" style="margin-bottom:10px">Кто сколько работал <span class="cyc-cnt">${_workAsgF.length}</span></div>
+            <div class="cyc-scroll" style="margin-bottom:18px">
+            ${_workAsgF.length?_workAsgF.map((a,i)=>`<div class="cyc-row2" style="animation-delay:${Math.min(i,12)*30}ms">
+              ${_cycRankPill(i,'mint')}
+              <div class="cyc-body"><div class="cyc-nm">${escH(a.name)}</div><div class="cyc-meta">${a.count} задач<span class="sep"> · </span>среднее ${_cycDur(a.avg*1000)}</div><div class="cyc-bar mint"><i style="width:${a.share}%"></i></div></div>
+              <div class="cyc-right"><div class="cyc-val mint">${_cycDur(a.total*1000)}</div><div class="cyc-sub">${a.share}%</div></div>
+            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
+            </div>
             <div class="eyebrow" style="margin-bottom:10px">Самые трудоёмкие задачи <span class="cyc-cnt">${_workTasksF.length}</span></div>
             <div class="cyc-scroll">
             ${_workTasksF.length?(()=>{const mx=Math.max(1,..._workTasksF.map(t=>t.sec));return _workTasksF.map((t,i)=>`<div class="cyc-row2" style="animation-delay:${Math.min(i,12)*30}ms">
@@ -29661,8 +29702,10 @@ window.addEventListener('resize',function(){ clearTimeout(window._sideRR); windo
 function _sideRefreshBadges(){
   /* Дедлайны */
   let dlOver=0;
-  try{ if(Array.isArray(window.DEADLINES)){ const today=new Date(); today.setHours(0,0,0,0);
-    dlOver=window.DEADLINES.filter(function(d){ return d && d.due && new Date(String(d.due)+'T00:00:00')<today && d.status!=='done'; }).length; } }catch(e){}
+  try{ const _DL=(typeof DEADLINES!=='undefined'&&DEADLINES)||window.DEADLINES;
+    if(Array.isArray(_DL)){ const today=new Date(); today.setHours(0,0,0,0);
+      const _vis=(typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
+      dlOver=_DL.filter(function(d){ return d && d.due && (!_vis || (d.pid!=null && _vis.has(d.pid))) && new Date(String(d.due)+'T00:00:00')<today && d.status!=='done'; }).length; } }catch(e){}
   const dl=document.getElementById('ag-dl-ct');
   if(dl){ if(dlOver>0){ dl.textContent=dlOver; dl.className='ct alert-neg'; dl.title=dlOver+' просроченных'; dl.style.display=''; }
     else { dl.style.display='none'; dl.className='ct'; dl.textContent=''; dl.title=''; } }
@@ -29678,10 +29721,11 @@ function _sideRefreshBadges(){
 function _sideQuickRender(){
   const wrap=document.getElementById('side-quick'); if(!wrap) return;
   let src=[];
-  try{ if(Array.isArray(window.PROJECTS)) src=window.PROJECTS.filter(function(p){ return p && (p.status||'active')==='active' && (typeof agCanSeeProject!=='function'||agCanSeeProject(p.id)); }); }catch(e){}
+  try{ const _PR=(typeof PROJECTS!=='undefined'&&PROJECTS)||window.PROJECTS;
+    if(Array.isArray(_PR)) src=_PR.filter(function(p){ return p && (p.status||'active')==='active' && (typeof agCanSeeProject!=='function'||agCanSeeProject(p.id)); }); }catch(e){}
   if(!src.length){ wrap.innerHTML=''; return; }
   const items=src.slice(0,3).map(function(p){
-    const idx=window.PROJECTS.indexOf(p);
+    const idx=((typeof PROJECTS!=='undefined'&&PROJECTS)||window.PROJECTS||[]).indexOf(p);
     const c=p.color||'#37E6C8';
     const ini=String((p.logo||(p.name||'?')[0])).toUpperCase();
     const logo=p.logoUrl?'<img src="'+String(p.logoUrl).replace(/"/g,'&quot;')+'" alt="">':(ini);
@@ -31655,19 +31699,23 @@ window.tProjectRenew = async (pid, ns, ne, _projName) => { try {
   // 1. снимок текущего цикла + старый период договора + номер следующего цикла
   const [stRes, tkRes, ctRes, cyRes] = await Promise.all([
     SB.from('project_stages').select('id,name,status,idx').eq('project_id',pid).order('idx',{ascending:true}),
-    SB.from('project_tasks').select('title,status,stage_id,assignee_id,time_spent,due_date').eq('project_id',pid),
+    SB.from('project_tasks').select('title,status,stage_id,assignee_id,time_spent,timer_started,review_spent,review_started,due_date,completed_at').eq('project_id',pid),
     SB.from('project_contracts').select('start_date,end_date').eq('project_id',pid).maybeSingle(),
     SB.from('project_cycles').select('cycle_no').eq('project_id',pid).order('cycle_no',{ascending:false}).limit(1)
   ]);
   if(stRes.error)throw stRes.error; if(tkRes.error)throw tkRes.error;
   const stages=(stRes.data||[]);
   const stName={}; stages.forEach(s=>{ stName[s.id]=s.name; });
-  const tasks=(tkRes.data||[]).map(t=>({title:t.title, status:t.status, stage:stName[t.stage_id]||'—', assignee_id:t.assignee_id||null, time_spent:t.time_spent||0, due_date:t.due_date||null}));
+  const _nowMs=Date.now();
+  const _spent=(t)=>{ let v=t.time_spent||0; if(t.timer_started&&t.status==='active') v+=Math.max(0,Math.round((_nowMs-new Date(t.timer_started).getTime())/1000)); return v; };
+  const _rev=(t)=>{ let v=t.review_spent||0; if(t.review_started&&t.status==='review') v+=Math.max(0,Math.round((_nowMs-new Date(t.review_started).getTime())/1000)); return v; };
+  /* в снимок кладём id этапа, время утверждения и добираем незакрытые таймеры — иначе они пропадали навсегда */
+  const tasks=(tkRes.data||[]).map(t=>({title:t.title, status:t.status, stage:stName[t.stage_id]||'—', stage_id:t.stage_id||null, assignee_id:t.assignee_id||null, time_spent:_spent(t), review_spent:_rev(t), due_date:t.due_date||null, completed_at:t.completed_at||null}));
   const oldPeriod=(ctRes&&ctRes.data)||{};
   const nextNo=((cyRes&&cyRes.data&&cyRes.data[0]&&cyRes.data[0].cycle_no)||0)+1;
   // 2. архивируем завершённый цикл (со СТАРЫМ периодом договора)
   if(stages.length || tasks.length){
-    const snap={ stages: stages.map(s=>({name:s.name,status:s.status,idx:s.idx})), tasks };
+    const snap={ stages: stages.map(s=>({id:s.id,name:s.name,status:s.status,idx:s.idx})), tasks };
     const {error:ae}=await SB.from('project_cycles').insert({project_id:pid, cycle_no:nextNo, period_start:oldPeriod.start_date||null, period_end:oldPeriod.end_date||null, snapshot:snap, archived_at:new Date().toISOString()});
     if(ae)throw ae;
   }
@@ -32370,7 +32418,7 @@ window.tLoadOverview = async () => {
   const overdueItems = overdueStages + overdueTasks;
 
   /* открытые / в работе / ожидание — раздельно (точечное состояние) */
-  const cnt = rows => { const o={open:0,active:0,wait:0,done:0}; rows.forEach(r=>{ if(o[r.status]!=null)o[r.status]++; if(r.status!=='done')o.open++; }); return o; };
+  const cnt = rows => { const o={open:0,active:0,wait:0,done:0,review:0,hold:0}; rows.forEach(r=>{ if(o[r.status]!=null)o[r.status]++; if(r.status!=='done')o.open++; }); return o; };
   const stC = cnt(stages), tkC = cnt(tasks);
 
   /* enrich PROJECTS in place (read by renderOverview / portfolio table) */
@@ -32378,7 +32426,11 @@ window.tLoadOverview = async () => {
     const a = roll[p.id] || { done:0, total:0, next:null, over:false };
     p._sdone = a.done; p._stot = a.total; p._nextDue = a.next; p._overdue = a.over;
     const la = lastAct[p.id], _cr = p.createdAt ? new Date(p.createdAt).getTime() : null;
-    p._lastActDays = (la != null) ? Math.floor((now - la)/86400000) : (_cr != null ? Math.floor((now - _cr)/86400000) : null);
+    const _hasWork = (a.total > 0) || tasks.some(t => t.project_id === p.id);
+    /* без событий в журнале ориентируемся на дату создания — но только если в проекте
+       вообще есть этапы или задачи, иначе пустой проект автоматически «застаивался» */
+    p._lastActDays = (la != null) ? Math.floor((now - la)/86400000)
+                   : (_hasWork && _cr != null ? Math.floor((now - _cr)/86400000) : null);
   });
 
   /* stage load grouped by stage name across the whole portfolio */
@@ -32400,8 +32452,8 @@ window.tLoadOverview = async () => {
     /* просрочка */
     overdueItems, overdueStages, overdueTasks,
     /* точечные счётчики статусов */
-    stOpen:stC.open, stActive:stC.active, stWait:stC.wait, stDone:stC.done,
-    tkOpen:tkC.open, tkActive:tkC.active, tkWait:tkC.wait, tkDone:tkC.done,
+    stOpen:stC.open, stActive:stC.active, stWait:stC.wait, stDone:stC.done, stReview:stC.review, stHold:stC.hold,
+    tkOpen:tkC.open, tkActive:tkC.active, tkWait:tkC.wait, tkDone:tkC.done, tkReview:tkC.review, tkHold:tkC.hold,
     stageLoad, _loaded:true, _at:Date.now() };
 };
 
@@ -32428,7 +32480,7 @@ window.tLoadCycles = async () => {
   const [histAll, sr, tasksAll, pmr] = await Promise.all([
     _pageAll(() => SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true})),
     SB.from('project_stages').select('id,name,project_id'),
-    _pageAll(() => SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at').order('created_at',{ascending:true})),
+    _pageAll(() => SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at,completed_at').order('created_at',{ascending:true})),
     SB.from('project_members').select('project_id,member_id')
   ]);
   /* scope сотрудника — из project_members напрямую, без зависимости от параллельного загрузчика */
@@ -32496,7 +32548,7 @@ window.tLoadCycles = async () => {
 
   // Покрытие: уникальные этапы с измеримым инстансом / уникальные этапы с любым завершением в истории (≤100%).
   const measurableUnique=Object.keys(byStage).filter(sid=>_walked[sid].everCompleted).length;
-  const completedUnique=Object.keys(byStage).filter(sid=>byStage[sid].some(h=>semOf(h.new_status)==='completed')).length;
+  const completedUnique=Object.keys(byStage).length;                 // все этапы, по которым вообще есть история
   const coveragePct=completedUnique?Math.min(100,Math.round(100*measurableUnique/completedUnique)):0;
 
   // Агрегация по ИМЕНИ этапа: p50/p90 от lead, медиана active, простой = p50(lead) − median(active).
@@ -32513,7 +32565,11 @@ window.tLoadCycles = async () => {
   const nameStat={}; stageRows.forEach(r=>nameStat[r.name]=r);
 
   // Узкое место = реально макс. p50 (без фильтра по n; ненадёжность помечаем подписью n / «мало данных»).
-  let bottleneck=null; stageRows.forEach(r=>{ if(r.p50Ms!=null&&(!bottleneck||r.p50Ms>bottleneck.p50Ms)) bottleneck={name:r.name,p50Ms:r.p50Ms,n:r.n}; });
+  /* сначала ищем среди надёжных (n≥3): иначе один медленный экземпляр случайного этапа
+     объявлял себя «узким местом всего агентства» */
+  let bottleneck=null;
+  const _pick=(min)=>{ let b=null; stageRows.forEach(r=>{ if(r.p50Ms!=null&&r.n>=min&&(!b||r.p50Ms>b.p50Ms)) b={name:r.name,p50Ms:r.p50Ms,n:r.n}; }); return b; };
+  bottleneck=_pick(3)||_pick(1);
 
   // Цикл проекта: span min(старт)→max(финиш); только проекты с ≥2 РАЗНЫМИ измеренными этапами (иначе это длительность 1 этапа).
   /* Берём ПОСЛЕДНИЙ проход проекта по разным этапам: идём от свежего завершения назад,
@@ -32588,7 +32644,9 @@ window.tLoadCycles = async () => {
   const _stNm={}; (sr.data||[]).forEach(st=>{ if(st&&st.id!=null) _stNm[st.id]=st.name; });
   const _revEl=(t)=>{ let v=t.review_spent||0; if(t.review_started && t.status==='review') v+=Math.max(0,Math.round((now-new Date(t.review_started).getTime())/1000)); return v; };   // без проверки статуса счётчик у закрытой задачи рос вечно
   const _rtasks=(tr.data||[]);
-  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,onReview:(t.status==='review'&&!!t.review_started),date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
+  /* дата СОБЫТИЯ, а не создания задачи: фильтр «за 7 дней» должен смотреть на согласование/закрытие */
+  const _evDate=(t)=>t.completed_at||t.review_started||t.timer_started||t.created_at;
+  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,onReview:(t.status==='review'&&!!t.review_started),date:_evDate(t),asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
   const _sg={}; _rtasks.forEach(t=>{ const sec=_revEl(t); if(sec<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_sg[nm]||(_sg[nm]={name:nm,total:0,count:0})); _sg[nm].total+=sec; _sg[nm].count++; });
   const reviewStages=Object.values(_sg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count)})).sort((a,b)=>b.total-a.total);
   const reviewNow=_rtasks.filter(t=>t.status==='review').length;
@@ -32608,9 +32666,11 @@ window.tLoadCycles = async () => {
   const workDoneAvgSec=workDoneCount?Math.round(_wdone.reduce((a,t)=>a+_workEl(t),0)/workDoneCount):0;
   const _wstg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_wstg[nm]||(_wstg[nm]={name:nm,total:0,count:0})); _wstg[nm].total+=v; _wstg[nm].count++; });
   const workStages=Object.values(_wstg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total);
-  const workTopTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_workEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,done:t.status==='done',date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
+  const workTopTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_workEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,done:t.status==='done',date:_evDate(t),asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
   const _wasg={}; _rtasks.forEach(t=>{ const v=_workEl(t); if(v<=0)return; const aid=t.assignee_id||'__none'; (_wasg[aid]||(_wasg[aid]={id:aid,total:0,count:0})); _wasg[aid].total+=v; _wasg[aid].count++; });
-  const _tmName=(id)=>{ if(id==='__none')return 'Не назначен'; const m=(typeof TEAM!=='undefined'?TEAM:[]).find(x=>x._id===id); return m?m.name:'—'; };
+  const _tmName=(id)=>{ if(id==='__none')return 'Не назначен';
+    const _all=[].concat((typeof TEAM!=='undefined'?TEAM:[]),(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]));
+    const m=_all.find(x=>String(x._id)===String(id)); return m?m.name:'—'; };
   const workByAsg=Object.values(_wasg).map(x=>({name:_tmName(x.id),total:x.total,count:x.count,avg:Math.round(x.total/x.count),share:workTotalSec?Math.round(100*x.total/workTotalSec):0})).sort((a,b)=>b.total-a.total).slice(0,8);
   let _cum=0,_p80=0; const _desc=[..._wsecs].sort((a,b)=>b-a); const _tgt=workTotalSec*0.8;
   for(const v of _desc){ _cum+=v; _p80++; if(_cum>=_tgt)break; }
@@ -32722,10 +32782,10 @@ window.KPI_METRICS = {
   smm_shr:        { label:'SHR',                 unit:'%',  dir:'up', scale:{soft:0.1,  hard:1},       scope:['project','team','agency'], category:'smm', sample_min:2, weight:10, formula:'Share Rate: репосты / охват × 100. Топ-сигнал вирусности.' },
   smm_sr:         { label:'SR',                  unit:'%',  dir:'up', scale:{soft:0.1,  hard:1.5},     scope:['project','team','agency'], category:'smm', sample_min:2, weight:5,  formula:'Save Rate: сохранения / охват × 100. Индикатор ценности контента.' },
   // ── Портфель · 6 метрик агентского уровня ──
-  portfolio_health: { label:'Здоровье портфеля', unit:'%',   dir:'up',   scale:{soft:60, hard:100},   scope:['agency'], category:'portfolio', sample_min:1, formula:'Доля активных проектов не в статусе blocked/at_risk' },
-  ontime_delivery:  { label:'On-time delivery',  unit:'%',   dir:'up',   scale:{soft:60, hard:100},   scope:['agency'], category:'portfolio', sample_min:5, formula:'Доля задач сданных в срок по всему агентству' },
-  velocity_30d:     { label:'Velocity 30 дней',  unit:'ед.', dir:'up',   scale:{soft:20, hard:200},   scope:['agency'], category:'portfolio', sample_min:0, formula:'Взвешенная выработка за последние 30 дней (rolling)' },
-  otkaty:           { label:'Откаты · rework',   unit:'%',   dir:'down', scale:{soft:5,  hard:30},    scope:['agency'], category:'portfolio', sample_min:5, formula:'Доля задач возвращённых на доработку' },
+  portfolio_health: { label:'Здоровье портфеля', unit:'%',   dir:'up',   scale:{soft:60, hard:100},   scope:['agency'], category:'portfolio', sample_min:1, formula:'Доля активных проектов без просрочки и без застоя (нет событий ≥14 дней)' },
+  ontime_delivery:  { label:'On-time delivery',  unit:'%',   dir:'up',   scale:{soft:60, hard:100},   scope:['agency'], category:'portfolio', sample_min:5, formula:'Этапы и задачи, закрытые не позже своего дедлайна (учитывается и время дедлайна), от всех закрытых со сроком' },
+  velocity_30d:     { label:'Velocity 30 дней',  unit:'ед.', dir:'up',   scale:{soft:20, hard:200},   scope:['agency'], category:'portfolio', sample_min:0, formula:'Уникальные первые завершения этапов и задач за последние 30 дней (rolling)' },
+  otkaty:           { label:'Откаты · rework',   unit:'%',   dir:'down', scale:{soft:5,  hard:30},    scope:['agency'], category:'portfolio', sample_min:5, formula:'Доля переходов назад по статусам (напр. review→active) от всех смен статуса этапов и задач' },
   mrr:              { label:'MRR',               unit:'$',   dir:'up',   scale:{soft:1000, hard:1000000}, scope:['agency'], category:'portfolio', sample_min:1, formula:'Сумма MRR активных проектов' },
   margin:           { label:'Маржа',             unit:'%',   dir:'up',   scale:{soft:15, hard:70},    scope:['agency'], category:'portfolio', sample_min:1, formula:'(выручка − себестоимость) / выручка × 100' },
 };
@@ -33551,8 +33611,18 @@ window.kpiComputeVelocity30d = async (sc, id, fromISO, toISO) => {
   const from = new Date(new Date(to).getTime() - 30*86400000).toISOString();
   return kpiComputeThroughputWeighted(sc, id, from, to);
 };
+/* Портфельные метрики — снимок «сейчас» (OVERVIEW/FINANCE), исторического среза нет.
+   Если запрашивают закрытое прошлое окно — честно отдаём null, чтобы дельта
+   показывала «—», а не выдуманный 0% изменения. */
+window._kpiPortfolioIsPast = (to) => { if(!to) return false;
+  const t=new Date(String(to).length<=10?(String(to)+'T23:59:59'):to).getTime();
+  return isFinite(t) && t < Date.now() - 12*3600000; };
 window.kpiComputePortfolioAll = async (sc, id, from, to) => {
   if (sc !== 'agency') return {};
+  if (window._kpiPortfolioIsPast(to)) {
+    const nil={value:null,sample_size:0,confidence:null};
+    return { portfolio_health:nil, ontime_delivery:nil, velocity_30d:nil, otkaty:nil, mrr:nil, margin:nil };
+  }
   const [ph, od, vel, ot, mrrR, margR] = await Promise.all([
     kpiComputePortfolioHealth(sc, id, from, to),
     kpiComputeOntimeDelivery(sc, id, from, to),
@@ -39708,7 +39778,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.07-overview-cycles';
+window.__BUILD='2026-07-25.08-cycles-filters';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
