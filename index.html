@@ -8976,7 +8976,9 @@ async function doLogin(){
   };
   if(document.body)start(); else document.addEventListener('DOMContentLoaded',start);
 })();
-function logout(){ if(window.tLogout)window.tLogout(); try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); KB_Q=''; _kbCatsLoaded=false; _kbPeriodLoaded=false; KB_PERIOD={mode:'all',v:''}; KB_ARCH_OPEN=false; if(typeof smmLbReset==='function') smmLbReset(); if(typeof ntfReset==='function') ntfReset(); window._ntfBooted=false; }catch(_e){} document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
+function logout(){ if(window.tLogout)window.tLogout(); try{ if(typeof kbAutoInvalidate==='function') kbAutoInvalidate(); KB_Q=''; _kbCatsLoaded=false; _kbPeriodLoaded=false; KB_PERIOD={mode:'all',v:''}; KB_ARCH_OPEN=false; window._aggLoaded=0;
+  kbProj=''; Object.keys(KB_DATA).forEach(function(k){ delete KB_DATA[k]; }); KB_PROJECTS.length=0;   // данные прошлого агентства не должны жить до первой загрузки нового
+  if(typeof smmLbReset==='function') smmLbReset(); if(typeof ntfReset==='function') ntfReset(); window._ntfBooted=false; }catch(_e){} document.getElementById('app').classList.remove('on'); document.getElementById('app-ag').classList.remove('on'); document.getElementById('app-cl').classList.remove('on'); document.documentElement.style.removeProperty('--accent'); document.documentElement.style.removeProperty('--accent-dim'); document.documentElement.style.removeProperty('--accent-line'); document.documentElement.style.removeProperty('--accent-ink'); document.getElementById('page-login').classList.remove('hidden'); document.getElementById('lg-login').value=''; document.getElementById('lg-pass').value=''; }
 function soon(w){ toast(w+' — строим следующим шагом'); }
 
 /* ——— GENERAL CABINET ——— */
@@ -9613,6 +9615,9 @@ function agProjectAccessMode(){
 }
 function agVisibleProjectIds(){                                          // Set<pid> или null (все)
   if(agProjectAccessMode()==='all') return null;
+  /* Состав команд приходит из tLoadProjectAggregates. Пока агрегаты в полёте, зона доступа
+     пуста — если фильтровать по ней, сотрудник на секунду видит «нет проектов» и нули везде. */
+  if(!window._aggLoaded) return null;
   const me=(window.tMe&&window.tMe())||{};
   const set=new Set();
   const mid=me.id||me._id;
@@ -12537,7 +12542,9 @@ function cycleCardHTML(c,i){
 /* ——— project filters (custom dropdowns + live data) ——— */
 const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
 const SORT_LABEL=Object.fromEntries(SORT_OPTS);
-const _ddEsc=v=>String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+/* Значение подставляется внутрь onclick="…'…'…" — атрибут в двойных кавычках.
+   Без экранирования " название категории вида  x" onmouseover="…  разрывало атрибут. */
+const _ddEsc=v=>String(v).replace(/&/g,'&amp;').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const _ddH=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function _dd(key,label,valLabel,opts,curVal,setter,right){
   const caret='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
@@ -12880,7 +12887,7 @@ function projFiltered(){
     if(_vis && !_vis.has(p.id))return false;                                          // сотрудник видит только назначенные проекты
     if(agFilter==='active'&&p.status!=='active')return false;
     if(agFilter==='done'&&p.status!=='done')return false;
-    if(agFilter==='overdue'&&!p._overdue)return false;
+    if(agFilter==='overdue'&&(!p._overdue||agIsArchivedProject(p)))return false;      // завершённый проект не «просрочен», даже если внутри остались старые сроки
     if(agCat!=='all'&&p.cat!==agCat)return false;
     if(agSvc!=='all'&&p.svc!==agSvc)return false;
     if(agLead!=='all'){ if(agLead==='__none'){ if(p.lead_id)return false; } else if(p.lead_id!==agLead)return false; }
@@ -12888,16 +12895,23 @@ function projFiltered(){
     if(q&&!((p.name||'').toLowerCase().includes(q)||(p.cat||'').toLowerCase().includes(q)||(p.svc||'').toLowerCase().includes(q)))return false;
     return true;
   });
-  if(agSort==='progress')l=l.slice().sort((a,b)=>b.pct-a.pct);
-  else if(agSort==='progress_asc')l=l.slice().sort((a,b)=>a.pct-b.pct);
+  if(agSort==='progress')l=l.slice().sort((a,b)=>(b.pct||0)-(a.pct||0));
+  else if(agSort==='progress_asc')l=l.slice().sort((a,b)=>(a.pct||0)-(b.pct||0));
   else if(agSort==='name')l=l.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru'));
+  /* «По активности» была подписью без реализации: список оставался в порядке создания.
+     Сортируем по дате последнего действия — свежие сверху, проекты без событий в конце. */
+  else if(agSort==='active')l=l.slice().sort((a,b)=>{
+    const A=(a._lastActDays==null?1e9:a._lastActDays), B=(b._lastActDays==null?1e9:b._lastActDays);
+    return A-B || (b._overdueAll||0)-(a._overdueAll||0) || (a.name||'').localeCompare(b.name||'','ru');
+  });
   return l;
 }
 function _kmrr(v){ if(!v) return '—'; if(v>=1e6) return (Math.round(v/1e5)/10)+'M'; if(v>=1e3) return Math.round(v/1e3)+'K'; return ''+v; }
 function _projTariff(p){ if(p.tariff) return {name:p.tariff,derived:false}; const m=p.mrr||0; const name=m>=20000000?'Platinum':m>=10000000?'Gold':m>0?'Silver':'—'; return {name,derived:true}; }
 function _ltvOf(p){
-  const months = p.createdAt ? Math.max(0,(Date.now()-new Date(p.createdAt).getTime())/(30.44*86400000)) : 0;
-  const ltv = (p.createdAt && p.mrr) ? Math.round(p.mrr*months) : 0;
+  const t = p.createdAt ? new Date(p.createdAt).getTime() : NaN;      // битая дата давала NaN и «NaN мес» на карточке
+  const months = isFinite(t) ? Math.max(0,(Date.now()-t)/(30.44*86400000)) : 0;
+  const ltv = (months && p.mrr) ? Math.round(p.mrr*months) : 0;
   return {ltv, months};
 }
 function _lifeDur(months){ const u=t=>`<span class="u">${t}</span>`;
@@ -12919,7 +12933,8 @@ function _lifeOf(p){
 }
 function _projComplexity(p){
   const tot=parseInt((p.stages||'0 / 0').split('/')[1])||0;
-  const cy=(typeof CYCLES!=='undefined'&&CYCLES.clients)?CYCLES.clients.find(c=>c.client===p.name):null;
+  /* связываем по id проекта: по имени тёзки получали чужие метрики, а переименование гасило гейдж */
+  const cy=(typeof CYCLES!=='undefined'&&CYCLES.clients)?CYCLES.clients.find(c=>String(c.pid)===String(p.id)):null;
   if(cy&&cy.medianMs!=null&&cy.n>=1){
     const days=cy.medianMs/86400000;
     const cycleScore=Math.min(100,Math.max(0,(Math.log10(days*24+1)/Math.log10(14*24+1))*100));
@@ -13087,7 +13102,7 @@ const _projCard=(p)=>{
   if(p._nextDue){ const t=new Date();t.setHours(0,0,0,0); const d=new Date(p._nextDue+'T00:00:00'); const diff=Math.round((d-t)/86400000); dueDays=diff; dueMain=_dDate(p._nextDue); dueSub=diff<0?('просрочен '+(-diff)+'д'):diff===0?'сегодня':diff===1?'завтра':('через '+diff+'д'); dueC=diff<0?'var(--neg)':diff<=3?'var(--warn)':'var(--txt-2)'; }
   let paceMain,paceSub,paceC;
   if(p.status==='done'){ paceMain='завершён'; paceSub='проект закрыт'; paceC='var(--txt-3)'; }
-  else if((p._overdueN||0)>0){ paceMain='отстаёт'; paceSub=p._overdueN+' просрочено'; paceC='var(--neg)'; }
+  else if((p._overdueAll||0)>0){ paceMain='отстаёт'; paceSub=p._overdueAll+' просрочено'; paceC='var(--neg)'; }   // считаем этапы И задачи — иначе точка «Просрочен» горит, а темп «в графике»
   else if(risk.lvl==='warn'&&risk.label==='Дедлайн близко'){ paceMain='впритык'; paceSub='дедлайн близко'; paceC='var(--warn)'; }
   else { paceMain='в графике'; paceSub='по плану'; paceC='var(--pos)'; }
   const noteEsc=(p.note||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -13095,7 +13110,7 @@ const _projCard=(p)=>{
   const _ptBig=s=>{const m=String(s).match(/^([0-9.,]+)\s*([\s\S]*)$/);return m?`<b>${m[1]}</b>${m[2]?`<i>${m[2]}</i>`:''}`:`<b class="sm">${s}</b>`;};
   const _tenW=life.cur>0?Math.max(6,Math.min(100,life.cur/365*100)).toFixed(0):0;
   const _dlW=dueDays==null?0:(dueDays<0?100:Math.max(6,(100-Math.min(100,dueDays/30*100))).toFixed(0));
-  const _paceW=p.status==='done'?100:((p._overdueN||0)>0?28:(risk.lvl==='warn'?64:100));
+  const _paceW=p.status==='done'?100:((p._overdueAll||0)>0?28:(risk.lvl==='warn'?64:100));
   let L=p._lead; if(!L && p.lead_id){ const _x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===p.lead_id); if(_x) L={name:_x.name,color:_x.color||'var(--accent)',avatar:_x.avatar||null}; }
   const leadHTML = L
     ? `<span class="pt-lead-av" style="background:${L.color}">${L.avatar?`<img src="${String(L.avatar).replace(/"/g,'')}" alt="">`:((L.name||'?')[0]||'?').toUpperCase()}</span><span class="pt-lead-txt"><span class="pt-lead-nm">${escH(L.name)}</span><span class="pt-lead-r">ответственный</span></span>`
@@ -13213,12 +13228,41 @@ const _projCard=(p)=>{
             <div class="pjm-track">${(pp.done+pp.active+pp.wait)>0?`${pp.done>0?`<i class="sd" style="flex:${pp.done}"></i>`:''}${pp.active>0?`<i class="sa" style="flex:${pp.active}"></i>`:''}${pp.wait>0?`<i class="sw" style="flex:${pp.wait}"></i>`:''}`:`<i class="sd" style="flex:${Math.max(0,Math.min(100,p.pct||0))}"></i><i class="sw" style="flex:${100-Math.max(0,Math.min(100,p.pct||0))}"></i>`}</div>
             <span class="pjm-pct" style="color:${ringColor}">${p.pct}%</span>
           </div>
-          ${(p._overdueN||0)>0&&p.status!=='done'?`<div class="pjm-alert"><span class="d"></span>${p._overdueN} ${_plural(p._overdueN,'задача просрочена','задачи просрочены','задач просрочено')}</div>`:''}
+          ${(()=>{ /* раньше подпись говорила «задача просрочена», а число было по этапам */
+            const _os=p._overdueStages||0, _ot=p._overdueTasks||0;
+            if(p.status==='done'||!(_os+_ot)) return '';
+            const parts=[]; if(_os) parts.push(_os+' '+_plural(_os,'этап просрочен','этапа просрочено','этапов просрочено'));
+            if(_ot) parts.push(_ot+' '+_plural(_ot,'задача просрочена','задачи просрочены','задач просрочено'));
+            return `<div class="pjm-alert"><span class="d"></span>${parts.join(' · ')}</div>`; })()}
         </div>
       </div>`;
 };
 function _projListHTML(l){ return l.length ? `<div class="list-h">${l.length} ${_plural(l.length,'проект','проекта','проектов')}</div>`+l.map(_projCard).join('') : `<div class="modph"><h3>Нет проектов в этом фильтре</h3><p>Под выбранные фильтры ничего не нашлось — измени категорию, услугу или сбрось фильтры.</p></div>`; }
-function paintProjList(){ const el=document.getElementById('pj-list'); if(el){ el.innerHTML=_projListHTML(projFiltered()); _pjhFit(); } }
+function paintProjList(){ const el=document.getElementById('pj-list'); if(el){ const _l=projFiltered(); el.innerHTML=_projListHTML(_l); _projStatsPaint(_l); _pjhFit(); } }
+/* Верхние карточки и кнопка «Показать: N» считаются от того же отфильтрованного списка.
+   Раньше поиск перерисовывал только список — сверху оставались цифры прошлого фильтра. */
+function _projStatsPaint(l){
+  try{
+    const act=l.filter(p=>p.status==='active');
+    const pipe=k=>act.reduce((s,p)=>s+((p._pipeline&&p._pipeline[k])||0),0);
+    const done=pipe('done'), total=pipe('total'), wip=pipe('active'), queue=pipe('wait');
+    const avg=total?Math.round(100*done/total):0;
+    const ovd=act.reduce((s,p)=>s+(p._overdueAll||0),0), ovdP=act.filter(p=>p._overdue).length;
+    const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.innerHTML=v; };
+    set('pjs-act',act.length); set('pjs-avg',avg+'<small>%</small>'); set('pjs-ovd',ovd);
+    set('pjs-avgx',done+' готово · '+wip+' в работе · '+queue+' в очереди');
+    set('pjs-actx',(total?(done+' из '+total+' этапов'):'этапов пока нет'));
+    set('pjs-ovdx',(ovd?(ovdP+' проект. затронуто'):'всё в срок ✓'));
+    const comp=document.querySelector('#content-ag .px-ov-comp');
+    if(comp) comp.innerHTML=(done||wip||queue)
+      ? ((done?'<i style="flex:'+done+';background:var(--accent)"></i>':'')+(wip?'<i style="flex:'+wip+';background:var(--violet)"></i>':'')+(queue?'<i style="flex:'+queue+';background:var(--bg-3)"></i>':''))
+      : '<i style="flex:1;background:var(--bg-3)"></i>';
+    const _ovC=document.getElementById('pjs-ovd'), _ovX=document.getElementById('pjs-ovdx');
+    const _c=ovd?'var(--neg)':'var(--pos)'; if(_ovC)_ovC.style.color=_c; if(_ovX)_ovX.style.color=_c;
+    const b=document.querySelector('#content-ag .tb-adv-apply');
+    if(b) b.textContent='Показать: '+l.length+' '+_plural(l.length,'проект','проекта','проектов');
+  }catch(_e){}
+}
 function renderProjects(){
   try{agRenderPlanChip();}catch(_){}
   if(typeof smmLoadLb==='function' && window.SB && typeof _smmLbStale==='function' && _smmLbStale() && !_smmLbLoading){
@@ -13235,19 +13279,22 @@ function renderProjects(){
   // SCOPED (для верхних карточек) — учитывает применённые фильтры
   const _act=list.filter(p=>p.status==='active'), _done=list.filter(p=>p.status==='done');
   const _hasFilt=(agCat!=='all'||agSvc!=='all'||agLead!=='all'||agCplx!=='all'||(agQ||'').trim()!==''||agFilter!=='active'&&agFilter!=='all');
-  const _avg=(()=>{const _d=_act.reduce((s,p)=>s+(parseInt(p.stages)||0),0),_t=_act.reduce((s,p)=>s+(parseInt((p.stages||'0 / 0').split('/')[1])||0),0);return _t?Math.round(100*_d/_t):0;})();
-  const _stDone=_act.reduce((s,p)=>s+(parseInt(p.stages)||0),0);
+  /* Считаем из _pipeline, а не из распарсенной строки p.stages: в композит-баре рядом
+     уже берутся active/wait из объекта, и при расхождении «готово + в работе + в очереди» не сходилось. */
+  const _pipe=k=>_act.reduce((s,p)=>s+((p._pipeline&&p._pipeline[k])||0),0);
+  const _stDone=_pipe('done'), _stTotal=_pipe('total');
+  const _avg=_stTotal?Math.round(100*_stDone/_stTotal):0;
   const _mrrTot=_act.reduce((s,p)=>s+(p.mrr||0),0), _costTot=_act.reduce((s,p)=>s+(p.cost||0),0);
   const _marginW=_mrrTot>0?Math.round(100*(_mrrTot-_costTot)/_mrrTot):null;
   const _ovdN=_act.reduce((s,p)=>s+(p._overdueAll||0),0), _ovdProj=_act.filter(p=>p._overdue).length;
-  const _ltvTot=_act.reduce((s,p)=>s+(_ltvOf(p).ltv||0),0), _tenAvg=_act.length?(_act.reduce((s,p)=>s+(_ltvOf(p).months||0),0)/_act.length):0;
-  const _wip=_act.reduce((s,p)=>s+((p._pipeline&&p._pipeline.active)||0),0);
-  const _queue=_act.reduce((s,p)=>s+((p._pipeline&&p._pipeline.wait)||0),0);
-  const _stTot=_act.reduce((s,p)=>s+(parseInt((p.stages||'0 / 0').split('/')[1])||0),0);
-  const _maxMo=_act.reduce((m,p)=>Math.max(m,_ltvOf(p).months||0),0);
-  /* min-удержание: смотрим только проекты с ненулевым сроком (только запущенные,
-     иначе минимум всегда 0 у новых проектов и метрика бесполезна). */
+  const _wip=_pipe('active');
+  const _queue=_pipe('wait');
+  const _stTot=_stTotal;
+  /* Удержание считаем по проектам с ненулевым сроком: у только что созданных срок 0,
+     и они занижали и минимум, и среднее, делая метрику бесполезной. */
   const _monthsList=_act.map(p=>_ltvOf(p).months||0).filter(m=>m>0);
+  const _tenAvg=_monthsList.length?(_monthsList.reduce((s,m)=>s+m,0)/_monthsList.length):0;
+  const _maxMo=_monthsList.length?Math.max.apply(null,_monthsList):0;
   const _minMo=_monthsList.length?Math.min.apply(null,_monthsList):0;
   // сайдбар — всегда полный счёт
   const _nb=document.getElementById('ag-proj-ct'); if(_nb){ _nb.classList.remove('skel'); _nb.textContent=_actAll.length; }
@@ -13263,19 +13310,19 @@ function renderProjects(){
     <div class="px-ov">
       <div class="px-ov-cell">
         <div class="px-ov-l">Активный портфель${_hasFilt?' <span class="px-ov-fchip">по фильтру</span>':''}</div>
-        <div class="px-ov-v">${_act.length}</div>
+        <div class="px-ov-v" id="pjs-act">${_act.length}</div>
         <div class="px-ov-comp">${(_stDone||_wip||_queue)?`${_stDone?`<i style="flex:${_stDone};background:var(--accent)"></i>`:''}${_wip?`<i style="flex:${_wip};background:var(--violet)"></i>`:''}${_queue?`<i style="flex:${_queue};background:var(--bg-3)"></i>`:''}`:'<i style="flex:1;background:var(--bg-3)"></i>'}</div>
-        <div class="px-ov-ctx">${_stDone} готово · ${_wip} в работе · ${_queue} в очереди</div>
+        <div class="px-ov-ctx" id="pjs-avgx">${_stDone} готово · ${_wip} в работе · ${_queue} в очереди</div>
       </div>
       <div class="px-ov-cell">
         <div class="px-ov-l">Средний прогресс</div>
-        <div class="px-ov-v">${_avg}<small>%</small></div>
-        <div class="px-ov-ctx">${_stDone} из ${_stTot} этапов</div>
+        <div class="px-ov-v" id="pjs-avg">${_avg}<small>%</small></div>
+        <div class="px-ov-ctx" id="pjs-actx">${_stTot?(_stDone+' из '+_stTot+' этапов'):'этапов пока нет'}</div>
       </div>
       <div class="px-ov-cell">
         <div class="px-ov-l">Просрочено</div>
-        <div class="px-ov-v" style="color:${_ovdN?'var(--neg)':'var(--pos)'}">${_ovdN}</div>
-        <div class="px-ov-ctx" style="color:${_ovdN?'var(--neg)':'var(--pos)'}">${_ovdN?(_ovdProj+' проект. затронуто'):'всё в срок ✓'}</div>
+        <div class="px-ov-v" id="pjs-ovd" style="color:${_ovdN?'var(--neg)':'var(--pos)'}">${_ovdN}</div>
+        <div class="px-ov-ctx" id="pjs-ovdx" style="color:${_ovdN?'var(--neg)':'var(--pos)'}">${_ovdN?(_ovdProj+' проект. затронуто'):'всё в срок ✓'}</div>
       </div>
       <div class="px-ov-cell">
         <div class="px-ov-l">Срок удержания</div>
@@ -13620,7 +13667,8 @@ function pkSearch(v){
 function _pkDueBucket(t){
   if(!t.due_date) return 'none';
   const today=new Date(); today.setHours(0,0,0,0);
-  const due=new Date(t.due_date); due.setHours(0,0,0,0);
+  const due=new Date(String(t.due_date).slice(0,10)+'T00:00:00'); if(isNaN(due.getTime())) return 'none';   // 'YYYY-MM-DD' парсится как UTC — в минусовых поясах день уезжал
+  due.setHours(0,0,0,0);
   const diff=Math.round((due-today)/86400000);
   if(t.status!=='done' && diff<0) return 'overdue';
   if(diff===0) return 'today';
@@ -13985,7 +14033,7 @@ function _pdlRerender(){
 function pdlSetSeg(v){PDL_SEG=v;_pdlRerender();}
 function pdlSetType(v){PDL_TYPE=v;_pdlRerender();}
 function pdlSetResp(v){PDL_RESP=v;_pdlRerender();}
-function pdlReset(){PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';_pdlRerender();}
+function pdlReset(){clearTimeout(_pdlSearchT);PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';_pdlRerender();}
 function pdlResetState(){PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';}
 function _pdlActive(){ return PDL_SEG!=='all'||PDL_TYPE!=='all'||PDL_RESP!=='all'||!!String(PDL_Q||'').trim(); }
 var _pdlSearchT;
@@ -14032,27 +14080,16 @@ function _pdlMatch(it){
   if(q && String(it._hay||'').indexOf(q)<0) return false;
   return true;
 }
-function _pdDueBucket(due,status){
-  if(status==='done'||status==='archived'||status==='closed') return 'done';
-  if(!due) return 'none';
-  const t=new Date(); t.setHours(0,0,0,0);
-  const d=new Date(String(due)+'T00:00:00'); if(isNaN(d.getTime())) return 'none';   // 'YYYY-MM-DD' без времени парсится как UTC → в минусовых поясах уезжал день
-  d.setHours(0,0,0,0);
-  const diff=Math.round((d-t)/86400000);
-  if(diff<0) return 'overdue'; if(diff===0) return 'today'; if(diff<=7) return 'week'; return 'future';
+/* Карточка проекта и модуль «Дедлайны» обязаны классифицировать срок одинаково —
+   иначе один и тот же этап попадает в разные корзины на двух экранах. */
+function _pdDueBucket(due,status,dueTime){
+  return (typeof dlBucket==='function') ? dlBucket(due,status,dueTime) : (due?'future':'none');
 }
 function _plDays(n){ const m=n%10,h=n%100; if(m===1&&h!==11)return 'день'; if(m>=2&&m<=4&&(h<10||h>=20))return 'дня'; return 'дней'; }
-function _relDue(due){
-  const t=new Date(); t.setHours(0,0,0,0); const d=new Date(due); d.setHours(0,0,0,0);
-  const diff=Math.round((d-t)/86400000);
-  if(diff===0)return 'сегодня'; if(diff===1)return 'завтра'; if(diff===-1)return 'вчера';
-  if(diff>1)return 'через '+diff+' '+_plDays(diff);
-  return Math.abs(diff)+' '+_plDays(Math.abs(diff))+' назад';
-}
 function _pdDeadlinesHTML(p){
   const stMap={}; (p._stages||[]).forEach(s=>{ stMap[s.id]=s.name; });
   const MONS=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
-  const enrich=o=>{ const d=new Date(o.due+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status); o.day=isNaN(d.getTime())?'—':d.getDate(); o.mon=isNaN(d.getTime())?'':MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; o.done_at=o.done_at||null;
+  const enrich=o=>{ const d=new Date(String(o.due||'').slice(0,10)+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status,o.dueTime); o.day=isNaN(d.getTime())?'—':d.getDate(); o.mon=isNaN(d.getTime())?'':MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; o.done_at=o.done_at||null;
     o._hay=((o.title||'')+' '+(o.parent||'')+' '+(p.name||'')+' '+((typeof _dlOwner==='function'?(_dlOwner(o).n||''):''))).toLowerCase();
     return o; };
   const _tkSec=t=>(typeof _taskElapsed==='function')?_taskElapsed(t):((t&&t.time_spent)||0);
@@ -14060,6 +14097,8 @@ function _pdDeadlinesHTML(p){
   const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,dueTime:_dTime(t.due_time),status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||'',done_at:t.completed_at||null,spent:_tkSec(t)}));
   const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,dueTime:_dTime(s.due_time),status:s.status,asg:null,parent:'',done_at:s.completed_at||null,spent:_stSec[s.id]||0}));
   const all=tasks.concat(stages).map(enrich);
+  /* пока tLoadProjectWork не вернулся, _stages/_tasks ещё undefined — «дедлайнов нет» было бы ложью */
+  if(!all.length && (p._stages===undefined || p._tasks===undefined)) return '<div class="pk-empty" style="padding:48px 0">Загрузка дедлайнов…</div>';
   if(!all.length) return '<div class="pk-empty" style="padding:48px 0">У проекта пока нет задач и этапов с дедлайнами.<br><span style="font-size:13.5px;color:var(--txt-3)">Назначь срок задаче или этапу — они появятся здесь.</span></div>';
   const flt=all.filter(_pdlMatch);
   const B={overdue:[],today:[],week:[],future:[],done:[],none:[]};
@@ -14076,7 +14115,10 @@ function _pdDeadlinesHTML(p){
     <div class="px-ov-cell"><div class="px-ov-l">Выполнено</div><div class="px-ov-v" style="color:var(--pos)">${done}</div><div class="px-ov-ctx">${unassigned?(unassigned+' без ответственного'):'за всё время'}</div></div>
   </div>`;
   // панель фильтров
-  const segs=[['all','Все','',flt.length],['overdue','Просрочены','var(--neg)',over],['today','Сегодня','var(--warn)',today],['week','Неделя','var(--accent)',weekN],['future','Будущие','',futureN],['done','Завершённые','var(--pos)',done]];
+  /* цвета точек должны совпадать с DL_BUCKETS и заголовками групп: «Сегодня» бирюзовое, «Неделя» янтарная.
+     Счётчик «Все» считается по тем же корзинам, что рисуются, — иначе он больше, чем видно на экране. */
+  const noneN=(B.none||[]).length;
+  const segs=[['all','Все','',over+today+weekN+futureN+noneN+done],['overdue','Просрочены','var(--neg)',over],['today','Сегодня','var(--accent)',today],['week','Неделя','var(--warn)',weekN],['future','Будущие','',futureN],['done','Завершённые','var(--pos)',done]];
   const typeOpts=[['all','Все типы'],['task','Задачи'],['stage','Этапы']];
   const _tmAll=[].concat((typeof TEAM!=='undefined'?TEAM:[]),(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]));
   const _asgIds={}; all.forEach(it=>{ if(it.asg) _asgIds[it.asg]=1; });                       // в списке показываем и тех, кого уже нет в активной команде
@@ -14092,7 +14134,7 @@ function _pdDeadlinesHTML(p){
     ${_dd('pdlresp','Ответственный',PDL_RESP==='all'?'Все':_lbl(respOpts,PDL_RESP),respOpts,PDL_RESP,'pdlSetResp')}
     <button class="pk-fclear" onclick="pdlReset()"${_active?'':' style="display:none"'}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>
   </div>`;
-  const order = PDL_SEG==='all' ? ['overdue','today','week','future','done'] : [PDL_SEG];
+  const order = PDL_SEG==='all' ? ['overdue','today','week','future','none','done'] : [PDL_SEG];
   const blocks = order.map(k=>{ const b=_dlMeta(k), items=B[k]||[]; if(!items.length) return ''; return `<div class="dl-sec"><div class="dl-group-h"><span class="dl-gdot ${b.c}"></span><span class="dl-glbl">${b.l}</span><span class="ct">${items.length}</span><span class="ln"></span></div>${items.map(_dlRow).join('')}</div>`; }).join('');
   const list = blocks + `<div class="pk-empty" id="pdl-empty" style="padding:40px 0${blocks?';display:none':''}">Ничего не найдено — измени поиск или сбрось фильтры.</div>`;
   return insight + kpis + filterBar + list;
@@ -14113,12 +14155,15 @@ function renderPd(){
       const S=p._stages;
       const total=S.length, done=S.filter(s=>s.status==='done').length, work=S.filter(s=>s.status==='active').length, wait=total-done-work;
       const pct=total?Math.round(done/total*100):0;
+      /* синхронизируем карточку в списке: иначе шапка модалки показывает новый процент,
+         а карточка под ней — старый, до следующего прохода агрегатов */
+      p.pct=pct; p.stages=done+' / '+total; p._pipeline={wait:wait,active:work,done:done,total:total};
       const pe=document.getElementById('pd-pct'); if(pe) pe.textContent=pct+'%';
       const mb=document.getElementById('pd-minibar'); if(mb) mb.style.width=pct+'%';
       const next=S.filter(s=>s.status!=='done'&&s.due_date).sort((a,b)=>a.due_date<b.due_date?-1:1)[0];
       const segs=S.map(s=>`<div class="pd-seg ${s.status==='done'?'done':s.status==='active'?'active':''}"></div>`).join('');
       let dlColor='var(--txt)';
-      if(next&&next.due_date){const _dd=new Date(next.due_date),_now=new Date(new Date().toDateString()),_diff=Math.round((_dd-_now)/86400000);if(_diff<0)dlColor='var(--neg)';else if(_diff<=3)dlColor='var(--warn)';}
+      if(next&&next.due_date){const _dd=new Date(String(next.due_date).slice(0,10)+'T00:00:00'),_now=new Date(new Date().toDateString()),_diff=Math.round((_dd-_now)/86400000);if(_diff<0)dlColor='var(--neg)';else if(_diff<=3)dlColor='var(--warn)';}
       const hero=`<div class="pd-hero"><div class="pd-hero-top">
         <div><div class="pd-bignum">${pct}<span class="pct">%</span></div><div class="pd-bigsub">${done} из ${total} этапов завершено</div></div>
         <div class="pd-segs"><div class="pd-seglbl"><span>Прогресс этапов</span><span style="font-family:var(--mono);color:var(--txt-2)">${done} / ${total}</span></div><div class="pd-segrow">${segs}</div></div>
@@ -14176,7 +14221,7 @@ function renderPd(){
           const _sopen=!!(window._pkSubOpen&&window._pkSubOpen.has(c.id));
           const _srows=_sopen?`<div class="pk-sublist">`+_sub.map((s,si)=>`<div class="pk-subrow"><button type="button" class="pk-subck ${s&&s.done?'on':''}" title="Отметить" onclick="event.stopPropagation();pkSubCheck('${c.id}',${si})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button><span class="pk-subtx ${s&&s.done?'done':''}">${_ddH((s&&s.title)||'')}</span></div>`).join('')+`</div>`:'';
           const subHtml=_sub.length?`<div class="pk-sub"><button type="button" class="pk-subtog${_sopen?' open':''}" onclick="event.stopPropagation();pkSubOpen('${c.id}')"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span class="lbl">Подзадачи</span><span class="cnt${_sdone===_sub.length?' full':''}">${_sdone}/${_sub.length}</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="pk-subpb ${_sdone===_sub.length?'full':''}"><i style="width:${_spct}%"></i></div>${_srows}</div>`:'';
-          const over=c.due_date && c.status!=='done' && new Date(c.due_date) < new Date(new Date().toDateString());
+          const over=c.due_date && c.status!=='done' && new Date(String(c.due_date).slice(0,10)+'T00:00:00') < new Date(new Date().toDateString());
           const due=c.due_date?`<span class="pk-due ${over?'over':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${_dDate(c.due_date)}${c.due_time?' · '+_dTime(c.due_time):''}</span>`:'';
           const adv=st!=='done'?`<button class="pk-adv" title="Продвинуть дальше" onclick="event.stopPropagation();pkAdvance('${c.id}','${c.status}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 18l6-6-6-6"/></svg></button>`:`<span class="pk-done-ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg></span>`;
           const el=_taskElapsed(c), running=!!c.timer_started;
@@ -14225,7 +14270,7 @@ function renderPd(){
       const pctDone=totalN?Math.round(doneN/totalN*100):0;
       const totalSec=T.reduce((a,t)=>a+_taskElapsed(t),0);
       const _t0=new Date(new Date().toDateString());
-      const overdueN=T.filter(t=>t.status!=='done'&&t.due_date&&new Date(t.due_date)<_t0).length;
+      const overdueN=T.filter(t=>t.status!=='done'&&t.due_date&&new Date(String(t.due_date).slice(0,10)+'T00:00:00')<_t0).length;
       const strip=`<div class="pk-strip">
         <div class="pk-mx"><div class="l">Время всего</div><div class="v pk-total-live">${pkFmtDur(totalSec)}</div><div class="s">отработано командой</div></div>
         <div class="pk-mx"><div class="l">В работе</div><div class="v ${activeN?'ac':'mut'}">${activeN}</div><div class="s">активных задач</div></div>
@@ -22412,6 +22457,7 @@ const DL_BUCKETS=[
   {k:'today',l:'Сегодня',c:'cyan',st:'Сегодня',sc:'b-cyan'},
   {k:'week',l:'На неделе',c:'amber',st:'На неделе',sc:'b-trial'},
   {k:'future',l:'Будущие',c:'mut',st:'Будущие',sc:'b-mut'},
+  {k:'none',l:'Без срока',c:'mut',st:'Без срока',sc:'b-mut'},          // битая дата не должна пропадать из списка молча
   {k:'done',l:'Выполнено',c:'green',st:'Выполнен',sc:'b-active'},
 ];
 let DEADLINES=[];   // ← этапы с due_date, из project_stages (tLoadDeadlines)
@@ -22432,18 +22478,21 @@ function setDlSearch(q){
 function setDlFrom(d){agDlFrom=d;renderDeadlines();}
 function setDlTo(d){agDlTo=d;renderDeadlines();}
 function setDlType(t){agDlType=t;renderDeadlines();}
-function dlResetFilters(){agDlFilter='all';agDlType='all';agDlResp='all';agDlProj='all';agDlSearch='';agDlFrom='';agDlTo='';renderDeadlines();}
+function dlResetFilters(){clearTimeout(_dlSearchT);agDlFilter='all';agDlType='all';agDlResp='all';agDlProj='all';agDlGroup='urgency';agDlSearch='';agDlFrom='';agDlTo='';renderDeadlines();}
 function _dlFiltered(){
   const q=agDlSearch.trim().toLowerCase();
   const _vis=(typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope member: Set(pid) видимых проектов; иначе null
+  /* Корзину пересчитываем на каждый рендер: она вычислялась один раз при загрузке,
+     и вкладка, оставленная открытой через полночь, показывала «На этой неделе · через −1 день». */
+  DEADLINES.forEach(d=>{ d.bucket=dlBucket(d.due,d.status,d.dueTime); });
   const inRange=d=>{ if(!d.due) return !(agDlFrom||agDlTo);
     if(agDlFrom && d.due<agDlFrom) return false; if(agDlTo && d.due>agDlTo) return false; return true; };
   return DEADLINES.filter(d=>
     (!_vis || (d.pid!=null && _vis.has(d.pid))) &&                                    // дедлайн виден только если его проект в scope сотрудника
-    (agDlProj==='all'||d.project===agDlProj) &&
+    (agDlProj==='all'||String(d.pid)===String(agDlProj)) &&                           // фильтр по id, а не по имени: тёзки больше не сливаются
     (agDlType==='all'||d.type===agDlType) &&
-    (agDlResp==='all'||_dlOwner(d).key===agDlResp) &&
-    (!q || (d.stage||'').toLowerCase().includes(q) || (d.project||'').toLowerCase().includes(q)) &&
+    (agDlResp==='all'||(agDlResp==='__none'?!d.assignee:String(d.assignee||'')===String(agDlResp))) &&
+    (!q || (d.stage||'').toLowerCase().includes(q) || (d.project||'').toLowerCase().includes(q) || (_dlOwner(d).n||'').toLowerCase().includes(q)) &&
     inRange(d));
 }
 function setDlGroup(g){agDlGroup=g;renderDeadlines();}
@@ -22467,7 +22516,7 @@ function _dlOwner(it){
   if(it.assignee){ const w=_who(it.assignee); if(w&&w.n&&w.n!=='—') return {n:w.n, c:w.c, key:it.assignee, avatar:w.avatar}; }
   return {n:'Не назначен', c:'var(--txt-3)', key:'__none', avatar:null};
 }
-function _dlSortUrg(a,b){ const ord={overdue:0,today:1,week:2,future:3,done:4}; return ((ord[a.bucket]||0)-(ord[b.bucket]||0)) || String(a.due||'').localeCompare(String(b.due||'')); }
+function _dlSortUrg(a,b){ const ord={overdue:0,today:1,week:2,future:3,none:4,done:5}; const g=x=>(x in ord?ord[x]:4); return (g(a.bucket)-g(b.bucket)) || String(a.due||'').localeCompare(String(b.due||'')); }
 function _loadPills(c){ const o=c('overdue'),t=c('today'),w=c('week')+c('future'),dn=c('done'); let h='';
   if(o)h+=`<span class="dl-pill r">${o} просроч.</span>`;
   if(t)h+=`<span class="dl-pill c">${t} сегодня</span>`;
@@ -22486,12 +22535,18 @@ function _dlDoneStatus(it){
   if(!it.done_at || !it.due) return {label:'Выполнен', color:'var(--pos)', dim:'var(--pos-dim)'};
   const comp=new Date(it.done_at);
   if(isNaN(comp.getTime())) return {label:'Выполнен', color:'var(--pos)', dim:'var(--pos-dim)'};
-  const dueStart=new Date(it.due+'T00:00:00');
-  const compDay=new Date(comp); compDay.setHours(0,0,0,0);
-  const dayDiff=Math.round((compDay-dueStart)/86400000);
-  if(dayDiff===0) return {label:'В срок', color:'var(--pos)', dim:'var(--pos-dim)'};
-  if(dayDiff<0){ const ms=new Date(it.due+'T23:59:59')-comp; return {label:'Раньше на '+_dhLabel(ms), color:'var(--violet)', dim:'rgba(138,143,255,.14)'}; }
-  const ms=comp-new Date(it.due+'T23:59:59'); return {label:'Позже на '+_dhLabel(ms), color:'var(--neg)', dim:'var(--neg-dim)'};
+  /* Сверяемся с МОМЕНТОМ дедлайна: задача со сроком «сегодня 10:00», закрытая в 23:00,
+     раньше получала зелёное «В срок», потому что сравнивались только календарные дни. */
+  const dueMs=_dlDueMs(it);
+  if(dueMs==null) return {label:'Выполнен', color:'var(--pos)', dim:'var(--pos-dim)'};
+  const delta=comp.getTime()-dueMs;
+  if(Math.abs(delta)<60000) return {label:'В срок', color:'var(--pos)', dim:'var(--pos-dim)'};
+  if(delta<0){
+    const dueStart=new Date(String(it.due).slice(0,10)+'T00:00:00');
+    if(comp>=dueStart) return {label:'В срок', color:'var(--pos)', dim:'var(--pos-dim)'};   // закрыто в день дедлайна до срока
+    return {label:'Раньше на '+_dhLabel(-delta), color:'var(--violet)', dim:'rgba(138,143,255,.14)'};
+  }
+  return {label:'Позже на '+_dhLabel(delta), color:'var(--neg)', dim:'var(--neg-dim)'};
 }
 function _dlSpent(sec){ sec=Math.round(sec||0); if(sec<60) return {v:'—',has:false}; const m=Math.round(sec/60), h=Math.floor(m/60), mm=m%60; let v; if(h>0&&mm>0)v=h+' ч '+mm+' мин'; else if(h>0)v=h+' ч'; else v=mm+' мин'; return {v:v,has:true}; }
 function _dlHalo(c){ return c==='var(--neg)'?'rgba(240,120,92,.16)':c==='var(--pos)'?'rgba(67,216,140,.16)':c==='var(--accent)'?'rgba(55,230,200,.16)':c==='var(--warn)'?'rgba(227,181,103,.16)':c==='var(--violet)'?'rgba(138,143,255,.16)':'rgba(154,161,172,.14)'; }
@@ -22531,7 +22586,8 @@ function _dlRow(it){
     cc='var(--neg)'; l1='Просрочен'; var ms=_dlDueMs(it); l2=ms?('на '+_dhLabel(Date.now()-ms)):'по сроку'; ic=IC.warn;
   } else {
     var diff=_dlDayDiff(it);
-    if(diff===0){ cc='var(--accent)'; l1='Сегодня'; l2='срок сегодня'+(it.dueTime?(' · '+it.dueTime):''); ic=IC.clock; }
+    if(diff!=null&&diff<0){ cc='var(--neg)'; l1='Просрочен'; var _ms=_dlDueMs(it); l2=_ms?('на '+_dhLabel(Date.now()-_ms)):'по сроку'; ic=IC.warn; }  // страховка: дата ушла в прошлое, а корзину не пересчитали
+    else if(diff===0){ cc='var(--accent)'; l1='Сегодня'; l2='срок сегодня'+(it.dueTime?(' · '+it.dueTime):''); ic=IC.clock; }
     else if(diff===1){ cc='var(--warn)'; l1='Завтра'; l2='срок завтра'+(it.dueTime?(' · '+it.dueTime):''); ic=IC.clock; }
     else if(diff!=null&&diff<=7){ cc='var(--warn)'; l1='На этой неделе'; l2='через '+diff+' '+_plural(diff,'день','дня','дней'); ic=IC.cal; }
     else if(diff!=null&&_dlSameMonth(it)){ cc='var(--pos)'; l1='В этом месяце'; l2='через '+diff+' '+_plural(diff,'день','дня','дней'); ic=IC.cal; }
@@ -22546,7 +22602,9 @@ function _dlRow(it){
     ? '<span class="dlx-resp none"><span class="dlx-rq">?</span><span class="rn">Не назначен</span></span>'
     : '<span class="dlx-resp">'+_avInit(o.n,o.c,o.avatar,22)+'<span class="rn">'+escH(o.n)+'</span></span>';
   var sp=_dlSpent(it.spent);
-  var _sh=escH(((it.title||'')+' '+(it.stage||'')+' '+(it.project||'')+' '+(o.n||'')).toLowerCase());
+  /* та же строка, по которой ищет _pdlMatch: иначе мгновенный фильтр прятал карточки,
+     которые дебаунс-ререндер через 240 мс возвращал обратно — список мигал */
+  var _sh=escH(String(it._hay || ((it.title||'')+' '+(it.stage||'')+' '+(it.project||'')+' '+(o.n||'')).toLowerCase()));
   return '<div class="dlx" data-b="'+escH(it.bucket||'')+'" data-search="'+_sh+'" style="--cc:'+p.cc+';--cbg:'+p.bg+';--cbg2:'+p.bg2+';--cbd:'+p.bd+';--sbg:'+p.bg+';--sbd:'+p.bd+';--sc:'+p.cc+';--shalo:'+p.halo+'">'
     +'<div class="dlx-date"><div class="d">'+escH(it.day)+'</div><div class="mo">'+escH(it.mon)+'</div>'+timeFooter+'</div>'
     +'<div class="dlx-lg"><div class="dlx-pav">'+logoFill(it.plogoUrl,L)+'</div><div class="dlx-type '+(it.type==='task'?'task':'stage')+'">'+(it.type==='task'?'задача':'этап')+'</div></div>'
@@ -22556,7 +22614,7 @@ function _dlRow(it){
 }
 
 function _dlByUrgency(FILT){
-  const order=agDlFilter==='all'?['overdue','today','week','future','done']:[agDlFilter];
+  const order=agDlFilter==='all'?['overdue','today','week','future','none','done']:[agDlFilter];
   return order.map(k=>{ const b=_dlMeta(k), items=FILT.filter(d=>d.bucket===k); if(!items.length) return '';
     items.sort((a,b)=>String(a.due||'').localeCompare(String(b.due||'')));
     return `<div class="dl-sec"><div class="dl-group-h"><span class="dl-gdot ${b.c}"></span><span class="dl-glbl">${b.l}</span><span class="ct">${items.length}</span><span class="ln"></span></div>${items.map(_dlRow).join('')}</div>`;
@@ -22567,10 +22625,12 @@ function _dlSeg(FILT){ return (typeof agDlFilter==='undefined'||agDlFilter==='al
 function _dlByProject(FILT){
   FILT=_dlSeg(FILT);
   const groups={}, order=[];
-  FILT.forEach(it=>{ if(!groups[it.project]){groups[it.project]={items:[],url:it.plogoUrl,logo:it.plogo};order.push(it.project);} groups[it.project].items.push(it); });
+  /* группируем по id проекта, а не по имени: два проекта-тёзки больше не сливаются в одну группу */
+  FILT.forEach(it=>{ const key=String(it.pid==null?('nm:'+it.project):it.pid);
+    if(!groups[key]){groups[key]={items:[],url:it.plogoUrl,logo:it.plogo,nm:it.project,pid:it.pid};order.push(key);} groups[key].items.push(it); });
   order.sort((a,b)=>{ const ga=groups[a].items,gb=groups[b].items; const oa=ga.filter(x=>x.bucket==='overdue').length,ob=gb.filter(x=>x.bucket==='overdue').length; return ob-oa || gb.length-ga.length; });
-  return order.map(nm=>{ const g=groups[nm], its=g.items.slice().sort(_dlSortUrg), c=k=>its.filter(x=>x.bucket===k).length;
-    const pr=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(p=>p.name===nm), prog=pr?(pr.pct||0):null;
+  return order.map(key=>{ const g=groups[key], nm=g.nm, its=g.items.slice().sort(_dlSortUrg), c=k=>its.filter(x=>x.bucket===k).length;
+    const pr=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(p=>String(p.id)===String(g.pid)), prog=pr?(pr.pct||0):null;
     const L=escH(((nm||'?')[0]||'?').toUpperCase());
     return `<div class="dl-sec"><div class="dl-ghead">
       <span class="dl-av" style="width:34px;height:34px;border-radius:9px;background:var(--bg-3);color:var(--txt-2);font-size:15px">${logoFill(g.url,L)}</span>
@@ -22625,7 +22685,7 @@ function _actFiltered(){
   return DL_ACT.filter(function(a){
     if(_vis && (a.pid==null || !_vis.has(a.pid))) return false;                       // событие фильтруется по scope проекта
     if(agDlType!=='all' && (a.type||'stage')!==agDlType) return false;
-    if(agDlProj!=='all' && a.project!==agDlProj) return false;
+    if(agDlProj!=='all' && String(a.pid||'')!==String(agDlProj)) return false;
     if(agDlResp!=='all'){ var _rid=_actResp(a).id; if(agDlResp==='__none'){ if(_rid) return false; } else if(String(_rid)!==String(agDlResp)) return false; }
     if(agDlFrom && a.ts && String(a.ts).slice(0,10) < agDlFrom) return false;
     if(agDlTo && a.ts && String(a.ts).slice(0,10) > agDlTo) return false;
@@ -22642,12 +22702,20 @@ function renderDeadlines(){
   const upcoming=weekN+futureN;
   const upS=FILT.filter(d=>(d.bucket==='week'||d.bucket==='future')&&d.type==='stage').length;
   const upT=FILT.filter(d=>(d.bucket==='week'||d.bucket==='future')&&d.type==='task').length;
-  const unassigned=FILT.filter(d=>d.type==='task'&&d.bucket!=='done'&&_dlOwner(d).key==='__none').length;
+  const unassigned=FILT.filter(d=>d.type==='task'&&d.bucket!=='done'&&!d.assignee).length;
   const onF=f=>agDlFilter===f?'on':'', onV=v=>agDlView===v?'on':'', onG=g=>agDlGroup===g?'on':'';
-  const projOptsArr=[['all','Все проекты']].concat((typeof PROJECTS!=='undefined'?PROJECTS:[]).map(p=>[p.name,p.name]));
+  /* значение опции — id проекта: по имени два проекта-тёзки было не различить,
+     а переименование на сервере оставляло фильтр указывать в пустоту */
+  const _dlPrj=(typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const projOptsArr=[['all','Все проекты']].concat(_dlPrj.map(p=>[String(p.id),p.name]));
   const _team=(typeof TEAM!=='undefined'?TEAM:[]);
-  const respOpts=[['all','Все исполнители'],['__none','Не назначен']].concat(_team.map(m=>[m._id,m.name]));
-  const respLabel = agDlResp==='all'?'Все':(agDlResp==='__none'?'Не назначен':((_team.find(m=>m._id===agDlResp)||{}).name||'—'));
+  const _teamArc=(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]);
+  /* в список исполнителей добавляем архивных: их задачи никуда не делись, но отфильтровать их было нельзя */
+  const _respSeen={}; const _respList=[];
+  _team.forEach(m=>{ if(!_respSeen[m._id]){_respSeen[m._id]=1;_respList.push([m._id,m.name]);} });
+  _teamArc.forEach(m=>{ if(!_respSeen[m._id]&&DEADLINES.some(d=>String(d.assignee||'')===String(m._id))){_respSeen[m._id]=1;_respList.push([m._id,(m.name||'—')+' · архив']);} });
+  const respOpts=[['all','Все исполнители'],['__none','Не назначен']].concat(_respList);
+  const respLabel = agDlResp==='all'?'Все':(agDlResp==='__none'?'Не назначен':((_respList.find(m=>String(m[0])===String(agDlResp))||[])[1]||'—'));
   const statusOpts=[['all','Все'],['overdue','Просрочены'],['today','Сегодня'],['week','Неделя'],['future','Будущие'],['done','Выполненные']];
   const statusLbl=(statusOpts.find(x=>x[0]===agDlFilter)||statusOpts[0])[1];
 
@@ -22667,7 +22735,7 @@ function renderDeadlines(){
     }).join('')}</div>`
     : (DL_ACT.length ? '<div class="modph"><h3>Ничего не найдено</h3><p>Под выбранные фильтры активности нет — измените проект, исполнителя, тип или период.</p></div>' : '<div class="modph"><h3>Пока нет активности</h3><p>Как только команда начнёт или завершит этап — события появятся здесь.</p></div>');
   }else{
-    const grouped = agDlGroup==='project' ? _dlByProject(FILT) : _dlByUrgency(FILT);
+    const grouped = agDlGroup==='project' ? _dlByProject(FILT) : agDlGroup==='owner' ? _dlByOwner(FILT) : _dlByUrgency(FILT);
     body = grouped || (agDlResp!=='all'
         ? `<div class="modph"><h3>Задач нет</h3><p>У сотрудника «${respLabel}» нет дедлайнов под текущие фильтры.</p></div>`
         : DEADLINES.length
@@ -22722,7 +22790,8 @@ function renderDeadlines(){
       <div class="tb-adv-hd"><div class="m-sheet-handle"></div><span>Фильтры</span></div>
       ${agDlView==='deadlines'?_dd('dlstatus','Срок',statusLbl,statusOpts,agDlFilter,'setDlFilter'):''}
       ${_dd('dltype','Тип', (agDlType==='all'?'Все':agDlType==='stage'?'Этапы':'Задачи'), [['all','Все типы'],['stage','Этапы'],['task','Задачи']], agDlType, 'setDlType')}
-      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':agDlProj, projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
+      ${agDlView==='deadlines'?_dd('dlgroup','Группировка', (agDlGroup==='project'?'По проектам':agDlGroup==='owner'?'По исполнителям':'По срочности'), [['urgency','По срочности'],['project','По проектам'],['owner','По исполнителям']], agDlGroup, 'setDlGroup'):''}
+      ${_dd('dlresp','Ответственный', respLabel, respOpts, agDlResp, 'setDlResp')}${_dd('dlproj','Проект', agDlProj==='all'?'Все':((projOptsArr.find(o=>String(o[0])===String(agDlProj))||[])[1]||'—'), projOptsArr, agDlProj, 'setDlProj')}${(agDlFilter!=='all'||agDlType!=='all'||agDlResp!=='all'||agDlProj!=='all'||agDlGroup!=='urgency'||agDlSearch||agDlFrom||agDlTo)?`<button class="pk-fclear" onclick="dlResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
       <button class="tb-adv-apply" onclick="window._tbAdvSet&&_tbAdvSet(false)">Готово</button>
       </div>
     </div>
@@ -23439,8 +23508,8 @@ function pfAdd(list){ PFIN[list].push({name:'',role:'',unit:'month',rate:0,qty:1
 function pfDel(list,i){ PFIN[list].splice(i,1); pfRender(); }
 function pfSetName(list,i,v){ PFIN[list][i].name=v; }
 function pfSetQty(list,i,v){ const r=PFIN[list][i]; r.qty=Math.max(0,parseFloat(v)||0); r.manual=false; r.amount=pfRowAmount(r); var el=document.getElementById('pfsum-'+list+'-'+i); if(el){ if(el.tagName==='INPUT') el.value=r.amount; else el.textContent=money(r.amount); } pfRecalc(); }
-function pfSetRate(list,i,v){ const r=PFIN[list][i]; r.rate=Math.max(0,parseInt(v,10)||0); r.manual=false; r.amount=pfRowAmount(r); var el=document.getElementById('pfsum-'+list+'-'+i); if(el){ if(el.tagName==='INPUT') el.value=r.amount; else el.textContent=money(r.amount); } pfRecalc(); }
-function pfSetAmt(list,i,v){ const r=PFIN[list][i]; r.amount=Math.max(0,parseInt(v,10)||0); r.manual=true; pfRecalc(); }
+function pfSetRate(list,i,v){ const r=PFIN[list][i]; r.rate=Math.max(0,Math.round(parseFloat(v)||0)); /* parseInt резал дробные суммы: «1500.5» → 1500 */ r.manual=false; r.amount=pfRowAmount(r); var el=document.getElementById('pfsum-'+list+'-'+i); if(el){ if(el.tagName==='INPUT') el.value=r.amount; else el.textContent=money(r.amount); } pfRecalc(); }
+function pfSetAmt(list,i,v){ const r=PFIN[list][i]; r.amount=Math.max(0,Math.round(parseFloat(v)||0)); r.manual=true; pfRecalc(); }
 // выбор роли/категории из справочника → подтягиваем ставку и единицу
 function pfPickCat(list,i,val){
   const r=PFIN[list][i]; const cat=finCatLoad();
@@ -23609,7 +23678,15 @@ async function saveProjFinance(){
   if(window.LIVE&&window.SB){
     const named=svcsArr.filter(s=>s.service);          // строки без названия услуги в справочник услуг не пишем
     let svcOk=true;
-    try{ await SB.from('project_services').delete().eq('project_id',PFIN.id); if(named.length){ const rows=named.map((s,k)=>({project_id:PFIN.id,service:s.service,tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; } }catch(e){ svcOk=false; console.error('fin services',e); toast('Услуги не сохранились'); }
+    /* Сначала снимок, потом delete+insert. Обрыв между удалением и вставкой раньше
+       стирал услуги проекта безвозвратно — теперь восстанавливаем прежние строки. */
+    let _bak=null;
+    try{ const r=await SB.from('project_services').select('*').eq('project_id',PFIN.id); _bak=(r&&r.data)||null; }catch(_e){}
+    try{ const {error:delErr}=await SB.from('project_services').delete().eq('project_id',PFIN.id); if(delErr)throw delErr;
+      if(named.length){ const rows=named.map((s,k)=>({project_id:PFIN.id,service:s.service,tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; } }
+    catch(e){ svcOk=false; console.error('fin services',e);
+      if(_bak&&_bak.length){ try{ await SB.from('project_services').insert(_bak); toast('Услуги не сохранились — вернули прежние'); }catch(_e2){ toast('Услуги не сохранились'); } }
+      else toast('Услуги не сохранились'); }
     const patch={mrr:PFIN.mrr,cost:t.cost,finance};
     if(prim.service)patch.service=prim.service;
     if(named.length)patch.tariff=prim.tariff||null;     // без строк услуг тариф проекта не трогаем
@@ -25882,11 +25959,13 @@ const KB_ABBR={'Miro':'Mi','Google Doc':'GD','Google Sheet':'GS','Figma':'Fg','N
 function kbCatsKey(){ return 'kb_cats_'+((((window.tMe&&window.tMe())||{}).agency_id)||'x'); }
 let _kbCatsLoaded=false;
 function kbCatsLoad(){ if(_kbCatsLoaded) return; _kbCatsLoaded=true;
-  try{ const a=JSON.parse(localStorage.getItem(kbCatsKey())||'null');
-    if(Array.isArray(a)&&a.length){ KB_CATS.length=0; a.forEach(function(c){ if(typeof c==='string'&&c.trim()&&KB_CATS.indexOf(c)<0) KB_CATS.push(c); }); }
+  try{ const raw=JSON.parse(localStorage.getItem(kbCatsKey())||'null');
+    const a=Array.isArray(raw)?raw:(raw&&Array.isArray(raw.cats)?raw.cats:null);
+    if(a&&a.length){ KB_CATS.length=0; a.forEach(function(c){ if(typeof c==='string'&&c.trim()&&KB_CATS.indexOf(c)<0) KB_CATS.push(c); }); }
+    if(raw&&raw.col&&typeof raw.col==='object') Object.assign(KB_CATCOL, raw.col);   // цвет категории должен переживать перезагрузку
   }catch(_e){}
 }
-function kbCatsSave(){ try{ localStorage.setItem(kbCatsKey(), JSON.stringify(KB_CATS)); }catch(_e){} }
+function kbCatsSave(){ try{ localStorage.setItem(kbCatsKey(), JSON.stringify({cats:KB_CATS, col:KB_CATCOL})); }catch(_e){} }
 const KB_DATA={
   'Uzbek Doner':{'Контент-стратегия':[{t:'Контент-план · июнь',ty:'Google Sheet'},{t:'Tone of voice бренда',ty:'Google Doc'}],'Аудит профиля':[{t:'Аудит Instagram',ty:'Miro'}]},
   'RESTO':{'Анализ конкурентов':[{t:'Карта конкурентов',ty:'Miro'}],'Контент-план':[{t:'Reels-сетка',ty:'Figma'}]},
@@ -25904,7 +25983,14 @@ function kbCountView(k){
   if(typeof _kbPerOn!=='function' || !_kbPerOn()) return kbCount(k);
   return Object.keys(KB_DATA[k]||{}).reduce(function(s,c){ return s+kbMatsView(k,c).length; },0);
 }
-function setKbProj(k){kbProj=String(k);renderKB();}
+function setKbProj(k){
+  if(typeof agCanView==='function' && !agCanView('kb')) return;           // переход из уведомления не должен обходить права
+  if(typeof agCanSeeProject==='function'){                                 // и не должен открывать проект вне зоны доступа
+    const _p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(x){return kbKeyOf(x)===String(k);});
+    if(_p && !agCanSeeProject(_p.id)) return;
+  }
+  kbProj=String(k);renderKB();
+}
 /* поиск по проектам: раньше инпут был без обработчика и просто ничего не делал */
 function kbFilterProjects(q){
   KB_Q=String(q==null?'':q);
@@ -25923,7 +26009,11 @@ function kbFilterProjects(q){
 let KB_AUTO = {};                       // кеш по project.id
 const KB_AUTO_TTL = 60000;              // сводка живёт минуту, дальше — тихое обновление
 const KB_AUTO_ERR_TTL = 15000;          // бэкофф после ошибки, иначе рендер↔запрос зациклятся
-function kbCurProj(){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(p){return kbKeyOf(p)===String(kbProj);}) || null; }
+function kbCurProj(){
+  const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(x){return kbKeyOf(x)===String(kbProj);}) || null;
+  if(p && typeof agCanSeeProject==='function' && !agCanSeeProject(p.id)) return null;   // чужой проект не отдаём даже по прямой ссылке
+  return p;
+}
 function kbProjName(){ var p=kbCurProj(); if(p&&p.name) return p.name;
   var e=KB_PROJECTS.find(function(x){return String(x.key)===String(kbProj);}); return e?e.name:String(kbProj||''); }
 function kbAutoInvalidate(pid){ if(pid==null) KB_AUTO={}; else delete KB_AUTO[pid]; }
@@ -25940,8 +26030,9 @@ function kbPeriodLoad(){
   if(_kbPeriodLoaded) return;              // грузим один раз: иначе каждый renderKB затирал состояние в памяти
   _kbPeriodLoaded=true;
   try{ const r=JSON.parse(localStorage.getItem(_kbPerKey())||'null');
-    if(r&&(r.mode==='all'||r.mode==='month'||r.mode==='day')) KB_PERIOD={mode:r.mode, v:String(r.v||'')};
-  }catch(_e){}
+    const okV=v=>(r.mode==='month'?/^\d{4}-\d{2}$/:/^\d{4}-\d{2}-\d{2}$/).test(String(v||''));
+    if(r&&(r.mode==='all'||((r.mode==='month'||r.mode==='day')&&okV(r.v)))) KB_PERIOD={mode:r.mode, v:String(r.v||'')};
+  }catch(_e){}                                                 // мусор в localStorage не должен ронять фильтр в «Invalid Date»
   if(KB_PERIOD.mode!=='all' && !KB_PERIOD.v) KB_PERIOD={mode:'all',v:''};
 }
 function kbPeriodSave(){ try{ localStorage.setItem(_kbPerKey(), JSON.stringify(KB_PERIOD)); }catch(_e){} }
@@ -25969,7 +26060,11 @@ function kbPeriodShift(delta){                                  // «‹ ›» �
 function _kbInPeriod(iso){
   if(KB_PERIOD.mode==='all') return true;
   if(!iso) return false;                                        // без даты в конкретный период не попадаем
-  const s=String(iso).slice(0,10);
+  /* Границы периода задаются в локальной зоне (_kbIso), а created_at приходит в UTC.
+     Без приведения материал, созданный 1 июня в 02:00 по Ташкенту, показывался как «01.06»,
+     но в фильтр «июнь» не попадал — он лежал в мае по UTC. */
+  const d=new Date(iso);
+  const s=isNaN(d.getTime()) ? String(iso).slice(0,10) : _kbIso(d);
   return KB_PERIOD.mode==='month' ? s.slice(0,7)===KB_PERIOD.v : s===KB_PERIOD.v;
 }
 function _kbPerLabel(){
@@ -26425,7 +26520,12 @@ function _kbBriefVal(f,v){
   var t=f.type||'short';
   if(v==null||v===''||(Array.isArray(v)&&!v.length)) return '';
   if(t==='file'){
-    if(v&&typeof v==='object'&&v.url) return '<a class="kb-chip" href="'+_kbEscAttr(v.url)+'" target="_blank" rel="noopener"><span class="ci" style="color:#6AA9FF">'+_KBIC.ext+'</span>'+escH(v.name||'Файл')+'</a>';
+    /* ответы брифа заполняет клиент — схему ссылки нельзя брать на веру:
+       javascript:… в href исполнился бы в сессии сотрудника агентства */
+    if(v&&typeof v==='object'&&v.url){
+      var fu=String(v.url); if(!/^https?:\/\//i.test(fu)) fu='https://'+fu.replace(/^[\/\\]+/,'');
+      return '<a class="kb-chip" href="'+_kbEscAttr(fu)+'" target="_blank" rel="noopener"><span class="ci" style="color:#6AA9FF">'+_KBIC.ext+'</span>'+escH(v.name||'Файл')+'</a>';
+    }
     return '<span class="kb-bq-v">'+escH(_kbArr(v))+'</span>';
   }
   if(t==='url'){ var u=String(v); return '<a class="kb-chip" href="'+_kbEscAttr(/^https?:/i.test(u)?u:'https://'+u)+'" target="_blank" rel="noopener"><span class="ci" style="color:#6AA9FF">'+_KBIC.ext+'</span>'+escH(u)+'</a>'; }
@@ -26911,7 +27011,13 @@ function kbAutoBlock(){
     +_kbSecContent(p,V)+_kbSecReports(p,V)+_kbSecOps(p,V)+_kbSecSmm(p,V);
 }
 
-function renderKB(){ kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
+function renderKB(){
+  if(typeof agCanView==='function' && !agCanView('kb')){                     // модуль рисуется и в обход agNav (переход из уведомления)
+    const _c=document.getElementById('content-ag');
+    if(_c) _c.innerHTML='<div class="ph"><div><div class="eyebrow">Агентство · Знания</div><h1>База знаний</h1></div></div><div class="kb-empty" style="margin:24px 0">Нет доступа к разделу</div>';
+    return;
+  }
+  kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
   const catIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>';
   const _perOn=_kbPerOn(), _perLbl=_kbPerLabel();
   const _kbExtra=Object.keys(KB_DATA[kbProj]||{}).filter(c=>!KB_CATS.includes(c)&&((KB_DATA[kbProj]||{})[c]||[]).length);
@@ -26921,7 +27027,9 @@ function renderKB(){ kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
     const itemsHtml=view.length
       ? view.map(x=>{ const m=x.m, tc=KB_TYPES[m.ty]||'#9AA1AC', ab=KB_ABBR[m.ty]||'··';
           const d=m.at?`<span class="kb-mi-d">${escH(_kbFmtD(m.at))}</span>`:'';
-          return `<div class="kb-mi" style="cursor:pointer" onclick="kbOpenMat('${_kbEscAttr(cat)}',${x.i})"><div class="mic" style="background:${tc}22;color:${tc}">${escH(ab)}</div><div class="mt">${escH(m.t)}</div>${d}<span class="ty-badge" style="background:${tc}22;color:${tc}">${escH(m.ty||'')}</span></div>`;
+          /* ключ — id материала, а не позиция в массиве: список перестраивается realtime-событием,
+             и удаление по индексу сносило соседнюю запись */
+          return `<div class="kb-mi" style="cursor:pointer" onclick="kbOpenMat('${_kbEscAttr(cat)}','${_kbEscAttr(m._id!=null?m._id:('#'+x.i))}')"><div class="mic" style="background:${tc}22;color:${tc}">${escH(ab)}</div><div class="mt">${escH(m.t)}</div>${d}<span class="ty-badge" style="background:${tc}22;color:${tc}">${escH(m.ty||'')}</span></div>`;
         }).join('')
       : `<div class="kb-empty">${_perOn?('За '+escH(_perLbl)+' материалов не добавляли'+(total?(' · всего '+total):'')):'Нет материалов'}</div>`;
     const sub=view.length?(view.length+' '+_plural(view.length,'материал','материала','материалов')+(_perOn?(' за '+_perLbl):'')):(_perOn?('за '+_perLbl+' — ничего'):'Нет материалов');
@@ -26930,12 +27038,16 @@ function renderKB(){ kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
       <div class="kb-items">${itemsHtml}</div></div>`;
   }).join('');
 
-  /* активные и архив — раздельно, чтобы завершённые не мешались под руками */
-  const _act=KB_PROJECTS.filter(x=>x.st!=='done');
-  const _arc=KB_PROJECTS.filter(x=>x.st==='done');
+  /* активные и архив — раздельно, чтобы завершённые не мешались под руками.
+     Архив — это done/archived/closed, как и во всём остальном приложении. */
+  const _isArc=x=>!!AG_ARCHIVED_ST[String(x.st||'')];
+  const _act=KB_PROJECTS.filter(x=>!_isArc(x));
+  const _arc=KB_PROJECTS.filter(_isArc);
   const _curArch=_arc.some(x=>String(x.key)===String(kbProj));
   if(_curArch) KB_ARCH_OPEN=true;                       // выбран архивный проект — раскрываем архив
-  const pcard=p=>`<div class="kb-pi ${String(p.key)===String(kbProj)?'on':''}${p.st==='done'?' arc':''}" data-nm="${escH(p.name||'')}" onclick="setKbProj('${_kbEscAttr(p.key)}')"><div class="lg">${escH(p.logo||'?')}</div><div class="nm">${escH(p.name||'')}</div><div class="ct">${kbCount(p.key)}</div></div>`;
+  /* data-nm включает названия материалов: поиск ищет и по ним, а не только по имени проекта.
+     Счётчик на карточке — с учётом периода, иначе в шапке «3 за июнь», а на карточке «17». */
+  const pcard=p=>`<div class="kb-pi ${String(p.key)===String(kbProj)?'on':''}${_isArc(p)?' arc':''}" data-nm="${escH(((p.name||'')+' '+Object.keys(KB_DATA[p.key]||{}).map(c=>((KB_DATA[p.key]||{})[c]||[]).map(m=>m.t||'').join(' ')).join(' ')).toLowerCase())}" onclick="setKbProj('${_kbEscAttr(p.key)}')"><div class="lg">${escH(p.logo||'?')}</div><div class="nm">${escH(p.name||'')}</div><div class="ct">${kbCountView(p.key)}</div></div>`;
   const _cnt=kbCountView(kbProj);
 
   document.getElementById('content-ag').innerHTML=`
@@ -26945,7 +27057,7 @@ function renderKB(){ kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
       <div>
         <div class="kb-stat"><div class="s"><div class="v">${_act.length}</div><div class="l">Активных</div></div><div class="s"><div class="v">${_cnt}</div><div class="l">Материалов</div></div></div>
         <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="kb-psearch" placeholder="Поиск проекта…" value="${escH(KB_Q)}" oninput="kbFilterProjects(this.value)" autocomplete="off"></div>
-        <div class="kb-actions"><button class="kb-act ghost" onclick="kbAddCat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Новая категория</button><button class="kb-act primary" onclick="kbAddMat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить материал</button></div>
+        <div class="kb-actions">${(typeof agCanEdit==='function'&&!agCanEdit('kb'))?'':`<button class="kb-act ghost" onclick="kbAddCat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 14v7M14 17.5h7"/></svg>Новая категория</button><button class="kb-act primary" onclick="kbAddMat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Добавить материал</button>`}</div>
         <div class="eyebrow" style="margin:16px 4px 0">Активные · ${_act.length}</div>
         <div class="kb-plist">${_act.map(pcard).join('')||'<div class="kb-empty">Нет активных проектов</div>'}</div>
         ${_arc.length?`
@@ -27039,8 +27151,16 @@ function renderTools(){
 
 /* ——— KB + Tools interactivity ——— */
 const KB_PAL=['#37E6C8','#8A8FFF','#F0785C','#43D88C','#E3B567','#6AA9FF'];
-function kbOpenMat(cat,i){
-  const m=((KB_DATA[kbProj]||{})[cat]||[])[i]; if(!m){ toast('Материал не найден'); return; }
+/* Поиск материала по стабильному ключу: id из базы либо «#индекс» для демо-режима. */
+function _kbFindMat(cat,key){
+  const arr=((KB_DATA[kbProj]||{})[cat])||[];
+  const k=String(key==null?'':key);
+  if(k.charAt(0)==='#'){ const i=parseInt(k.slice(1),10); return {arr:arr, i:i, m:arr[i]||null}; }
+  const i=arr.findIndex(function(x){ return x && x._id!=null && String(x._id)===k; });
+  return {arr:arr, i:i, m:i>=0?arr[i]:null};
+}
+function kbOpenMat(cat,key){
+  const f=_kbFindMat(cat,key), m=f.m; if(!m){ toast('Материал не найден'); return; }
   const c=KB_TYPES[m.ty]||'#9AA1AC';
   const link=(m.url?(/^https?:/i.test(m.url)?m.url:'https://'+m.url):'').replace(/['"<>\s]/g,'');
   pd2Open(`<div class="modal">
@@ -27052,26 +27172,32 @@ function kbOpenMat(cat,i){
     <div class="modal-b"><div class="mat-box">
       <div class="ic" style="background:${c}22;color:${c}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg></div>
       <div class="nm">${link?'Материал доступен по ссылке':'Ссылка не задана'}</div>
-      <div class="meta">${link?escH(link):'добавьте ссылку при следующем редактировании'}</div>
+      <div class="meta">${link?escH(link):'ссылка не задана'}</div>
     </div></div>
     <div class="modal-f">
-      <button class="btn-ghost" style="color:var(--neg)" onclick="kbDelMat('${_kbEscAttr(cat)}',${i})">Удалить</button>
+      ${(typeof agCanEdit!=='function'||agCanEdit('kb'))?`<button class="btn-ghost" style="color:var(--neg)" onclick="kbDelMat('${_kbEscAttr(cat)}','${_kbEscAttr(key)}')">Удалить</button>`:''}
       ${link?`<button class="btn-ghost" onclick="kbOpenUrl('${_kbEscAttr(link)}',event)">Открыть</button>`:''}
       <button class="btn-add" onclick="pd2Close()">Закрыть</button>
     </div></div>`);
 }
-function kbDelMat(cat,i){
-  const arr=((KB_DATA[kbProj]||{})[cat])||[], it=arr[i];
-  if(window.LIVE){ if(it&&it._id) window.tKbDel(it._id); else toast('Материал не найден'); pd2Close(); return; }
-  if(it) arr.splice(i,1);
+function kbDelMat(cat,key){
+  if(typeof agCanEdit==='function' && !agCanEdit('kb')){ toast('Нет прав на изменение базы знаний'); return; }
+  const f=_kbFindMat(cat,key), it=f.m;
+  if(!it){ toast('Материал не найден — список успел обновиться'); pd2Close(); renderKB(); return; }
+  if(!confirm('Удалить «'+(it.t||'материал')+'» из категории «'+cat+'»?\n\nДействие необратимо.')) return;
+  if(window.LIVE){ if(it._id!=null) window.tKbDel(it._id); else toast('Материал не найден'); pd2Close(); return; }
+  f.arr.splice(f.i,1);
   pd2Close(); renderKB(); toast('Материал удалён');
 }
 function kbAddMat(){
+  if(typeof agCanEdit==='function' && !agCanEdit('kb')){ toast('Нет прав на изменение базы знаний'); return; }
+  /* список должен совпадать с тем, что видно на экране: категории из БД тоже доступны для пополнения */
+  const _allCats=KB_CATS.concat(Object.keys(KB_DATA[kbProj]||{}).filter(c=>!KB_CATS.includes(c)));
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Добавить материал</h3><p>${escH(kbProjName())} · ссылка на доску или документ</p></div>
     <div class="modal-b">
       <div class="fld2">
-        <div class="fld"><label>Категория</label>${selField('kb-cat', KB_CATS, KB_CATS[0])}</div>
+        <div class="fld"><label>Категория</label>${selField('kb-cat', _allCats, _allCats[0])}</div>
         <div class="fld"><label>Тип</label>${selField('kb-ty', Object.keys(KB_TYPES), Object.keys(KB_TYPES)[0])}</div>
       </div>
       <div class="fld"><label>Название</label><input id="kb-title" placeholder="Контент-план · июль"></div>
@@ -27080,23 +27206,34 @@ function kbAddMat(){
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="kbSaveMat()">Добавить</button></div></div>`);
 }
 function kbSaveMat(){
-  const cat=_v('kb-cat'),ty=_v('kb-ty'),t=_v('kb-title'),url=_v('kb-url');
+  if(typeof agCanEdit==='function' && !agCanEdit('kb')){ toast('Нет прав на изменение базы знаний'); return; }
+  const cat=_v('kb-cat'),ty=_v('kb-ty'),t=(_v('kb-title')||'').trim(),url=(_v('kb-url')||'').trim();
   if(!t){toast('Введи название материала');return;}
-  if(window.LIVE){ window.tKbAdd(cat,t,ty,url); pd2Close(); return; }
+  if(!cat){toast('Выбери категорию');return;}
+  if(window.LIVE){
+    if(typeof window.tKbAdd!=='function'){ toast('Сервис недоступен, обновите страницу'); return; }
+    if(!kbCurProj()){ toast('Сначала выбери проект'); return; }        // проверяем ДО закрытия модалки, иначе введённое теряется
+    window.tKbAdd(cat,t,ty,url); pd2Close(); return; }
   if(!KB_DATA[kbProj])KB_DATA[kbProj]={};
   if(!KB_DATA[kbProj][cat])KB_DATA[kbProj][cat]=[];
-  KB_DATA[kbProj][cat].push({t,ty,url});
+  KB_DATA[kbProj][cat].push({t,ty,url,at:new Date().toISOString()});   // без даты материал не попадал в активный фильтр периода
   pd2Close(); renderKB(); toast(`«${t}» добавлен в «${cat}»`);
 }
 function kbAddCat(){
+  if(typeof agCanEdit==='function' && !agCanEdit('kb')){ toast('Нет прав на изменение базы знаний'); return; }
   pd2Open(`<div class="modal">
     <div class="modal-h"><h3>Новая категория</h3><p>Категории базы знаний — кастомные для агентства</p></div>
     <div class="modal-b"><div class="fld"><label>Название категории</label><input id="kb-newcat" placeholder="Например: Брендбук"></div></div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="kbSaveCat()">Создать</button></div></div>`);
 }
 function kbSaveCat(){
+  if(typeof agCanEdit==='function' && !agCanEdit('kb')){ toast('Нет прав на изменение базы знаний'); return; }
   const n=(_v('kb-newcat')||'').trim(); if(!n){toast('Введи название категории');return;}
-  if(KB_CATS.indexOf(n)<0){ KB_CATS.push(n); KB_CATCOL[n]=KB_PAL[KB_CATS.length%KB_PAL.length]; kbCatsSave(); }
+  /* сравнение без учёта регистра: «Брендбук» и «брендбук» — одна категория, иначе материалы расползаются */
+  const dup=KB_CATS.concat(Object.keys(KB_DATA[kbProj]||{})).find(c=>String(c).toLowerCase()===n.toLowerCase());
+  if(dup){ toast(`Категория «${dup}» уже существует`); pd2Close(); return; }
+  KB_CATCOL[n]=KB_PAL[KB_CATS.length%KB_PAL.length];    // цвет по будущему индексу, до push — иначе сдвиг на единицу
+  KB_CATS.push(n); kbCatsSave();
   pd2Close(); renderKB(); toast(`Категория «${n}» создана`);
 }
 function toolOpen(si,ii){const it=TOOLS_DATA[si].items[ii];const u=(/^https?:/i.test(it.url)?it.url:'https://'+it.url).replace(/['"<>]/g,'');window.open(u,'_blank');}
@@ -30863,6 +31000,8 @@ function _ntfBriefRt(pl){
 }
 function _ntfKbRt(pl){
   const r=pl&&pl.new; if(!r||!r.id) return;
+  if(typeof agCanView==='function' && !agCanView('kb')) return;                       // не показываем то, чего человек не может открыть
+  if(r.project_id!=null && typeof agCanSeeProject==='function' && !agCanSeeProject(r.project_id)) return;
   ntfAdd({ id:'kb.'+r.id, ts:Date.now(), src:'live', kind:'kb', sev:'info',
     title:'Материал в базе знаний', obj:r.title||'',
     roles:[{k:'Категория', v:r.category||'—'}],
@@ -31161,6 +31300,7 @@ function ntfGoto(id){
   ntfRead(id);
   if(e.mod==='kpi'){ ntfClose(); if(typeof agNav==='function') agNav('kpi'); return; }
   if(e.kind==='kb'){
+    if(typeof agCanView==='function' && !agCanView('kb')){ toast('Нет доступа к базе знаний'); return; }
     ntfClose();
     if(typeof agNav==='function') agNav('kb');
     if(e.projId&&typeof setKbProj==='function') setTimeout(function(){ try{ setKbProj(e.projId); }catch(_e){} }, 80);
@@ -31896,7 +32036,9 @@ const mapAgency = (a, c) => ({ id:a.id, name:a.name, slug:a.slug, vertical:a.ver
   active:_seenLabel((c.seen&&c.seen[a.id])||0) });
 const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
   logoUrl:p.logo_url||'', cat:p.category||'—', svc:p.service||'SMM', pct:p.pct||0,
-  stages:(p.stages_done||0)+' / '+(p.stages_total||6), health:p.health||'В норме',
+  /* «|| 6» выдумывало шесть несуществующих этапов проекту без этапов: средний прогресс
+     занижался, а карточка обещала загрузку того, чего нет. Реальные числа приходят из агрегатов. */
+  stages:(p.stages_done||0)+' / '+(p.stages_total||0), health:p.health||'В норме',
   dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, tg_linked_at:p.tg_linked_at||null, tg_chat_title:p.tg_chat_title||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]), leads:Array.isArray(p.leads)?p.leads:(typeof p.leads==='string'?(function(){try{return JSON.parse(p.leads)||[];}catch(_){return [];}})():[]) });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
@@ -32000,14 +32142,17 @@ window.tFreezeTrials = async () => {
 
 window.tLoadKB = async () => {
   if (!SB) return;
-  const { data } = await SB.from('kb_materials').select('*');
+  // постранично и в стабильном порядке: индексы материалов используются в разметке
+  const data = await window._sbPageAll(() => SB.from('kb_materials').select('*').order('created_at',{ascending:false}).order('id',{ascending:false}));
+  const _visKB=(typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const _visIds=new Set(_visKB.map(p=>String(kbKeyOf(p))));
   const map = {};
   (data||[]).forEach(r => { const k = String(r.project_id==null?'':r.project_id);      // ключ — id проекта, а не имя: проекты-тёзки больше не сливают материалы
-    if (!k) return;
-    (map[k] = map[k]||{}); (map[k][r.category] = map[k][r.category]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', at:r.created_at||'', _id:r.id }); });
+    if (!k || !_visIds.has(k)) return;                                                 // материалы проектов вне зоны доступа сотрудника не грузим вовсе
+    const cat = (r.category && String(r.category).trim()) || 'Прочее';
+    (map[k] = map[k]||{}); (map[k][cat] = map[k][cat]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', at:r.created_at||'', _id:r.id }); });
   if (typeof KB_DATA !== 'undefined'){ Object.keys(KB_DATA).forEach(k => delete KB_DATA[k]); Object.assign(KB_DATA, map); }
   if (typeof KB_PROJECTS !== 'undefined'){ KB_PROJECTS.length = 0;
-    const _visKB=(typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
     _visKB.forEach(p => KB_PROJECTS.push({ key:kbKeyOf(p), name:p.name, logo:p.logo||((p.name&&p.name[0])||'?').toUpperCase(), st:p.status||'active' })); }
   try { if (typeof kbProj !== 'undefined' && KB_PROJECTS[0] && !KB_PROJECTS.some(p => String(p.key)===String(kbProj))) kbProj = KB_PROJECTS[0].key; } catch(e){}
 };
@@ -32029,42 +32174,54 @@ function tAgo(iso){
   return Math.floor(s/86400)+' дн назад';
 }
 const DL_MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-function dlBucket(due, status){
-  if (status === 'done') return 'done';
-  if (!due) return 'future';
+/* Единая классификация срока для всех экранов: модуль «Дедлайны», карточка проекта, канбан.
+   Терминальные статусы — не только done: архивный и закрытый этап тоже не может быть просрочен.
+   Просрочка считается по МОМЕНТУ дедлайна: срок «сегодня 10:00» в 18:00 — уже просрочен. */
+const DL_TERMINAL_ST = { done:1, archived:1, closed:1, cancelled:1 };
+function dlBucket(due, status, dueTime){
+  if (status && DL_TERMINAL_ST[String(status)]) return 'done';
+  if (!due) return 'none';
   const today = new Date(); today.setHours(0,0,0,0);
-  const d = new Date(due+'T00:00:00');
+  const d = new Date(String(due).slice(0,10)+'T00:00:00');
+  if (isNaN(d.getTime())) return 'none';
+  const hm = (dueTime && /^\d{1,2}:\d{2}/.test(String(dueTime))) ? String(dueTime).slice(0,5) : '23:59';
+  const at = new Date(String(due).slice(0,10)+'T'+hm+':59').getTime();
+  if (!isNaN(at) && at < Date.now()) return 'overdue';
   const diff = Math.round((d - today)/86400000);
   if (diff < 0)  return 'overdue';
   if (diff === 0) return 'today';
   if (diff <= 7) return 'week';
   return 'future';
 }
+window.dlBucket = dlBucket;
 window.tLoadDeadlines = async () => {
   if (!SB) return;
+  const PG=window._sbPageAll;                                       // без пагинации часть дедлайнов молча исчезала
   const [st, tk, hist] = await Promise.all([
-    SB.from('project_stages').select('id,name,status,due_date,due_time,project_id, projects(name,logo,logo_url,status)').not('due_date','is',null),
-    SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,project_id, projects(name,logo,logo_url,status)').not('due_date','is',null),
+    PG(()=>SB.from('project_stages').select('id,name,status,due_date,due_time,project_id, projects(name,logo,logo_url,status)').not('due_date','is',null).order('id')),
+    PG(()=>SB.from('project_tasks').select('id,title,status,due_date,due_time,assignee_id,project_id, projects(name,logo,logo_url,status)').not('due_date','is',null).order('id')),
     SB.from('stage_history').select('stage_name,old_status,new_status,created_at,changed_by,project_id, projects(name)').order('created_at',{ascending:false}).limit(60)
   ]);
   const _push = (label, status, due, projObj, id, type, assignee, dueTime, doneAt, pid, spent) => {
-    const d = due ? new Date(due+'T00:00:00') : null;
+    const _ds = due ? String(due).slice(0,10) : '';
+    const d = _ds ? new Date(_ds+'T00:00:00') : null;
+    const ok = !!(d && !isNaN(d.getTime()));
     DEADLINES.push({ stage:label, project:(projObj&&projObj.name)||'—',
       plogo:(projObj&&(projObj.logo||((projObj.name||'?')[0])))||'?', plogoUrl:(projObj&&projObj.logo_url)||'',
-      day: d? d.getDate():'—', mon: d? DL_MON[d.getMonth()]:'', dueTime: _dTime(dueTime),
-      due: due, bucket: dlBucket(due, status), status, type, _id:id, pid:pid||null, assignee: assignee||null, done_at: doneAt||null, spent: spent||0 });
+      day: ok? d.getDate():'—', mon: ok? DL_MON[d.getMonth()]:'', dueTime: _dTime(dueTime),
+      due: ok?_ds:'', bucket: dlBucket(ok?_ds:'', status, dueTime), status, type, _id:id, pid:pid||null, assignee: assignee||null, done_at: doneAt||null, spent: spent||0 });
   };
   if (typeof DEADLINES !== 'undefined'){
     DEADLINES.length = 0;
     // мягкая догрузка даты завершения (если колонок ещё нет — задачи/этапы всё равно грузятся)
     let _stDone = {}, _tkDone = {};
-    try { const sd = await SB.from('project_stages').select('id,completed_at'); if(!sd.error && sd.data) sd.data.forEach(r=>{ if(r.completed_at) _stDone[r.id]=r.completed_at; }); } catch(_){}
-    try { const td = await SB.from('project_tasks').select('id,completed_at'); if(!td.error && td.data) td.data.forEach(r=>{ if(r.completed_at) _tkDone[r.id]=r.completed_at; }); } catch(_){}
+    try { const sd = await PG(()=>SB.from('project_stages').select('id,completed_at').not('completed_at','is',null).order('id')); (sd||[]).forEach(r=>{ if(r.completed_at) _stDone[r.id]=r.completed_at; }); } catch(_){}
+    try { const td = await PG(()=>SB.from('project_tasks').select('id,completed_at').not('completed_at','is',null).order('id')); (td||[]).forEach(r=>{ if(r.completed_at) _tkDone[r.id]=r.completed_at; }); } catch(_){}
     let _tkSpent={}, _stSpent={};
-    try { const _tsp = await SB.from('project_tasks').select('id,stage_id,time_spent,timer_started,status'); if(!_tsp.error && _tsp.data) _tsp.data.forEach(r=>{ let sec=(r.time_spent||0); if(r.timer_started && r.status==='active') sec+=Math.max(0,Math.round((Date.now()-new Date(r.timer_started).getTime())/1000)); _tkSpent[r.id]=sec; if(r.stage_id) _stSpent[r.stage_id]=(_stSpent[r.stage_id]||0)+sec; }); } catch(_){}
+    try { const _tsp = await PG(()=>SB.from('project_tasks').select('id,stage_id,time_spent,timer_started,status').order('id')); (_tsp||[]).forEach(r=>{ let sec=(r.time_spent||0); if(r.timer_started && r.status==='active') sec+=Math.max(0,Math.round((Date.now()-new Date(r.timer_started).getTime())/1000)); _tkSpent[r.id]=sec; if(r.stage_id) _stSpent[r.stage_id]=(_stSpent[r.stage_id]||0)+sec; }); } catch(_){}
     const _liveP = r => !(r && r.projects && AG_ARCHIVED_ST[String(r.projects.status||'')]);   // дедлайны завершённых проектов не нужны
-    (st.data||[]).filter(_liveP).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id], r.project_id, _stSpent[r.id]||0));
-    (tk.data||[]).filter(_liveP).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, _tkDone[r.id], r.project_id, _tkSpent[r.id]||0));
+    (st||[]).filter(_liveP).forEach(r => _push(r.name, r.status, r.due_date, r.projects, r.id, 'stage', null, r.due_time, _stDone[r.id], r.project_id, _stSpent[r.id]||0));
+    (tk||[]).filter(_liveP).forEach(r => _push(r.title, r.status, r.due_date, r.projects, r.id, 'task', r.assignee_id, r.due_time, _tkDone[r.id], r.project_id, _tkSpent[r.id]||0));
   }
   if (typeof DL_ACT !== 'undefined'){
     DL_ACT.length = 0;
@@ -32704,36 +32861,52 @@ window.tLoadProjectAggregates = async () => {
   if (!SB) return;
   const today=new Date(); today.setHours(0,0,0,0);
   const wk=new Date(Date.now()-7*86400000).toISOString();
+  /* Все выборки постранично: PostgREST режет ответ на 1000 строк, а без этого
+     проекты за отсечкой молча получают нулевой прогресс и «в графике» вместо просрочек. */
+  const PG=window._sbPageAll;
   const [st,tk,hs,pm,pc]=await Promise.all([
-    SB.from('project_stages').select('project_id,status,due_date'),
-    SB.from('project_tasks').select('project_id,status,due_date,assignee_id'),
-    SB.from('stage_history').select('project_id,changed_by,new_status,created_at'),
-    SB.from('project_members').select('project_id,member_id'),
-    SB.from('project_contracts').select('project_id,start_date,end_date') ]);
-  const _pm={}; ((pm&&pm.data)||[]).forEach(r=>{ (_pm[r.project_id]=_pm[r.project_id]||[]).push(r.member_id); });
-  const _pc={}; ((pc&&pc.data)||[]).forEach(r=>{ _pc[r.project_id]={start:r.start_date, end:r.end_date}; });
+    PG(()=>SB.from('project_stages').select('project_id,status,due_date,due_time').order('id')),
+    PG(()=>SB.from('project_tasks').select('project_id,status,due_date,due_time,assignee_id').order('id')),
+    PG(()=>SB.from('stage_history').select('project_id,changed_by,new_status,created_at').order('created_at')),
+    PG(()=>SB.from('project_members').select('project_id,member_id').order('project_id')),
+    PG(()=>SB.from('project_contracts').select('project_id,start_date,end_date').order('project_id')) ]);
+  const _pm={}; (pm||[]).forEach(r=>{ (_pm[r.project_id]=_pm[r.project_id]||[]).push(r.member_id); });
+  const _pc={}; (pc||[]).forEach(r=>{ _pc[r.project_id]={start:r.start_date, end:r.end_date}; });
   let _closed={}, _lastArch={};
-  try{ const [_cl,_cy]=await Promise.all([ SB.from('projects').select('id,closed_at'), SB.from('project_cycles').select('project_id,archived_at') ]);
-    ((_cl&&_cl.data)||[]).forEach(r=>{ _closed[r.id]=r.closed_at||null; });
-    ((_cy&&_cy.data)||[]).forEach(r=>{ if(!r.archived_at)return; const cur=_lastArch[r.project_id]; if(!cur||Date.parse(r.archived_at)>Date.parse(cur)) _lastArch[r.project_id]=r.archived_at; });
+  try{ const [_cl,_cy]=await Promise.all([
+      PG(()=>SB.from('projects').select('id,closed_at').order('id')),
+      PG(()=>SB.from('project_cycles').select('project_id,archived_at').order('project_id')) ]);
+    (_cl||[]).forEach(r=>{ _closed[r.id]=r.closed_at||null; });
+    (_cy||[]).forEach(r=>{ if(!r.archived_at)return; const cur=_lastArch[r.project_id]; if(!cur||Date.parse(r.archived_at)>Date.parse(cur)) _lastArch[r.project_id]=r.archived_at; });
   }catch(_e){ console.warn('life agg',_e); }
   const agg={};
-  const A=pid=>(agg[pid]||(agg[pid]={over:false,next:null,overN:0,overAll:0,wait:0,active:0,done:0,tDone:0,tTotal:0,by:{},asg:{}}));
-  const add=(pid,status,due,stage)=>{ if(!pid)return; const a=A(pid);
-    if(status!=='done'&&due){ const d=new Date(due+'T00:00:00'); if(d<today){ a.over=true; a.overAll++; if(stage) a.overN++; } if(!a.next||due<a.next) a.next=due; } };
-  (st.data||[]).forEach(r=>{ const a=A(r.project_id); if(r.status==='done')a.done++; else if(r.status==='active')a.active++; else a.wait++; add(r.project_id,r.status,r.due_date,true); });
-  (tk.data||[]).forEach(r=>{ const a=A(r.project_id); a.tTotal++; if(r.status==='done')a.tDone++; add(r.project_id,r.status,r.due_date,false); if(r.assignee_id){ a.asg[r.assignee_id]=(a.asg[r.assignee_id]||0)+1; } });
+  const NOW=Date.now();
+  const A=pid=>(agg[pid]||(agg[pid]={over:false,next:null,overStages:0,overTasks:0,overAll:0,wait:0,active:0,done:0,tDone:0,tTotal:0,by:{},asg:{}}));
+  /* Просрочка считается по моменту дедлайна, а не по дате: этап со сроком «сегодня 10:00»
+     в 18:00 уже просрочен. Без времени берём конец дня — так же, как в сводке on-time. */
+  const add=(pid,status,due,stage,dueTime)=>{ if(!pid)return; const a=A(pid);
+    if(status!=='done'&&due){
+      const hm=(dueTime&&/^\d{1,2}:\d{2}/.test(String(dueTime)))?String(dueTime).slice(0,5):'23:59';
+      const d=new Date(due+'T'+hm+':59');
+      if(!isNaN(d.getTime()) && d.getTime()<NOW){ a.over=true; a.overAll++; if(stage) a.overStages++; else a.overTasks++; }
+      if(!a.next||due<a.next) a.next=due; } };
+  (st||[]).forEach(r=>{ const a=A(r.project_id); if(r.status==='done')a.done++; else if(r.status==='active')a.active++; else a.wait++; add(r.project_id,r.status,r.due_date,true,r.due_time); });
+  (tk||[]).forEach(r=>{ const a=A(r.project_id); a.tTotal++; if(r.status==='done')a.tDone++; add(r.project_id,r.status,r.due_date,false,r.due_time); if(r.assignee_id){ a.asg[r.assignee_id]=(a.asg[r.assignee_id]||0)+1; } });
   const wkMs=Date.parse(wk), done7={};
-  (hs.data||[]).forEach(r=>{ if(r.new_status==='done' && Date.parse(r.created_at)>=wkMs) done7[r.project_id]=(done7[r.project_id]||0)+1;
+  (hs||[]).forEach(r=>{ if(r.new_status==='done' && Date.parse(r.created_at)>=wkMs) done7[r.project_id]=(done7[r.project_id]||0)+1;
     if(r.changed_by && r.project_id){ const a=A(r.project_id); a.by[r.changed_by]=(a.by[r.changed_by]||0)+1; } });
   const top=t=>{ let b=null,m=0; for(const k in t){ if(t[k]>m){m=t[k];b=k;} } return b; };
   const mem=id=>{ const x=(typeof TEAM!=='undefined'?TEAM:[]).find(y=>y._id===id); return x?{name:x.name||'—',color:x.color||'var(--accent)',avatar:x.avatar||null}:null; };
   (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{
-    const a=agg[p.id]||{over:false,next:null,overN:0,overAll:0,wait:0,active:0,done:0,tDone:0,tTotal:0,by:{},asg:{}}, d7=done7[p.id]||0;
-    p._nextDue=a.next; p._overdue=a.over; p._overdueN=a.overN||0; p._overdueAll=a.overAll||0;
+    const a=agg[p.id]||{over:false,next:null,overStages:0,overTasks:0,overAll:0,wait:0,active:0,done:0,tDone:0,tTotal:0,by:{},asg:{}}, d7=done7[p.id]||0;
+    p._nextDue=a.next; p._overdue=a.over;
+    p._overdueStages=a.overStages||0; p._overdueTasks=a.overTasks||0;
+    p._overdueN=a.overStages||0; p._overdueAll=a.overAll||0;
     p._pipeline={wait:a.wait,active:a.active,done:a.done,total:a.wait+a.active+a.done};
     p._taskAgg={done:a.tDone||0,total:a.tTotal||0};
-    { const _tot=a.wait+a.active+a.done; if(_tot>0){ p.pct=Math.round(100*a.done/_tot); p.stages=a.done+' / '+_tot; } }
+    /* Без этапов прогресс — ноль, а не «сколько было в прошлый раз»: иначе карточка
+       показывает «100%» рядом с «0 из 0 готово» после удаления или архивации этапов. */
+    { const _tot=a.wait+a.active+a.done; p.pct=_tot>0?Math.round(100*a.done/_tot):0; p.stages=a.done+' / '+_tot; }
     p._dyn = d7>0?('↑ '+d7+' / 7д'):'— 0 / 7д';
     p._health = p.status==='done'?'Завершён':(a.over?'Риск':'В норме');
     p._healthCls = (p.status!=='done'&&a.over)?'risk':'ok';
@@ -32741,6 +32914,8 @@ window.tLoadProjectAggregates = async () => {
     p._team=(_pm[p.id]||[]).map(mid=>{ const m=mem(mid); return m?{name:m.name,color:m.color,avatar:m.avatar,_id:mid}:null; }).filter(Boolean);
     p._contract=_pc[p.id]||null; p._closedAt=_closed[p.id]||null; p._lastArch=_lastArch[p.id]||null;
   });
+  window._aggLoaded=1;                       // до этого момента зона доступа сотрудника ещё не построена
+  try{ if(typeof paintProjList==='function' && document.getElementById('pj-list')) paintProjList(); }catch(_e){}
 };
 
 /* ===== OVERVIEW · live aggregation (real metrics, no mock) ===== */
@@ -32753,16 +32928,17 @@ window.tLoadOverview = async () => {
   const isoMon = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
   const MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-  const [sr, tr, hr, thr, pmr, pjr] = await Promise.all([
-    SB.from('project_stages').select('id,project_id,name,status,due_date,due_time'),
-    SB.from('project_tasks').select('id,project_id,status,due_date,due_time'),
-    SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at'),
+  const PG=window._sbPageAll;
+  const [sr, tr, hr, thr, pmr, pjr] = await Promise.all([          // постранично: иначе сводка считается по первой тысяче строк
+    PG(()=>SB.from('project_stages').select('id,project_id,name,status,due_date,due_time').order('id')),
+    PG(()=>SB.from('project_tasks').select('id,project_id,status,due_date,due_time').order('id')),
+    PG(()=>SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at').order('created_at')),
     SB.from('task_history').select('task_id,project_id,old_status,new_status,created_at'),  // может ещё не существовать
-    SB.from('project_members').select('project_id,member_id'),
-    SB.from('projects').select('id,status')
+    PG(()=>SB.from('project_members').select('project_id,member_id').order('project_id')),
+    PG(()=>SB.from('projects').select('id,status').order('id'))
   ]);
   /* архив (завершённые проекты) не должен попадать в агрегаты: просрочка, velocity, откаты, on-time */
-  const _arch = new Set(); ((pjr&&pjr.data)||[]).forEach(r => { if(AG_ARCHIVED_ST[String(r.status||'')]) _arch.add(r.id); });
+  const _arch = new Set(); (pjr||[]).forEach(r => { if(AG_ARCHIVED_ST[String(r.status||'')]) _arch.add(r.id); });
   const _live = x => !_arch.has(x.project_id);
   /* scope сотрудника строим из project_members НАПРЯМУЮ: agVisibleProjectIds() читает p._team,
      который заполняет параллельный загрузчик — при гонке scope оказывался пустым и вся сводка обнулялась */
@@ -32770,12 +32946,12 @@ window.tLoadOverview = async () => {
   if (typeof agProjectAccessMode==='function' && agProjectAccessMode()!=='all'){
     const _me=(window.tMe&&window.tMe())||{}, _mid=String(_me.id||_me._id||'');
     _vis = new Set();
-    ((pmr&&pmr.data)||[]).forEach(r => { if(String(r.member_id)===_mid && r.project_id) _vis.add(r.project_id); });
+    (pmr||[]).forEach(r => { if(String(r.member_id)===_mid && r.project_id) _vis.add(r.project_id); });
     const _s2 = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
     if(_s2) _s2.forEach(id => _vis.add(id));
   }
   const _pf = (arr) => (arr||[]).filter(x => !_vis || _vis.has(x.project_id));         // отсекает записи по невидимым проектам
-  const stages = _pf(sr.data), tasks = _pf(tr.data), hist = _pf(hr.data);
+  const stages = _pf(sr), tasks = _pf(tr), hist = _pf(hr);
   const taskHistoryExists = !!(thr && !thr.error);                 // создана ли таблица журнала задач
   const taskHist = (taskHistoryExists && thr.data) ? _pf(thr.data) : [];
   const rank = { wait:0, hold:0, active:1, review:2, done:3 };     // полный алфавит: без review/hold откаты считались мимо кассы
@@ -32912,26 +33088,26 @@ window.tLoadCycles = async () => {
   const _pageAll = window._sbPageAll;
   const [histAll, sr, tasksAll, pmr, pjr] = await Promise.all([
     _pageAll(() => SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true})),
-    SB.from('project_stages').select('id,name,project_id'),
+    _pageAll(() => SB.from('project_stages').select('id,name,project_id').order('id')),
     _pageAll(() => SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at,completed_at').order('created_at',{ascending:true})),
-    SB.from('project_members').select('project_id,member_id'),
-    SB.from('projects').select('id,status')
+    _pageAll(() => SB.from('project_members').select('project_id,member_id').order('project_id')),
+    _pageAll(() => SB.from('projects').select('id,status').order('id'))
   ]);
   /* завершённые проекты в аналитику циклов не идут — метрики должны описывать живой портфель */
-  const _archCy = new Set(); ((pjr&&pjr.data)||[]).forEach(r => { if(AG_ARCHIVED_ST[String(r.status||'')]) _archCy.add(r.id); });
+  const _archCy = new Set(); (pjr||[]).forEach(r => { if(AG_ARCHIVED_ST[String(r.status||'')]) _archCy.add(r.id); });
   /* scope сотрудника — из project_members напрямую, без зависимости от параллельного загрузчика */
   let _visCy = null;
   if (typeof agProjectAccessMode==='function' && agProjectAccessMode()!=='all'){
     const _me=(window.tMe&&window.tMe())||{}, _mid=String(_me.id||_me._id||'');
     _visCy = new Set();
-    ((pmr&&pmr.data)||[]).forEach(r => { if(String(r.member_id)===_mid && r.project_id) _visCy.add(r.project_id); });
+    (pmr||[]).forEach(r => { if(String(r.member_id)===_mid && r.project_id) _visCy.add(r.project_id); });
     const _s2 = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
     if(_s2) _s2.forEach(id => _visCy.add(id));
   }
   const _okCy = pid => !_archCy.has(pid) && (!_visCy || _visCy.has(pid));
   const hist = histAll.filter(h => _okCy(h.project_id));
   const tr = { data: tasksAll.filter(t => _okCy(t.project_id)) };
-  if (sr.data) sr.data = sr.data.filter(x => _okCy(x.project_id));   // чужие и архивные этапы не должны утекать на график
+  const sr2 = { data: (sr||[]).filter(x => _okCy(x.project_id)) };   // чужие и архивные этапы не должны утекать на график
   const nameById={}, mrrById={}, logoById={};
   const _visPrjSrc = (typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p.status!=='done');
   _visPrjSrc.forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; logoById[p.id]={url:p.logoUrl||'', letter:(p.logo||(p.name?p.name[0]:'?'))}; });
@@ -33070,15 +33246,15 @@ window.tLoadCycles = async () => {
   // Бенчмарк по клиентам (проектам): средний/медианный цикл завершённого этапа.
   const byClient={};
   instances.forEach(it=>{ const b=byClient[it.pid]||(byClient[it.pid]={leads:[],rework:0,n:0}); b.leads.push(it.leadMs); if(it.returns>0) b.rework++; b.n++; });
-  const clients=Object.keys(byClient).map(pid=>{ const b=byClient[pid]; const lg=logoById[pid]||{url:'',letter:'?'}; return {client:nameById[pid]||'—',logoUrl:lg.url,logo:lg.letter,n:b.n,medianMs:median(b.leads),avgMs:mean(b.leads),reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null}; }).sort((a,b)=>(b.medianMs||0)-(a.medianMs||0));
+  const clients=Object.keys(byClient).map(pid=>{ const b=byClient[pid]; const lg=logoById[pid]||{url:'',letter:'?'}; return {pid:pid,client:nameById[pid]||'—',logoUrl:lg.url,logo:lg.letter,n:b.n,medianMs:median(b.leads),avgMs:mean(b.leads),reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null}; }).sort((a,b)=>(b.medianMs||0)-(a.medianMs||0));
 
   // Полный конвейер для графика: все этапы (даже без замера) — как в DTR: ось заполнена, узкое место слева, неизмеренные нули справа.
   const bnName=bottleneck?bottleneck.name:null;
-  const allNames=[...new Set([...(sr.data||[]).map(r=>r.name).filter(Boolean), ...stageRows.map(r=>r.name)])];
+  const allNames=[...new Set([...(sr2.data||[]).map(r=>r.name).filter(Boolean), ...stageRows.map(r=>r.name)])];
   const chartStages=allNames.map(nm=>{ const st=nameStat[nm]; return st?{name:nm,p50Ms:st.p50Ms,p90Ms:st.p90Ms,n:st.n,bn:nm===bnName,unmeasured:false}:{name:nm,p50Ms:0,p90Ms:null,n:0,bn:false,unmeasured:true}; }).sort((a,b)=>(b.p50Ms||0)-(a.p50Ms||0));
 
   // ——— аналитика времени на утверждении (review) ———
-  const _stNm={}; (sr.data||[]).forEach(st=>{ if(st&&st.id!=null) _stNm[st.id]=st.name; });
+  const _stNm={}; (sr2.data||[]).forEach(st=>{ if(st&&st.id!=null) _stNm[st.id]=st.name; });
   const _revEl=(t)=>{ let v=t.review_spent||0; if(t.review_started && t.status==='review') v+=Math.max(0,Math.round((now-new Date(t.review_started).getTime())/1000)); return v; };   // без проверки статуса счётчик у закрытой задачи рос вечно
   const _rtasks=(tr.data||[]);
   /* дата СОБЫТИЯ, а не создания задачи: фильтр «за 7 дней» должен смотреть на согласование/закрытие */
@@ -37605,18 +37781,24 @@ window.tMemberRestore = async (id, name) => {
     renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
 };
+/* supabase-js не бросает на отказ PostgREST/RLS — он возвращает {error}. Без явной проверки
+   пользователь видел зелёный тост «Материал добавлен», а строка в базу не попадала. */
 window.tKbAdd = async (cat, title, ty, url) => {
   try { const proj=(typeof kbCurProj==='function')?kbCurProj():null;
-    if (!proj || !proj.id){ toast('Сначала выбери проект'); return; }
-    await SB.from('kb_materials').insert({ agency_id: ME&&ME.agency_id, project_id: proj.id, category:cat, title, kind:ty, url:url||null });
+    if (!proj || !proj.id){ toast('Сначала выбери проект'); return false; }
+    const { error } = await SB.from('kb_materials').insert({ agency_id: ME&&ME.agency_id, project_id: proj.id, category:cat, title, kind:ty, url:url||null });
+    if (error){ toast('Не удалось добавить: ' + (error.message||error)); return false; }
     if (typeof kbAutoInvalidate==='function') kbAutoInvalidate(proj.id);
-    toast('Материал добавлен'); await window.tLoadKB(); renderKB();
-  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+    toast('Материал добавлен'); await window.tLoadKB(); renderKB(); return true;
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); return false; }
 };
 window.tKbDel = async (id) => {
-  try { if (!id) return; await SB.from('kb_materials').delete().eq('id', id);
-    toast('Материал удалён'); await window.tLoadKB(); renderKB();
-  } catch(e){ toast('Ошибка: ' + (e.message||e)); }
+  try { if (!id) return false;
+    const { data, error } = await SB.from('kb_materials').delete().eq('id', id).select('id');
+    if (error){ toast('Не удалось удалить: ' + (error.message||error)); return false; }
+    if (!data || !data.length){ toast('Материал не найден или нет прав на удаление'); await window.tLoadKB(); renderKB(); return false; }
+    toast('Материал удалён'); await window.tLoadKB(); renderKB(); return true;
+  } catch(e){ toast('Ошибка: ' + (e.message||e)); return false; }
 };
 window.tToolAdd = async (cat, name, ty, url) => {
   try { await SB.from('tools').insert({ agency_id: ME&&ME.agency_id, category:cat, name, kind:ty, url:url||null });
@@ -40277,7 +40459,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.26-client-cabinet';
+window.__BUILD='2026-07-25.27-audit-proj-dl-kb';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
