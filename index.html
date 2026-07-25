@@ -7829,6 +7829,48 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   body.m-app .ntf-day{padding:8px 4px 6px;font-size:10px}
   body.m-app .ntf-h{padding:14px 16px 10px}
 
+  /* ══ КЛИЕНТСКИЙ КАБИНЕТ · мобильная вёрстка ══ */
+  /* полноэкранный режим на телефоне не нужен */
+  #cl-fs-btn{display:none !important}
+  /* счётчики: компактная сетка 2×2 вместо гигантских плиток */
+  #app-cl .kpis{grid-template-columns:1fr 1fr !important;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  #app-cl .kpi{background:var(--bg-1);border:none;border-radius:0;padding:12px 14px 11px;min-height:0;box-shadow:none}
+  #app-cl .kpi .l{font-size:8.5px;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #app-cl .kpi .v{font-size:21px;margin-top:6px;font-weight:700}
+  #app-cl .kpi .sub{font-size:10.5px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:none;padding:0}
+  #app-cl .kpi .kfoot{font-size:10px;margin-top:3px;padding-top:0;border-top:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* производственный цикл: горизонтальная лента этапов */
+  #app-cl .cl-nodes{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;padding:16px 2px 10px;gap:0}
+  #app-cl .cl-nodes::-webkit-scrollbar{display:none}
+  #app-cl .cl-nodes>*{flex:none}
+  /* Отчёты + Активность: одна колонка, компактные карточки */
+  #app-cl .row2{grid-template-columns:1fr !important;gap:12px}
+  #app-cl .act-row{padding:10px 12px;gap:10px;align-items:flex-start}
+  #app-cl .act-ic{width:32px !important;height:32px !important;border-radius:9px}
+  #app-cl .act-ic svg{width:15px;height:15px}
+  #app-cl .act-row>div{min-width:0}
+  #app-cl .act-txt{font-size:12.5px;line-height:1.35}
+  #app-cl .act-tag{font-size:10.5px}
+  #app-cl .act-t{position:static;font-size:10px;white-space:nowrap;flex:none;margin-left:auto;padding-left:8px}
+  #app-cl .cl-rep-row{padding:10px 12px}
+  /* карточка отчёта на вкладке «Отчёты» */
+  #app-cl .crep-h{padding:12px 12px;gap:10px;flex-wrap:wrap}
+  #app-cl .crep-ic{width:34px;height:34px;border-radius:9px}
+  #app-cl .crep-ic svg{width:16px;height:16px}
+  #app-cl .crep-t{font-size:13.5px}
+  #app-cl .crep-meta{font-size:10.5px;margin-top:2px}
+  #app-cl .rep-metrics{gap:1px}
+  #app-cl .rep-metrics .rm{padding:9px 10px}
+  #app-cl .rep-metrics .rm-l{font-size:8.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #app-cl .rep-metrics .rm-v{font-size:16px;margin-top:3px}
+  /* бриф-форма (Google Forms-стиль) на телефоне */
+  .m-bfc{margin-top:4px}
+  .m-bfc .bfc-formhead{padding:18px 16px 16px;border-radius:14px;margin-bottom:12px}
+  .m-bfc .bfc-formtitle{font-size:19px}
+  .m-bfc .bfc-formdesc{font-size:13px;margin-top:6px}
+  .m-bfc .bxfield{padding:12px !important;border-radius:12px}
+  .m-bfc textarea,.m-bfc input{font-size:16px !important}
+
   /* модалки: сохранение всегда видно — таб-бар прячется под открытым окном */
   body:has(.ov.on) #m-tabbar,body:has(.ov[style*="flex"]) #m-tabbar,body:has(.kpi3-scrim) #m-tabbar,body:has(.smm-mov) #m-tabbar,body:has(.ntf-panel.on) #m-tabbar{display:none !important}
   .ov .modal{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
@@ -39434,22 +39476,28 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
       primary=AG_TABS.filter(function(m){ return byM[m]; });
       withMore=false;
     }else{
-      var pref=items[0].hasAttribute('data-cm')?PREF.cm:PREF.m;
+      var isClient=items[0].hasAttribute('data-cm');
+      var pref=isClient?PREF.cm:PREF.m;
       primary=pref.filter(function(m){ return byM[m]; });
       items.forEach(function(i){ var m=keyOf(i); if(primary.length<4&&primary.indexOf(m)<0) primary.push(m); });
       primary=primary.slice(0,4);
-      withMore=true;
+      withMore=!isClient;
     }
     var html='';
     primary.forEach(function(m){
       html+='<button type="button" class="m-tab" data-m="'+m+'">'+iconOf(byM[m])+'<span>'+labelOf(byM[m])+'</span></button>';
     });
+    /* клиентский кабинет: пятая вкладка — Бриф (форма как Google Forms) */
+    if(shell.id==='app-cl') html+='<button type="button" class="m-tab" data-m="__brief"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg><span>Бриф</span></button>';
     if(withMore) html+='<button type="button" class="m-tab m-tab-more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span>Ещё</span></button>';
     tabbar.innerHTML=html;
     tabbar.querySelectorAll('.m-tab[data-m]').forEach(function(b){
       b.addEventListener('click',function(){
         var shell2=shellEl(); if(!shell2) return;
-        var it=findItem(shell2,b.getAttribute('data-m'));
+        var m=b.getAttribute('data-m');
+        if(m==='__brief'){ mClBriefOpen(); mMoreToggle(false); return; }
+        window.__mClBrief=false;
+        var it=findItem(shell2,m);
         if(it) it.click();
         mMoreToggle(false);
         setTimeout(sync,0);
@@ -39529,6 +39577,7 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
     if((shell.id||'app')!==builtFor){ build(); return; }
     var active=null;
     navItems(shell).forEach(function(i){ if(i.classList.contains('on')) active=keyOf(i); });
+    if(window.__mClBrief&&shell.id==='app-cl') active='__brief';
     if(agApp){
       mHeadUpdate();
       /* в приложении живут только 5 модулей — всё остальное уводим в Проекты */
@@ -39573,8 +39622,9 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
     ['agNav','clNav'].forEach(function(fn){
       var o=window[fn];
       if(typeof o==='function') window[fn]=function(){
-        /* смена модуля закрывает открытую шторку фильтров */
+        /* смена модуля закрывает открытую шторку фильтров и выходит из брифа */
         if(window._tbAdvOpen&&window._tbAdvSet) window._tbAdvSet(false);
+        window.__mClBrief=false;
         var r=o.apply(this,arguments);
         /* мягкий переход экрана в мобильном приложении */
         if(document.body.classList.contains('m-app')){
@@ -39724,7 +39774,32 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
         return o.apply(this,arguments);
       };
     });
+    /* клиентский кабинет: отчёты на телефоне не открываются */
+    var oR=window.openReport;
+    if(typeof oR==='function') window.openReport=function(){
+      if(window.innerWidth<=MQ&&document.querySelector('#app-cl.on')){
+        if(typeof window.toast==='function') toast('Для просмотра отчёта зайдите с компьютера или ноутбука');
+        return;
+      }
+      return oR.apply(this,arguments);
+    };
   })();
+
+  /* ── клиентский модуль «Бриф»: форма как Google Forms, только на телефоне ── */
+  window.mClBriefOpen=function(){
+    var c=document.getElementById('content-cl'); if(!c) return;
+    window.__mClBrief=true;
+    var pid=window.CLP&&(window.CLP.id||window.CLP.project_id);
+    var inner='';
+    try{
+      if(typeof briefClientFormHTML==='function'&&pid) inner=briefClientFormHTML(pid,false);
+    }catch(e){ inner=''; }
+    if(!inner) inner='<div class="modph" style="margin-top:8px"><h3>Бриф пока не заполнен</h3><p>Агентство ещё не опубликовало бриф по вашему проекту.</p></div>';
+    c.innerHTML='<div class="ph"><div><div class="eyebrow">Проект</div><h1>Бриф</h1></div></div><div class="m-bfc">'+inner+'</div>';
+    document.querySelectorAll('#app-cl .nav-i').forEach(function(i){ i.classList.remove('on'); });
+    window.scrollTo(0,0);
+    setTimeout(sync,0);
+  };
 
   /* клавиатура открыта → таб-бар прячем */
   document.addEventListener('focusin',function(e){
