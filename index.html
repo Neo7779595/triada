@@ -8543,6 +8543,7 @@ body.m-lock{overflow:hidden}
         <div class="nav-i" data-m="team" data-tt="Команда" onclick="agNav('team')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0112 0"/><path d="M16 5.5a3 3 0 010 5.8M21 20a6 6 0 00-4-5.6"/></svg><span class="lbl">Команда</span></div>
         <div class="nav-i" data-m="kb" data-tt="База знаний" onclick="agNav('kb')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg><span class="lbl">База знаний</span></div>
         <div class="nav-i" data-m="tools" data-tt="Инструменты" onclick="agNav('tools')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg><span class="lbl">Инструменты</span></div>
+        <div class="nav-i" data-m="integrations" data-tt="Интеграции" onclick="agNav('integrations')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg><span class="lbl">Интеграции</span></div>
       </div>
     </nav>
     <div class="metrics-rail">
@@ -9586,7 +9587,7 @@ let PROJECTS = [
 ];
 let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all',agCplx='all';
 let PROJECT_TAGS={category:[],service:[],tariff:[],dept:[],rubric:[]};
-const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',calendar:'Расписание',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты',kpi:'KPI',leaderboard:'Лидерборд'};
+const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',calendar:'Расписание',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты',kpi:'KPI',leaderboard:'Лидерборд',integrations:'Интеграции'};
 
 function enterAgency(){
   document.getElementById('page-login').classList.add('hidden');
@@ -9606,6 +9607,7 @@ function agCanView(m){
   if(!me || me.role!=='member' || me.is_director) return true;          // владелец/админ/директор видят всё
   const p=me.permissions||{};
   if(m==='calendar' && !p.calendar) return true;                        // миграция: у старых сотрудников без ключа calendar — доступ по-прежнему есть
+  if(m==='integrations') return false;                                  // подключение внешних сервисов — только владелец агентства
   return !!(p[m]&&p[m].view);
 }
 function agCanEdit(m){
@@ -11882,7 +11884,7 @@ function agNav(m){if(typeof _closePops==='function')_closePops();
   document.getElementById('ag-tb').innerHTML='Агентство<b>'+AG_MODULES[m]+'</b>';
   { const _tgb=document.getElementById('ag-tg-btn'); if(_tgb) _tgb.style.display=(m==='team'&&agIsOwner())?'':'none'; }
   _agSetTopBtn(m);
-  if(m==='projects') renderProjects(); else if(m==='deadlines') renderDeadlines(); else if(m==='calendar') renderSchedule(); else if(m==='overview') renderOverview(); else if(m==='cycles') renderCycles(); else if(m==='finance') renderFinance(); else if(m==='team') renderTeam(); else if(m==='kpi') renderKPI(); else if(m==='leaderboard') renderLeaderboard(); else if(m==='kb') renderKB(); else if(m==='tools') renderTools(); else renderModule(m);
+  if(m==='projects') renderProjects(); else if(m==='deadlines') renderDeadlines(); else if(m==='calendar') renderSchedule(); else if(m==='overview') renderOverview(); else if(m==='cycles') renderCycles(); else if(m==='finance') renderFinance(); else if(m==='team') renderTeam(); else if(m==='kpi') renderKPI(); else if(m==='leaderboard') renderLeaderboard(); else if(m==='kb') renderKB(); else if(m==='tools') renderTools(); else if(m==='integrations') renderIntegrations(); else renderModule(m);
   /* агрегаты Сводки/Циклов/Финансов грузятся фоном — если модуль открыли раньше, дотягиваем и перерисовываем */
   if(window.tEnsureAggregates && (m==='overview'||m==='cycles'||m==='kpi'||m==='finance')){
     window.tEnsureAggregates(m).then(function(did){
@@ -27118,6 +27120,178 @@ function _toolsPaint(){
   });
   document.querySelectorAll('#tools-filt .tf').forEach(b=>{ b.classList.toggle('on', b.dataset.f===TOOL_FILT); });
 }
+/* ═══════════════ ИНТЕГРАЦИИ ═══════════════
+   Подключение внешних сервисов на уровне агентства. Токены живут только
+   в edge-функциях и в таблице google_accounts, куда браузеру ходу нет:
+   интерфейс читает представление google_status, где секретов нет вовсе. */
+const GI = { google:null, loading:false, projects:[], busy:'' };
+
+async function _giFetch(fn, params, body){
+  if(!(window.LIVE && window.SB)) throw new Error('Интеграции работают только в онлайн-режиме');
+  const { data:{ session } } = await SB.auth.getSession();
+  if(!session) throw new Error('Сессия истекла — войдите заново');
+  const url = SUPA_URL + '/functions/v1/' + fn + '?' + new URLSearchParams(params||{}).toString();
+  const r = await fetch(url, {
+    method:'POST',
+    headers:{ 'Authorization':'Bearer '+session.access_token, 'apikey':SUPA_KEY, 'Content-Type':'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let j=null; try{ j=await r.json(); }catch(_){ j={ error:'bad_response' }; }
+  return { status:r.status, data:j };
+}
+
+async function renderIntegrations(){
+  const el=document.getElementById('content-ag'); if(!el) return;
+  if(!agIsOwner()){ el.innerHTML='<div style="padding:40px;text-align:center;opacity:.6">Раздел доступен владельцу агентства.</div>'; return; }
+
+  el.innerHTML=`<div style="padding:clamp(14px,2vw,26px) 0">
+    <div style="max-width:860px">
+      <div style="font-size:clamp(19px,2vw,25px);font-weight:650;letter-spacing:-.02em">Интеграции</div>
+      <div style="opacity:.6;font-size:13.5px;margin-top:6px;line-height:1.6">Подключите внешние сервисы один раз — дальше кнопки появятся внутри проектов, отчётов и контент-плана.</div>
+      <div id="gi-google" style="margin-top:22px"><div style="opacity:.5;font-size:13px;padding:20px 0">Проверяю подключение…</div></div>
+    </div></div>`;
+
+  await giLoad();
+}
+
+async function giLoad(){
+  GI.loading=true;
+  try{
+    if(window.LIVE && window.SB){
+      const { data } = await SB.from('google_status').select('*').limit(1);
+      GI.google=(data&&data[0])||null;
+    }
+  }catch(_){ GI.google=null; }
+  GI.loading=false;
+  giPaint();
+}
+
+function giPaint(){
+  const box=document.getElementById('gi-google'); if(!box) return;
+  const g=GI.google;
+  const card=(inner,tone)=>`<div style="border:1px solid ${tone||'var(--line)'};border-radius:var(--r);background:var(--panel);padding:20px 22px">${inner}</div>`;
+  const logo=`<div style="width:38px;height:38px;border-radius:10px;background:#fff;display:grid;place-items:center;flex:none;font-weight:700;font-size:17px;font-family:var(--mono);color:#1a73e8">G</div>`;
+
+  if(!g){
+    box.innerHTML=card(`
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        ${logo}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:620;font-size:15px">Google Workspace</div>
+          <div style="opacity:.6;font-size:13px;margin-top:5px;line-height:1.6">Календарь со сроками проектов, документы из шаблонов, папки и отчёты. Подключается один раз на всё агентство — сотрудникам и клиентам ничего подключать не нужно.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+            <button class="btn-add" onclick="giConnect()" id="gi-connect">Подключить Google</button>
+          </div>
+          <div style="opacity:.45;font-size:12px;margin-top:12px;line-height:1.6">Запрашиваем минимум: календари, созданные самой системой, и файлы, которые она создала или которые вы выбрали. Доступа ко всему вашему Диску у неё нет.</div>
+        </div>
+      </div>`);
+    return;
+  }
+
+  const broken=g.status!=='active';
+  const sync=g.last_sync_at?('последняя синхронизация '+_giWhen(g.last_sync_at)):'синхронизации ещё не было';
+  box.innerHTML=card(`
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      ${logo}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="font-weight:620;font-size:15px">Google Workspace</div>
+          <span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;padding:3px 9px;border-radius:99px;background:${broken?'rgba(240,120,92,.13)':'rgba(67,216,140,.13)'};color:${broken?'var(--neg)':'var(--pos)'};border:1px solid ${broken?'rgba(240,120,92,.3)':'rgba(67,216,140,.3)'}">${broken?'нужно переподключить':'подключён'}</span>
+        </div>
+        <div style="opacity:.7;font-size:13px;margin-top:6px">${escH(g.google_email||'аккаунт Google')}</div>
+        <div style="opacity:.45;font-size:12px;margin-top:3px">${escH(sync)}${g.connected_by_name?(' · подключил '+escH(g.connected_by_name)):''}</div>
+        ${broken&&g.last_error?`<div style="margin-top:10px;font-size:12.5px;color:var(--neg);opacity:.9">${escH(g.last_error)}</div>`:''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn-add" onclick="giSyncAll()" id="gi-sync">Синхронизировать календари</button>
+          ${broken?'<button class="btn-ghost" onclick="giConnect()">Переподключить</button>':''}
+          <button class="btn-ghost" onclick="giDisconnect()">Отключить</button>
+        </div>
+        <div id="gi-log" style="margin-top:14px"></div>
+      </div>
+    </div>`, broken?'rgba(240,120,92,.3)':'var(--line)');
+}
+
+function _giWhen(ts){
+  const d=new Date(ts), m=Math.round((Date.now()-d.getTime())/60000);
+  if(m<1) return 'только что';
+  if(m<60) return m+' мин назад';
+  if(m<1440) return Math.round(m/60)+' ч назад';
+  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+}
+
+async function giConnect(){
+  const b=document.getElementById('gi-connect'); if(b){ b.disabled=true; b.textContent='Открываю Google…'; }
+  try{
+    const { status, data } = await _giFetch('google-auth', { action:'start' });
+    if(status===503){ giSetupHint(data&&data.message); return; }
+    if(!data||!data.url) throw new Error((data&&data.message)||'Не удалось получить ссылку на Google');
+    /* Открываем согласие в отдельном окне: так пользователь не теряет рабочий контекст,
+       а после подтверждения окно само сообщит нам об успехе и закроется. */
+    const w=window.open(data.url,'google-oauth','width=520,height=680');
+    if(!w){ location.href=data.url; return; }
+    const onMsg=(e)=>{ if(e.data&&e.data.google){ window.removeEventListener('message',onMsg); setTimeout(giLoad,600); } };
+    window.addEventListener('message',onMsg);
+    const t=setInterval(()=>{ if(w.closed){ clearInterval(t); window.removeEventListener('message',onMsg); giLoad(); } },900);
+  }catch(e){ toast(String(e.message||e)); }
+  finally{ if(b){ b.disabled=false; b.textContent='Подключить Google'; } }
+}
+
+function giSetupHint(msg){
+  const box=document.getElementById('gi-google'); if(!box) return;
+  box.innerHTML=`<div style="border:1px solid rgba(227,181,103,.3);background:rgba(227,181,103,.07);border-radius:var(--r);padding:20px 22px">
+    <div style="font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--warn);margin-bottom:9px">Осталось настроить доступ</div>
+    <div style="font-size:13.5px;line-height:1.65;opacity:.85">${escH(msg||'Интеграция ещё не настроена.')}</div>
+    <div style="font-size:13px;line-height:1.75;opacity:.7;margin-top:12px">
+      Нужно один раз завести проект в Google Cloud Console, включить Calendar API и Google Drive API,
+      создать учётные данные OAuth и прописать их ключи в настройках Supabase.
+      Это администрирование, а не разработка — занимает около десяти минут.
+    </div>
+    <div style="margin-top:14px"><button class="btn-ghost" onclick="giLoad()">Проверить ещё раз</button></div>
+  </div>`;
+}
+
+async function giDisconnect(){
+  if(!confirm('Отключить Google? Созданные календари и файлы останутся на месте, но система перестанет их обновлять.')) return;
+  try{
+    const { data } = await _giFetch('google-auth', { action:'revoke' });
+    toast((data&&data.message)||'Отключено');
+    GI.google=null; giPaint();
+  }catch(e){ toast(String(e.message||e)); }
+}
+
+async function giSyncAll(){
+  const btn=document.getElementById('gi-sync'), log=document.getElementById('gi-log');
+  if(btn){ btn.disabled=true; btn.textContent='Синхронизирую…'; }
+  if(log) log.innerHTML='<div style="opacity:.5;font-size:12.5px">Создаю календари и события…</div>';
+  try{
+    /* Синхронизируем только живые проекты: закрытые не трогаем,
+       чтобы не тратить квоту Google на то, что уже никому не нужно. */
+    const live=(window.PROJECTS||[]).filter(p=>!['done','archived','closed','cancelled'].includes(String(p.status||'')));
+    if(!live.length){ if(log) log.innerHTML='<div style="opacity:.5;font-size:12.5px">Нет активных проектов.</div>'; return; }
+    const rows=[];
+    for(const p of live.slice(0,25)){
+      const { status, data } = await _giFetch('google-cal', { action:'sync_project' }, { project_id:p.id });
+      if(status===503){ giSetupHint(data&&data.message); return; }
+      rows.push({ name:p.name, r:data });
+      if(data && data.ok===false && /отозван|не подключ/i.test(String(data.error||''))){ break; }
+    }
+    if(log) log.innerHTML=rows.map(x=>{
+      const r=x.r||{};
+      if(r.ok===false) return `<div style="font-size:12.5px;margin:4px 0;color:var(--neg)">✗ ${escH(x.name)} — ${escH(r.error||'ошибка')}</div>`;
+      const parts=[]; if(r.created)parts.push('создано '+r.created); if(r.updated)parts.push('обновлено '+r.updated);
+      if(r.removed)parts.push('убрано '+r.removed); if(!parts.length)parts.push('без изменений');
+      return `<div style="font-size:12.5px;margin:4px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="color:var(--pos)">✓</span><span>${escH(x.name)}</span>
+        <span style="opacity:.5">${escH(parts.join(' · '))}</span>
+        ${r.subscribe?`<a href="${escH(r.subscribe)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:12px">открыть календарь →</a>`:''}
+      </div>`;
+    }).join('');
+    giLoad();
+  }catch(e){
+    if(log) log.innerHTML=`<div style="font-size:12.5px;color:var(--neg)">${escH(String(e.message||e))}</div>`;
+  }finally{ if(btn){ btn.disabled=false; btn.textContent='Синхронизировать календари'; } }
+}
+
 function renderTools(){
   const linkIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>';
   const totalItems=TOOLS_DATA.reduce((s,x)=>s+x.items.length,0);
