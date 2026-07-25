@@ -177,7 +177,7 @@ button{font-family:inherit}
 .login-title .t{color:var(--accent);background:linear-gradient(120deg,var(--accent) 20%,#7ff0dd 40%,var(--accent) 60%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 30px rgba(55,230,200,.35);animation:lgShine 6s linear infinite}
 @keyframes lgShine{to{background-position:200% center}}
 .login-sub{color:var(--txt-3);font-size:14px;margin-top:14px;letter-spacing:.01em}
-.login-form{margin-top:30px;display:flex;flex-direction:column;gap:11px;text-align:left}
+.login-form{margin:30px 0 0;padding:0;border:0;display:flex;flex-direction:column;gap:11px;text-align:left}
 .field{position:relative;display:flex;align-items:center}
 .field-ic{position:absolute;left:14px;width:18px;height:18px;color:var(--txt-3);pointer-events:none;transition:color .18s,transform .18s}
 .field input{width:100%;background:rgba(10,13,11,.6);border:1px solid var(--line-2);border-radius:10px;padding:14px 14px 14px 44px;color:var(--txt);font-family:var(--font);font-size:15px;transition:border-color .18s,box-shadow .18s,background .18s}
@@ -7991,11 +7991,11 @@ body.m-lock{overflow:hidden}
       <div class="login-eyebrow">DETROYD SYSTEM GROUP</div>
     <div class="login-title"><span class="lt-a">DETROYD</span><span class="lt-hr"></span><span class="lt-b">SMART SYSTEM</span></div>
     <div class="login-sub">Платформа аналитики нового поколения</div>
-    <div class="login-form">
+    <form class="login-form" onsubmit="event.preventDefault();doLogin();return false;" novalidate>
       <div class="field"><svg class="field-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg><input id="lg-login" type="text" placeholder="Логин" aria-label="Логин" autocomplete="username"></div>
       <div class="field"><svg class="field-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><input id="lg-pass" type="password" placeholder="Пароль" aria-label="Пароль" autocomplete="current-password"></div>
-      <button class="btn btn-primary" id="lg-btn" onclick="doLogin()"><span>Войти</span></button>
-    </div>
+      <button class="btn btn-primary" id="lg-btn" type="submit"><span>Войти</span></button>
+    </form>
     <div class="lg-divider"><span>ещё нет аккаунта?</span></div>
     <button class="btn lg-reg-btn" onclick="_regShowPublicTariffs()" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -27806,7 +27806,7 @@ function renderModule(m){
     </div>`;
 }
 
-document.getElementById('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+/* Enter обрабатывает <form onsubmit> — отдельный слушатель дал бы двойной вызов */
 _initCounters();
 
 
@@ -31157,23 +31157,27 @@ window.ddxScanAll=ddxScanAll; window.ddxClose=ddxClose; window.ddxUpgrade=ddxUpg
 /* Динамический импорт с запасным CDN: при статическом import падение esm.sh
    роняло весь модуль — приложение молча оставалось «не настроенным». */
 let createClient = null;
-for (const _src of ['./vendor/supabase-js-2.110.8.min.js',                       /* свой бандл: не зависит от сторонних CDN */
-                    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
-                    'https://esm.sh/@supabase/supabase-js@2']) {
-  try { const _m = await import(/* @vite-ignore */ _src); if (_m && _m.createClient){ createClient = _m.createClient; break; } }
-  catch(_e){ console.warn('supabase cdn failed:', _src, _e && _e.message); }
-}
-if (!createClient) {
-  window.__SB_FAIL = true;
-  try { window.dispatchEvent(new Event('sb-failed')); } catch(_e){}
-  throw new Error('Supabase SDK не загрузился ни с одного CDN');
+{
+  const _srcs = ['./vendor/supabase-js-2.110.8.min.js',                          /* свой бандл: не зависит от сторонних CDN */
+                 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+                 'https://esm.sh/@supabase/supabase-js@2'];
+  const _tried = [];
+  for (const _src of _srcs) {
+    try { const _m = await import(/* @vite-ignore */ _src); if (_m && _m.createClient){ createClient = _m.createClient; break; } }
+    catch(_e){ _tried.push(_src + ' — ' + ((_e && _e.message) || _e)); }          /* тихо: пока есть запасной источник, это не ошибка */
+  }
+  if (!createClient) {
+    window.__SB_FAIL = true;
+    console.error('Supabase SDK не загрузился ни из одного источника:\n' + _tried.join('\n'));
+    try { window.dispatchEvent(new Event('sb-failed')); } catch(_e){}
+  }
 }
 
 /* ===== TRIADA · live Supabase layer (live-only, real-time) ===== */
 const SUPA_URL = 'https://frotqycnpnrsgncdylbq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyb3RxeWNucG5yc2duY2R5bGJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDk1OTAsImV4cCI6MjA5NzAyNTU5MH0.CALL01cDTr7yv8d0a1TwqXKBwIkrPHE06CzfuIM_nkU';   // публичный ключ — безопасен (защита через RLS)
 
-const configured = SUPA_KEY && SUPA_KEY.indexOf('__') !== 0;
+const configured = !!createClient && SUPA_KEY && SUPA_KEY.indexOf('__') !== 0;
 const SB = configured ? createClient(SUPA_URL, SUPA_KEY) : null;
 window.SB = SB; window.LIVE = !!SB;
 
@@ -39575,7 +39579,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.05-sb-selfhost';
+window.__BUILD='2026-07-25.06-no-errors';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
