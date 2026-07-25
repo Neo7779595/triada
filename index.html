@@ -8710,6 +8710,10 @@ body.m-lock{overflow:hidden}
             </div>
           </div>
         </div>
+        <div class="fld"><label>Рабочая почта Google</label>
+          <input id="e-gmail" placeholder="ivan@gmail.com" autocomplete="off">
+          <div style="opacity:.45;font-size:11.5px;margin-top:5px;line-height:1.5">По этому адресу система сама откроет доступ к папкам и календарям проектов, где человек в команде. Логин в системе для этого не годится — это не адрес Google.</div>
+        </div>
       </div>
       <div class="emp-sec">
         <div class="emp-sec-h">Права доступа</div>
@@ -25317,7 +25321,7 @@ function openEmp(){
   empProjectScope='assigned'; empProjectIds=new Set();                  // новый сотрудник по умолчанию видит только проекты, где он назначен участником
   empColor=ACCENTS[0]; empPM=false; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=false; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.remove('on'); } empDirector=false; _dirRefresh();
   document.getElementById('e-sw').innerHTML=ACCENTS.map(c=>`<span class="sw ${c===empColor?'on':''}" style="background:${c}" onclick="pickEmpColor('${c}',this)"></span>`).join('');
-  ['name','role','login','pass','phone','tg'].forEach(id=>document.getElementById('e-'+id).value='');
+  ['name','role','login','pass','phone','tg','gmail'].forEach(id=>{ const _f=document.getElementById('e-'+id); if(_f)_f.value=''; });
   document.getElementById('e-dept-host').innerHTML=tagCombo('e-dept','Команда',_tagList('dept',['Продакшн','Администрация','Руководство'],'Продакшн'),'Продакшн','Выбери или создай','dept');
   document.getElementById('e-email').textContent='ivan@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Новый сотрудник';
@@ -25347,6 +25351,7 @@ function openEmpEdit(i){
   document.getElementById('e-pass').value='';
   document.getElementById('e-phone').value=e.phone||'';
   document.getElementById('e-tg').value=e.tg||e.tg_username||'';
+  { const _g=document.getElementById('e-gmail'); if(_g)_g.value=e.google_email||''; }
   empPM=!!e.is_pm; { const _pm=document.getElementById('e-pm'); if(_pm)_pm.checked=empPM; const _pc=document.getElementById('e-pm-card'); if(_pc)_pc.classList.toggle('on',empPM); } empDirector=!!e.is_director; _dirRefresh();
   document.getElementById('e-email').textContent=(e.login||'user')+'@detroyd.triada.app';
   document.getElementById('emp-title').textContent='Редактировать сотрудника';
@@ -25953,6 +25958,11 @@ function saveEmp(){
   const login=document.getElementById('e-login').value.trim();
   const phone=document.getElementById('e-phone').value.trim();
   const tg=document.getElementById('e-tg').value.trim();
+  const gmail=((document.getElementById('e-gmail')||{}).value||'').trim().toLowerCase();
+  /* Пустое поле — это «доступы не раздаём», и так можно. А вот внутренний логин
+     вместо почты Google молча не сработает: Google такой адрес не примет. */
+  if(gmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(gmail)){ toast('Рабочая почта Google указана с ошибкой'); return; }
+  if(gmail && /\.triada\.app$/.test(gmail)){ toast('Это логин в системе, а не почта Google — нужен настоящий адрес'); return; }
   /* фиксируем scope в permissions.projects.scope — источник истины для клиентской фильтрации.
      Директор всегда 'all' (полный доступ), scope для него игнорируется. */
   if(!empPerms.projects) empPerms.projects={view:true,edit:false};
@@ -25964,13 +25974,13 @@ function saveEmp(){
   if(window.LIVE){ const epass=document.getElementById('e-pass').value;
     if(empEditIdx!=null){
       const _mid=TEAM[empEditIdx]._id;
-      window.tUpdateMember(_mid, _permsSnap, {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM,is_director:empDirector,dept});
+      window.tUpdateMember(_mid, _permsSnap, {phone,tg_username:tg,color:empColor,role_title:role,is_pm:empPM,is_director:empDirector,dept,google_email:gmail});
       if(!empDirector && _effScope==='assigned' && typeof _syncMemberProjects==='function') _syncMemberProjects(_mid, _projIdsSnap);
       closeEmp(); return;
     }
     if(!login){toast('Задай логин сотруднику');return;}
     if(!epass){toast('Задай пароль');return;}
-    window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,is_pm:empPM,is_director:empDirector,permissions:_permsSnap,slug:((window.tMe&&window.tMe())||{}).agencySlug||'', _projectIds:(!empDirector && _effScope==='assigned')?_projIdsSnap:null});
+    window.tProvisionMember({login,pass:epass,full_name:name,role_title:role,dept,color:empColor,phone,tg_username:tg,google_email:gmail,is_pm:empPM,is_director:empDirector,permissions:_permsSnap,slug:((window.tMe&&window.tMe())||{}).agencySlug||'', _projectIds:(!empDirector && _effScope==='assigned')?_projIdsSnap:null});
     closeEmp(); return;
   }
   if(empEditIdx!=null){
@@ -27283,7 +27293,12 @@ async function pdOpenDrive(){
       toast((data && (data.error||data.message)) || 'Не удалось открыть папку проекта');
       return;
     }
-    toast(data.created ? ('Папка проекта готова: создано разделов — ' + data.created) : 'Папка проекта открыта');
+    const bits=[];
+    if(data.created) bits.push('создано разделов ' + data.created);
+    if(data.renamed) bits.push('папка переименована');
+    if(data.granted) bits.push('доступ выдан ' + data.granted);
+    if(data.revoked) bits.push('доступ снят у ' + data.revoked);
+    toast(bits.length ? ('Папка проекта: ' + bits.join(', ')) : 'Папка проекта открыта');
     if(tab) tab.location = data.link; else window.open(data.link, '_blank', 'noopener');
   }catch(e){
     if(tab) tab.close();
@@ -27504,7 +27519,11 @@ async function giDriveAll(){
       if(r.ok===false) return `<div style="font-size:12.5px;margin:4px 0;color:var(--neg)">✗ ${escH(r.project||'проект')} — ${escH(r.error||'ошибка')}</div>`;
       return `<div style="font-size:12.5px;margin:4px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span style="color:var(--pos)">✓</span><span>${escH(r.project||'')}</span>
-        <span style="opacity:.5">${r.created?('создано разделов '+r.created):'папка уже была'}</span>
+        <span style="opacity:.5">${[
+          r.created?('создано разделов '+r.created):'папка на месте',
+          r.granted?('доступ выдан '+r.granted):'',
+          r.revoked?('доступ снят у '+r.revoked):''
+        ].filter(Boolean).join(' · ')}</span>
         ${r.link?`<a href="${escH(r.link)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:12px">открыть папку →</a>`:''}
       </div>`;
     }).join('');
@@ -32326,7 +32345,7 @@ const mapProject = p => ({ id:p.id, name:p.name, logo:p.logo||((p.name||'?')[0]|
   dyn:p.dyn||'— 0 / 7д', status:p.status||'active', note:p.note||'', mrr:p.mrr||0, cost:p.cost||0, createdAt:p.created_at||null, tariff:p.tariff||null, lead_id:p.lead_id||null, agency_id:p.agency_id||null, tg_chat_id:p.tg_chat_id||null, tg_link_code:p.tg_link_code||null, tg_settings:p.tg_settings||null, tg_linked_at:p.tg_linked_at||null, tg_chat_title:p.tg_chat_title||null, contacts:p.contacts||null, cl_hidden:Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[]), leads:Array.isArray(p.leads)?p.leads:(typeof p.leads==='string'?(function(){try{return JSON.parse(p.leads)||[];}catch(_){return [];}})():[]) });
 const mapMember = m => ({ name:m.full_name, role:m.role_title||'Сотрудник', dept:m.dept||'Продакшн',
   color:m.color||'#37E6C8', avatar:m.avatar_url||null, cycle:'—', inwork:'—', d7:'—', d30:'—', rework:0, eff:null,
-  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', is_pm:!!m.is_pm, is_director:!!m.is_director, perms:m.permissions||{}, _seenTs:(m.last_seen_at?Date.parse(m.last_seen_at):0), archived_at:m.archived_at||null, _id:m.id,
+  login:m.login||'', phone:m.phone||'', tg:m.tg_username||'', google_email:m.google_email||'', is_pm:!!m.is_pm, is_director:!!m.is_director, perms:m.permissions||{}, _seenTs:(m.last_seen_at?Date.parse(m.last_seen_at):0), archived_at:m.archived_at||null, _id:m.id,
   /* passport card fields */
   birthday:m.birthday||null, hire_date:m.hire_date||null, created_at:m.created_at||null, tg_user_id:m.tg_user_id||null, tg_link_code:m.tg_link_code||null });
 
@@ -37937,6 +37956,7 @@ window.tProvisionMember = async (m) => {
       email:(m.login||'user')+'@'+(m.slug||'agency')+'.triada.app', password:m.pass, login:m.login,
       full_name:m.full_name, role_title:m.role_title, dept:m.dept, color:m.color, phone:m.phone||null, tg_username:m.tg_username||null, is_pm:!!m.is_pm, is_director:!!m.is_director, permissions:m.permissions }});
     if(m.is_director){ try{ await SB.from('profiles').update({ is_director:true }).eq('login', m.login).eq('agency_id', ME&&ME.agency_id); }catch(_){} }   // подстраховка, если edge-функция не знает поле
+    if(m.google_email){ try{ await SB.from('profiles').update({ google_email:m.google_email }).eq('login', m.login).eq('agency_id', ME&&ME.agency_id); }catch(_){} }   // то же самое: функция создания о поле не знает
     if(Array.isArray(m._projectIds)){                                                        // scope='assigned' → синхронизируем project_members для только что созданного профиля
       try{
         const p=await SB.from('profiles').select('id').eq('login', m.login).eq('agency_id', ME&&ME.agency_id).maybeSingle();
@@ -37989,7 +38009,14 @@ window.tUpdateMember = async (id, perms, contact={}) => {
     if (contact.is_pm!==undefined) upd.is_pm = !!contact.is_pm;
     if (contact.is_director!==undefined) upd.is_director = !!contact.is_director;
     if (contact.dept!==undefined) upd.dept = contact.dept;
-    const { error } = await SB.from('profiles').update(upd).eq('id', id);
+    if (contact.google_email!==undefined) upd.google_email = contact.google_email||null;
+    let { error } = await SB.from('profiles').update(upd).eq('id', id);
+    /* Колонки google_email может ещё не быть в базе — тогда сохраняем всё остальное,
+       а не теряем правки целиком из-за одного нового поля. */
+    if (error && /google_email/.test(error.message||'')) {
+      delete upd.google_email;
+      ({ error } = await SB.from('profiles').update(upd).eq('id', id));
+    }
     if (error) { toast('Не удалось сохранить: ' + error.message); return; }
     toast('Сотрудник обновлён'); await window.tLoadAll(ME.role); teamTab='employees'; renderTeam();
   } catch(e){ toast('Ошибка: ' + (e.message||e)); }
