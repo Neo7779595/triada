@@ -27269,10 +27269,18 @@ async function giSyncAll(){
   if(btn){ btn.disabled=true; btn.textContent='Синхронизирую…'; }
   if(log) log.innerHTML='<div style="opacity:.5;font-size:12.5px">Создаю календари и события…</div>';
   try{
+    /* PROJECTS объявлен через let в обычном скрипте — такие переменные живут
+       в глобальной лексической области и на window НЕ появляются. Берём по имени,
+       а если список ещё не загружен — тянем прямо из базы. */
+    let src = (typeof PROJECTS!=='undefined' && Array.isArray(PROJECTS)) ? PROJECTS : [];
+    if(!src.length && window.SB){
+      const { data } = await SB.from('projects').select('id,name,status').limit(200);
+      src = data||[];
+    }
     /* Синхронизируем только живые проекты: закрытые не трогаем,
        чтобы не тратить квоту Google на то, что уже никому не нужно. */
-    const live=(window.PROJECTS||[]).filter(p=>!['done','archived','closed','cancelled'].includes(String(p.status||'')));
-    if(!live.length){ if(log) log.innerHTML='<div style="opacity:.5;font-size:12.5px">Нет активных проектов.</div>'; return; }
+    const live=src.filter(p=>p&&p.id&&!['done','archived','closed','cancelled'].includes(String(p.status||'')));
+    if(!live.length){ if(log) log.innerHTML='<div style="opacity:.5;font-size:12.5px">Активных проектов не нашлось. Откройте раздел «Проекты» и попробуйте снова.</div>'; return; }
     const rows=[];
     for(const p of live.slice(0,25)){
       const { status, data } = await _giFetch('google-cal', { action:'sync_project' }, { project_id:p.id });
