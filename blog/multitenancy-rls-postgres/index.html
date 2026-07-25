@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A0B0D">
+<title>Мультитенантность на Postgres: как изолировать данные агентств через RLS — DETROYD</title>
+<meta name="description" content="Практика построения SaaS с изоляцией арендаторов на Row Level Security: схема с agency_id, политики, доступ по проектам, типичные дыры и как их закрыть.">
+<meta name="keywords" content="multitenancy postgres, row level security, rls supabase, изоляция арендаторов, saas архитектура, detroyd">
+<link rel="canonical" href="https://detroyd.com/blog/multitenancy-rls-postgres/">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="DETROYD SMART SYSTEM">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://detroyd.com/blog/multitenancy-rls-postgres/">
+<meta property="og:title" content="Мультитенантность на Postgres: как изолировать данные агентств через RLS — DETROYD">
+<meta property="og:description" content="Практика построения SaaS с изоляцией арендаторов на Row Level Security: схема с agency_id, политики, доступ по проектам, типичные дыры и как их закрыть.">
+<meta property="og:image" content="https://detroyd.com/icon-512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Мультитенантность на Postgres: как изолировать данные агентств через RLS — DETROYD">
+<meta name="twitter:description" content="Практика построения SaaS с изоляцией арендаторов на Row Level Security: схема с agency_id, политики, доступ по проектам, типичные дыры и как их закрыть.">
+<meta name="twitter:image" content="https://detroyd.com/icon-512.png">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#0A0B0D;--bg-1:#0F1116;--bg-2:#151920;--line:#1B2027;--line-2:#252C36;
+ --txt:#EAECEF;--txt-2:#9AA1AC;--txt-3:#7A828D;--accent:#37E6C8;--accent-dim:rgba(55,230,200,.1);
+ --accent-line:rgba(55,230,200,.28);--pos:#43D88C;--warn:#E3B567;--neg:#F0785C;
+ --font:'Geist','DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+ --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;--ease:cubic-bezier(.16,1,.3,1)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(900px 520px at 50% -10%,rgba(55,230,200,.07),transparent 60%),var(--bg);
+ color:var(--txt-2);font-family:var(--font);font-size:16.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(55,230,200,.28);transition:.16s}
+a:hover{color:#9df4e5;border-color:#9df4e5}
+.wrap{max-width:800px;margin:0 auto;padding:0 22px}
+header.top{border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;
+ background:rgba(10,11,13,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.top .wrap{max-width:1080px;display:flex;align-items:center;gap:22px;height:62px}
+.brand{display:flex;align-items:baseline;gap:9px;border:0;color:var(--txt);font-weight:600;letter-spacing:.16em;font-size:15px}
+.brand:hover{color:var(--accent)}
+.brand small{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--accent);font-weight:500}
+nav.top-nav{margin-left:auto;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+nav.top-nav a{border:0;color:var(--txt-2);font-size:14px;font-weight:500}
+nav.top-nav a:hover{color:var(--accent)}
+.cta{border:1px solid var(--accent-line)!important;background:var(--accent-dim);color:var(--accent)!important;
+ border-radius:9px;padding:8px 15px;font-size:13.5px;font-weight:600}
+.cta:hover{background:rgba(55,230,200,.16)}
+main{padding:56px 0 40px}
+h1{font-size:clamp(29px,4.4vw,44px);line-height:1.12;letter-spacing:-.022em;color:var(--txt);font-weight:600;margin:0 0 18px}
+h2{font-size:clamp(21px,2.6vw,27px);line-height:1.25;letter-spacing:-.015em;color:var(--txt);font-weight:600;margin:44px 0 14px}
+h3{font-size:18px;color:var(--txt);font-weight:600;margin:28px 0 10px}
+p{margin:0 0 16px}
+.lead{font-size:18.5px;line-height:1.6;color:var(--txt-2);margin-bottom:26px}
+ul,ol{margin:0 0 18px;padding-left:22px}
+li{margin-bottom:9px}
+li::marker{color:var(--accent)}
+strong,b{color:var(--txt);font-weight:600}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg-2);border:1px solid var(--line);
+ border-radius:5px;padding:1.5px 6px;color:#b9f5e8}
+pre{background:var(--bg-1);border:1px solid var(--line);border-radius:12px;padding:15px 17px;overflow-x:auto;margin:0 0 20px}
+pre code{background:none;border:0;padding:0;font-size:13px;line-height:1.6;color:#c7d0da}
+blockquote{margin:0 0 20px;padding:14px 18px;border-left:2px solid var(--accent);
+ background:linear-gradient(90deg,var(--accent-dim),transparent);border-radius:0 10px 10px 0;color:var(--txt-2)}
+blockquote p:last-child{margin:0}
+table{width:100%;border-collapse:collapse;margin:0 0 22px;font-size:15px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--txt-3);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+td strong{color:var(--txt)}
+.meta{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--txt-3);text-transform:uppercase;margin-bottom:16px}
+.tag{display:inline-block;border:1px solid var(--line-2);border-radius:999px;padding:4px 11px;font-size:11.5px;color:var(--txt-3);margin:0 6px 6px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:0 0 26px}
+.card{border:1px solid var(--line);border-radius:14px;padding:17px 18px;background:linear-gradient(180deg,rgba(21,25,32,.7),rgba(15,17,22,.7))}
+.card h3{margin:0 0 7px;font-size:15.5px}
+.card p{margin:0;font-size:14px;color:var(--txt-3);line-height:1.55}
+.post-list{list-style:none;padding:0;margin:0}
+.post-list li{margin:0 0 12px}
+.post-list a{display:block;border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+ background:linear-gradient(180deg,rgba(21,25,32,.6),rgba(15,17,22,.6));color:var(--txt)}
+.post-list a:hover{border-color:var(--accent-line);background:rgba(55,230,200,.05)}
+.post-list .t{display:block;font-size:17px;font-weight:600;color:var(--txt);margin-bottom:6px;line-height:1.35}
+.post-list .d{display:block;font-size:14px;color:var(--txt-3);line-height:1.5}
+.post-list .dt{display:block;font-family:var(--mono);font-size:11px;color:var(--txt-3);margin-top:9px;letter-spacing:.06em}
+.band{border:1px solid var(--accent-line);border-radius:16px;padding:24px 26px;margin:46px 0 10px;
+ background:linear-gradient(140deg,rgba(55,230,200,.09),rgba(55,230,200,.02))}
+.band h2{margin:0 0 8px;font-size:21px}
+.band p{margin:0 0 16px;color:var(--txt-2)}
+.btn{display:inline-flex;align-items:center;gap:9px;background:var(--accent);color:#06140f;border:0;border-radius:10px;
+ padding:12px 20px;font-weight:700;font-size:14.5px;font-family:inherit}
+.btn:hover{filter:brightness(1.07);color:#06140f}
+footer{border-top:1px solid var(--line);margin-top:56px;padding:26px 0 40px;color:var(--txt-3);font-size:13.5px}
+footer .wrap{max-width:1080px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--txt-3);border:0}
+footer a:hover{color:var(--accent)}
+footer .cp{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;margin-left:auto}
+.crumbs{font-size:13px;color:var(--txt-3);margin-bottom:18px}
+.crumbs a{border:0;color:var(--txt-3)}
+.crumbs a:hover{color:var(--accent)}
+@media(max-width:720px){
+ main{padding:34px 0 26px}
+ .top .wrap{height:auto;padding-top:11px;padding-bottom:11px;flex-wrap:wrap;gap:12px}
+ nav.top-nav{gap:14px;width:100%;margin-left:0}
+ footer .cp{margin-left:0;width:100%}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","@id":"https://detroyd.com/blog/multitenancy-rls-postgres/#article","headline":"Мультитенантность на Postgres: как изолировать данные агентств через RLS","description":"Практика построения SaaS с изоляцией арендаторов на Row Level Security: схема с agency_id, политики, доступ по проектам, типичные дыры и как их закрыть.","inLanguage":"ru-RU","datePublished":"2026-07-24","dateModified":"2026-07-24","mainEntityOfPage":{"@type":"WebPage","@id":"https://detroyd.com/blog/multitenancy-rls-postgres/"},"author":{"@type":"Organization","name":"DETROYD SYSTEM GROUP","url":"https://detroyd.com/"},"publisher":{"@type":"Organization","name":"DETROYD SYSTEM GROUP","url":"https://detroyd.com/","logo":{"@type":"ImageObject","url":"https://detroyd.com/icon-512.png"}},"image":"https://detroyd.com/icon-512.png"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Главная","item":"https://detroyd.com/"},{"@type":"ListItem","position":2,"name":"Блог","item":"https://detroyd.com/blog/"},{"@type":"ListItem","position":3,"name":"Мультитенантность на Postgres: как изолировать данные агентств через RLS","item":"https://detroyd.com/blog/multitenancy-rls-postgres/"}]}]}</script></head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/platform/">DETROYD<small>SMART SYSTEM</small></a>
+<nav class="top-nav">
+<a href="/platform/">Платформа</a>
+<a href="/blog/">Блог</a>
+<a class="cta" href="/">Войти · демо</a>
+</nav></div></header>
+<main><div class="wrap">
+<div class="crumbs"><a href="/platform/">Платформа</a> · <a href="/blog/">Блог</a></div><h1>Мультитенантность на Postgres: как изолировать данные агентств через RLS</h1><div class="meta">24.07.2026 · 9 мин · DETROYD SYSTEM GROUP</div>
+<p class="lead">Когда одна база обслуживает сотни агентств, вопрос изоляции данных перестаёт быть архитектурным упражнением. Одна забытая проверка в одном запросе — и клиент видит проекты конкурента. Разбираем подход, при котором изоляция гарантируется базой, а не дисциплиной разработчика.</p>
+
+<h2>Три способа разделить арендаторов</h2>
+<table>
+<thead><tr><th>Подход</th><th>Изоляция</th><th>Цена</th></tr></thead>
+<tbody>
+<tr><td>База на арендатора</td><td>Полная</td><td>Миграции × N, дорогое обслуживание</td></tr>
+<tr><td>Схема на арендатора</td><td>Высокая</td><td>Тысячи схем ломают инструментарий</td></tr>
+<tr><td>Общие таблицы + RLS</td><td>Высокая при верной настройке</td><td>Дисциплина в политиках</td></tr>
+</tbody></table>
+<p>Для SaaS с быстрым выпуском изменений третий вариант выигрывает: одна миграция применяется ко всем, а изоляцию обеспечивает сама СУБД.</p>
+
+<h2>Базовая конструкция</h2>
+<p>Каждая таблица с данными арендатора несёт <code>agency_id</code>. Профиль пользователя связывает учётную запись с агентством:</p>
+<pre><code>create table profiles (
+  id          uuid primary key references auth.users(id),
+  agency_id   uuid not null references agencies(id),
+  role        text not null
+);
+
+create table projects (
+  id          uuid primary key default gen_random_uuid(),
+  agency_id   uuid not null references agencies(id),
+  name        text not null,
+  status      text not null default 'active'
+);
+
+alter table projects enable row level security;</code></pre>
+<p>Ключевая функция — определение агентства текущего пользователя. Её объявляют <code>stable</code>, чтобы планировщик вычислял её один раз на запрос, а не на каждую строку:</p>
+<pre><code>create or replace function current_agency() returns uuid
+language sql stable security definer set search_path = public as $$
+  select agency_id from profiles where id = auth.uid()
+$$;
+
+create policy tenant_read on projects
+  for select using (agency_id = current_agency());</code></pre>
+
+<h2>Три вещи, которые ломают изоляцию</h2>
+<h3>1. Таблица без включённого RLS</h3>
+<p>Забыли <code>enable row level security</code> — таблица открыта всем. Это не гипотетический риск, а самая частая реальная утечка. Лечится не внимательностью, а проверкой в CI: запросом к <code>pg_class</code> находим все таблицы схемы <code>public</code> с <code>relrowsecurity = false</code> и роняем сборку.</p>
+
+<h3>2. Политика есть только на чтение</h3>
+<p><code>for select</code> закрывает чтение, но <code>insert</code>, <code>update</code> и <code>delete</code> остаются без ограничений. Нужны политики на все операции, причём для записи важен <code>with check</code> — иначе пользователь сможет вставить строку с чужим <code>agency_id</code> или переписать своей записи владельца.</p>
+<pre><code>create policy tenant_write on projects
+  for all
+  using      (agency_id = current_agency())
+  with check (agency_id = current_agency());</code></pre>
+
+<h3>3. Функции с security definer</h3>
+<p>Такая функция выполняется с правами владельца и обходит RLS. Это нужно (например, чтобы отдать анониму несколько публичных полей настроек), но каждая такая функция обязана сама фильтровать данные и возвращать только явно разрешённый белый список полей. Обязательно указывайте <code>set search_path</code> — иначе вызывающий может подсунуть свою схему и подменить используемые функции.</p>
+
+<h2>Второй уровень: доступ к конкретным проектам</h2>
+<p>Изоляции по агентству мало. Внутри агентства монтажёр не должен видеть финансы, а фрилансер — все проекты. Появляется таблица участников проекта и режимы доступа: владелец видит всё, сотрудник — только назначенные ему проекты.</p>
+<pre><code>create policy project_scope on projects
+  for select using (
+    agency_id = current_agency()
+    and (
+      current_role_is_owner()
+      or exists (select 1 from project_members m
+                 where m.project_id = projects.id and m.user_id = auth.uid())
+    )
+  );</code></pre>
+<p>Здесь появляется неочевидная ловушка на клиенте. Если интерфейс строит список видимых проектов из данных, которые подгружаются параллельно другим запросом, возникает гонка: аналитика успевает посчитаться до того, как приехал состав участников, и показывает пустой экран или, наоборот, лишнее. Правило простое: <strong>зона доступа строится в том же запросе, который считает данные</strong>, а не берётся из общего состояния приложения.</p>
+
+<h2>Производительность</h2>
+<p>Условия политик попадают в каждый запрос, поэтому индексы должны их поддерживать. Практика:</p>
+<ul>
+<li>Составные индексы, начинающиеся с <code>agency_id</code>: <code>(agency_id, created_at desc)</code>, <code>(agency_id, status)</code>.</li>
+<li>Функции в политиках — только <code>stable</code>, иначе вызов на строку.</li>
+<li>Проверяйте <code>explain analyze</code> от имени обычной роли, а не суперпользователя: у суперпользователя RLS не применяется и план будет другим.</li>
+</ul>
+
+<h2>Пагинация: ограничение, о котором забывают</h2>
+<p>PostgREST и подобные слои по умолчанию отдают ограниченное число строк — как правило, тысячу. Аналитика по журналу за полгода легко превышает лимит, и метрика молча считается по обрезанным данным. Ошибки нет, цифра есть, цифра неверная. Забор должен идти постранично через <code>Range</code>, с защитой от бесконечного цикла: если очередная страница начинается с той же строки, что предыдущая, значит прокси срезал заголовок — цикл нужно прервать.</p>
+
+<h2>Что проверять регулярно</h2>
+<ol>
+<li>Все таблицы схемы имеют включённый RLS — автоматической проверкой в CI.</li>
+<li>На каждой таблице есть политики для чтения и для записи, у записи есть <code>with check</code>.</li>
+<li>Каждая <code>security definer</code>-функция фильтрует данные сама и имеет фиксированный <code>search_path</code>.</li>
+<li>Тест изоляции: пользователь агентства A под своим токеном не получает ни одной строки агентства B — по каждой таблице.</li>
+</ol>
+
+<h2>Как это устроено в DETROYD</h2>
+<p>Платформа построена на Postgres с RLS: все данные несут <code>agency_id</code>, доступ ограничен политиками на уровне базы, внутри агентства действует второй уровень — зона доступа по участию в проектах. Публичные данные (например, ссылки на странице входа) отдаются анониму через отдельную функцию с белым списком полей, сами настройки платформы при этом остаются закрытыми. Аналитические выборки забираются постранично, чтобы метрики не считались по обрезанным данным.</p>
+<div class="band"><h2>Так это и работает в DETROYD</h2><p>Платформа управления креативным агентством: проекты и этапы, дедлайны, циклы, финансы, KPI и клиентский кабинет. Демо открывается без регистрации.</p><a class="btn" href="/">Открыть демо →</a></div>
+</div></main>
+<footer><div class="wrap">
+<a href="/platform/">О платформе</a><a href="/blog/">Блог</a>
+<a href="/">Вход и демо</a><a href="https://t.me/detroyd_system" rel="nofollow">Telegram</a>
+<span class="cp">© 2026 DETROYD SYSTEM GROUP</span>
+</div></footer>
+</body></html>

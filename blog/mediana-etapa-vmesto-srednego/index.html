@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A0B0D">
+<title>Медиана этапа вместо среднего: как измерить реальную скорость агентства — DETROYD</title>
+<meta name="description" content="Почему среднее время этапа врёт, как считать p50 и p90 по журналу статусов, как находить узкое место продакшена и отделять простой от работы.">
+<meta name="keywords" content="медиана этапа, cycle time агентства, узкое место продакшена, p50 p90, метрики креативного агентства, detroyd">
+<link rel="canonical" href="https://detroyd.com/blog/mediana-etapa-vmesto-srednego/">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="DETROYD SMART SYSTEM">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://detroyd.com/blog/mediana-etapa-vmesto-srednego/">
+<meta property="og:title" content="Медиана этапа вместо среднего: как измерить реальную скорость агентства — DETROYD">
+<meta property="og:description" content="Почему среднее время этапа врёт, как считать p50 и p90 по журналу статусов, как находить узкое место продакшена и отделять простой от работы.">
+<meta property="og:image" content="https://detroyd.com/icon-512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Медиана этапа вместо среднего: как измерить реальную скорость агентства — DETROYD">
+<meta name="twitter:description" content="Почему среднее время этапа врёт, как считать p50 и p90 по журналу статусов, как находить узкое место продакшена и отделять простой от работы.">
+<meta name="twitter:image" content="https://detroyd.com/icon-512.png">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#0A0B0D;--bg-1:#0F1116;--bg-2:#151920;--line:#1B2027;--line-2:#252C36;
+ --txt:#EAECEF;--txt-2:#9AA1AC;--txt-3:#7A828D;--accent:#37E6C8;--accent-dim:rgba(55,230,200,.1);
+ --accent-line:rgba(55,230,200,.28);--pos:#43D88C;--warn:#E3B567;--neg:#F0785C;
+ --font:'Geist','DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+ --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;--ease:cubic-bezier(.16,1,.3,1)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:radial-gradient(900px 520px at 50% -10%,rgba(55,230,200,.07),transparent 60%),var(--bg);
+ color:var(--txt-2);font-family:var(--font);font-size:16.5px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(55,230,200,.28);transition:.16s}
+a:hover{color:#9df4e5;border-color:#9df4e5}
+.wrap{max-width:800px;margin:0 auto;padding:0 22px}
+header.top{border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;
+ background:rgba(10,11,13,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.top .wrap{max-width:1080px;display:flex;align-items:center;gap:22px;height:62px}
+.brand{display:flex;align-items:baseline;gap:9px;border:0;color:var(--txt);font-weight:600;letter-spacing:.16em;font-size:15px}
+.brand:hover{color:var(--accent)}
+.brand small{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--accent);font-weight:500}
+nav.top-nav{margin-left:auto;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+nav.top-nav a{border:0;color:var(--txt-2);font-size:14px;font-weight:500}
+nav.top-nav a:hover{color:var(--accent)}
+.cta{border:1px solid var(--accent-line)!important;background:var(--accent-dim);color:var(--accent)!important;
+ border-radius:9px;padding:8px 15px;font-size:13.5px;font-weight:600}
+.cta:hover{background:rgba(55,230,200,.16)}
+main{padding:56px 0 40px}
+h1{font-size:clamp(29px,4.4vw,44px);line-height:1.12;letter-spacing:-.022em;color:var(--txt);font-weight:600;margin:0 0 18px}
+h2{font-size:clamp(21px,2.6vw,27px);line-height:1.25;letter-spacing:-.015em;color:var(--txt);font-weight:600;margin:44px 0 14px}
+h3{font-size:18px;color:var(--txt);font-weight:600;margin:28px 0 10px}
+p{margin:0 0 16px}
+.lead{font-size:18.5px;line-height:1.6;color:var(--txt-2);margin-bottom:26px}
+ul,ol{margin:0 0 18px;padding-left:22px}
+li{margin-bottom:9px}
+li::marker{color:var(--accent)}
+strong,b{color:var(--txt);font-weight:600}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg-2);border:1px solid var(--line);
+ border-radius:5px;padding:1.5px 6px;color:#b9f5e8}
+pre{background:var(--bg-1);border:1px solid var(--line);border-radius:12px;padding:15px 17px;overflow-x:auto;margin:0 0 20px}
+pre code{background:none;border:0;padding:0;font-size:13px;line-height:1.6;color:#c7d0da}
+blockquote{margin:0 0 20px;padding:14px 18px;border-left:2px solid var(--accent);
+ background:linear-gradient(90deg,var(--accent-dim),transparent);border-radius:0 10px 10px 0;color:var(--txt-2)}
+blockquote p:last-child{margin:0}
+table{width:100%;border-collapse:collapse;margin:0 0 22px;font-size:15px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--txt-3);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+td strong{color:var(--txt)}
+.meta{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--txt-3);text-transform:uppercase;margin-bottom:16px}
+.tag{display:inline-block;border:1px solid var(--line-2);border-radius:999px;padding:4px 11px;font-size:11.5px;color:var(--txt-3);margin:0 6px 6px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:0 0 26px}
+.card{border:1px solid var(--line);border-radius:14px;padding:17px 18px;background:linear-gradient(180deg,rgba(21,25,32,.7),rgba(15,17,22,.7))}
+.card h3{margin:0 0 7px;font-size:15.5px}
+.card p{margin:0;font-size:14px;color:var(--txt-3);line-height:1.55}
+.post-list{list-style:none;padding:0;margin:0}
+.post-list li{margin:0 0 12px}
+.post-list a{display:block;border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+ background:linear-gradient(180deg,rgba(21,25,32,.6),rgba(15,17,22,.6));color:var(--txt)}
+.post-list a:hover{border-color:var(--accent-line);background:rgba(55,230,200,.05)}
+.post-list .t{display:block;font-size:17px;font-weight:600;color:var(--txt);margin-bottom:6px;line-height:1.35}
+.post-list .d{display:block;font-size:14px;color:var(--txt-3);line-height:1.5}
+.post-list .dt{display:block;font-family:var(--mono);font-size:11px;color:var(--txt-3);margin-top:9px;letter-spacing:.06em}
+.band{border:1px solid var(--accent-line);border-radius:16px;padding:24px 26px;margin:46px 0 10px;
+ background:linear-gradient(140deg,rgba(55,230,200,.09),rgba(55,230,200,.02))}
+.band h2{margin:0 0 8px;font-size:21px}
+.band p{margin:0 0 16px;color:var(--txt-2)}
+.btn{display:inline-flex;align-items:center;gap:9px;background:var(--accent);color:#06140f;border:0;border-radius:10px;
+ padding:12px 20px;font-weight:700;font-size:14.5px;font-family:inherit}
+.btn:hover{filter:brightness(1.07);color:#06140f}
+footer{border-top:1px solid var(--line);margin-top:56px;padding:26px 0 40px;color:var(--txt-3);font-size:13.5px}
+footer .wrap{max-width:1080px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--txt-3);border:0}
+footer a:hover{color:var(--accent)}
+footer .cp{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;margin-left:auto}
+.crumbs{font-size:13px;color:var(--txt-3);margin-bottom:18px}
+.crumbs a{border:0;color:var(--txt-3)}
+.crumbs a:hover{color:var(--accent)}
+@media(max-width:720px){
+ main{padding:34px 0 26px}
+ .top .wrap{height:auto;padding-top:11px;padding-bottom:11px;flex-wrap:wrap;gap:12px}
+ nav.top-nav{gap:14px;width:100%;margin-left:0}
+ footer .cp{margin-left:0;width:100%}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"TechArticle","@id":"https://detroyd.com/blog/mediana-etapa-vmesto-srednego/#article","headline":"Медиана этапа вместо среднего: как измерить реальную скорость агентства","description":"Почему среднее время этапа врёт, как считать p50 и p90 по журналу статусов, как находить узкое место продакшена и отделять простой от работы.","inLanguage":"ru-RU","datePublished":"2026-07-14","dateModified":"2026-07-14","mainEntityOfPage":{"@type":"WebPage","@id":"https://detroyd.com/blog/mediana-etapa-vmesto-srednego/"},"author":{"@type":"Organization","name":"DETROYD SYSTEM GROUP","url":"https://detroyd.com/"},"publisher":{"@type":"Organization","name":"DETROYD SYSTEM GROUP","url":"https://detroyd.com/","logo":{"@type":"ImageObject","url":"https://detroyd.com/icon-512.png"}},"image":"https://detroyd.com/icon-512.png"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Главная","item":"https://detroyd.com/"},{"@type":"ListItem","position":2,"name":"Блог","item":"https://detroyd.com/blog/"},{"@type":"ListItem","position":3,"name":"Медиана этапа вместо среднего: как измерить реальную скорость агентства","item":"https://detroyd.com/blog/mediana-etapa-vmesto-srednego/"}]}]}</script></head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="/platform/">DETROYD<small>SMART SYSTEM</small></a>
+<nav class="top-nav">
+<a href="/platform/">Платформа</a>
+<a href="/blog/">Блог</a>
+<a class="cta" href="/">Войти · демо</a>
+</nav></div></header>
+<main><div class="wrap">
+<div class="crumbs"><a href="/platform/">Платформа</a> · <a href="/blog/">Блог</a></div><h1>Медиана этапа вместо среднего: как измерить реальную скорость агентства</h1><div class="meta">14.07.2026 · 7 мин · DETROYD SYSTEM GROUP</div>
+<p class="lead">Вопрос «сколько у нас занимает съёмка» кажется простым, пока не начнёшь считать. Среднее арифметическое даёт число, которому нельзя верить: один затянувшийся проект поднимает его так, что метрика перестаёт описывать реальность. Разбираем, как измерять длительность этапов честно.</p>
+
+<h2>Почему среднее врёт</h2>
+<p>Длительности этапов в агентстве распределены не нормально, а с длинным правым хвостом. Большинство съёмок укладывается в три-четыре дня, но один проект, где клиент две недели не согласовывал локацию, тянет среднее вверх на несколько дней. Руководитель смотрит на «среднее 9 дней», планирует под эту цифру — и промахивается и по типичному проекту, и по проблемному.</p>
+<p><strong>Медиана (p50)</strong> отвечает на другой вопрос: сколько занимает <em>типичный</em> этап. Половина случаев быстрее, половина медленнее. Один выброс её почти не двигает. Для планирования нужна именно она.</p>
+<p>Но одной медианы мало. <strong>p90</strong> — это граница, в которую укладывается девять случаев из десяти. Разрыв между p50 и p90 показывает предсказуемость: если медиана 3 дня, а p90 — 4 дня, процесс управляемый. Если медиана 3 дня, а p90 — 21 день, у вас не процесс, а лотерея, и обещать клиенту сроки по медиане нельзя.</p>
+
+<h2>Что именно считать: журнал статусов, а не даты в карточке</h2>
+<p>Соблазн — взять дату создания этапа и дату завершения. Так делать нельзя: этап мог месяц лежать в ожидании, пока команда занималась другим проектом. Это не длительность работы, это возраст записи.</p>
+<p>Правильный источник — журнал смен статусов. Каждый переход пишется отдельной строкой:</p>
+<pre><code>stage_history
+  stage_id | old_status | new_status | created_at
+  a1       | null       | wait       | 2026-06-01T09:00
+  a1       | wait       | active     | 2026-06-03T10:20
+  a1       | active     | done       | 2026-06-05T18:40</code></pre>
+<p>Отсюда получаются две принципиально разные метрики:</p>
+<ul>
+<li><strong>Lead time</strong> — от постановки (<code>wait</code>) до сдачи (<code>done</code>). Столько ждёт клиент.</li>
+<li><strong>Active time</strong> — суммарное время в статусе «в работе». Столько этап реально делали.</li>
+</ul>
+<p>Разница между ними — <strong>простой</strong>. Это самая полезная цифра из всех: она показывает, сколько времени этап просто лежал. Если lead time 8 дней, а active — 2, проблема не в скорости монтажёра. Проблема в том, что задача шесть дней ждала своей очереди или согласования.</p>
+
+<h2>Узкое место: сравнивать не длительности, а доли</h2>
+<p>Узкое место — не самый длинный этап, а тот, что съедает наибольшую долю цикла. Этап «Съёмка» может идти четыре дня и быть нормой, а «Согласование» — два дня, но при общем цикле в шесть дней это треть срока, потраченная на переписку.</p>
+<p>Считать так: медиана каждого этапа делится на сумму медиан всех этапов проекта. Полученная доля и есть вклад этапа в срок сдачи. Ускорять имеет смысл тот, у кого доля максимальная — на остальных экономия не отразится на клиентском сроке.</p>
+
+<h2>Переделки: rework rate</h2>
+<p>Отдельная метрика, которую почти никто не считает, — доля возвратов назад. В журнале это переходы, где новый статус «ниже» старого по рангу: из <code>done</code> обратно в <code>active</code>, из <code>review</code> в <code>active</code>.</p>
+<p>Модель рангов:</p>
+<pre><code>wait = 0, hold = 0, active = 1, review = 2, done = 3
+переделка = переход, где rank(new) &lt; rank(old)
+rework % = переделки / все переходы статуса</code></pre>
+<p>Здесь есть ловушка, о которую спотыкаются почти все реализации. При продлении договора система обычно сбрасывает все этапы проекта обратно в ожидание — это одна операция, а не десяток персональных провалов. Если её не распознавать, метрика переделок раздувается и обвиняет людей в том, чего они не делали.</p>
+<blockquote><p>Признак пакетного сброса: три и более этапов одного проекта переведены в <code>wait</code> в пределах одной операции по времени. Такие строки нужно помечать и исключать из персональных возвратов, оставляя в истории проекта.</p></blockquote>
+
+<h2>Открытый WIP: то, что не попадает ни в одну метрику</h2>
+<p>Все расчёты выше опираются на завершённые этапы. Но самое опасное в агентстве — этап, который начали и забыли: его откатили в ожидание, ответственный ушёл в отпуск, клиент замолчал. Он не завершён, поэтому в медиану не попадает, и в отчёте его не видно вообще.</p>
+<p>Ловится это отдельным проходом: берём последний переход по каждому этапу и, если он не <code>done</code>, считаем время с этого момента до сейчас. Если оно превышает медиану этого типа этапа в полтора-два раза — этап завис, и об этом нужно сообщать до того, как дедлайн станет просроченным.</p>
+
+<h2>Что с этим делать на практике</h2>
+<ul>
+<li>Планируйте сроки по медиане, обещайте клиенту — по p90.</li>
+<li>Ускоряйте не самый длинный этап, а тот, у которого наибольшая доля в цикле.</li>
+<li>Сначала уберите простой, потом оптимизируйте работу: шесть дней ожидания дешевле сократить, чем два дня монтажа.</li>
+<li>Считайте выборку. Медиана по трём наблюдениям — это не метрика, а совпадение; помечайте такие этапы как «мало данных» и не принимайте по ним решений.</li>
+</ul>
+
+<h2>Как это устроено в DETROYD</h2>
+<p>В модуле «Циклы» платформа собирает журнал статусов постранично (PostgREST отдаёт максимум тысячу строк за запрос, поэтому забор идёт кусками по 1000 с защитой от дублей), строит по каждому этапу p50, p85 и p90, отдельно показывает активное время и простой, вычисляет долю этапа в цикле и подсвечивает узкое место. Возвраты считаются по полной модели рангов, пакетные сбросы при продлении договора распознаются и не засчитываются людям. Зависшие этапы попадают в отдельный блок с указанием, сколько именно они стоят и по чьей стороне — вашей или клиента.</p>
+<div class="band"><h2>Так это и работает в DETROYD</h2><p>Платформа управления креативным агентством: проекты и этапы, дедлайны, циклы, финансы, KPI и клиентский кабинет. Демо открывается без регистрации.</p><a class="btn" href="/">Открыть демо →</a></div>
+</div></main>
+<footer><div class="wrap">
+<a href="/platform/">О платформе</a><a href="/blog/">Блог</a>
+<a href="/">Вход и демо</a><a href="https://t.me/detroyd_system" rel="nofollow">Telegram</a>
+<span class="cp">© 2026 DETROYD SYSTEM GROUP</span>
+</div></footer>
+</body></html>
