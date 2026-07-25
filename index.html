@@ -4075,10 +4075,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pdl-kpi[onclick]:hover{border-color:var(--line-2);transform:translateY(-2px)}
 .pdl-kpi.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .pdl-filters{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:20px;position:relative;z-index:6}
-.pdl-filters .pdl-search{flex:0 1 260px;min-width:170px;display:flex;align-items:center;gap:8px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px;padding:0 12px;height:38px}
+.pdl-filters .pdl-search{flex:1 1 200px;min-width:150px;max-width:300px;display:flex;align-items:center;gap:8px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px;padding:0 12px;height:38px}
 .pdl-filters .pdl-search svg{position:static;transform:none;flex-shrink:0;width:15px;height:15px;color:var(--txt-3)}
 .pdl-filters .pdl-search input{position:static;border:none;background:transparent;padding:0;height:100%;flex:1;min-width:0;color:var(--txt);font-family:var(--font);font-size:14px;outline:none}
 .pdl-segm .d{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:6px}
+.pdl-filters .pdl-segm button{padding:7px 10px}
+.pdl-segm .sc{margin-left:5px;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--txt-3);line-height:1}
+.pdl-segm button.on .sc{color:var(--accent)}
+.pdl-segm button.zero{opacity:.42}
 .pdl-kpi{background:var(--bg-1);border:1px solid var(--line);border-radius:13px;padding:16px 18px}
 .pdl-kpi .v{font-size:30.9px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
 .pdl-kpi .l{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--txt-3);margin-top:9px;font-weight:600}
@@ -7580,6 +7584,11 @@ body{overscroll-behavior-y:none;touch-action:manipulation}
   .tb-proj .segm{width:100%;display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:6px;padding-bottom:2px}
   .tb-proj .segm::-webkit-scrollbar{display:none}
   .tb-proj .segm button{white-space:nowrap;flex:none;min-height:40px}
+  /* дедлайны проекта: поиск на всю ширину, сегменты — горизонтальной лентой */
+  .pdl-filters .pdl-search{flex:1 1 100%;min-width:0;max-width:none;height:44px}
+  .pdl-filters .pdl-segm{width:100%;display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:4px}
+  .pdl-filters .pdl-segm::-webkit-scrollbar{display:none}
+  .pdl-filters .pdl-segm button{white-space:nowrap;flex:none;min-height:40px}
   /* тач-цели сегментов и чипов ≥40px */
   .card-h .segm button{min-height:40px;white-space:nowrap}
   .sched-seg{height:auto;min-height:42px}
@@ -8574,6 +8583,9 @@ function _cFmt(val,m){
 }
 function animateCounters(root){
   if(!root||window.matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  // \u0414\u0432\u0430 \u0440\u0435\u043D\u0434\u0435\u0440\u0430 \u0432 \u043E\u0434\u043D\u043E\u043C \u043A\u0430\u0434\u0440\u0435: \u0432\u0442\u043E\u0440\u043E\u0439 \u043F\u0440\u043E\u0433\u043E\u043D \u0441\u043D\u0438\u043C\u0430\u043B \u0443\u0436\u0435 \u043E\u0431\u043D\u0443\u043B\u0451\u043D\u043D\u044B\u0439 \u0442\u0435\u043A\u0441\u0442 \u043A\u0430\u043A \u00AB\u0438\u0441\u0445\u043E\u0434\u043D\u044B\u0439\u00BB \u2014 \u0441\u0447\u0451\u0442\u0447\u0438\u043A\u0438 \u043D\u0430\u0432\u0441\u0435\u0433\u0434\u0430 \u0437\u0430\u0441\u0442\u0440\u0435\u0432\u0430\u043B\u0438 \u043D\u0430 0.
+  const GEN=(root.__cntGen=(root.__cntGen||0)+1);
+  if(root.__cntJobs){ try{ root.__cntJobs.forEach(function(j){ j.node.nodeValue=j.orig; }); }catch(_){} root.__cntJobs=null; }
   const rx=/\d[\d\u202F\u00A0 .,]*\d|\d/g;
   const CNT_OK='[data-count],.v,.lbx-cv,.px-ov-v,.cl-track-pct,.pct,.pe-pct,.brk-pct,.pd-pctsm,.dynx-ring-v,.pt-ring-c,.cnt-anim';
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(n){
@@ -8596,11 +8608,14 @@ function animateCounters(root){
     node.nodeValue=segs.map(x=>x.s!=null?x.s:_cFmt(0,x.m)).join('');
   }
   if(!jobs.length) return;
+  root.__cntJobs=jobs;
   const D=850,t0=performance.now();
   (function step(now){
+    if(root.__cntGen!==GEN) return;                       // начался новый прогон — этот молча выходим
     const e=_cEase(Math.min(1,(now-t0)/D)), done=e>=1;
     for(const j of jobs) j.node.nodeValue= done? j.orig : j.segs.map(x=>x.s!=null?x.s:_cFmt(x.m.value*e,x.m)).join('');
-    if(!done) requestAnimationFrame(step);
+    if(done){ if(root.__cntJobs===jobs) root.__cntJobs=null; return; }
+    requestAnimationFrame(step);
   })(t0);
 }
 function _initCounters(){
@@ -13232,6 +13247,7 @@ function openProject(i){
   const _pchk=PROJECTS[i];                                                            // защита от прямого вызова по индексу невидимого проекта (палитра, deep-link)
   if(_pchk && typeof agCanSeeProject==='function' && !agCanSeeProject(_pchk.id)){ toast('Нет доступа к этому проекту'); return; }
   pdIdx=i;pdTabCur='stages';
+  if(typeof pdlResetState==='function') pdlResetState();   // фильтры дедлайнов не переезжают с прошлого проекта
   window._pdLastTab=null; window._pdLastProj=null;   // первая отрисовка модалки — с анимацией входа
   const p=PROJECTS[i]; p._d=p._d||buildDetail(p); window._pdProj=p.id; p._stReloaded=0;   // сбрасываем одноразовый авто-повтор загрузки этапов
   document.getElementById('pd-logo').innerHTML=logoFill(p.logoUrl,p.logo);
@@ -13628,37 +13644,68 @@ function pkProjTotal(){ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PRO
 function pkTickUpdate(){ try{ const p=(typeof PROJECTS!=='undefined'&&pdIdx!=null)?PROJECTS[pdIdx]:null; if(!p||!p._tasks) return; let total=0; p._tasks.forEach(t=>{ const e=_taskElapsed(t); total+=e; const el=document.getElementById('tmr-'+t.id); if(el) el.textContent=pkFmtDur(e); const re=_taskReviewElapsed(t); const rel=document.getElementById('rtmr-'+t.id); if(rel) rel.textContent=pkFmtDur(re); }); document.querySelectorAll('.pk-total-live').forEach(el=>{ el.textContent=pkFmtDur(total); }); }catch(_){} }
 setInterval(pkTickUpdate,1000);
 let PDL_SEG='all', PDL_TYPE='all', PDL_RESP='all', PDL_Q='';
-function pdlSetSeg(v){PDL_SEG=v;if(typeof renderDeadlines==='function')renderDeadlines();}
-function pdlSetType(v){PDL_TYPE=v;if(typeof renderDeadlines==='function')renderDeadlines();}
-function pdlSetResp(v){PDL_RESP=v;if(typeof renderDeadlines==='function')renderDeadlines();}
+// Фильтры вкладки «Дедлайны» живут ВНУТРИ карточки проекта — перерисовывать надо renderPd(),
+// а не модуль агентства renderDeadlines() (он рисует в #content-ag под модалкой — кнопки казались мёртвыми).
+function _pdlRerender(){
+  var ov=document.getElementById('ov-proj');
+  if(ov && ov.classList.contains('on') && typeof pdTabCur!=='undefined' && pdTabCur==='deadlines' && typeof renderPd==='function') renderPd();
+}
+function pdlSetSeg(v){PDL_SEG=v;_pdlRerender();}
+function pdlSetType(v){PDL_TYPE=v;_pdlRerender();}
+function pdlSetResp(v){PDL_RESP=v;_pdlRerender();}
+function pdlReset(){PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';_pdlRerender();}
+function pdlResetState(){PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';}
+function _pdlActive(){ return PDL_SEG!=='all'||PDL_TYPE!=='all'||PDL_RESP!=='all'||!!String(PDL_Q||'').trim(); }
+var _pdlSearchT;
 function pdlSearch(v){
-  PDL_Q=v;
-  var q=(v||'').toLowerCase().trim();
-  // Клиентский фильтр: показать/скрыть .dlx без ререндера — фокус в input не теряется
+  PDL_Q = (v==null?'':String(v));
+  _pdlApplyQ();                                  // мгновенный отклик без ререндера — поле не теряет фокус
+  clearTimeout(_pdlSearchT);
+  _pdlSearchT=setTimeout(function(){             // дебаунс: пересобираем блок, чтобы плитки и счётчики совпали со списком
+    _pdlRerender();
+    var inp=document.getElementById('pdl-q');
+    if(inp){ inp.focus(); var n=inp.value.length; try{ inp.setSelectionRange(n,n); }catch(_){} }
+  },240);
+}
+function _pdlApplyQ(){
+  var root=document.getElementById('pd-body'); if(!root) return;   // только внутри карточки проекта, не трогаем список агентства
+  var q=String(PDL_Q||'').toLowerCase().trim();
   try{
-    var items=document.querySelectorAll('.dlx');
-    items.forEach(function(el){
-      var s=(el.getAttribute('data-search')||'');
-      el.style.display = (!q || s.indexOf(q)>=0) ? '' : 'none';
+    var shown=0, byB={};
+    root.querySelectorAll('.dlx').forEach(function(el){
+      var ok = !q || (el.getAttribute('data-search')||'').indexOf(q)>=0;
+      el.style.display = ok?'':'none';
+      if(ok){ shown++; var b=el.getAttribute('data-b')||''; byB[b]=(byB[b]||0)+1; }
     });
-    // Скрыть пустые секции
-    document.querySelectorAll('.dl-sec').forEach(function(sec){
-      var vis=sec.querySelectorAll('.dlx:not([style*="display: none"])').length;
-      sec.style.display = (vis===0 && q) ? 'none' : '';
+    root.querySelectorAll('.dl-sec').forEach(function(sec){
+      var vis=0; sec.querySelectorAll('.dlx').forEach(function(el){ if(el.style.display!=='none') vis++; });
+      var ct=sec.querySelector('.ct'); if(ct) ct.textContent=vis;
+      sec.style.display = vis?'':'none';
     });
+    if(PDL_SEG==='all'){                          // счётчики на сегментах верны только когда отрисованы все корзины
+      root.querySelectorAll('.pdl-segm button[data-seg]').forEach(function(btn){
+        var k=btn.getAttribute('data-seg'), n=(k==='all')?shown:(byB[k]||0);
+        var c=btn.querySelector('.sc'); if(c) c.textContent=n;
+        btn.classList.toggle('zero', !n && k!=='all');
+      });
+    }
+    var em=root.querySelector('#pdl-empty'); if(em) em.style.display=shown?'none':'';
+    var cl=root.querySelector('.pdl-filters .pk-fclear'); if(cl) cl.style.display=_pdlActive()?'':'none';
   }catch(_){}
 }
-function pdlReset(){PDL_SEG='all';PDL_TYPE='all';PDL_RESP='all';PDL_Q='';if(typeof renderDeadlines==='function')renderDeadlines();}
 function _pdlMatch(it){
   if(PDL_TYPE!=='all' && it.kind!==PDL_TYPE) return false;
   if(PDL_RESP!=='all'){ if(PDL_RESP==='__none'){ if(it.asg) return false; } else if(String(it.asg||'')!==String(PDL_RESP)) return false; }
-  // Поиск теперь клиентский через data-search атрибут — не фильтруем на рендер-этапе
+  var q=String(PDL_Q||'').toLowerCase().trim();
+  if(q && String(it._hay||'').indexOf(q)<0) return false;
   return true;
 }
 function _pdDueBucket(due,status){
-  if(status==='done') return 'done';
+  if(status==='done'||status==='archived'||status==='closed') return 'done';
   if(!due) return 'none';
-  const t=new Date(); t.setHours(0,0,0,0); const d=new Date(due); d.setHours(0,0,0,0);
+  const t=new Date(); t.setHours(0,0,0,0);
+  const d=new Date(String(due)+'T00:00:00'); if(isNaN(d.getTime())) return 'none';   // 'YYYY-MM-DD' без времени парсится как UTC → в минусовых поясах уезжал день
+  d.setHours(0,0,0,0);
   const diff=Math.round((d-t)/86400000);
   if(diff<0) return 'overdue'; if(diff===0) return 'today'; if(diff<=7) return 'week'; return 'future';
 }
@@ -13673,15 +13720,20 @@ function _relDue(due){
 function _pdDeadlinesHTML(p){
   const stMap={}; (p._stages||[]).forEach(s=>{ stMap[s.id]=s.name; });
   const MONS=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
-  const enrich=o=>{ const d=new Date(o.due+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status); o.day=d.getDate(); o.mon=MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; o.done_at=o.done_at||null; return o; };
-  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,dueTime:_dTime(t.due_time),status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||'',done_at:t.completed_at||null}));
-  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,dueTime:_dTime(s.due_time),status:s.status,asg:null,parent:'',done_at:s.completed_at||null}));
+  const enrich=o=>{ const d=new Date(o.due+'T00:00:00'); o.bucket=_pdDueBucket(o.due,o.status); o.day=isNaN(d.getTime())?'—':d.getDate(); o.mon=isNaN(d.getTime())?'':MONS[d.getMonth()]; o.stage=o.title; o.project=o.parent||p.name; o.plogoUrl=p.logoUrl; o.type=o.kind; o.assignee=o.asg; o.done_at=o.done_at||null;
+    o._hay=((o.title||'')+' '+(o.parent||'')+' '+(p.name||'')+' '+((typeof _dlOwner==='function'?(_dlOwner(o).n||''):''))).toLowerCase();
+    return o; };
+  const _tkSec=t=>(typeof _taskElapsed==='function')?_taskElapsed(t):((t&&t.time_spent)||0);
+  const _stSec={}; (p._tasks||[]).forEach(t=>{ if(t&&t.stage_id) _stSec[t.stage_id]=(_stSec[t.stage_id]||0)+_tkSec(t); });   // «Потрачено» у этапа = сумма его задач
+  const tasks=(p._tasks||[]).filter(t=>t.due_date).map(t=>({kind:'task',title:t.title||'Задача',due:t.due_date,dueTime:_dTime(t.due_time),status:t.status,asg:t.assignee_id,parent:stMap[t.stage_id]||'',done_at:t.completed_at||null,spent:_tkSec(t)}));
+  const stages=(p._stages||[]).filter(s=>s.due_date).map(s=>({kind:'stage',title:s.name||'Этап',due:s.due_date,dueTime:_dTime(s.due_time),status:s.status,asg:null,parent:'',done_at:s.completed_at||null,spent:_stSec[s.id]||0}));
   const all=tasks.concat(stages).map(enrich);
   if(!all.length) return '<div class="pk-empty" style="padding:48px 0">У проекта пока нет задач и этапов с дедлайнами.<br><span style="font-size:13.5px;color:var(--txt-3)">Назначь срок задаче или этапу — они появятся здесь.</span></div>';
   const flt=all.filter(_pdlMatch);
-  const B={overdue:[],today:[],week:[],future:[],done:[]};
-  flt.forEach(it=>{ if(B[it.bucket]) B[it.bucket].push(it); });
-  Object.keys(B).forEach(k=>B[k].sort((a,b)=>a.due<b.due?-1:1));
+  const B={overdue:[],today:[],week:[],future:[],done:[],none:[]};
+  flt.forEach(it=>{ (B[it.bucket]||B.none).push(it); });
+  const _byDue=(a,b)=>{ const A=String(a.due||'')+'T'+(a.dueTime||'23:59'), Z=String(b.due||'')+'T'+(b.dueTime||'23:59'); return A<Z?-1:A>Z?1:0; };
+  Object.keys(B).forEach(k=>B[k].sort(k==='done'?((a,b)=>-_byDue(a,b)):_byDue));   // выполненные — свежие сверху
   const over=B.overdue.length, today=B.today.length, weekN=B.week.length, futureN=B.future.length, done=B.done.length, upcoming=weekN+futureN;
   const unassigned=flt.filter(it=>it.type==='task'&&it.bucket!=='done'&&!it.asg).length;
   const insight=_dlInsight(over,today,weekN,futureN,done,unassigned);
@@ -13692,21 +13744,25 @@ function _pdDeadlinesHTML(p){
     <div class="px-ov-cell"><div class="px-ov-l">Выполнено</div><div class="px-ov-v" style="color:var(--pos)">${done}</div><div class="px-ov-ctx">${unassigned?(unassigned+' без ответственного'):'за всё время'}</div></div>
   </div>`;
   // панель фильтров
-  const segs=[['all','Все'],['overdue','Просрочены','var(--neg)'],['today','Сегодня','var(--warn)'],['week','Неделя','var(--accent)'],['future','Будущие'],['done','Завершённые','var(--pos)']];
+  const segs=[['all','Все','',flt.length],['overdue','Просрочены','var(--neg)',over],['today','Сегодня','var(--warn)',today],['week','Неделя','var(--accent)',weekN],['future','Будущие','',futureN],['done','Завершённые','var(--pos)',done]];
   const typeOpts=[['all','Все типы'],['task','Задачи'],['stage','Этапы']];
-  const respOpts=[['all','Все исполнители'],['__none','Не назначен']].concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]));
+  const _tmAll=[].concat((typeof TEAM!=='undefined'?TEAM:[]),(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]));
+  const _asgIds={}; all.forEach(it=>{ if(it.asg) _asgIds[it.asg]=1; });                       // в списке показываем и тех, кого уже нет в активной команде
+  const respOpts=[['all','Все исполнители'],['__none','Не назначен']]
+    .concat((typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]))
+    .concat(_tmAll.filter(m=>_asgIds[m._id]&&(typeof TEAM==='undefined'||!TEAM.some(x=>String(x._id)===String(m._id)))).map(m=>[m._id,m.name+' · в архиве']));
   const _lbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[1]:o[0][1];};
-  const _active=PDL_SEG!=='all'||PDL_TYPE!=='all'||PDL_RESP!=='all'||!!PDL_Q;
+  const _active=_pdlActive();
   const filterBar=`<div class="pdl-filters">
-    <div class="search pdl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pdl-q" placeholder="Поиск по задаче или этапу…" value="${(PDL_Q||'').replace(/"/g,'&quot;')}" oninput="pdlSearch(this.value)" autocomplete="off" spellcheck="false"></div>
-    <div class="segm pdl-segm">${segs.map(([k,l,c])=>`<button class="${k===PDL_SEG?'on':''}" onclick="pdlSetSeg('${k}')">${c?`<span class="d" style="background:${c}"></span>`:''}${l}</button>`).join('')}</div>
-    ${_dd('pdltype','Тип',_lbl(typeOpts,PDL_TYPE),typeOpts,PDL_TYPE,'pdlSetType')}
-    ${_dd('pdlresp','Ответственный',_lbl(respOpts,PDL_RESP),respOpts,PDL_RESP,'pdlSetResp')}
-    ${_active?`<button class="pk-fclear" onclick="pdlReset()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
+    <div class="search pdl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input id="pdl-q" placeholder="Поиск по задаче, этапу, исполнителю…" value="${escH(PDL_Q||'')}" oninput="pdlSearch(this.value)" autocomplete="off" spellcheck="false"></div>
+    <div class="segm pdl-segm">${segs.map(([k,l,c,n])=>`<button type="button" data-seg="${k}" class="${k===PDL_SEG?'on':''}${(!n&&k!=='all')?' zero':''}" onclick="pdlSetSeg('${k}')">${c?`<span class="d" style="background:${c}"></span>`:''}${l}<span class="sc">${n}</span></button>`).join('')}</div>
+    ${_dd('pdltype','Тип',PDL_TYPE==='all'?'Все':_lbl(typeOpts,PDL_TYPE),typeOpts,PDL_TYPE,'pdlSetType')}
+    ${_dd('pdlresp','Ответственный',PDL_RESP==='all'?'Все':_lbl(respOpts,PDL_RESP),respOpts,PDL_RESP,'pdlSetResp')}
+    <button class="pk-fclear" onclick="pdlReset()"${_active?'':' style="display:none"'}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>
   </div>`;
   const order = PDL_SEG==='all' ? ['overdue','today','week','future','done'] : [PDL_SEG];
   const blocks = order.map(k=>{ const b=_dlMeta(k), items=B[k]||[]; if(!items.length) return ''; return `<div class="dl-sec"><div class="dl-group-h"><span class="dl-gdot ${b.c}"></span><span class="dl-glbl">${b.l}</span><span class="ct">${items.length}</span><span class="ln"></span></div>${items.map(_dlRow).join('')}</div>`; }).join('');
-  const list = blocks || '<div class="pk-empty" style="padding:40px 0">Ничего не найдено по выбранным фильтрам.</div>';
+  const list = blocks + `<div class="pk-empty" id="pdl-empty" style="padding:40px 0${blocks?';display:none':''}">Ничего не найдено — измени поиск или сбрось фильтры.</div>`;
   return insight + kpis + filterBar + list;
 }
 function renderPd(){
@@ -22062,7 +22118,7 @@ function setDlGroup(g){agDlGroup=g;renderDeadlines();}
 function setDlResp(v){agDlResp=v;renderDeadlines();}
 function _plural(n,one,few,many){ n=Math.abs(n); const m=n%10,h=n%100; if(m===1&&h!==11)return one; if(m>=2&&m<=4&&(h<10||h>=20))return few; return many; }
 function _dlMeta(b){ return DL_BUCKETS.find(x=>x.k===b)||DL_BUCKETS[3]; }
-function _avInit(name,bg,url,sz,light){ sz=sz||24; const L=((name||'?')[0]||'?').toUpperCase();
+function _avInit(name,bg,url,sz,light){ sz=sz||24; const L=escH(((name||'?')[0]||'?').toUpperCase());
   return `<span class="dl-av" style="width:${sz}px;height:${sz}px;background:${bg||'var(--bg-3)'};color:${light?'var(--txt-2)':'#06140f'};font-size:${Math.round(sz*0.42)}px">${logoFill(url,L)}</span>`; }
 function _dlDist(it){
   if(it.bucket==='done') return {t:'сдан', c:'var(--pos)'};
@@ -22121,7 +22177,7 @@ function _dlDueMs(it){ if(!it.due) return null; var tm=(it.dueTime&&/^\d{1,2}:\d
 function _dlRow(it){
   var _DLMON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
   var o=_dlOwner(it);
-  var L=((it.project||'?')[0]||'?').toUpperCase();
+  var L=escH(((it.project||'?')[0]||'?').toUpperCase());
   var done=it.bucket==='done';
   var IC={
     warn:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
@@ -22156,13 +22212,13 @@ function _dlRow(it){
   var timeFooter = done ? ('<div class="tm">'+CHK+'закрыт</div>') : (it.dueTime?('<div class="tm">'+CLK+it.dueTime+'</div>'):'');
   var owner = o.key==='__none'
     ? '<span class="dlx-resp none"><span class="dlx-rq">?</span><span class="rn">Не назначен</span></span>'
-    : '<span class="dlx-resp">'+_avInit(o.n,o.c,o.avatar,22)+'<span class="rn">'+o.n+'</span></span>';
+    : '<span class="dlx-resp">'+_avInit(o.n,o.c,o.avatar,22)+'<span class="rn">'+escH(o.n)+'</span></span>';
   var sp=_dlSpent(it.spent);
-  var _sh=((it.title||'')+' '+(it.stage||'')+' '+(it.project||'')+' '+(o.n||'')).toLowerCase().replace(/"/g,'');
-  return '<div class="dlx" data-search="'+_sh+'" style="--cc:'+p.cc+';--cbg:'+p.bg+';--cbg2:'+p.bg2+';--cbd:'+p.bd+';--sbg:'+p.bg+';--sbd:'+p.bd+';--sc:'+p.cc+';--shalo:'+p.halo+'">'
-    +'<div class="dlx-date"><div class="d">'+it.day+'</div><div class="mo">'+it.mon+'</div>'+timeFooter+'</div>'
+  var _sh=escH(((it.title||'')+' '+(it.stage||'')+' '+(it.project||'')+' '+(o.n||'')).toLowerCase());
+  return '<div class="dlx" data-b="'+escH(it.bucket||'')+'" data-search="'+_sh+'" style="--cc:'+p.cc+';--cbg:'+p.bg+';--cbg2:'+p.bg2+';--cbd:'+p.bd+';--sbg:'+p.bg+';--sbd:'+p.bd+';--sc:'+p.cc+';--shalo:'+p.halo+'">'
+    +'<div class="dlx-date"><div class="d">'+escH(it.day)+'</div><div class="mo">'+escH(it.mon)+'</div>'+timeFooter+'</div>'
     +'<div class="dlx-lg"><div class="dlx-pav">'+logoFill(it.plogoUrl,L)+'</div><div class="dlx-type '+(it.type==='task'?'task':'stage')+'">'+(it.type==='task'?'задача':'этап')+'</div></div>'
-    +'<div class="dlx-txt"><div class="dlx-pjn">'+it.project+'</div>'+owner+'<div class="dlx-tl">'+it.stage+'</div></div>'
+    +'<div class="dlx-txt"><div class="dlx-pjn">'+escH(it.project)+'</div>'+owner+'<div class="dlx-tl">'+escH(it.stage)+'</div></div>'
     +'<div class="dlx-stat"><div class="dlx-badge"><span class="dlx-dot"><svg viewBox="0 0 24 24">'+ic+'</svg></span><div class="dlx-bt"><div class="l1">'+l1+'</div><div class="l2">'+l2+'</div></div></div><div class="dlx-spent"><i></i>Потрачено <b>'+(sp.has?sp.v:'—')+'</b></div></div>'
   +'</div>';
 }
@@ -22174,20 +22230,24 @@ function _dlByUrgency(FILT){
     return `<div class="dl-sec"><div class="dl-group-h"><span class="dl-gdot ${b.c}"></span><span class="dl-glbl">${b.l}</span><span class="ct">${items.length}</span><span class="ln"></span></div>${items.map(_dlRow).join('')}</div>`;
   }).join('');
 }
+// статус-сегмент (Просрочены/Сегодня/…) в группировках «по проектам» и «по исполнителям» раньше игнорировался
+function _dlSeg(FILT){ return (typeof agDlFilter==='undefined'||agDlFilter==='all')?FILT:FILT.filter(d=>d.bucket===agDlFilter); }
 function _dlByProject(FILT){
+  FILT=_dlSeg(FILT);
   const groups={}, order=[];
   FILT.forEach(it=>{ if(!groups[it.project]){groups[it.project]={items:[],url:it.plogoUrl,logo:it.plogo};order.push(it.project);} groups[it.project].items.push(it); });
   order.sort((a,b)=>{ const ga=groups[a].items,gb=groups[b].items; const oa=ga.filter(x=>x.bucket==='overdue').length,ob=gb.filter(x=>x.bucket==='overdue').length; return ob-oa || gb.length-ga.length; });
   return order.map(nm=>{ const g=groups[nm], its=g.items.slice().sort(_dlSortUrg), c=k=>its.filter(x=>x.bucket===k).length;
     const pr=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(p=>p.name===nm), prog=pr?(pr.pct||0):null;
-    const L=((nm||'?')[0]||'?').toUpperCase();
+    const L=escH(((nm||'?')[0]||'?').toUpperCase());
     return `<div class="dl-sec"><div class="dl-ghead">
       <span class="dl-av" style="width:34px;height:34px;border-radius:9px;background:var(--bg-3);color:var(--txt-2);font-size:15px">${logoFill(g.url,L)}</span>
-      <div><div class="gnm">${nm}</div><div class="gsub">${its.length} ${_plural(its.length,'дедлайн','дедлайна','дедлайнов')}${prog!=null?' · '+prog+'% прогресс проекта':''}</div></div>
+      <div><div class="gnm">${escH(nm)}</div><div class="gsub">${its.length} ${_plural(its.length,'дедлайн','дедлайна','дедлайнов')}${prog!=null?' · '+prog+'% прогресс проекта':''}</div></div>
       <div class="gload">${_loadPills(c)}</div></div>${its.map(_dlRow).join('')}</div>`;
   }).join('');
 }
 function _dlByOwner(FILT){
+  FILT=_dlSeg(FILT);
   const groups={}, order=[];
   FILT.forEach(it=>{ const o=_dlOwner(it), key=o.key; if(!groups[key]){groups[key]={o,items:[]};order.push(key);} groups[key].items.push(it); });
   order.sort((a,b)=>{ if(a==='__none')return 1; if(b==='__none')return -1; const ga=groups[a].items,gb=groups[b].items; const oa=ga.filter(x=>x.bucket==='overdue').length,ob=gb.filter(x=>x.bucket==='overdue').length; return ob-oa || gb.length-ga.length; });
@@ -22195,7 +22255,7 @@ function _dlByOwner(FILT){
     const av = key==='__none' ? `<span class="dl-av" style="width:34px;height:34px;background:var(--bg-3);color:var(--txt-3);font-size:15px;border:1px dashed var(--line-2)">?</span>` : _avInit(o.n,o.c,o.avatar,34);
     const sub = key==='__none' ? 'задачи без ответственного — назначьте исполнителя' : (its.length+' '+_plural(its.length,'дедлайн','дедлайна','дедлайнов')+' в зоне ответственности');
     return `<div class="dl-sec"><div class="dl-ghead">${av}
-      <div><div class="gnm">${o.n}</div><div class="gsub">${sub}</div></div>
+      <div><div class="gnm">${escH(o.n)}</div><div class="gsub">${sub}</div></div>
       <div class="gload">${_loadPills(c)}</div></div>${its.map(_dlRow).join('')}</div>`;
   }).join('');
 }
@@ -39884,7 +39944,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.11-team-lb-kpi';
+window.__BUILD='2026-07-25.12-pd-deadlines-filters';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
