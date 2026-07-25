@@ -27152,20 +27152,36 @@ const GI = { google:null, loading:false, projects:[], busy:'' };
 async function _giFetch(fn, params, body){
   if(!(window.LIVE && window.SB)) throw new Error('Интеграции работают только в онлайн-режиме');
   const { data:{ session } } = await SB.auth.getSession();
-  if(!session) throw new Error('Сессия истекла — войдите заново');
+  if(!session) throw new Error('Сессия истекла — обновите страницу и войдите заново');
   /* SUPA_URL объявлен в модульном блоке и в глобальную область не попадает —
      берём его с window, куда он выставлен рядом с window.SB */
   const base = window.SUPA_URL || (SB && SB.supabaseUrl) || '';
   const key = window.SUPA_KEY || (SB && SB.supabaseKey) || '';
   if(!base) throw new Error('Не найден адрес Supabase — обновите страницу');
   const url = base + '/functions/v1/' + fn + '?' + new URLSearchParams(params||{}).toString();
-  const r = await fetch(url, {
-    method:'POST',
-    headers:{ 'Authorization':'Bearer '+session.access_token, 'apikey':key, 'Content-Type':'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  let j=null; try{ j=await r.json(); }catch(_){ j={ error:'bad_response' }; }
-  return { status:r.status, data:j };
+
+  const call = async (token) => {
+    const r = await fetch(url, {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer '+token, 'apikey':key, 'Content-Type':'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    let j=null; try{ j=await r.json(); }catch(_){ j={ error:'bad_response' }; }
+    return { status:r.status, data:j };
+  };
+
+  let res = await call(session.access_token);
+  /* 401 здесь означает не «нет прав», а «токен больше не действителен»: чаще всего
+     в соседней вкладке вошли под другим сотрудником и прежняя сессия отозвана.
+     Обычные запросы к базе этого не замечают — они проверяют подпись, а не сессию,
+     поэтому интерфейс выглядит рабочим. Пробуем обновить токен и повторяем один раз. */
+  if(res.status===401){
+    let fresh=null;
+    try{ const { data } = await SB.auth.refreshSession(); fresh = data && data.session; }catch(_){ }
+    if(fresh && fresh.access_token && fresh.access_token!==session.access_token) res = await call(fresh.access_token);
+    if(res.status===401) throw new Error('Сессия устарела — обновите страницу и войдите заново');
+  }
+  return res;
 }
 
 async function renderIntegrations(){
