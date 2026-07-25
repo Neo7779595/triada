@@ -4192,6 +4192,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-task .tmr svg{width:12px;height:12px}
 /* kanban */
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.cyc-asg-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+@media(max-width:900px){.cyc-asg-grid{grid-template-columns:1fr}}
 .rev-grid>div{min-width:0}
 .rev-grid>div:first-child{padding-right:26px}
 .rev-grid>div:last-child{padding-left:26px;border-left:1px solid var(--line)}
@@ -22931,14 +22933,6 @@ function renderCycles(){
             </div>
           </div>
           <div>
-            <div class="eyebrow" style="margin-bottom:10px">Кто сколько работал <span class="cyc-cnt">${_workAsgF.length}</span></div>
-            <div class="cyc-scroll" style="margin-bottom:18px">
-            ${_workAsgF.length?_workAsgF.map((a,i)=>`<div class="cyc-row2" style="animation-delay:${Math.min(i,12)*30}ms">
-              ${_cycRankPill(i,'mint')}
-              <div class="cyc-body"><div class="cyc-nm">${escH(a.name)}</div><div class="cyc-meta">${a.count} задач<span class="sep"> · </span>среднее ${_cycDur(a.avg*1000)}</div><div class="cyc-bar mint"><i style="width:${a.share}%"></i></div></div>
-              <div class="cyc-right"><div class="cyc-val mint">${_cycDur(a.total*1000)}</div><div class="cyc-sub">${a.share}%</div></div>
-            </div>`).join(''):'<div class="rev-empty">Ничего не найдено</div>'}
-            </div>
             <div class="eyebrow" style="margin-bottom:10px">Самые трудоёмкие задачи <span class="cyc-cnt">${_workTasksF.length}</span></div>
             <div class="cyc-scroll">
             ${_workTasksF.length?(()=>{const mx=Math.max(1,..._workTasksF.map(t=>t.sec));return _workTasksF.map((t,i)=>`<div class="cyc-row2" style="animation-delay:${Math.min(i,12)*30}ms">
@@ -22952,6 +22946,21 @@ function renderCycles(){
       `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:14px;line-height:1.6">Пока нет задач с отработанным временем.<br>Данные появятся, когда команда начнёт работать над задачами в колонке «В работе».</div>`}
       </div>
     </div>
+
+    ${_workAsgF.length?`<div class="card cyc-card" style="margin-top:16px">
+      <div class="card-h"><div class="t" style="display:flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px -1px var(--accent)"></span>Кто сколько работал <span class="c">распределение рабочего времени по исполнителям${_workFiltered?' · по текущему фильтру':''}</span></div>
+        <div class="m" style="font-size:12.5px;color:var(--txt-3)">${_workAsgF.length} ${_plural(_workAsgF.length,'исполнитель','исполнителя','исполнителей')} · ${_cycDur(_workA.total*1000)}</div>
+      </div>
+      <div class="card-body">
+        <div class="cyc-asg-grid">
+        ${_workAsgF.map((a,i)=>`<div class="cyc-row2" style="animation-delay:${Math.min(i,12)*30}ms">
+          ${_cycRankPill(i,'mint')}
+          <div class="cyc-body"><div class="cyc-nm">${escH(a.name)}</div><div class="cyc-meta">${a.count} ${_plural(a.count,'задача','задачи','задач')}<span class="sep"> · </span>среднее ${_cycDur(a.avg*1000)}</div><div class="cyc-bar mint"><i style="width:${a.share}%"></i></div></div>
+          <div class="cyc-right"><div class="cyc-val mint">${_cycDur(a.total*1000)}</div><div class="cyc-sub">${a.share}%</div></div>
+        </div>`).join('')}
+        </div>
+      </div>
+    </div>`:''}
 `;
 }
 
@@ -29725,6 +29734,8 @@ function _sideRefreshBadges(){
 /* Быстрые проекты — топ-3 активных */
 function _sideQuickRender(){
   const wrap=document.getElementById('side-quick'); if(!wrap) return;
+  wrap.innerHTML=''; return;                                  // блок «Активные проекты» в сайдбаре отключён
+  /* eslint-disable no-unreachable */
   let src=[];
   try{ const _PR=(typeof PROJECTS!=='undefined'&&PROJECTS)||window.PROJECTS;
     if(Array.isArray(_PR)) src=_PR.filter(function(p){ return p && (p.status||'active')==='active' && (typeof agCanSeeProject!=='function'||agCanSeeProject(p.id)); }); }catch(e){}
@@ -29737,6 +29748,7 @@ function _sideQuickRender(){
     return '<button class="side-quick-i" onclick="openProject('+idx+')" title="'+_ddA(p.name||'')+'"><span class="logo" style="background:'+c+'22;color:'+c+'">'+logo+'</span><span class="nm">'+_ddH(p.name||'—')+'</span></button>';
   }).join('');
   wrap.innerHTML='<div class="side-quick-h">Активные проекты</div>'+items;
+  /* eslint-enable no-unreachable */
 }
 /* Профиль внизу */
 function _sideProfileUpdate(){
@@ -39792,7 +39804,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.09-no-archive-in-stats';
+window.__BUILD='2026-07-25.10-ui-tweaks';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
