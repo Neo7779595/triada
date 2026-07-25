@@ -11508,6 +11508,16 @@ function agNav(m){if(typeof _closePops==='function')_closePops();
   { const _tgb=document.getElementById('ag-tg-btn'); if(_tgb) _tgb.style.display=(m==='team'&&agIsOwner())?'':'none'; }
   _agSetTopBtn(m);
   if(m==='projects') renderProjects(); else if(m==='deadlines') renderDeadlines(); else if(m==='calendar') renderSchedule(); else if(m==='overview') renderOverview(); else if(m==='cycles') renderCycles(); else if(m==='finance') renderFinance(); else if(m==='team') renderTeam(); else if(m==='kpi') renderKPI(); else if(m==='leaderboard') renderLeaderboard(); else if(m==='kb') renderKB(); else if(m==='tools') renderTools(); else renderModule(m);
+  /* агрегаты Сводки/Циклов/Финансов грузятся фоном — если модуль открыли раньше, дотягиваем и перерисовываем */
+  if(window.tEnsureAggregates && (m==='overview'||m==='cycles'||m==='kpi'||m==='finance')){
+    window.tEnsureAggregates(m).then(function(did){
+      if(!did) return;
+      const cur=document.querySelector('#app-ag .nav-i.on[data-m]');
+      if(!cur || cur.dataset.m!==m) return;                       // пользователь уже ушёл в другой модуль
+      if(m==='overview') renderOverview(); else if(m==='cycles') renderCycles();
+      else if(m==='kpi') renderKPI(); else if(m==='finance') renderFinance();
+    }).catch(function(){});
+  }
 }
 /* ——— project quick actions / general settings actions ——— */
 function _agSetTopBtn(m){
@@ -22360,7 +22370,8 @@ function ovCompositionHTML(){
 function _dNowLong(){var d=new Date();var M=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];var W=['вс','пн','вт','ср','чт','пт','сб'];return W[d.getDay()]+', '+d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();}
 function renderOverview(){
   const O = OVERVIEW;
-  const P = (typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const P = (typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);   // scope сотрудника: чужие проекты в сводку не попадают
+  const _ready = !!O._loaded;                                     // данные ещё не пришли → показываем «—», а не ложные 100%
 
   /* —— scalars derived from the projects themselves (always match the table) —— */
   const active = P.filter(p => p.status !== 'done');
@@ -22368,13 +22379,13 @@ function renderOverview(){
   const STALE = 14;
   const _isStale = p => p._lastActDays != null && p._lastActDays >= STALE;
   const onTrack = active.filter(p => !p._overdue && !_isStale(p)).length;
-  const health  = active.length ? Math.round(100 * onTrack / active.length) : 100;
+  const health  = (_ready && active.length) ? Math.round(100 * onTrack / active.length) : null;
   const _actDoneN = active.reduce((s,p)=>s+(p._sdone||0),0), _actStgN = active.reduce((s,p)=>s+(p._stot||0),0);
-  const avgProg = _actStgN ? Math.round(100*_actDoneN/_actStgN) : 0;
+  const avgProg = _actStgN ? Math.round(100*_actDoneN/_actStgN) : null;
   const overdueProjects = active.filter(p => p._overdue).length;
   const stale = active.filter(_isStale).length;
   const staleOnly = active.filter(p => !p._overdue && _isStale(p)).length;
-  const mrrOf = p => p.mrr || 0;
+  const mrrOf = p => Number(p.mrr) || 0;                          // PostgREST может отдать numeric строкой — иначе конкатенация вместо суммы
   const mrrs = active.map(mrrOf), mrrSum = mrrs.reduce((a,b)=>a+b,0);
   let concentration = 0, concTop = '—';
   if (mrrSum > 0){ let mx=0, idx=-1; active.forEach((p,i)=>{ if(mrrs[i]>mx){ mx=mrrs[i]; idx=i; } });
@@ -22384,10 +22395,11 @@ function renderOverview(){
 
   /* —— scalars derived from stage history (loaded into OVERVIEW) —— */
   const otPct = O.deadlineDone ? Math.round(100*O.onTime/O.deadlineDone) : null;
-  const reworkPct = O.trans ? Math.round(100*O.rework/O.trans) : 0;
+  const reworkPct = O.trans ? Math.round(100*O.rework/O.trans) : null;
 
   /* —— thresholds → colour + badge —— */
-  const hMeta  = health>=80 ? ['var(--pos)','отличное состояние'] : health>=50 ? ['var(--warn)','требует внимания'] : ['var(--neg)','критическое состояние'];
+  const hMeta  = health==null ? ['var(--txt-3)', _ready?'нет активных проектов':'данные загружаются']
+               : health>=80 ? ['var(--pos)','отличное состояние'] : health>=50 ? ['var(--warn)','требует внимания'] : ['var(--neg)','критическое состояние'];
   const concB  = concentration>=50 ? ['b-susp','Высокий'] : concentration>=30 ? ['b-trial','Умеренный'] : ['b-active','Низкий'];
   const progB  = avgProg>=66 ? ['b-active','Высокий'] : avgProg>=33 ? ['b-trial','Средний'] : ['b-susp','Низкий'];
   const churnB = stale===0 ? ['b-active','Норма'] : stale<=1 ? ['b-trial','Внимание'] : ['b-susp','Риск'];
@@ -22397,10 +22409,10 @@ function renderOverview(){
   const TH = O.taskHistoryExists;
   const v30C = O.v30 + O.tV30, v7C = O.v7 + O.tV7, vMonC = O.vMonth + O.tVMonth;
   const reworkC = O.rework + O.tRework, transC = O.trans + O.tTrans;
-  const reworkPctC = transC ? Math.round(100*reworkC/transC) : 0;
+  const reworkPctC = transC ? Math.round(100*reworkC/transC) : null;
   const otDoneC = O.deadlineDone + O.tDeadlineDone, otOkC = O.onTime + O.tOnTime;
   const otPctC = otDoneC ? Math.round(100*otOkC/otDoneC) : null;
-  const reworkBC = reworkPctC>=20 ? ['b-susp','Высокий'] : reworkPctC>=8 ? ['b-trial','Средний'] : ['b-active','Низкий'];
+  const reworkBC = reworkPctC==null ? ['b-active','—'] : reworkPctC>=20 ? ['b-susp','Высокий'] : reworkPctC>=8 ? ['b-trial','Средний'] : ['b-active','Низкий'];
   const IC_ST = '<path d="M3 12h4l2 6 4-14 2 8h6"/>';
   const IC_TK = '<rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="14" y="4" width="6" height="10" rx="1.5"/>';
   const _svg = ic => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">${ic}</svg>`;
@@ -22415,12 +22427,13 @@ function renderOverview(){
   const IC_REDO = '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>';
 
   /* —— portfolio rows (respect the active filter tab) —— */
-  const rows = P.filter(p => ovFilter==='all' ? true : ovFilter==='active' ? p.status!=='done' : ovFilter==='overdue' ? !!p._overdue : p.status==='done');
+  const rows = P.filter(p => ovFilter==='all' ? true : ovFilter==='active' ? p.status!=='done' : ovFilter==='overdue' ? (!!p._overdue && p.status!=='done') : p.status==='done');
   const seg = (k,lbl,dot) => `<button class="${ovFilter===k?'on':''}" onclick="setOvFilter('${k}')">${dot||''}${lbl}</button>`;
 
   /* —— deadline radar: overdue → today → week —— */
   const ord = { overdue:0, today:1, week:2 };
-  const radar = DEADLINES.filter(d => d.bucket==='overdue'||d.bucket==='today'||d.bucket==='week')
+  const _visIds = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // тот же scope, что и в модуле «Дедлайны»
+  const radar = DEADLINES.filter(d => (!_visIds || (d.pid!=null && _visIds.has(d.pid))) && (d.bucket==='overdue'||d.bucket==='today'||d.bucket==='week'))
     .sort((a,b)=> (ord[a.bucket]-ord[b.bucket]) || String(a.due||'').localeCompare(String(b.due||'')));
   const rBadge = b => b==='overdue' ? ['b-susp','Просрочен'] : b==='today' ? ['b-cyan','Сегодня'] : ['b-trial','Неделя'];
 
@@ -22431,7 +22444,7 @@ function renderOverview(){
     <div class="ov-hero" style="--hue:${hMeta[0]}">
       <div class="ov-hero-left">
         <div class="ov-hero-eyebrow">Здоровье портфеля</div>
-        <div class="ov-hero-big" style="color:${hMeta[0]}">${health}<span class="pct">%</span></div>
+        <div class="ov-hero-big" style="color:${hMeta[0]}">${health==null?'—':health}${health==null?'':'<span class="pct">%</span>'}</div>
         <div class="ov-hero-label" style="color:${hMeta[0]}">${hMeta[1]}</div>
         <div class="ov-hero-dist" title="в норме · застой · просрочены">
           ${active.length?`${onTrack?`<i class="seg-ok" style="flex:${onTrack}" title="в норме: ${onTrack}"></i>`:''}${staleOnly?`<i class="seg-warn" style="flex:${staleOnly}" title="застой: ${staleOnly}"></i>`:''}${overdueProjects?`<i class="seg-neg" style="flex:${overdueProjects}" title="под риском: ${overdueProjects}"></i>`:''}`:'<i class="seg-mut" style="flex:1"></i>'}
@@ -22451,8 +22464,8 @@ function renderOverview(){
         </div>
         <div class="ov-hero-cell">
           <div class="l">Средний прогресс</div>
-          <div class="v">${avgProg}<small>%</small></div>
-          <div class="s">${_actDoneN} из ${_actStgN} этапов</div>
+          <div class="v">${avgProg==null?'—':avgProg+'<small>%</small>'}</div>
+          <div class="s">${avgProg==null?'нет этапов':(_actDoneN+' из '+_actStgN+' этапов')}</div>
         </div>
         <div class="ov-hero-cell">
           <div class="l">On-time delivery</div>
@@ -22461,8 +22474,8 @@ function renderOverview(){
         </div>
         <div class="ov-hero-cell">
           <div class="l">Просрочено сейчас</div>
-          <div class="v" style="color:${O.overdueItems?'var(--neg)':'var(--pos)'}">${O.overdueItems}</div>
-          <div class="s">${O.overdueItems?('эт '+O.overdueStages+' · зад '+O.overdueTasks):'всё в норме ✓'}</div>
+          <div class="v" style="color:${!_ready?'var(--txt-3)':O.overdueItems?'var(--neg)':'var(--pos)'}">${_ready?O.overdueItems:'—'}</div>
+          <div class="s">${!_ready?'данные загружаются':O.overdueItems?('эт '+O.overdueStages+' · зад '+O.overdueTasks):'всё в норме ✓'}</div>
         </div>
       </div>
     </div>
@@ -22497,9 +22510,9 @@ function renderOverview(){
     </style>
     <div class="ov-quick">
       <div class="ov-quick-item"><span class="l">Velocity 30 дней</span><span class="v">${uniq30C}</span><span class="s">7д: ${uniq7C}${redo30C?(' · '+redo30C+' повторно'):''}</span></div>
-      <div class="ov-quick-item"><span class="l">Концентрация выручки</span><span class="v" style="color:${concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${concentration}%</span><span class="s">${_ddH(concTop)} · крупнейший</span></div>
-      <div class="ov-quick-item"><span class="l">Риск оттока</span><span class="v" style="color:${stale?'var(--warn)':'var(--pos)'}">${stale}</span><span class="s">${stale?('без активности ≥ '+STALE+' дн'):'активность в норме'}</span></div>
-      <div class="ov-quick-item"><span class="l">Откаты · rework</span><span class="v" style="color:${reworkPctC>=20?'var(--neg)':reworkPctC>=8?'var(--warn)':'var(--txt)'}">${reworkC}</span><span class="s">${reworkPctC}% переходов назад</span></div>
+      <div class="ov-quick-item"><span class="l">Концентрация выручки</span><span class="v" style="color:${mrrSum<=0?'var(--txt-3)':concentration>=50?'var(--neg)':concentration>=30?'var(--warn)':'var(--txt)'}">${mrrSum>0?concentration+'%':'—'}</span><span class="s">${mrrSum>0?(escH(concTop)+' · крупнейший'):'бюджеты не заданы'}</span></div>
+      <div class="ov-quick-item" title="Проекты без событий в журнале ≥ ${STALE} дн, включая просроченные"><span class="l">Риск оттока</span><span class="v" style="color:${stale?'var(--warn)':'var(--pos)'}">${stale}</span><span class="s">${stale?('без активности ≥ '+STALE+' дн'):'активность в норме'}</span></div>
+      <div class="ov-quick-item"><span class="l">Откаты · rework</span><span class="v" style="color:${reworkPctC==null?'var(--txt-3)':reworkPctC>=20?'var(--neg)':reworkPctC>=8?'var(--warn)':'var(--txt)'}">${reworkC}</span><span class="s">${reworkPctC==null?'нет смен статуса':reworkPctC+'% переходов назад'}</span></div>
     </div>
 
 
@@ -22516,16 +22529,16 @@ function renderOverview(){
           const la = p._lastActDays;
           const laC = la==null?'var(--txt-3)':la>=14?'var(--neg)':la>=7?'var(--warn)':'var(--pos)';
           const laT = la==null?'—':la===0?'сегодня':la+'д назад';
-          const hl = p.status==='done'?['Завершён','var(--pos)']:p._overdue?['Риск','var(--neg)']:['В норме','var(--txt-2)'];
+          const hl = p.status==='done'?['Завершён','var(--pos)']:p._overdue?['Риск','var(--neg)']:_isStale(p)?['Застой','var(--warn)']:['В норме','var(--txt-2)'];   // здоровье в таблице теперь совпадает с формулой в hero
           let dueTxt='—', dueRel='';
           if(p._nextDue){ const _t=new Date(); _t.setHours(0,0,0,0); const _d=new Date(p._nextDue+'T00:00:00'); const _diff=Math.round((_d-_t)/86400000);
             dueTxt=_ovDue(p._nextDue); dueRel=_diff<0?('просрочен '+(-_diff)+' дн'):_diff===0?'сегодня':_diff===1?'завтра':('через '+_diff+' дн'); }
           return `<tr onclick="ovOpen('${p.id}')">
             <td><div class="ag-name" style="gap:12px">
               <div class="ov-avw"><div class="ov-av">${logoFill(p.logoUrl,p.logo)}</div><span class="ov-st" style="background:${dot}"></span></div>
-              <div style="min-width:0"><div class="nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${escH(p.name)}</div>${p.svc?`<div class="sl" style="color:var(--accent)">${p.svc}</div>`:''}</div>
+              <div style="min-width:0"><div class="nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${escH(p.name)}</div>${p.svc?`<div class="sl" style="color:var(--accent)">${escH(p.svc)}</div>`:''}</div>
             </div></td>
-            <td style="text-align:right">${p.cat&&p.cat!=='—'?`<span class="tagx">${p.cat}</span>`:'<span style="color:var(--txt-3)">—</span>'}</td>
+            <td style="text-align:right">${p.cat&&p.cat!=='—'?`<span class="tagx">${escH(p.cat)}</span>`:'<span style="color:var(--txt-3)">—</span>'}</td>
             <td><div style="display:flex;align-items:center;gap:9px;justify-content:flex-end"><span class="num">${prog}%</span><div style="width:72px;height:6px;background:var(--bg-3);border-radius:3px;overflow:hidden"><i style="display:block;width:${prog}%;height:100%;background:${prog>=100?'var(--pos)':'var(--accent)'};border-radius:3px"></i></div></div></td>
             <td class="num">${(p._sdone||0)} / ${(p._stot||0)}</td>
             <td><span style="color:${hl[1]};font-weight:600;font-size:13px">${hl[0]}</span></td>
@@ -22540,9 +22553,9 @@ function renderOverview(){
     <div class="row2" style="margin-top:16px">
       <div class="card">
         <div class="card-h"><div class="t">Радар дедлайнов <span class="c">просрочено · сегодня · неделя</span></div></div>
-        <div class="card-body rd-scroll">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);const tt=d.type==='task'?`<span class="ov-rtok tk" title="Задача">${_svg(IC_TK)}</span>`:`<span class="ov-rtok st" title="Этап">${_svg(IC_ST)}</span>`; let _r=null; if(d.type==='task'&&d.assignee){const w=_who(d.assignee);if(w&&w.n!=='—')_r={name:w.n,color:w.c,avatar:w.avatar};} else if(d.type==='stage'){const _pp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(p=>String(p.id)===String(d.pid));if(_pp&&_pp._lead)_r={name:_pp._lead.name,color:_pp._lead.color,avatar:_pp._lead.avatar};} const resp=_r?`<span class="rd-resp" title="Ответственный: ${_ddH(_r.name)}"><span class="rd-resp-av" style="background:${_r.color||'var(--accent)'}">${logoFill(_r.avatar||null,((_r.name||'?')[0]||'?').toUpperCase())}</span><span class="rd-resp-n">${_ddH(_r.name)}</span></span>`:''; return `<div class="rd-row bk-${d.bucket}" onclick="dlGoto('${d.pid}','${d.type}','${d._id}')" title="Открыть ${d.type==='task'?'задачу':'этап'}">
+        <div class="card-body rd-scroll">${radar.length?radar.map(d=>{const rb=rBadge(d.bucket);const tt=d.type==='task'?`<span class="ov-rtok tk" title="Задача">${_svg(IC_TK)}</span>`:`<span class="ov-rtok st" title="Этап">${_svg(IC_ST)}</span>`; let _r=null; if(d.type==='task'&&d.assignee){const w=_who(d.assignee);if(w&&w.n!=='—')_r={name:w.n,color:w.c,avatar:w.avatar};} else if(d.type==='stage'){const _pp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(p=>String(p.id)===String(d.pid));if(_pp&&_pp._lead)_r={name:_pp._lead.name,color:_pp._lead.color,avatar:_pp._lead.avatar};} const resp=_r?`<span class="rd-resp" title="Ответственный: ${escH(_r.name)}"><span class="rd-resp-av" style="background:${escH(_r.color||'var(--accent)')}">${logoFill(_r.avatar||null,escH(((_r.name||'?')[0]||'?').toUpperCase()))}</span><span class="rd-resp-n">${escH(_r.name)}</span></span>`:''; return `<div class="rd-row bk-${d.bucket}" onclick="dlGoto('${d.pid}','${d.type}','${d._id}')" title="Открыть ${d.type==='task'?'задачу':'этап'}">
           ${tt}<div class="rd-date">${d.day} ${d.mon}</div>
-          <div class="rd-main"><div class="rd-stage">${d.stage}</div><div class="rd-proj">${d.project}</div></div>
+          <div class="rd-main"><div class="rd-stage">${escH(d.stage)}</div><div class="rd-proj">${escH(d.project)}</div></div>
           ${resp}<span class="badge ${rb[0]}" style="font-size:11px;padding:2px 7px">${rb[1]}</span>
         </div>`;}).join(''):'<div class="empty-mini">Нет ближайших дедлайнов</div>'}</div>
       </div>
@@ -22558,7 +22571,7 @@ function renderOverview(){
 }
 
 /* ——— CYCLES module ——— */
-let CYCLES = { projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[], reviewTasks:[], reviewStages:[], reviewNow:0, reviewCount:0, reviewTotalSec:0, reviewAvgSec:0, workCount:0, workTotalSec:0, workMedianSec:0, workMeanSec:0, workP90Sec:0, workDoneCount:0, workDoneAvgSec:0, workStages:[], workTopTasks:[], workByAsg:[], workParetoPct:0 };
+let CYCLES = { _loaded:false, _at:0, projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[], reviewTasks:[], reviewStages:[], reviewNow:0, reviewCount:0, reviewTotalSec:0, reviewAvgSec:0, workCount:0, workTotalSec:0, workMedianSec:0, workMeanSec:0, workP90Sec:0, workDoneCount:0, workDoneAvgSec:0, workStages:[], workTopTasks:[], workByAsg:[], workParetoPct:0 };
 function _cycDur(ms){ if(ms==null) return '—'; if(ms<=0) return '0'; if(ms<60000) return Math.round(ms/1000)+' с'; const m=ms/60000; if(m<60) return Math.round(m)+' мин'; const h=m/60; if(h<24) return (h<10?h.toFixed(1).replace('.0',''):''+Math.round(h))+' ч'; const d=h/24; return (d<10?d.toFixed(1).replace('.0',''):''+Math.round(d))+' дн'; }
 function svgLine(vals,labels){
   const W=1100,H=230,padL=46,padR=26,padT=30,padB=38;
@@ -22594,7 +22607,7 @@ function svgCycleBars(stages){
   stages.forEach((s,i)=>{
     const cx=padL+gW*i+gW/2, v=(s.p50Ms||0)/ax.div, h=Math.max((v/maxV)*iH,0);
     if(h>0.4) bars+=`<rect class="c-bar" style="animation-delay:${i*40}ms" x="${(cx-bW/2).toFixed(1)}" y="${(padT+iH-h).toFixed(1)}" width="${bW.toFixed(1)}" height="${h.toFixed(1)}" rx="2.5" fill="${s.bn?'var(--neg)':'var(--accent)'}"/>`;
-    const lbl=s.name.length>16?s.name.slice(0,15)+'…':s.name;
+    const lbl=escH(s.name.length>16?s.name.slice(0,15)+'…':s.name);
     xl+=`<text x="${cx.toFixed(1)}" y="${H-padB+14}" text-anchor="end" fill="${s.unmeasured?'#474C54':'#8A929C'}" font-size="9" transform="rotate(-32 ${cx.toFixed(1)} ${H-padB+14})">${lbl}</text>`;
   });
   let p90l='',p90d='',prev=null;
@@ -22612,26 +22625,31 @@ function svgCycleBars(stages){
 function svgCycleTrend(msVals,labels){
   const W=1100,H=240,padL=54,padR=26,padT=30,padB=40;
   const iW=W-padL-padR,iH=H-padT-padB;
-  const maxMs=Math.max(...msVals,1);
+  const _real=(msVals||[]).filter(v=>v!=null&&isFinite(v));
+  const maxMs=Math.max(..._real,1);
   const ax=_cycAxis(maxMs), maxV=_niceMax(maxMs/ax.div*1.18);
-  const vals=msVals.map(v=>v/ax.div);
+  const vals=(msVals||[]).map(v=>(v==null||!isFinite(v))?null:v/ax.div);   // месяц без завершений — разрыв линии, а не ноль
   const x=i=>padL+iW*(vals.length>1?i/(vals.length-1):0.5);
   const y=v=>padT+iH-(v/maxV)*iH;
   let grid='',yl='';const steps=4;
   for(let k=0;k<=steps;k++){ const v=maxV*k/steps, yy=y(v);
     grid+=`<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W-padR}" y2="${yy.toFixed(1)}" stroke="var(--line)"/>`;
     yl+=`<text x="${padL-9}" y="${(yy+3).toFixed(1)}" text-anchor="end" fill="#5B616B" font-size="10" font-family="ui-monospace,monospace">${_axLbl(v)}${ax.unit}</text>`; }
-  const pts=vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  const area=`${x(0).toFixed(1)},${(padT+iH).toFixed(1)} ${pts} ${x(vals.length-1).toFixed(1)},${(padT+iH).toFixed(1)}`;
+  const segs=[]; let cur=[];
+  vals.forEach((v,i)=>{ if(v==null){ if(cur.length) segs.push(cur); cur=[]; return; } cur.push(`${x(i).toFixed(1)},${y(v).toFixed(1)}`); });
+  if(cur.length) segs.push(cur);
   const dn=Math.max(vals.length-1,1);
-  const dots=vals.map((v,i)=>`<circle class="c-dot" style="animation-delay:${(260+i*640/dn).toFixed(0)}ms" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="var(--accent)"/>`).join('');
-  const vlabs=vals.map((v,i)=>`<text class="c-vlab" style="animation-delay:${(340+i*640/dn).toFixed(0)}ms" x="${x(i).toFixed(1)}" y="${(y(v)-13).toFixed(1)}" text-anchor="middle" fill="#C9CDD3" font-size="13" font-family="ui-monospace,monospace">${_axLbl(v)}${ax.unit}</text>`).join('');
-  const xlabs=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" fill="#7A828C" font-size="11">${l}</text>`).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;height:auto"><polygon class="c-area" points="${area}" fill="var(--accent-dim)"/>${grid}${yl}<polyline class="c-line" pathLength="1" points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>${dots}${vlabs}${xlabs}</svg>`;
+  const lines=segs.filter(a=>a.length>1).map(a=>`<polyline class="c-line" pathLength="1" points="${a.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`).join('');
+  const areas=segs.filter(a=>a.length>1).map(a=>{ const f=a[0].split(',')[0], l=a[a.length-1].split(',')[0];
+    return `<polygon class="c-area" points="${f},${(padT+iH).toFixed(1)} ${a.join(' ')} ${l},${(padT+iH).toFixed(1)}" fill="var(--accent-dim)"/>`; }).join('');
+  const dots=vals.map((v,i)=>v==null?'':`<circle class="c-dot" style="animation-delay:${(260+i*640/dn).toFixed(0)}ms" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="var(--accent)"/>`).join('');
+  const vlabs=vals.map((v,i)=>v==null?'':`<text class="c-vlab" style="animation-delay:${(340+i*640/dn).toFixed(0)}ms" x="${x(i).toFixed(1)}" y="${(y(v)-13).toFixed(1)}" text-anchor="middle" fill="#C9CDD3" font-size="13" font-family="ui-monospace,monospace">${_axLbl(v)}${ax.unit}</text>`).join('');
+  const xlabs=labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-12}" text-anchor="middle" fill="#7A828C" font-size="11">${escH(l)}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;height:auto">${areas}${grid}${yl}${lines}${dots}${vlabs}${xlabs}</svg>`;
 }
 function _cycTipShow(e,i){
   const d=(window._cycChart||[])[i], el=document.getElementById('cyc-tip'); if(!d||!el) return;
-  let h='<div class="tt-h">'+d.name+'</div>';
+  let h='<div class="tt-h">'+escH(d.name)+'</div>';
   if(d.unmeasured){ h+='<div class="tt-mut">Нет измеренных циклов</div>'; }
   else{
     h+='<div class="tt-r"><span>Медиана (p50)</span><b>'+_cycDur(d.p50Ms)+'</b></div>';
@@ -22730,7 +22748,7 @@ function renderCycles(){
       </div>
       <div class="px-ov-cell">
         <div class="px-ov-l">Узкое место</div>
-        <div class="px-ov-v" style="font-size:18px;letter-spacing:-.01em;color:${bn?'var(--neg)':'var(--txt-3)'}">${bn?bn.name:'—'}</div>
+        <div class="px-ov-v" style="font-size:18px;letter-spacing:-.01em;color:${bn?'var(--neg)':'var(--txt-3)'}">${bn?escH(bn.name):'—'}</div>
         <div class="px-ov-ctx">${bn?('медиана '+_cycDur(bn.p50Ms)+' · n='+bn.n+(bn.n<3?' ⚠':'')):'нет данных'}</div>
       </div>
       <div class="px-ov-cell">
@@ -22742,17 +22760,18 @@ function renderCycles(){
       <div class="px-ov-cell">
         <div class="px-ov-l">Застряло сейчас</div>
         <div class="px-ov-v" style="color:${C.stuckNow?'var(--neg)':'var(--pos)'}">${C.stuckNow}</div>
-        <div class="px-ov-ctx" style="${C.stuckNow?'':'color:var(--pos)'}">${C.stuckNow?'дольше нормы p85':'всё в норме ✓'}</div>
+        <div class="px-ov-ctx" style="${C.stuckNow?'':(C.stages.length?'color:var(--pos)':'')}">${C.stuckNow?'дольше нормы p85':(C.stages.length?'всё в норме ✓':'нет замеров для нормы')}</div>
       </div>
     </div>
 
     ${aging.length?`<div class="card" style="margin-top:16px;border-color:var(--accent-line)">
       <div class="card-h"><div class="t" style="color:var(--neg)">Застрявшие этапы <span class="c">дольше своего p85</span></div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
-        ${aging.map((a,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--neg-dim);border:1px solid var(--neg-dim);border-radius:10px;animation:cycRow .4s var(--ease-out) both;animation-delay:${i*55}ms">
-          <div style="min-width:0"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.client}</div><div style="font-size:12.5px;color:var(--txt-2);font-family:var(--mono);margin-top:2px">${a.stage}</div></div>
-          <div style="text-align:right;flex-shrink:0"><div class="num" style="font-weight:800;font-size:16px;color:var(--neg)">${_cycDur(a.sinceMs)}</div><div style="font-size:11.5px;color:var(--warn);font-family:var(--mono);margin-top:2px">+${a.overPct}% к норме${a.frozen!=null?' · ~'+money(a.frozen)+' заморож.':''}</div></div>
+        ${aging.slice(0,12).map((a,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;background:var(--neg-dim);border:1px solid var(--neg-dim);border-radius:10px;animation:cycRow .4s var(--ease-out) both;animation-delay:${i*55}ms">
+          <div style="min-width:0"><div style="font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(a.client)}</div><div style="font-size:12.5px;color:var(--txt-2);font-family:var(--mono);margin-top:2px">${escH(a.stage)}</div></div>
+          <div style="text-align:right;flex-shrink:0"><div class="num" style="font-weight:800;font-size:16px;color:var(--neg)">${_cycDur(a.sinceMs)}</div><div style="font-size:11.5px;color:var(--warn);font-family:var(--mono);margin-top:2px">+${a.overPct}% к норме${a.byOwn?'':' (общая)'}${a.frozen!=null?' · ~'+money(a.frozen)+' заморож.':''}</div></div>
         </div>`).join('')}
+        ${aging.length>12?`<div style="text-align:center;color:var(--txt-3);font-size:12.5px;font-family:var(--mono);padding:4px 0">и ещё ${aging.length-12}</div>`:''}
       </div>
     </div>`:''}
 
@@ -22786,7 +22805,7 @@ function renderCycles(){
       </table>
     </div>
 
-    ${C.trend.vals.length>=2?`<div class="card" style="margin-top:16px">
+    ${C.trend.vals.filter(v=>v!=null).length>=2?`<div class="card" style="margin-top:16px">
       <div class="card-h"><div class="t">Тренд медианы цикла <span class="c">по месяцам</span></div></div>
       <div class="card-body">${svgCycleTrend(C.trend.vals,C.trend.labels)}</div>
     </div>`:''}
@@ -22796,7 +22815,7 @@ function renderCycles(){
       <table class="ctbl">
         <thead><tr><th>Клиент</th><th>Этапов</th><th>Медиана</th><th>Среднее</th><th>% возвратов</th></tr></thead>
         <tbody>${C.clients.map((c,i)=>`<tr style="animation-delay:${i*45}ms">
-          <td><div class="ag-name" style="gap:11px"><span class="cyc-av">${logoFill(c.logoUrl,c.logo)}</span><div class="nm">${c.client}</div></div></td>
+          <td><div class="ag-name" style="gap:11px"><span class="cyc-av">${logoFill(c.logoUrl,escH(c.logo))}</span><div class="nm">${escH(c.client)}</div></div></td>
           <td class="num">${c.n}</td>
           <td class="num" style="color:var(--accent)">${_cycDur(c.medianMs)}</td>
           <td class="num" style="color:var(--txt-3)">${_cycDur(c.avgMs)}</td>
@@ -32258,23 +32277,43 @@ window.tLoadOverview = async () => {
   const isoMon = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
   const MON = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-  const [sr, tr, hr, thr] = await Promise.all([
-    SB.from('project_stages').select('id,project_id,name,status,due_date'),
-    SB.from('project_tasks').select('id,project_id,status,due_date'),
+  const [sr, tr, hr, thr, pmr] = await Promise.all([
+    SB.from('project_stages').select('id,project_id,name,status,due_date,due_time'),
+    SB.from('project_tasks').select('id,project_id,status,due_date,due_time'),
     SB.from('stage_history').select('stage_id,project_id,old_status,new_status,created_at'),
-    SB.from('task_history').select('task_id,project_id,old_status,new_status,created_at')   // может ещё не существовать
+    SB.from('task_history').select('task_id,project_id,old_status,new_status,created_at'),  // может ещё не существовать
+    SB.from('project_members').select('project_id,member_id')
   ]);
-  const _vis = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope=member → Set(pid) видимых проектов; иначе null
+  /* scope сотрудника строим из project_members НАПРЯМУЮ: agVisibleProjectIds() читает p._team,
+     который заполняет параллельный загрузчик — при гонке scope оказывался пустым и вся сводка обнулялась */
+  let _vis = null;
+  if (typeof agProjectAccessMode==='function' && agProjectAccessMode()!=='all'){
+    const _me=(window.tMe&&window.tMe())||{}, _mid=String(_me.id||_me._id||'');
+    _vis = new Set();
+    ((pmr&&pmr.data)||[]).forEach(r => { if(String(r.member_id)===_mid && r.project_id) _vis.add(r.project_id); });
+    const _s2 = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
+    if(_s2) _s2.forEach(id => _vis.add(id));
+  }
   const _pf = (arr) => (arr||[]).filter(x => !_vis || _vis.has(x.project_id));         // отсекает записи по невидимым проектам
   const stages = _pf(sr.data), tasks = _pf(tr.data), hist = _pf(hr.data);
   const taskHistoryExists = !!(thr && !thr.error);                 // создана ли таблица журнала задач
   const taskHist = (taskHistoryExists && thr.data) ? _pf(thr.data) : [];
-  const rank = { wait:0, active:1, done:2 };
-  const dueOfStage = {}; stages.forEach(s => { dueOfStage[s.id] = s.due_date; });
-  const dueOfTask  = {}; tasks.forEach(t => { dueOfTask[t.id]  = t.due_date; });
+  const rank = { wait:0, hold:0, active:1, review:2, done:3 };     // полный алфавит: без review/hold откаты считались мимо кассы
+  const dueOfStage = {}, dueTimeOfStage = {}; stages.forEach(s => { dueOfStage[s.id] = s.due_date; dueTimeOfStage[s.id] = s.due_time; });
+  const dueOfTask  = {}, dueTimeOfTask  = {}; tasks.forEach(t => { dueOfTask[t.id]  = t.due_date; dueTimeOfTask[t.id]  = t.due_time; });
+  /* продление договора (tProjectRenew) переводит ВСЕ этапы проекта в wait одним пакетом —
+     это не откаты; помечаем такие пачки, чтобы они не гнали rework вверх при каждом продлении */
+  (function(){
+    const bucket = {};
+    hist.forEach(h => { if(h.new_status!=='wait') return;
+      const t = new Date(h.created_at).getTime(); if(isNaN(t)) return;
+      const k = h.project_id + '|' + Math.floor(t/10000);
+      (bucket[k] || (bucket[k]=[])).push(h); });
+    Object.keys(bucket).forEach(k => { if(bucket[k].length>=3) bucket[k].forEach(h => { h.__bulkReset = true; }); });
+  })();
 
   /* —— общий разбор журнала переходов: velocity / откаты / on-time / последняя активность —— */
-  const tally = (rows, dueMap, idKey) => {
+  const tally = (rows, dueMap, dueTimeMap, idKey) => {
     const o = { v7:0, v30:0, vMonth:0, uniq7:0, uniq30:0, uniqMonth:0, redo7:0, redo30:0, redoMonth:0,
                 rework:0, trans:0, onTime:0, deadlineDone:0, lastAct:{} };
     const doneCount = {};   // id → сколько раз уже доходила до done за всю историю
@@ -32282,9 +32321,13 @@ window.tLoadOverview = async () => {
     sorted.forEach(h => {
       const t = new Date(h.created_at).getTime();
       if (!(h.project_id in o.lastAct) || t > o.lastAct[h.project_id]) o.lastAct[h.project_id] = t;
-      o.trans++;
-      const f = rank[h.old_status], to = rank[h.new_status];
-      if (f != null && to != null && to < f) o.rework++;          // переход назад = откат
+      /* переходом считаем только реальную смену статуса: строки создания (old_status = null)
+         и «wait→wait» раздували знаменатель и занижали процент откатов */
+      if (!h.__bulkReset && h.old_status != null && h.old_status !== h.new_status){
+        o.trans++;
+        const f = rank[h.old_status], to = rank[h.new_status];
+        if (f != null && to != null && to < f) o.rework++;        // переход назад = откат
+      }
       if (h.new_status === 'done') {
         const idv = h[idKey];
         const isFirst = !(doneCount[idv] > 0);                     // первое done за всю историю → уникальное; иначе повторное (redo)
@@ -32293,13 +32336,16 @@ window.tLoadOverview = async () => {
         if (h.created_at >= iso7) { o.v7++;     if(isFirst)o.uniq7++;     else o.redo7++; }
         if (h.created_at >= isoMon){ o.vMonth++; if(isFirst)o.uniqMonth++; else o.redoMonth++; }
         const due = dueMap[idv];
-        if (due && isFirst) { o.deadlineDone++; if (t <= new Date(due+'T23:59:59').getTime()) o.onTime++; }  // on-time только по первой (уникальной) доставке — повторные не задваиваются
+        if (due && isFirst) { o.deadlineDone++;
+          const _dt = dueTimeMap && dueTimeMap[idv];                                   // время дедлайна, если задано
+          const _hm = (_dt && /^\d{1,2}:\d{2}/.test(String(_dt))) ? String(_dt).slice(0,5) : '23:59';
+          if (t <= new Date(due+'T'+_hm+':59').getTime()) o.onTime++; }                // on-time только по первой (уникальной) доставке
       }
     });
     return o;
   };
-  const S = tally(hist,     dueOfStage, 'stage_id');   // этапы
-  const T = tally(taskHist, dueOfTask,  'task_id');    // задачи
+  const S = tally(hist,     dueOfStage, dueTimeOfStage, 'stage_id');   // этапы
+  const T = tally(taskHist, dueOfTask,  dueTimeOfTask,  'task_id');    // задачи
 
   /* последняя активность по проекту — из обоих журналов */
   const lastAct = {};
@@ -32336,8 +32382,10 @@ window.tLoadOverview = async () => {
   });
 
   /* stage load grouped by stage name across the whole portfolio */
+  const _doneProj = new Set(); (typeof PROJECTS!=='undefined'?PROJECTS:[]).forEach(p=>{ if(p.status==='done') _doneProj.add(p.id); });
   const lm = {}, lo = [];
-  stages.forEach(s => { const nm = s.name || '—'; if (!lm[nm]){ lm[nm] = { name:nm, done:0, total:0 }; lo.push(nm); }
+  stages.forEach(s => { if(_doneProj.has(s.project_id)) return;        // завершённые проекты не отражают текущую загрузку
+    const nm = s.name || '—'; if (!lm[nm]){ lm[nm] = { name:nm, done:0, total:0 }; lo.push(nm); }
     lm[nm].total++; if (s.status==='done') lm[nm].done++; });
   const stageLoad = lo.map(n => lm[n]).sort((a,b)=> (b.total-a.total) || a.name.localeCompare(b.name,'ru'));
 
@@ -32354,21 +32402,47 @@ window.tLoadOverview = async () => {
     /* точечные счётчики статусов */
     stOpen:stC.open, stActive:stC.active, stWait:stC.wait, stDone:stC.done,
     tkOpen:tkC.open, tkActive:tkC.active, tkWait:tkC.wait, tkDone:tkC.done,
-    stageLoad };
+    stageLoad, _loaded:true, _at:Date.now() };
 };
 
 /* ===== CYCLES · live aggregation (cycle time from stage history) ===== */
 window.tLoadCycles = async () => {
   if (!SB) return;
   const now = Date.now();
-  const [hr, sr, tr] = await Promise.all([
-    SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true}),
-    SB.from('project_stages').select('id,name'),
-    SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at')
+  /* PostgREST отдаёт максимум 1000 строк за запрос. Без пагинации метрики циклов
+     замирали на самой старой тысяче событий и новые завершения этапов их не двигали. */
+  const _pageAll = async (build, cap) => {
+    const out = []; const step = 1000; cap = cap || 30000; let prevKey = null;
+    for (let from = 0; from < cap; from += step){
+      const r = await build().range(from, from + step - 1);
+      if (r.error) break;
+      const d = r.data || [];
+      const key = d.length ? JSON.stringify(d[0]) : '';
+      if (key && key === prevKey) break;            // прокси проглотил заголовок Range и вернул ту же страницу — не задваиваем
+      prevKey = key;
+      for (const x of d) out.push(x);
+      if (d.length < step) break;
+    }
+    return out;
+  };
+  const [histAll, sr, tasksAll, pmr] = await Promise.all([
+    _pageAll(() => SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true})),
+    SB.from('project_stages').select('id,name,project_id'),
+    _pageAll(() => SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,assignee_id,created_at').order('created_at',{ascending:true})),
+    SB.from('project_members').select('project_id,member_id')
   ]);
-  const _visCy = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // фильтр по scope сотрудника
-  const hist = (hr.data||[]).filter(h => !_visCy || _visCy.has(h.project_id));
-  if(_visCy){ tr.data = (tr.data||[]).filter(t => _visCy.has(t.project_id)); }
+  /* scope сотрудника — из project_members напрямую, без зависимости от параллельного загрузчика */
+  let _visCy = null;
+  if (typeof agProjectAccessMode==='function' && agProjectAccessMode()!=='all'){
+    const _me=(window.tMe&&window.tMe())||{}, _mid=String(_me.id||_me._id||'');
+    _visCy = new Set();
+    ((pmr&&pmr.data)||[]).forEach(r => { if(String(r.member_id)===_mid && r.project_id) _visCy.add(r.project_id); });
+    const _s2 = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
+    if(_s2) _s2.forEach(id => _visCy.add(id));
+  }
+  const hist = histAll.filter(h => !_visCy || _visCy.has(h.project_id));
+  const tr = { data: _visCy ? tasksAll.filter(t => _visCy.has(t.project_id)) : tasksAll };
+  if (_visCy && sr.data) sr.data = sr.data.filter(x => _visCy.has(x.project_id));   // имена этапов чужих проектов не должны утекать на график
   const nameById={}, mrrById={}, logoById={};
   const _visPrjSrc = (typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
   _visPrjSrc.forEach(p=>{ nameById[p.id]=p.name; mrrById[p.id]=p.mrr||0; logoById[p.id]={url:p.logoUrl||'', letter:(p.logo||(p.name?p.name[0]:'?'))}; });
@@ -32378,6 +32452,16 @@ window.tLoadCycles = async () => {
   const SEM={active:'active',done:'completed',wait:'pending'};
   const semOf=x=>SEM[x]||null;
 
+  /* tProjectRenew переводит ВСЕ этапы проекта в wait одним пакетом — это граница нового цикла,
+     а не возврат. Без этого открытый инстанс тянулся через продление и завышал все медианы. */
+  (function(){
+    const bucket={};
+    hist.forEach(h=>{ if(h.new_status!=='wait') return;
+      const t=new Date(h.created_at).getTime(); if(isNaN(t)) return;
+      const k=h.project_id+'|'+Math.floor(t/10000);
+      (bucket[k]||(bucket[k]=[])).push(h); });
+    Object.keys(bucket).forEach(k=>{ if(bucket[k].length>=3) bucket[k].forEach(h=>{ h.__bulkReset=true; }); });
+  })();
   const byStage={};
   hist.forEach(h=>{ if(!h.stage_id) return; (byStage[h.stage_id]||(byStage[h.stage_id]=[])).push(h); });
 
@@ -32391,9 +32475,11 @@ window.tLoadCycles = async () => {
       if(isNaN(t)) return;
       if(st==='active'){ if(start===null) start=t; if(activeSince===null) activeSince=t; }
       else if(st==='completed'){ if(activeSince!==null){ activeMs+=t-activeSince; activeSince=null; } if(start!==null&&t>=start) inst.push({start,complete:t,activeMs,returns}); start=null; activeMs=0; returns=0; }
-      else if(st==='pending'){ if(activeSince!==null){ activeMs+=t-activeSince; activeSince=null; } if(start!==null) returns++; }
+      else if(st==='pending'){ if(activeSince!==null){ activeMs+=t-activeSince; activeSince=null; }
+        if(e.__bulkReset){ start=null; activeMs=0; returns=0; }      // сброс при продлении — незавершённый инстанс отбрасываем
+        else if(start!==null) returns++; }
     });
-    const wip=(start!==null)?{start,stillActive:activeSince!==null}:null;
+    const wip=(start!==null)?{start,stillActive:activeSince!==null,activeMs:activeMs+(activeSince!==null?(now-activeSince):0)}:null;
     return {inst,wip,nm,pid,everCompleted:inst.length>0};
   }
 
@@ -32401,24 +32487,24 @@ window.tLoadCycles = async () => {
   const median=a=>pctl(a,0.5);
   const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 
-  const instances=[], wips=[];
+  const instances=[], wips=[], _walked={};
   Object.keys(byStage).forEach(sid=>{
-    const w=walk(byStage[sid]);
+    const w=_walked[sid]=walk(byStage[sid]);
     w.inst.forEach(it=>instances.push({pid:w.pid,name:w.nm||'Этап',startMs:it.start,leadMs:it.complete-it.start,activeMs:it.activeMs,returns:it.returns,completeAt:it.complete}));
-    if(w.wip&&w.wip.stillActive) wips.push({pid:w.pid,name:w.nm||'Этап',sinceMs:now-w.wip.start});
+    if(w.wip) wips.push({pid:w.pid,name:w.nm||'Этап',startMs:w.wip.start,sinceMs:now-w.wip.start,stillActive:w.wip.stillActive});
   });
 
   // Покрытие: уникальные этапы с измеримым инстансом / уникальные этапы с любым завершением в истории (≤100%).
-  const measurableUnique=Object.keys(byStage).filter(sid=>walk(byStage[sid]).everCompleted).length;
+  const measurableUnique=Object.keys(byStage).filter(sid=>_walked[sid].everCompleted).length;
   const completedUnique=Object.keys(byStage).filter(sid=>byStage[sid].some(h=>semOf(h.new_status)==='completed')).length;
   const coveragePct=completedUnique?Math.min(100,Math.round(100*measurableUnique/completedUnique)):0;
 
   // Агрегация по ИМЕНИ этапа: p50/p90 от lead, медиана active, простой = p50(lead) − median(active).
   const g={};
-  instances.forEach(it=>{ const b=g[it.name]||(g[it.name]={leads:[],acts:[],rework:0,n:0}); b.leads.push(it.leadMs); b.acts.push(it.activeMs); if(it.returns>0) b.rework++; b.n++; });
+  instances.forEach(it=>{ const b=g[it.name]||(g[it.name]={leads:[],acts:[],idle:[],rework:0,n:0}); b.leads.push(it.leadMs); b.acts.push(it.activeMs); b.idle.push(Math.max(0,it.leadMs-it.activeMs)); if(it.returns>0) b.rework++; b.n++; });
   let stageRows=Object.keys(g).map(name=>{ const b=g[name];
     const p50=median(b.leads), p90=b.n>=5?pctl(b.leads,0.9):null, p85=b.n>=4?pctl(b.leads,0.85):null;
-    const actMed=median(b.acts), loss=(p50!=null&&actMed!=null)?Math.max(0,p50-actMed):null;
+    const actMed=median(b.acts), loss=median(b.idle);   // медиана простоя по инстансам: разность медиан этого не даёт
     return {name,n:b.n,p50Ms:p50,p90Ms:p90,p85Ms:p85,actMedMs:actMed,lossMs:loss,reworkPct:b.n>=2?Math.round(100*b.rework/b.n):null,lowSample:b.n<3};
   });
   const sumP50=stageRows.reduce((acc,r)=>acc+(r.p50Ms||0),0);
@@ -32430,24 +32516,63 @@ window.tLoadCycles = async () => {
   let bottleneck=null; stageRows.forEach(r=>{ if(r.p50Ms!=null&&(!bottleneck||r.p50Ms>bottleneck.p50Ms)) bottleneck={name:r.name,p50Ms:r.p50Ms,n:r.n}; });
 
   // Цикл проекта: span min(старт)→max(финиш); только проекты с ≥2 РАЗНЫМИ измеренными этапами (иначе это длительность 1 этапа).
-  const projAgg={};
-  instances.forEach(it=>{ const a=projAgg[it.pid]||(projAgg[it.pid]={minStart:it.startMs,maxEnd:it.completeAt,names:new Set()}); if(it.startMs<a.minStart) a.minStart=it.startMs; if(it.completeAt>a.maxEnd) a.maxEnd=it.completeAt; a.names.add(it.name); });
-  const spans=Object.keys(projAgg).filter(pid=>projAgg[pid].names.size>=2).map(pid=>projAgg[pid].maxEnd-projAgg[pid].minStart).sort((a,b)=>a-b);
+  /* Берём ПОСЛЕДНИЙ проход проекта по разным этапам: идём от свежего завершения назад,
+     пока имя этапа не повторится. Иначе min(старт)…max(финиш) по всей истории — это возраст проекта. */
+  const byProj={};
+  instances.forEach(it=>{ (byProj[it.pid]||(byProj[it.pid]=[])).push(it); });
+  const resetTs={};                                                  // границы циклов = продления договора
+  hist.forEach(h=>{ if(!h.__bulkReset) return; const t=new Date(h.created_at).getTime(); if(isNaN(t)) return;
+    (resetTs[h.project_id]||(resetTs[h.project_id]=[])).push(t); });
+  Object.keys(resetTs).forEach(k=>resetTs[k].sort((a,b)=>a-b));
+  const _spanOf=list=>{ const seen=new Set(); let mn=null,mx=null;
+    for(let i=list.length-1;i>=0;i--){ const it=list[i];
+      if(seen.has(it.name)) break;                                   // имя повторилось — дальше уже предыдущий проход
+      seen.add(it.name);
+      if(mn==null||it.startMs<mn) mn=it.startMs;
+      if(mx==null||it.completeAt>mx) mx=it.completeAt; }
+    return (seen.size>=2 && mn!=null && mx>mn) ? mx-mn : null; };
+  const spans=[];
+  Object.keys(byProj).forEach(pid=>{
+    const all=byProj[pid].slice().sort((a,b)=>a.completeAt-b.completeAt);
+    const cuts=resetTs[pid]||[];
+    const groups=[]; let g=[], ci=0;
+    all.forEach(it=>{ while(ci<cuts.length && it.startMs>=cuts[ci]){ if(g.length) groups.push(g); g=[]; ci++; } g.push(it); });
+    if(g.length) groups.push(g);
+    for(let i=groups.length-1;i>=0;i--){ const sp=_spanOf(groups[i]); if(sp!=null){ spans.push(sp); break; } }   // последний цикл, где есть что мерить
+  });
+  spans.sort((a,b)=>a-b);
   const projMedianMs=spans.length?median(spans):null, projCount=spans.length;
 
   // Застрявшие WIP: открыты дольше своего p85 (p85 честен от n≥4). Заморож. бюджет ≈ mrr/30.44 × дней.
+  const _globalP85=pctl(instances.map(it=>it.leadMs),0.85);       // фолбэк для этапов, у которых своих замеров < 4
   const agingRows=[];
-  wips.forEach(w=>{ const st=nameStat[w.name], thr=(st&&st.p85Ms!=null)?st.p85Ms:null;
-    if(thr!=null&&w.sinceMs>thr){ const mrr=mrrById[w.pid]||0, daysIn=w.sinceMs/86400000, frozen=mrr>0?Math.round(mrr/30.44*daysIn):null;
-      agingRows.push({client:nameById[w.pid]||'—',stage:w.name,sinceMs:w.sinceMs,overPct:Math.round((w.sinceMs/thr-1)*100),frozen}); } });
+  wips.forEach(w=>{ const st=nameStat[w.name];
+    const own=(st&&st.p85Ms!=null)?st.p85Ms:null;
+    const thr=own!=null?own:_globalP85;
+    if(thr==null||thr<=0) return;                                  // порога нет вовсе → не выдумываем «застрял»
+    if(w.sinceMs<=thr) return;
+    agingRows.push({pid:w.pid,client:nameById[w.pid]||'—',stage:w.name,sinceMs:w.sinceMs,startMs:w.startMs,
+      overPct:Math.round((w.sinceMs/thr-1)*100),byOwn:own!=null,frozen:null}); });
   agingRows.sort((a,b)=>b.sinceMs-a.sinceMs);
+  /* «Заморожено» — деньги проекта, а не этапа: считаем один раз на проект по самому долгому застрявшему этапу */
+  const _frozenSeen={};
+  agingRows.forEach(a=>{ if(_frozenSeen[a.pid]) return; _frozenSeen[a.pid]=1;
+    const mrr=mrrById[a.pid]||0; if(mrr>0) a.frozen=Math.round(mrr/30.44*(a.sinceMs/86400000)); });
 
   // Тренд: медиана lead по месяцу завершения (последние 6 месяцев с данными).
   const MON=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
   const byMonth={};
   instances.forEach(it=>{ const d=new Date(it.completeAt), key=d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'); (byMonth[key]||(byMonth[key]={m:d.getMonth(),y:d.getFullYear(),leads:[]})).leads.push(it.leadMs); });
-  const mk=Object.keys(byMonth).sort().slice(-6);
-  const trend={vals:mk.map(k=>median(byMonth[k].leads)),labels:mk.map(k=>MON[byMonth[k].m]+' '+String(byMonth[k].y).slice(2))};
+  const _mkAll=Object.keys(byMonth).sort();
+  let trend={vals:[],labels:[]};
+  if(_mkAll.length){
+    /* последние 6 КАЛЕНДАРНЫХ месяцев до последнего с данными: раньше пустые месяцы схлопывались
+       и график рисовал «янв → июн» как соседние точки */
+    const _last=_mkAll[_mkAll.length-1].split('-'); let ly=+_last[0], lm=+_last[1];
+    const seq=[]; for(let i=5;i>=0;i--){ let m=lm-i, y=ly; while(m<0){ m+=12; y--; } seq.push({k:y+'-'+String(m).padStart(2,'0'),m:m,y:y}); }
+    trend={ vals:seq.map(x=>byMonth[x.k]?median(byMonth[x.k].leads):null),
+            labels:seq.map(x=>MON[x.m]+' '+String(x.y).slice(2)) };
+  }
 
   // Бенчмарк по клиентам (проектам): средний/медианный цикл завершённого этапа.
   const byClient={};
@@ -32461,9 +32586,9 @@ window.tLoadCycles = async () => {
 
   // ——— аналитика времени на утверждении (review) ———
   const _stNm={}; (sr.data||[]).forEach(st=>{ if(st&&st.id!=null) _stNm[st.id]=st.name; });
-  const _revEl=(t)=>{ let v=t.review_spent||0; if(t.review_started) v+=Math.max(0,Math.round((now-new Date(t.review_started).getTime())/1000)); return v; };
+  const _revEl=(t)=>{ let v=t.review_spent||0; if(t.review_started && t.status==='review') v+=Math.max(0,Math.round((now-new Date(t.review_started).getTime())/1000)); return v; };   // без проверки статуса счётчик у закрытой задачи рос вечно
   const _rtasks=(tr.data||[]);
-  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,onReview:!!t.review_started,date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
+  const reviewTasks=_rtasks.map(t=>({title:t.title||'Задача',sec:_revEl(t),stage:_stNm[t.stage_id]||'—',project:nameById[t.project_id]||'',pid:t.project_id||null,onReview:(t.status==='review'&&!!t.review_started),date:t.created_at,asg:t.assignee_id})).filter(x=>x.sec>0).sort((a,b)=>b.sec-a.sec);
   const _sg={}; _rtasks.forEach(t=>{ const sec=_revEl(t); if(sec<=0)return; const nm=_stNm[t.stage_id]||'Без этапа'; (_sg[nm]||(_sg[nm]={name:nm,total:0,count:0})); _sg[nm].total+=sec; _sg[nm].count++; });
   const reviewStages=Object.values(_sg).map(x=>({name:x.name,total:x.total,count:x.count,avg:Math.round(x.total/x.count)})).sort((a,b)=>b.total-a.total);
   const reviewNow=_rtasks.filter(t=>t.status==='review').length;
@@ -32490,7 +32615,7 @@ window.tLoadCycles = async () => {
   let _cum=0,_p80=0; const _desc=[..._wsecs].sort((a,b)=>b-a); const _tgt=workTotalSec*0.8;
   for(const v of _desc){ _cum+=v; _p80++; if(_cum>=_tgt)break; }
   const workParetoPct=workCount?Math.round(100*_p80/workCount):0;
-  CYCLES={projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients,reviewTasks,reviewStages,reviewNow,reviewCount,reviewTotalSec,reviewAvgSec,workCount,workTotalSec,workMedianSec,workMeanSec,workP90Sec,workDoneCount,workDoneAvgSec,workStages,workTopTasks,workByAsg,workParetoPct};
+  CYCLES={_loaded:true,_at:now,projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients,reviewTasks,reviewStages,reviewNow,reviewCount,reviewTotalSec,reviewAvgSec,workCount,workTotalSec,workMedianSec,workMeanSec,workP90Sec,workDoneCount,workDoneAvgSec,workStages,workTopTasks,workByAsg,workParetoPct};
 };
 
 /* ===== TEAM · live aggregation (workload & activity per member) ===== */
@@ -33465,11 +33590,12 @@ window.kpiComputeOntimeDelivery = async (sc, id) => {
   return { value: val, sample_size: done, confidence: _kpiConfidence('ontime_delivery', done) };
 };
 
-/* Velocity 30 дней — этапы+задачи за 30 дней (v30 + tV30 из OVERVIEW) */
+/* Velocity 30 дней — этапы+задачи за 30 дней. Считаем УНИКАЛЬНЫЕ первые завершения,
+   ровно как плитка «Velocity 30 дней» в Сводке: повторное закрытие не должно давать +1 */
 window.kpiComputeVelocity30d = async (sc, id) => {
   if (sc && sc !== 'agency') return { value:null, sample_size:0, confidence:null };
   const O = (typeof OVERVIEW!=='undefined' ? OVERVIEW : {}) || {};
-  const val = (O.v30 || 0) + (O.tV30 || 0);
+  const val = (O.uniq30 || 0) + (O.tUniq30 || 0);
   return { value: val, sample_size: val, confidence: _kpiConfidence('velocity_30d', val) };
 };
 
@@ -33508,16 +33634,19 @@ window.kpiComputeMargin = async (sc, id) => {
   return { value: Math.round(F.marginPct * 10) / 10, sample_size: F.paying || 1, confidence: _kpiConfidence('margin', F.paying || 1) };
 };
 
-/* Убедимся что OVERVIEW и FINANCE подгружены при заходе в KPI-модуль */
-const _kpiOrigRenderKPI2 = window.renderKPI;
-window.renderKPI = async () => {
-  const needsOverview = !window.OVERVIEW || typeof window.OVERVIEW.deadlineDone === 'undefined';
-  const needsFinance  = !window.FINANCE  || typeof window.FINANCE.totalMrr === 'undefined';
+/* Подгрузка OVERVIEW/FINANCE перед показом модулей, которым они нужны.
+   Раньше здесь оборачивался window.renderKPI — но на этой строке он ещё не определён,
+   а ниже переприсваивается ещё несколько раз, так что обёртка была мертва.
+   Теперь это отдельная функция, её зовёт agNav. */
+window.tEnsureAggregates = async (m) => {
   const jobs = [];
-  if (needsOverview && window.tLoadOverview) jobs.push(window.tLoadOverview().catch(()=>{}));
-  if (needsFinance  && window.tLoadFinance)  jobs.push(window.tLoadFinance().catch(()=>{}));
+  const O = (typeof OVERVIEW!=='undefined' ? OVERVIEW : null);
+  const F = (typeof FINANCE!=='undefined' ? FINANCE : null);
+  if ((m==='kpi'||m==='overview') && window.tLoadOverview && !(O && O._loaded)) jobs.push(window.tLoadOverview().catch(()=>{}));
+  if ((m==='kpi'||m==='finance') && window.tLoadFinance  && !(F && F.ready))    jobs.push(window.tLoadFinance().catch(()=>{}));
+  if ((m==='cycles') && window.tLoadCycles && !(typeof CYCLES!=='undefined' && CYCLES._loaded)) jobs.push(window.tLoadCycles().catch(()=>{}));
   if (jobs.length) await Promise.all(jobs);
-  return _kpiOrigRenderKPI2();
+  return jobs.length > 0;
 };
 /* ═══ /Синхронизация ═══ */
 
@@ -39579,7 +39708,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.06-no-errors';
+window.__BUILD='2026-07-25.07-overview-cycles';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
