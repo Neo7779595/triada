@@ -31186,8 +31186,9 @@ function _ntfProjectRt(pl){
     _ntfPStatus[r.id]=r.status||'active';
     ntfAdd({ id:'p.new.'+r.id, ts:(r.created_at?new Date(r.created_at).getTime():Date.now()), src:'live', kind:'project', sev:'info',
       title:'Новый проект', obj:r.name||'без названия',
-      roles:(r.created_by?[{k:'Создал', v:_ntfWho(r.created_by)}]:[]).concat([{k:'Тариф', v:r.tariff||'—', muted:!r.tariff}]),
-      actor:r.created_by||null, projId:r.id, proj:r.name||'', tab:NTF_TAB.project, evt:'create', _rt:1 });
+      /* у проекта нет автора записи, зато есть ответственный — его и показываем */
+      roles:(r.lead_id?[{k:'Ответственный', v:_ntfWho(r.lead_id)}]:[]).concat([{k:'Тариф', v:r.tariff||'—', muted:!r.tariff}]),
+      actor:r.lead_id||null, projId:r.id, proj:r.name||'', tab:NTF_TAB.project, evt:'create', _rt:1 });
     return;
   }
   /* Событие только на РЕАЛЬНУЮ смену статуса. UPDATE прилетает на каждое
@@ -31296,7 +31297,9 @@ async function ntfPoll(force){
       /* этапы и проекты, созданные напрямую (если истории нет в publication),
          и новые сотрудники — realtime может молчать, опрос доставит всё равно */
       safe(SB.from('project_stages').select('id,name,project_id,status,created_at').in('project_id',pids).gt('created_at',since).order('created_at')),
-      safe(SB.from('projects').select('id,name,status,tariff,created_by,created_at').gt('created_at',since).order('created_at')),
+      /* у projects нет колонки created_by — запрос с ней падал с 400,
+         и уведомления о новых проектах не доходили через опрос */
+      safe(SB.from('projects').select('id,name,status,tariff,lead_id,created_at').gt('created_at',since).order('created_at')),
       safe(SB.from('profiles').select('id,full_name,role_title,dept,is_pm,is_director,agency_id,archived_at,created_at').gt('created_at',since).order('created_at'))
     ]);
     const first=(_ntfRtSeen===0 && NTF.length===0);
