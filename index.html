@@ -2968,6 +2968,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .lb-ops-toolbar .dd{flex:none}
 .lb-ops-toolbar .dd-btn{padding:8px 12px}
 .lb-ops-toolbar .lb-ops-sort{flex:1;min-width:0}
+.lb-mixnote{margin:10px 2px 0;padding:8px 12px;border-radius:9px;background:rgba(227,181,103,.1);border:1px solid rgba(227,181,103,.24);color:var(--warn);font-size:12.5px;line-height:1.45}
 .lb-ops-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:22px 0 12px}
 .lb-ops-sort{display:inline-flex;gap:4px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:4px}
 .lb-ops-sort.wrap{flex-wrap:wrap}
@@ -21024,7 +21025,7 @@ let _smmLbData=null, _smmLbMetric='er', _smmLbLoading=false, _smmLbSortDir='desc
    если PROJECTS приехали позже первого рендера (обычное дело при входе) — сигнатуры
    разойдутся, и данные подгрузятся сами. Раньше вместо этого стоял одноразовый флаг
    window._smmProjLoaded, из-за которого пустой кеш залипал до перезагрузки страницы. */
-let _smmLbSig='', _smmLbErrAt=0;
+let _smmLbSig='', _smmLbErrAt=0, _smmLbErr='', _smmLbMixed=false;
 const _SMM_LB_ERR_TTL=15000;
 function _smmIds(){ const _src=(typeof agActiveProjects==='function')?agActiveProjects():((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]).filter(p=>p.status!=='done'); return _src.map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }   // scope сотрудника + без архива: лидерборд ранжирует живые проекты
 function _smmLbStale(){ const s=_smmIds(); return !!s && s!==_smmLbSig && !(_smmLbErrAt && Date.now()-_smmLbErrAt<_SMM_LB_ERR_TTL); }
@@ -21057,20 +21058,24 @@ async function smmLoadLb(){
       all.push({proj, reportId:r.id, m:sm.metrics, period:(sm.period||'').trim(), ts:r.published_at||''});
     });
     _smmLbAll=all;
-    _smmLbSig=sig; _smmLbErrAt=0;                 // кеш собран именно по этому набору проектов
+    _smmLbSig=sig; _smmLbErrAt=0; _smmLbErr='';                 // кеш собран именно по этому набору проектов
     // уникальные непустые периоды по свежести (max дата отчёта); n = число проектов с данными за период
     const pm={};
     all.forEach(r=>{ if(!r.period) return; const e=pm[r.period]||(pm[r.period]={period:r.period, ts:r.ts, projs:new Set()}); if(r.ts>e.ts)e.ts=r.ts; e.projs.add(String(r.proj.id)); });
     _smmLbPeriods=Object.values(pm).map(e=>({period:e.period, ts:e.ts, n:e.projs.size})).sort((a,b)=> a.ts<b.ts?1:a.ts>b.ts?-1:0);
     if(_smmLbPeriod!=='__latest' && !_smmLbPeriods.some(p=>p.period===_smmLbPeriod)) _smmLbPeriod='__latest'; // выбранный период исчез → актуальное
     lbApplyPeriod();
-  }catch(e){ console.warn('smmLoadLb', e); _smmLbAll=[]; _smmLbPeriods=[]; _smmLbData=[]; _smmLbSig=''; _smmLbErrAt=Date.now(); }
+  }catch(e){ console.warn('smmLoadLb', e); _smmLbAll=[]; _smmLbPeriods=[]; _smmLbData=[]; _smmLbSig=''; _smmLbErrAt=Date.now(); _smmLbErr=String((e&&e.message)||e); }
   _smmLbLoading=false;
 }
 function lbApplyPeriod(){
   const all=_smmLbAll||[]; const seen=new Set(), out=[];
-  all.forEach(r=>{ if(_smmLbPeriod!=='__latest' && r.period!==_smmLbPeriod) return; const k=String(r.proj.id); if(seen.has(k)) return; seen.add(k); out.push({proj:r.proj, reportId:r.reportId, m:r.m}); });
+  all.forEach(r=>{ if(_smmLbPeriod!=='__latest' && r.period!==_smmLbPeriod) return; const k=String(r.proj.id); if(seen.has(k)) return; seen.add(k); out.push({proj:r.proj, reportId:r.reportId, m:r.m, period:r.period, ts:r.ts}); });
   _smmLbData=out;
+  /* в режиме «Последний отчёт» у проектов могут быть отчёты за разные месяцы —
+     это сравнение разнородных периодов, о нём нужно предупредить */
+  _smmLbMixed=false;
+  if(_smmLbPeriod==='__latest'){ const ps=new Set(out.map(function(r){return r.period||'';}).filter(Boolean)); _smmLbMixed=ps.size>1; }
 }
 function smmSetLbPeriodByVal(v){ if(v==='__latest'){ smmSetLbPeriodIdx(-1); return; } const _ix=_smmLbPeriods.findIndex(function(pp){return pp.period===v;}); smmSetLbPeriodIdx(_ix>=0?_ix:-1); }
 function smmSetLbPeriodIdx(i){ _smmLbPeriod=(i<0?'__latest':((_smmLbPeriods[i]&&_smmLbPeriods[i].period)||'__latest')); _smmLbAnim=true; if(typeof _closePops==='function')_closePops(); lbApplyPeriod(); lbPaint(); }
@@ -21107,7 +21112,7 @@ function lbControlsHTML(){
   const menuItems=M.map(mc=>'<div class="lbx-mi'+(mc.k===_smmLbMetric?' on':'')+'" onclick="smmSetLbMetric(\''+mc.k+'\')"><span class="mc">'+mc.l+'</span><span class="mn">'+NAMES[mc.k]+'</span><span class="mv">'+(cstat[mc.k]?fmtCell(cstat[mc.k].avg,mc):'—')+'</span><span class="ck">'+(mc.k===_smmLbMetric?I_CHECK:'')+'</span></div>').join('');
   const I_CAL='<svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:-2px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.5M16 3v3.5"/></svg>';
   const perLbl=(_smmLbPeriod==='__latest')?'Последний отчёт':_smmLbPeriod;
-  const perItems='<div class="lbx-mi'+(_smmLbPeriod==='__latest'?' on':'')+'" onclick="smmSetLbPeriodIdx(-1)"><span class="mc">'+I_CAL+'</span><span class="mn">Последний отчёт</span><span class="mv">'+(_smmLbAll?_smmLbAll.length:0)+'</span></div>'
+  const perItems='<div class="lbx-mi'+(_smmLbPeriod==='__latest'?' on':'')+'" onclick="smmSetLbPeriodIdx(-1)"><span class="mc">'+I_CAL+'</span><span class="mn">Последний отчёт</span><span class="mv">'+(_smmLbAll?new Set(_smmLbAll.map(function(r){return String(r.proj.id);})).size:0)+'</span></div>'
     +_smmLbPeriods.map((p,pi)=>'<div class="lbx-mi'+(p.period===_smmLbPeriod?' on':'')+'" onclick="smmSetLbPeriodIdx('+pi+')"><span class="mc">'+I_CAL+'</span><span class="mn">'+_ddH(p.period)+'</span><span class="mv">'+p.n+'</span></div>').join('');
   const periodDD=_smmLbPeriods.length?('<div class="dd lbx-ddwrap" id="dd-lbperiod"><button class="lbx-dd" onclick="event.stopPropagation();ddToggle(\'lbperiod\')"><span class="c">'+I_CAL+'</span><span class="nm">'+_ddH(perLbl)+'</span><span class="ch">'+I_CHEV+'</span></button><div class="lbx-menu"><div class="lbx-mh">Период рейтинга</div>'+perItems+'</div></div>'):'';
   return '<div class="lbx-ctr">'
@@ -21175,11 +21180,14 @@ function renderSmmLbSimple(){
   const perLabel=_smmLbPeriod==='__latest'?'Последний':_smmLbPeriod;
   const perDD=_dd('smmlb-per','Период',perLabel,perOptsArr,_smmLbPeriod,'smmSetLbPeriodByVal');
   const metricBtns=M.map(mc=>'<button class="'+(mc.k===cfg.k?'on':'')+'" onclick="smmSetLbMetric(\''+mc.k+'\')">'+SHORT[mc.k]+'</button>').join('');
-  const headBar='<div class="lb-ops-head"><div class="lb-ops-toolbar">'+perDD+'<div class="lb-ops-sort wrap">'+metricBtns+'</div></div></div>';
+  /* «Последний отчёт» у разных проектов может быть за разные месяцы — сравнение разнородное, предупреждаем */
+  const mixNote=(_smmLbPeriod==='__latest'&&_smmLbMixed)?'<div class="lb-mixnote">Отчёты за разные периоды — сравнение приблизительное. Выберите конкретный период выше для корректного рейтинга.</div>':'';
+  const headBar='<div class="lb-ops-head"><div class="lb-ops-toolbar">'+perDD+'<div class="lb-ops-sort wrap">'+metricBtns+'</div></div>'+mixNote+'</div>';
   const shell=inner=>headBar+inner;
   if(_smmLbData===null) return shell('<div class="lb-load">Загрузка рейтинга…</div>');
+  if(!_all.length && _smmLbErr) return headBar+'<div class="lb-load">Не удалось загрузить рейтинг<br><span style="opacity:.6">'+esc(_smmLbErr)+'</span><br><button class="pk-fclear" style="margin-top:12px" onclick="smmLbReset();renderLeaderboard()">Повторить</button></div>';
   if(!_all.length) return headBar+'<div class="lb-load">SMM-отчётов в агентстве пока нет<br><span style="opacity:.6">создайте отчёты в проектах — они появятся здесь</span></div>';
-  const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m)})).filter(r=>r.val!=null);
+  const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m)})).filter(r=>r.val!=null&&isFinite(r.val));
   if(!_smmLbData.length) return shell('<div class="lb-load">За период «'+esc(curName)+'» отчётов нет<br><span style="opacity:.6">выберите другой период выше</span></div>');
   if(!rows.length) return shell('<div class="lb-load">Нет данных по метрике «'+esc(NAMES[cfg.k])+'» за «'+esc(curName)+'»<br><span style="opacity:.6">попробуйте другую метрику или период</span></div>');
   rows.sort((a,b)=>(b.val||0)-(a.val||0)); rows.forEach((r,i)=>r.rank=i+1);
@@ -21203,7 +21211,7 @@ function renderSmmLbSimple(){
     const t=(r.val-minV)/((maxV-minV)||1);
     let dChip=''; const _pm=prevMap[String(r.proj.id)]; const _pv=_pm?cfg.get(_pm):null; if(_pv!=null&&r.val!=null&&_pv!==0){ const dv=(r.val-_pv)/Math.abs(_pv); const up=dv>0.005,dn=dv<-0.005,pc=Math.round(Math.abs(dv)*100); dChip=up?'<span class="lb-opd up">\u25B2'+pc+'%</span>':(dn?'<span class="lb-opd dn">\u25BC'+pc+'%</span>':'<span class="lb-opd fl">\u2248</span>'); }
     const hcol=t>=.66?'var(--pos)':t>=.33?'var(--accent)':'var(--txt-2)';
-    const bw=_tClamp(Math.round(Math.abs(r.val)/maxAbs*100),3,100);
+    const bw=r.val>=0?_tClamp(Math.round(r.val/maxAbs*100),3,100):3;   // у отрицательных (отток) бар минимальный, а не «во всю ширину»
     const rk=r.rank<=3?'<span class="lb-medal m'+r.rank+'">'+r.rank+'</span>':'<span class="lb-rk">'+r.rank+'</span>';
     const col=r.proj.color||'#37E6C8'; const init=esc(((r.proj.name||'?').trim()[0]||'?').toUpperCase());
     const ic='<span class="lb-opic" style="background:'+col+'22;color:'+col+'">'+logoFill(r.proj.logoUrl,init)+'</span>';
@@ -21223,7 +21231,7 @@ function renderSmmLbSimple(){
 function computeProjectOps(period){
   const raw=window._teamRaw;
   const _w=_opsWindow(period), _in=ms=>_w.days==null||(ms>=_w.t0&&ms<_w.t1), _ip=ms=>_w.days!=null&&ms>=_w.prevT0&&ms<_w.prevT1;
-  const projs=(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>p&&p.id!=null&&p.status!=='done'&&p.status!=='archived');
+  const projs=((typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>!AG_ARCHIVED_ST[String(p.status||'')])).filter(p=>p&&p.id!=null);
   const P={}; projs.forEach(p=>{ P[p.id]={p,cyc:[],closes:0,open:0,overdue:0,withDue:0,onTime:0,recent:0,pcyc:[],pcloses:0}; });
   if(raw){
     const sh=_tWalk(raw.hist||[],'stage_id'), th=_tWalk(raw.taskHist||[],'task_id');
@@ -21245,9 +21253,13 @@ function computeProjectOps(period){
     r.speed=(r.med!=null&&bench)?Math.round(_tClamp(70*bench/r.med,5,100)):null;
     r.onTimePct=r.withDue>0?Math.round(100*r.onTime/r.withDue):null;
     const overRate=r.open>0?r.overdue/r.open:0;
-    r.flow=r.withDue>0?r.onTimePct:(r.open>0?Math.round(_tClamp(100-overRate*100,0,100)):null);
-    let num=0,den=0; const add=(v,w)=>{ if(v!=null){num+=v*w;den+=w;} }; add(r.speed,50); add(r.flow,30); add(r.pct,20);
-    r.score=den>0?Math.round(num/den):null;
+    const _openScore=r.open>0?Math.round(_tClamp(100-overRate*100,0,100)):null;
+    /* и сданное в срок, и то, что горит прямо сейчас: раньше одна закрытая в срок задача
+       давала flow=100 при двадцати просроченных открытых */
+    r.flow=(r.onTimePct!=null&&_openScore!=null)?Math.round(0.6*r.onTimePct+0.4*_openScore)
+          :(r.onTimePct!=null?r.onTimePct:_openScore);
+    let num=0,den=0,parts=0; const add=(v,w)=>{ if(v!=null){num+=v*w;den+=w;parts++;} }; add(r.speed,50); add(r.flow,30); add(r.pct,20);
+    r.score=(den>0&&parts>=2)?Math.round(num/den):null;   // один прогресс по этапам — это не «общий балл»
     r.verdict=r.speed==null?null:(r.speed>=66?'fast':r.speed>=40?'ok':'slow');
     r.speedDelta=(r.med!=null&&r.pmed!=null&&r.pmed>0)?((r.pmed-r.med)/r.pmed):null;
     r.tpDelta=(r.pcloses>0)?((r.closes-r.pcloses)/r.pcloses):((r.closes>0&&_w.days!=null)?1:null);
@@ -21259,11 +21271,11 @@ function renderOpsLb(){
   const O=computeProjectOps(_opsPeriod);
   if(!O.total) return '<div class="lb-load">Активных проектов нет — операционный рейтинг появится, когда пойдёт работа по этапам и задачам.</div>';
   const MET={
-    speed:{l:'Скорость',desc:'кто быстрее закрывает этапы и задачи',get:r=>r.speed,disp:r=>r.med!=null?_cycDur(r.med):'—',asc:false,bar:r=>r.speed,hi:true},
+    speed:{l:'Скорость',desc:'кто быстрее закрывает этапы и задачи',get:r=>r.med!=null?-r.med:null,disp:r=>r.med!=null?_cycDur(r.med):'—',asc:false,bar:r=>r.speed,hi:true},
     score:{l:'Общий балл',desc:'скорость + пунктуальность + прогресс',get:r=>r.score,disp:r=>r.score!=null?r.score:'—',asc:false,bar:r=>r.score,hi:true},
-    throughput:{l:'Выработка',desc:'закрыто этапов и задач за всё время',get:r=>r.closes,disp:r=>r.closes,asc:false,bar:r=>r.closes},
+    throughput:{l:'Выработка',desc:'закрыто этапов и задач за выбранный период',get:r=>r.closes,disp:r=>r.closes,asc:false,bar:r=>r.closes},
     progress:{l:'Прогресс',desc:'готовность по этапам',get:r=>r.pct,disp:r=>r.pct+'%',asc:false,bar:r=>r.pct},
-    overdue:{l:'Просрочено',desc:'больше задач с истёкшим сроком — выше в списке',get:r=>r.overdue,disp:r=>r.overdue,asc:false,bar:r=>r.open>0?Math.round(100*r.overdue/r.open):0,neg:true}
+    overdue:{l:'Просрочено',desc:'больше задач с истёкшим сроком — выше в списке',get:r=>r.overdue,disp:r=>r.overdue,asc:false,bar:r=>r.overdue,neg:true}
   };
   const sort=MET[_opsSort]?_opsSort:'speed'; const cfg=MET[sort];
   let rows=O.rows.slice(); const gv=r=>{ const v=cfg.get(r); return v==null?(cfg.asc?Infinity:-1):v; };
@@ -21394,7 +21406,7 @@ function renderOpsLb(){
     const vlab=r.verdict==='fast'?'быстро':r.verdict==='ok'?'норма':r.verdict==='slow'?'медленно':'нет данных';
     const bw=cfg.bar(r)!=null?_tClamp(Math.round((cfg.bar(r)||0)/maxBar*100),3,100):0;
     const bcol=cfg.neg?(r.overdue>0?'var(--neg)':'var(--pos)'):vcol;
-    const rk=r.rank<=3?'<span class="lb-medal m'+r.rank+'">'+r.rank+'</span>':'<span class="lb-rk">'+r.rank+'</span>';
+    const rk=(!cfg.neg&&r.rank<=3)?'<span class="lb-medal m'+r.rank+'">'+r.rank+'</span>':'<span class="lb-rk">'+r.rank+'</span>';   // золото за худшую просрочку — не награда
     const col=r.p.color||'#37E6C8'; const init=esc(((r.p.name||'?').trim()[0]||'?').toUpperCase());
     const ic='<span class="lb-opic" style="background:'+col+'22;color:'+col+'">'+logoFill(r.p.logoUrl,init)+'</span>';
     const val=cfg.hi?vcol:'var(--txt)';
@@ -21405,7 +21417,7 @@ function renderOpsLb(){
       +'<span class="lb-opmetric"><span class="lb-opvrow"><b style="color:'+val+'">'+cfg.disp(r)+'</b>'+dChip+'</span><span class="lb-opbar"><i style="width:'+bw+'%;background:'+bcol+'"></i></span></span>'
       +'<span class="lb-opc">'+r.closes+'</span>'
       +'<span class="lb-opc"><span class="lb-opprog"><i style="width:'+_tClamp(r.pct,0,100)+'%"></i></span>'+r.pct+'%</span>'
-      +'<span class="lb-opc" style="'+(r.overdue>0?'color:var(--neg)':'color:var(--txt-3)')+'">'+(r.overdue||'—')+'</span>'
+      +'<span class="lb-opc" style="'+(r.overdue>0?'color:var(--neg)':'color:var(--txt-3)')+'">'+r.overdue+'</span>'
     +'</div>';
   }).join('');
   const headerRow='<div class="lb-oprow lb-ophead"><span>#</span><span>Проект</span><span class="c">'+cfg.l+'</span><span class="c">Выработка</span><span class="c">Прогресс</span><span class="c">Просрочено</span></div>';
@@ -23792,8 +23804,8 @@ function _tWindow(){
   return {t0,t1,prevT0:t0-days*86400000,prevT1:t0,days};
 }
 /* проходим историю по предмету: пары active→done = циклы; откаты = возвраты (вешаем на исполнителя последнего done) */
-function _tWalk(rows, idKey){
-  const rank={wait:0,active:1,review:2,done:3};
+function _tWalk(rows, idKey, isStage){
+  const rank={wait:0,hold:0,active:1,review:2,done:3};
   const byItem={};
   (rows||[]).forEach(r=>{ const k=r[idKey]; if(k==null) return; (byItem[k]=byItem[k]||[]).push(r); });
   const closes=[], returns=[], seen={};
@@ -23805,10 +23817,10 @@ function _tWalk(rows, idKey){
       const f=rank[h.old_status], to=rank[h.new_status];
       if(h.new_status==='active'){ activeStart=ms; lastActiveMs=ms; }
       if(h.new_status==='done'){
-        closes.push({ by:h.changed_by, ms, durMs:activeStart!=null?Math.max(ms-activeStart,0):null, projectId:h.project_id||null, name:h.stage_name||null, id, first:!seen[id] });
+        closes.push({ by:h.changed_by, ms, durMs:activeStart!=null?Math.max(ms-activeStart,0):null, projectId:h.project_id||null, name:h.stage_name||null, id, isStage:!!isStage, first:!seen[id] });
         seen[id]=true; lastDoneBy=h.changed_by; activeStart=null;
       }
-      if(f!=null && to!=null && to<f) returns.push({ against:lastDoneBy||h.changed_by, ms, sinceActiveMs:(lastActiveMs!=null?Math.max(ms-lastActiveMs,0):null) });
+      if(!h.__bulkReset && h.old_status!=null && h.old_status!==h.new_status && f!=null && to!=null && to<f) returns.push({ against:lastDoneBy||h.changed_by, ms, sinceActiveMs:(lastActiveMs!=null?Math.max(ms-lastActiveMs,0):null) });
     });
   }
   return {closes,returns};
@@ -23838,20 +23850,21 @@ function computeTeamMetrics(){
   const diffOf=id=> (raw&&raw.taskDiff&&id!=null)?raw.taskDiff[id]:null;
   const projOf=id=> (raw&&raw.taskProj&&id!=null)?raw.taskProj[id]:null;
   if(raw){
-    const sh=_tWalk(raw.hist,'stage_id'), th=_tWalk(raw.taskHist,'task_id');
+    const sh=_tWalk(raw.hist,'stage_id',true), th=_tWalk(raw.taskHist,'task_id',false);
     const closes=sh.closes.concat(th.closes), returns=sh.returns.concat(th.returns);
     // карта: когда предмет последний раз становился active (для оценки «быстрого реджекта»)
     closes.forEach(c=>{
       const a=M[c.by]; if(!a) return;
-      const w=_diffW(diffOf(c.id));
+      const w=c.isStage?1.0:_diffW(diffOf(c.id));   // сложность есть только у задач
       if(inPrev(c.ms) && c.first){ a.prevTp++; a.prevTpW+=w; }
       if(!inWin(c.ms)) return;
       a.closes++;
       if(c.first){ a.tp++; a.tpW+=w; a.weeksArr[bIdx(c.ms)]++; } else a.redo++;
       if(c.durMs!=null){ a.cycles.push(c.durMs); allCycles.push(c.durMs);
         const rl=(a.m.role||'—'); (roleCycles[rl]=roleCycles[rl]||[]).push(c.durMs);
-        const pj=projOf(c.id); if(pj!=null){ (projCycles[pj]=projCycles[pj]||[]).push(c.durMs); } }
-      if(c.id!=null && raw.taskDue && raw.taskDue[c.id]!==undefined){ const due=raw.taskDue[c.id]; if(due){ a.withDue++; if(c.ms <= new Date(due+'T23:59:59').getTime()) a.onTime++; } }
+        const pj=c.projectId||(c.isStage?((raw.stageProj||{})[c.id]):projOf(c.id)); if(pj!=null){ (projCycles[pj]=projCycles[pj]||[]).push(c.durMs); } }
+      if(!c.isStage && c.id!=null && raw.taskDue && raw.taskDue[c.id]!==undefined){ const due=raw.taskDue[c.id]; if(due){ a.withDue++; if(c.ms <= new Date(due+'T23:59:59').getTime()) a.onTime++; } }
+      else if(c.isStage && c.id!=null && raw.stageDue && raw.stageDue[c.id]){ const due=raw.stageDue[c.id]; a.withDue++; if(c.ms <= new Date(due+'T23:59:59').getTime()) a.onTime++; }
     });
     returns.forEach(r=>{ if(!inWin(r.ms)) return; const a=M[r.against]; if(!a) return;
       // «мягкий» возврат: если откат случился быстро после взятия — вероятно, вина ТЗ/постановки, а не исполнения
@@ -23872,14 +23885,12 @@ function computeTeamMetrics(){
     // СКОРОСТЬ: эталон = смесь медианы по роли и по проектам, где человек работал (устойчивее одной роли)
     const rl=(m.role||'—');
     const roleMed=_tMed(roleCycles[rl]);
-    // персональный проектный эталон: медиана по всем проектам сотрудника
-    const myProjMeds=[]; const seenPj={};
-    (a.cycles.length?Object.keys(projCycles):[]).forEach(()=>{});
-    // собираем медианы проектов, где у человека были циклы
-    const projMedAll=_tMed([].concat(...Object.values(projCycles)));
+    // проектный эталон: медиана медиан по проектам (устойчивее, чем общая куча циклов)
+    const _projMeds=Object.keys(projCycles).map(k=>_tMed(projCycles[k])).filter(x=>x!=null);
+    const projMedAll=_projMeds.length?_tMed(_projMeds):null;
     const benchMed = (roleMed!=null && projMedAll!=null) ? (roleMed*0.6+projMedAll*0.4)
                    : (roleMed!=null?roleMed : (projMedAll!=null?projMedAll:_tMed(allCycles)));
-    a.pSpeed = (a.medCycle!=null && benchMed && !a.lowSpeed) ? _tClamp(70*benchMed/a.medCycle,8,100) : null;
+    a.pSpeed = (a.medCycle!=null && a.medCycle>0 && benchMed && !a.lowSpeed) ? _tClamp(70*benchMed/a.medCycle,8,100) : null;
     // КАЧЕСТВО: доля без возвратов (возвраты уже смягчены по вине ТЗ)
     a.pQuality = a.closes>0 ? _tClamp(100*(1-a.returns/a.closes),0,100) : null;
     // НАДЁЖНОСТЬ: пунктуальность по дедлайнам, но только при достаточной выборке
@@ -23898,7 +23909,8 @@ function computeTeamMetrics(){
     a.weeks=a.weeksArr;   // совместимость с _tArch
     a.dataConf = _tClamp(Math.round(100*a.closes/(a.closes+6)),0,100);   // доверие к данным (0 задач=0, много=~100)
   });
-  const ranked=members.filter(m=>M[m._id].tpi!=null).sort((x,y)=>M[y._id].tpi-M[x._id].tpi);
+  /* ранг только тем, у кого достаточно данных — иначе в таблице зияли дыры «2, 4, 6» */
+  const ranked=members.filter(m=>M[m._id].tpi!=null && M[m._id].n>=3).sort((x,y)=>M[y._id].tpi-M[x._id].tpi);
   ranked.forEach((m,i)=>{ M[m._id].rank=i+1; });
   members.forEach(m=>{ const a=M[m._id]; a.arch=_tArch(a); });
   const sum=k=>members.reduce((s,m)=>s+(M[m._id][k]||0),0);
@@ -23936,7 +23948,7 @@ const TEAM_SMM_W={ er:0.40, reachTrend:0.25, followers:0.20, cadence:0.15 };
 
 function _teamSmmScore(projLinks){
   // projLinks: [{id, role:'lead'|'member'}] — как команда связана с проектом (ПМ или участник)
-  const all=window._smmLbAll||[];
+  const all=((typeof _smmLbAll!=='undefined'&&_smmLbAll)||[]);   // top-level let: на window его нет
   if(!all.length || !projLinks || !projLinks.length) return null;
   const linkOf={}; projLinks.forEach(l=>{ linkOf[String(l.id)]=l.role; });
   const idset=new Set(projLinks.map(l=>String(l.id)));
@@ -24055,7 +24067,7 @@ function _tiSpark(series,col){
   const last=series[n-1];
   return `<svg class="ti-spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><polygon points="${area}" fill="${col}" opacity=".1"/><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" opacity=".85"/><circle cx="${X(n-1).toFixed(1)}" cy="${Y(last).toFixed(1)}" r="2.4" fill="${col}"/></svg>`;
 }
-function _avInner(m){ const ini=((m.name||'?')[0]||'?').toUpperCase(); return m.avatar?`<span class="ph"><img src="${m.avatar}" alt=""></span>`:ini; }
+function _avInner(m){ const ini=escH(((m.name||'?')[0]||'?').toUpperCase()); return m.avatar?`<span class="ph">${logoFill(m.avatar,ini)}</span>`:ini; }
 function _tiPillar(label,v){ const na=v==null; const col=na?'var(--txt-3)':v>=75?'var(--pos)':v>=50?'var(--accent)':v>=30?'var(--warn)':'var(--neg)';
   return `<div class="eqi${na?' gh':''}"><span class="vv">${na?'–':Math.round(v)}</span><span class="trk">${na?'':`<i style="height:${Math.max(5,Math.round(v))}%;background:${col}"></i>`}</span><span class="ll">${label}</span></div>`; }
 function _tiCountUp(){
@@ -24077,6 +24089,11 @@ const _periodLbl=()=>({'7d':'7 дней','30d':'30 дней','90d':'90 дней'
 
 const TM_SORT_OPTS=[['tpi','По TPI'],['throughput','По выработке'],['speed','По скорости'],['quality','По качеству'],['reliability','По надёжности'],['cycle','Самый быстрый цикл']];
 function renderTeam(){
+  if(!window._teamRaw && window.tLoadTeam && window.LIVE){
+    window.tLoadTeam().then(function(){ if(typeof _agCurModule==='function' && _agCurModule()==='team') renderTeam(); }).catch(function(){});
+    const _c=document.getElementById('content-ag');
+    if(_c && !_c.querySelector('.ti-bar')){ _c.innerHTML='<div class="ph"><div><div class="eyebrow">Агентство · Люди</div><h1>Команда</h1></div></div><div class="lb-load">Загружаем данные команды…</div>'; return; }
+  }
   const M = computeTeamMetrics();
   const A = M.agg;
   const fmtDays = d => d==null?'—':d===0?'сегодня':d+'д назад';
@@ -24096,11 +24113,11 @@ function renderTeam(){
         <th>#</th><th>Сотрудник</th><th>TPI</th><th>Профиль · O·S·Q·R</th><th>Выработка</th><th>Медиана цикла</th><th>Возвраты</th><th class="col-spark">Динамика</th><th class="col-arch">Тип</th>
       </tr></thead><tbody>
       ${rows.length?rows.map(r=>{const m=r.m,g=_gradeOf(r.tpi),st=actColor(m._lastDays),low=r.n<3;
-        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st pres-dot${_isOnline(m)?' on':''}" data-pid="${m._id}" title="${_presLabel(m)}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')} · <span class="pres-txt${_isOnline(m)?' on':''}" data-pid="${m._id}">${_presLabel(m)}</span></div></div></div>`;
+        const idCell=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st pres-dot${_isOnline(m)?' on':''}" data-pid="${m._id}" title="${escH(_presLabel(m))}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${escH(m.role||'Сотрудник')} · ${escH(m.dept||'—')} · <span class="pres-txt${_isOnline(m)?' on':''}" data-pid="${m._id}">${_presLabel(m)}</span></div></div></div>`;
         if(low){
           const need=Math.max(0,3-r.n);
           const hint=`<div class="ti-hint">${need>0?`ещё ${need} ${_taskWord(need)} до оценки`:'оценка формируется'}</div>`;
-          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st pres-dot${_isOnline(m)?' on':''}" data-pid="${m._id}" title="${_presLabel(m)}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${(m.role||'Сотрудник')} · ${(m.dept||'—')} · <span class="pres-txt${_isOnline(m)?' on':''}" data-pid="${m._id}">${_presLabel(m)}</span></div>${hint}</div></div>`;
+          const idCellLow=`<div class="ti-id"><span class="ti-av" style="background:${m.color||'var(--accent)'}">${_avInner(m)}<span class="st pres-dot${_isOnline(m)?' on':''}" data-pid="${m._id}" title="${escH(_presLabel(m))}"></span></span><div><div class="nm">${escH(m.name||'—')}</div><div class="sl">${m.is_director?'<span class="dir-badge">Директор</span> ':''}${escH(m.role||'Сотрудник')} · ${escH(m.dept||'—')} · <span class="pres-txt${_isOnline(m)?' on':''}" data-pid="${m._id}">${_presLabel(m)}</span></div>${hint}</div></div>`;
           return `<tr class="ti-low" onclick="pmCardOpen('${m._id}')" style="cursor:pointer">
         <td><span class="ti-rank idle">–</span></td>
         <td>${idCellLow}</td>
@@ -24125,9 +24142,9 @@ function renderTeam(){
       </tr>`;}).join(''):`<tr><td colspan="9" class="ti-empty">${TEAM.length?'Никого не нашли по фильтру':'Нет сотрудников'}</td></tr>`}
       </tbody></table></div></div>`;
   } else if(teamTab==='workload'){
-    const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
-    const TOT=W+I+D, shareOf=v=>TOT?Math.round(100*v/TOT):0;
-    const sorted=[...TEAM].sort((a,b)=>((b._wait||0)+(b._active||0)+(b._done||0))-((a._wait||0)+(a._active||0)+(a._done||0)));
+    const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), R=TEAM.reduce((s,e)=>s+(e._review||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
+    const TOT=W+I+R+D, shareOf=v=>TOT?Math.round(100*v/TOT):0;   // «На утверждении» тоже часть нагрузки — иначе проценты не сходятся со строками
+    const sorted=[...TEAM].sort((a,b)=>((b._wait||0)+(b._active||0)+(b._review||0)+(b._done||0))-((a._wait||0)+(a._active||0)+(a._review||0)+(a._done||0)));
     const {t0:_pwT0,t1:_pwT1}=_tWindow();
     const _pWork={}; (window._timeLogs||[]).forEach(l=>{ if(!l||(l.kind&&l.kind!=='work')) return; const ts=l.started_at?new Date(l.started_at).getTime():0; if(ts>=_pwT0&&ts<=_pwT1){ const a=_pWork[l.member_id]||(_pWork[l.member_id]={sec:0,cnt:0}); a.sec+=(l.seconds||0); a.cnt++; } });
     const _wsec=e=>{ const a=_pWork[e._id]; return a?{sec:a.sec,cnt:a.cnt}:{sec:0,cnt:0}; };
@@ -24138,6 +24155,7 @@ function renderTeam(){
       <div class="wlx-sum">
         <div class="wlx-s"><div class="v" style="color:var(--warn)">${W}<small>${shareOf(W)}%</small></div><div class="l"><span class="dt" style="background:var(--warn)"></span>В ожидании</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--accent)">${I}<small>${shareOf(I)}%</small></div><div class="l"><span class="dt" style="background:var(--accent)"></span>В работе</div></div>
+        <div class="wlx-s"><div class="v" style="color:var(--violet)">${R}<small>${shareOf(R)}%</small></div><div class="l"><span class="dt" style="background:var(--violet)"></span>На утверждении</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--pos)">${D}<small>${shareOf(D)}%</small></div><div class="l"><span class="dt" style="background:var(--pos)"></span>Завершено</div></div>
         <div class="wlx-s"><div class="v" style="color:var(--accent)">${_totWork>0?_cycDur(_totWork*1000):'—'}</div><div class="l"><span class="dt" style="background:var(--accent)"></span>Время в работе · за ${_periodLbl()}</div></div>
       </div>
@@ -24998,7 +25016,7 @@ function _pmRender(m){
       <div class="pm-a-grid">
         <div class="pm-a-tile"><div class="pm-a-tile-l">Выработка</div><div class="pm-a-tile-v">${m.tp||0}</div><div class="pm-a-tile-s">закрытых задач</div></div>
         <div class="pm-a-tile"><div class="pm-a-tile-l">Медиана цикла</div><div class="pm-a-tile-v">${m.medCycle!=null?(typeof _cycDur==='function'?_cycDur(m.medCycle):m.medCycle):'—'}</div><div class="pm-a-tile-s">старт → финиш</div></div>
-        <div class="pm-a-tile"><div class="pm-a-tile-l">Возвраты</div><div class="pm-a-tile-v ${(m.returns&&m.returns>0)?'is-neg':''}">${m.returns?Math.round(100*m.returns/Math.max(1,m.closes||1))+'%':'0%'}</div><div class="pm-a-tile-s">за период</div></div>
+        <div class="pm-a-tile"><div class="pm-a-tile-l">Возвраты</div><div class="pm-a-tile-v ${(m.returns&&m.returns>0)?'is-neg':''}">${m.closes?Math.round(100*(m.returns||0)/m.closes)+'%':'—'}</div><div class="pm-a-tile-s">за период</div></div>
         <div class="pm-a-tile"><div class="pm-a-tile-l">Активные</div><div class="pm-a-tile-v">${m.open||0}</div><div class="pm-a-tile-s">незакрытых сейчас</div></div>
       </div>
       ${s&&s.TPI==null?'<div class="pm-a-empty">Мало данных для оценки — метрики появятся после нескольких закрытых задач.</div>':''}
@@ -30484,7 +30502,7 @@ async function _ntfKpi(){
   for(const k of Object.keys(scopes)){
     const [sk, sid]=k.split('|');
     let cur={};
-    try{ cur=await kpiComputeAll(sk, sid||null, per.start_date, per.end_date)||{}; }catch(e){ cur={}; }
+    try{ cur=await kpiComputeAll(sk, sid||null, per.start_date, (per.end_date?per.end_date+'T23:59:59.999Z':per.end_date))||{}; }catch(e){ cur={}; }   // иначе весь последний день периода отбрасывался
     scopes[k].forEach(function(t){
       const M=(window.KPI_METRICS||{})[t.metric_key]||{};
       const v=cur[t.metric_key];
@@ -32480,25 +32498,26 @@ window.tLoadOverview = async () => {
 };
 
 /* ===== CYCLES · live aggregation (cycle time from stage history) ===== */
+/* PostgREST отдаёт максимум 1000 строк за запрос. Без пагинации любая аналитика
+   молча замирает на самой старой тысяче записей. Общий помощник для всех загрузчиков. */
+window._sbPageAll = async (build, cap) => {
+  const out = []; const step = 1000; cap = cap || 30000; let prevKey = null;
+  for (let from = 0; from < cap; from += step){
+    const r = await build().range(from, from + step - 1);
+    if (r.error) break;
+    const d = r.data || [];
+    const key = d.length ? JSON.stringify(d[0]) : '';
+    if (key && key === prevKey) break;            // прокси проглотил Range и вернул ту же страницу — не задваиваем
+    prevKey = key;
+    for (const x of d) out.push(x);
+    if (d.length < step) break;
+  }
+  return out;
+};
 window.tLoadCycles = async () => {
   if (!SB) return;
   const now = Date.now();
-  /* PostgREST отдаёт максимум 1000 строк за запрос. Без пагинации метрики циклов
-     замирали на самой старой тысяче событий и новые завершения этапов их не двигали. */
-  const _pageAll = async (build, cap) => {
-    const out = []; const step = 1000; cap = cap || 30000; let prevKey = null;
-    for (let from = 0; from < cap; from += step){
-      const r = await build().range(from, from + step - 1);
-      if (r.error) break;
-      const d = r.data || [];
-      const key = d.length ? JSON.stringify(d[0]) : '';
-      if (key && key === prevKey) break;            // прокси проглотил заголовок Range и вернул ту же страницу — не задваиваем
-      prevKey = key;
-      for (const x of d) out.push(x);
-      if (d.length < step) break;
-    }
-    return out;
-  };
+  const _pageAll = window._sbPageAll;
   const [histAll, sr, tasksAll, pmr, pjr] = await Promise.all([
     _pageAll(() => SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true})),
     SB.from('project_stages').select('id,name,project_id'),
@@ -32705,35 +32724,61 @@ window.tLoadCycles = async () => {
 };
 
 /* ===== TEAM · live aggregation (workload & activity per member) ===== */
-window.tLoadTeam = async () => {
+window._tmLoading = null;
+window.tLoadTeam = async (force) => {
   if (!SB) return;
+  if (window._tmLoading) return window._tmLoading;                    // уже грузим — не запускаем второй залп
+  const _fresh = window._teamRaw && (Date.now() - (window._teamRaw.loadedAt||0) < 120000);
+  if (!force && _fresh) return;                                       // данные свежие (2 мин)
+  window._tmLoading = (async () => {
   const now = Date.now();
   const today = new Date(); today.setHours(0,0,0,0);
   const iso30 = new Date(now - 30*86400000).toISOString();
   const iso365 = new Date(now - 365*86400000).toISOString();
-  const [tr, hr, thr, pr, tl] = await Promise.all([
-    SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started'),
-    SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at'),
-    SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at'),
+  const [tr, hr, thr, pr, sgr, tl, pmr] = await Promise.all([
+    window._sbPageAll(() => SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started').order('id')).then(d=>({data:d})),
+    window._sbPageAll(() => SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at').order('created_at')).then(d=>({data:d})),
+    window._sbPageAll(() => SB.from('task_history').select('task_id,project_id,changed_by,old_status,new_status,created_at').order('created_at')).then(d=>({data:d})).catch(()=>({data:[],error:1})),
     SB.from('projects').select('id,status,name'),
-    SB.from('time_logs').select('member_id,seconds,started_at,kind').gte('started_at',iso365)
+    window._sbPageAll(() => SB.from('project_stages').select('id,project_id,due_date').order('id')).then(d=>({data:d})),
+    window._sbPageAll(() => SB.from('time_logs').select('member_id,seconds,started_at,kind').gte('started_at',iso365).order('started_at')).then(d=>({data:d})),
+    SB.from('project_members').select('project_id,member_id')
   ]);
   window._timeLogs = (tl && !tl.error && tl.data) ? tl.data : [];   // журнал может ещё не существовать (до миграции)
   const _doneProj = new Set(((pr&&pr.data)||[]).filter(x=>AG_ARCHIVED_ST[String(x.status||'')]).map(x=>x.id));
   const _projName={}; ((pr&&pr.data)||[]).forEach(x=>{ _projName[x.id]=x.name||''; });
   const _td={};   // детальная статистика задач по исполнителю (реальные данные)
-  let tr2=await SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started,difficulty,priority');
-  if(tr2.error && /difficulty|priority/.test(tr2.error.message||'')) tr2=tr;   // колонок ещё нет — используем базовую выборку
-  const trUse = (tr2 && !tr2.error) ? tr2 : tr;
-  const _visLB = (typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope=member → операционный лидерборд/статистика команды считаются только по видимым проектам
-  const tasks = (trUse.data||[]).filter(t => !_doneProj.has(t.project_id) && (!_visLB || _visLB.has(t.project_id)));
-  const hist = (hr.data||[]).filter(h => !_visLB || _visLB.has(h.project_id));
-  const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];   // task_history не имеет project_id, но его id-задач автоматически ограничатся taskDue/taskProj ниже
+  let tr2=null;
+  try{ tr2={data: await window._sbPageAll(() => SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,time_spent,timer_started,difficulty,priority').order('id'))}; }catch(_e){ tr2=null; }
+  const trUse = (tr2 && tr2.data && tr2.data.length) ? tr2 : tr;              // колонок difficulty/priority может ещё не быть
+  /* scope сотрудника — из project_members напрямую: agVisibleProjectIds() читает p._team,
+     который заполняет параллельный загрузчик, и при гонке обнулял весь модуль */
+  let _visLB = null;
+  if (typeof agProjectAccessMode==='function' && agProjectAccessMode()!=='all'){
+    const _me=(window.tMe&&window.tMe())||{}, _mid=String(_me.id||_me._id||'');
+    _visLB = new Set();
+    ((pmr&&pmr.data)||[]).forEach(r => { if(String(r.member_id)===_mid && r.project_id) _visLB.add(r.project_id); });
+    const _s2=(typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;
+    if(_s2) _s2.forEach(id => _visLB.add(id));
+  }
+  const _okTm = pid => !_doneProj.has(pid) && (!_visLB || _visLB.has(pid));   // архив и чужие проекты — мимо метрик
+  const tasks = (trUse.data||[]).filter(t => _okTm(t.project_id));
+  const hist = (hr.data||[]).filter(h => _okTm(h.project_id));
+  const taskHist = ((thr && thr.data) || []).filter(h => _okTm(h.project_id));
   const taskDue = {}; tasks.forEach(t=>{ if(t.id!=null) taskDue[t.id]=t.due_date||null; });
   const taskDiff = {}; tasks.forEach(t=>{ if(t.id!=null && t.difficulty) taskDiff[t.id]=t.difficulty; });   // сложность по задаче (для взвешивания выработки)
   const taskProj = {}; tasks.forEach(t=>{ if(t.id!=null) taskProj[t.id]=t.project_id; });                   // проект задачи (для эталона скорости)
-  window._teamRaw = { tasks, hist, taskHist, taskDue, taskDiff, taskProj, loadedAt: now };
-  const rank = { wait:0, active:1, done:2 };
+  /* продление договора переводит все этапы проекта в wait одним пакетом — это не возвраты людей */
+  (function(){
+    const bucket={};
+    hist.forEach(h=>{ if(h.new_status!=='wait') return; const t=new Date(h.created_at).getTime(); if(isNaN(t)) return;
+      const k=h.project_id+'|'+Math.floor(t/10000); (bucket[k]||(bucket[k]=[])).push(h); });
+    Object.keys(bucket).forEach(k=>{ if(bucket[k].length>=3) bucket[k].forEach(h=>{ h.__bulkReset=true; }); });
+  })();
+  const stageIds = {}; hist.forEach(h=>{ if(h.stage_id!=null) stageIds[h.stage_id]=h.project_id; });
+  const stageDue = {}; ((sgr&&sgr.data)||[]).forEach(x=>{ if(x.id!=null && _okTm(x.project_id) && x.due_date) stageDue[x.id]=x.due_date; });   // дедлайны этапов — для «надёжности» по этапам
+  window._teamRaw = { tasks, hist, taskHist, taskDue, taskDiff, taskProj, stageProj:stageIds, stageDue, loadedAt: now };
+  const rank = { wait:0, hold:0, active:1, review:2, done:3 };
   const stat = {};
   const S = id => stat[id] || (stat[id] = { assigned:0,done:0,open:0,wait:0,active:0,review:0,overdue:0, uniq30:0,redo30:0,sUniq30:0,tUniq30:0, rework:0,last:null, worksec:0,workcnt:0 });
 
@@ -32755,7 +32800,7 @@ window.tLoadTeam = async () => {
       const tt = new Date(h.created_at).getTime();
       if (a.last==null || tt>a.last) a.last = tt;
       const f = rank[h.old_status], to = rank[h.new_status];
-      if (f!=null && to!=null && to<f) a.rework++;                  // переход назад = возврат
+      if (!h.__bulkReset && h.old_status!=null && h.old_status!==h.new_status && f!=null && to!=null && to<f) a.rework++;   // переход назад = возврат
       if (h.new_status==='done') {
         const idv = h[idKey];
         const isFirst = !(doneCount[idv] > 0);
@@ -32783,6 +32828,8 @@ window.tLoadTeam = async () => {
     tA+=a.assigned; tO+=a.open; tOv+=a.overdue; tV+=a.uniq30;
   });
   TEAMAGG = { assigned:tA, open:tO, overdue:tOv, v30:tV };
+  })().finally(() => { window._tmLoading = null; });
+  return window._tmLoading;
 };
 
 /* ═══════════ KPI FOUNDATION ═══════════
@@ -32840,7 +32887,7 @@ window.kpiNormalize = (metricKey, value, baseline, target) => {
     if (m.dir === 'up') { b = m.scale.soft; t = m.scale.hard; }
     else                { b = m.scale.hard; t = m.scale.soft; }
   }
-  if (b === t) return value >= t ? 100 : 0;
+  if (b === t) return (m.dir === 'down' ? (value <= t) : (value >= t)) ? 100 : 0;
   let pct;
   if (m.dir === 'up') pct = 100 * (value - b) / (t - b);
   else                pct = 100 * (b - value) / (b - t);
@@ -33056,12 +33103,17 @@ window._kpiStddev = (arr) => {
 };
 
 /* уверенность результата по правилу sample_size vs sample_min */
+/* Внутренние имена вычислителей → ключи реестра. Раньше сюда прилетали 'cycle_time',
+   'ontime_rate' и т.п., которых в KPI_METRICS нет, поэтому sample_min всегда падал до 1
+   и «доверие» было 'ok' даже по одной задаче. */
+const _KPI_CONF_ALIAS = { cycle_time:'skorost', ontime_rate:'nadezhnost', rework_rate:'kachestvo',
+  throughput_w:'vyrabotka', review_response:'skorost', smm_growth:'smm_growth_abs',
+  smm_discipline:'smm_er', smm_score:'smm_er', margin_pct:'margin', profit_hour:'margin',
+  nrr:'mrr', concentration:'mrr' };
 window._kpiConfidence = (metricKey, sampleSize) => {
-  const m = KPI_METRICS[metricKey];
   if (!sampleSize) return null;
-  // composite/legacy метрики (smm_score, smm_growth, smm_discipline, cycle_time, throughput_w и т.п.)
-  // могут не быть в KPI_METRICS напрямую — используем sane defaults.
-  const sampleMin = m ? (m.sample_min || 0) : 1;
+  const m = KPI_METRICS[metricKey] || KPI_METRICS[_KPI_CONF_ALIAS[metricKey]];
+  const sampleMin = m ? (m.sample_min || 0) : 3;
   return sampleSize >= sampleMin ? 'ok' : 'low';
 };
 
@@ -33072,21 +33124,27 @@ window._kpiFetchOpsRaw = async (fromISO, toISO) => {
   const key = `${ME.agency_id}|${fromISO}|${toISO}`;
   const now = Date.now();
   if (_kpiOpsRawCache.key === key && (now - _kpiOpsRawCache.ts) < 300000) return _kpiOpsRawCache.data;
-  const [tr, thr, hr] = await Promise.all([
-    SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,created_at,time_spent,difficulty,priority'),
-    SB.from('task_history').select('task_id,changed_by,old_status,new_status,created_at').gte('created_at', fromISO).lte('created_at', toISO),
-    SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at').gte('created_at', fromISO).lte('created_at', toISO),
+  const _P = window._sbPageAll || (async (b)=>{ const r=await b(); return (r&&r.data)||[]; });
+  const [tasksAll, taskHistAll, stageHistAll, pjr] = await Promise.all([
+    _P(() => SB.from('project_tasks').select('id,title,assignee_id,project_id,status,due_date,due_time,created_at,completed_at,time_spent,difficulty,priority').order('id')),
+    _P(() => SB.from('task_history').select('task_id,project_id,changed_by,old_status,new_status,created_at').gte('created_at', fromISO).lte('created_at', toISO).order('created_at')),
+    _P(() => SB.from('stage_history').select('stage_id,project_id,stage_name,changed_by,old_status,new_status,created_at').gte('created_at', fromISO).lte('created_at', toISO).order('created_at')),
+    SB.from('projects').select('id,status')
   ]);
-  const tasks = (tr && !tr.error && tr.data) ? tr.data : [];
-  const taskHist = (thr && !thr.error && thr.data) ? thr.data : [];
-  const stageHist = (hr && !hr.error && hr.data) ? hr.data : [];
+  /* архивные проекты в KPI не идут — иначе цифры расходятся со Сводкой и Циклами */
+  const _archK = new Set(((pjr&&pjr.data)||[]).filter(r=>AG_ARCHIVED_ST[String(r.status||'')]).map(r=>r.id));
+  const tasks = tasksAll.filter(t => !_archK.has(t.project_id));
+  const _liveTask = new Set(tasks.map(t=>t.id));
+  const taskHist = taskHistAll.filter(h => h.project_id!=null ? !_archK.has(h.project_id) : _liveTask.has(h.task_id));
+  const stageHist = stageHistAll.filter(h => !_archK.has(h.project_id));
   // Индексы
   const byTask = {}; tasks.forEach(t => { byTask[t.id] = t; });
   const data = { tasks, taskHist, stageHist, byTask, fromISO, toISO };
   _kpiOpsRawCache = { key, ts: now, data };
   return data;
 };
-window._kpiInvalidateOpsRaw = () => { _kpiOpsRawCache = { key:null, ts:0, data:null }; };
+window._kpiInvalidateOpsRaw = () => { _kpiOpsRawCache = { key:null, ts:0, data:null };
+  try{ if(window._kpi3){ window._kpi3.rowVals = {}; window._kpi3.aggregateVals = {}; window._kpi3.selectedVals = {}; } }catch(_e){} };   // иначе плитки показывали устаревшие значения до перезагрузки страницы
 
 /* Резолвер team_members на дату (для scope='team') */
 window._kpiTeamMembersCache = window._kpiTeamMembersCache || {};
@@ -33189,18 +33247,17 @@ window.kpiComputeOnTimeRate = async (scopeKind, scopeId, fromISO, toISO) => {
   const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
   // задачи, закрытые в периоде (last new_status='done')
   const doneEvents = f.taskHist.filter(h => h.new_status === 'done');
-  const lastDoneByTask = {};
-  doneEvents.forEach(h => { const p = lastDoneByTask[h.task_id]; if (!p || p.created_at < h.created_at) lastDoneByTask[h.task_id] = h; });
+  /* берём ПЕРВОЕ закрытие в периоде — так же, как Сводка; иначе переоткрытая
+     и пересданная задача считается по-разному в двух модулях */
+  const firstDoneByTask = {};
+  doneEvents.forEach(h => { const p = firstDoneByTask[h.task_id]; if (!p || h.created_at < p.created_at) firstDoneByTask[h.task_id] = h; });
   let ok = 0, total = 0;
-  Object.entries(lastDoneByTask).forEach(([tid, h]) => {
+  Object.entries(firstDoneByTask).forEach(([tid, h]) => {
     const t = raw.byTask[tid]; if(!t) return;
     if (!t.due_date) return;
     total++;
-    // Сравниваем по датам (без времени) — соответствует прямому SQL в БД.
-    // h.created_at может быть с TZ ('2026-07-10T19:39:11.550903+00'), берём date-часть.
-    const closedDate = String(h.created_at).slice(0, 10);
-    const dueDate = String(t.due_date).slice(0, 10);
-    if (closedDate <= dueDate) ok++;
+    const _dt = t.due_time && /^\d{1,2}:\d{2}/.test(String(t.due_time)) ? String(t.due_time).slice(0,5) : '23:59';
+    if (new Date(h.created_at).getTime() <= new Date(String(t.due_date).slice(0,10)+'T'+_dt+':59').getTime()) ok++;   // дедлайн со временем, как в Сводке
   });
   const val = total ? Math.round(1000 * ok / total) / 10 : null;
   return { value: val, sample_size: total, confidence: _kpiConfidence('ontime_rate', total) };
@@ -33215,9 +33272,13 @@ window.kpiComputeReworkRate = async (scopeKind, scopeId, fromISO, toISO) => {
   const doneTasks = new Set(f.taskHist.filter(h => h.new_status === 'done').map(h => h.task_id));
   // Rework — только для задач которые в итоге закрылись в этом периоде.
   // Если задача была возвращена но не закрыта — она не в знаменателе, не должна быть и в числителе.
+  /* любой переход назад по цепочке wait→active→review→done, а не только два частных случая:
+     review→wait, done→wait, active→wait раньше не считались откатом */
+  const _rk = { wait:0, hold:0, active:1, review:2, done:3 };
   const reworkedTasks = new Set();
   f.taskHist.forEach(h => {
-    if ((h.old_status === 'done' || h.old_status === 'review') && h.new_status === 'active') {
+    const fo = _rk[h.old_status], to = _rk[h.new_status];
+    if (h.old_status!=null && h.old_status!==h.new_status && fo!=null && to!=null && to < fo) {
       if (doneTasks.has(h.task_id)) reworkedTasks.add(h.task_id);
     }
   });
@@ -33231,13 +33292,13 @@ window.kpiComputeReworkRate = async (scopeKind, scopeId, fromISO, toISO) => {
 window.kpiComputeThroughputWeighted = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchOpsRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
   const f = await _kpiFilterByScope(raw, scopeKind, scopeId);
-  const wOf = (d) => ({easy:1, medium:2, hard:3.5})[d] || 1.5;
+  const wOf = (d) => ({easy:1, medium:2, hard:3.5})[d] || 1;   // без метки сложности — базовый вес 1, а не 1.5
   // считаем последнее done-событие каждой задачи в периоде
   const lastDoneByTask = {};
   f.taskHist.forEach(h => { if (h.new_status !== 'done') return; const p = lastDoneByTask[h.task_id]; if (!p || p.created_at < h.created_at) lastDoneByTask[h.task_id] = h; });
   let sum = 0, n = 0;
   Object.keys(lastDoneByTask).forEach(tid => { const t = raw.byTask[tid]; if(!t) return; sum += wOf(t.difficulty); n++; });
-  return { value: Math.round(sum*10)/10, sample_size: n, confidence: _kpiConfidence('throughput_w', n) };
+  return { value: n ? Math.round(sum*10)/10 : null, sample_size: n, confidence: _kpiConfidence('throughput_w', n) };   // ноль закрытий — это «нет данных», а не ноль баллов
 };
 
 /* ── 5. review_response (часы) ── */
@@ -35170,7 +35231,7 @@ window._kpiScopeRows = (scope) => {
     }));
   }
   if (scope === 'project'){
-    return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done').map(p => ({
+    return ((typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => !AG_ARCHIVED_ST[String(p.status||'')])).map(p => ({
       id: p.id,
       name: p.name || '—',
       subtitle: ((p.service ? p.service : '') + (p.category ? (p.service ? ' · ' : '') + p.category : '')) || '',
@@ -36100,9 +36161,15 @@ window._kpiRefreshNavBadge = async () => {
   const now = Date.now();
   // Кэш 2 минуты
   if (_kpiAlertsCache.ts && now - _kpiAlertsCache.ts < 120000) { _kpiApplyNavBadge(); return; }
+  /* Бейдж в навигации отключён (_kpiApplyNavBadge ничего не рисует), а расчёт тянул
+     project_tasks + оба журнала + reports каждые 5 минут на любой странице. Не считаем. */
+  _kpiApplyNavBadge();
+  return;
+  /* eslint-disable no-unreachable */
   const seg = await _kpiGoalsForBadge();
   _kpiAlertsCache = { ts: now, onTrack: seg.onTrack, behind: seg.behind };
   _kpiApplyNavBadge();
+  /* eslint-enable no-unreachable */
 };
 
 /* Считает цели ВСЕХ активных KPI-периодов и разбивает на «идём по плану» / «отстаём»
@@ -36207,8 +36274,8 @@ window._kpiLoadMembers = async () => {
   if (window._kpiMembers) return window._kpiMembers;
   if (!SB || !ME) { window._kpiMembers = []; return []; }
   const { data, error } = await SB.from('profiles')
-    .select('id, full_name, dept, role_title, avatar_url, is_pm, color')
-    .eq('agency_id', ME.agency_id).eq('role', 'member').order('full_name');
+    .select('id, full_name, dept, role_title, avatar_url, is_pm, is_director, color, archived_at')
+    .eq('agency_id', ME.agency_id).eq('role', 'member').is('archived_at', null).order('full_name').limit(500);
   if (error){ console.warn('[KPI] loadMembers', error); window._kpiMembers = []; return []; }
   window._kpiMembers = data || [];
   return window._kpiMembers;
@@ -36247,7 +36314,7 @@ window._kpiScopeRows = (scope) => {
     }));
   }
   if (scope === 'project'){
-    return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => p.status !== 'done').map(p => ({
+    return ((typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p => !AG_ARCHIVED_ST[String(p.status||'')])).map(p => ({
       id: p.id,
       name: p.name || '—',
       subtitle: ((p.service ? p.service : '') + (p.category ? (p.service ? ' · ' : '') + p.category : '')) || '',
@@ -37233,9 +37300,12 @@ window._kpi3UpdateTabActions = () => {
 
 // Окно данных теперь всегда фиксированное — последние 30 дней
 window._kpi3ResolveWindow = () => {
-  const now = new Date();
-  const from = new Date(now.getTime() - 30*86400000);
-  return { from: from.toISOString(), to: now.toISOString(), days: 30, label: '30 дней' };
+  /* «до» квантуем до начала часа: иначе ключ кеша (agency|from|to) уникален при каждом
+     вызове, и четыре панели KPI тянули project_tasks + оба журнала по разу каждая */
+  const now = new Date(); now.setMinutes(0,0,0);
+  const to = new Date(now.getTime() + 3600000);
+  const from = new Date(to.getTime() - 30*86400000);
+  return { from: from.toISOString(), to: to.toISOString(), days: 30, label: '30 дней' };
 };
 
 window._kpi3TpiKeys = ['vyrabotka','skorost','nadezhnost','kachestvo'];
@@ -37958,8 +38028,7 @@ window._kpi3FillPointA = async () => {
       agg[k] = _kpi3ExtractVal(rv && rv[k]);
       if (agg[k] != null && Number.isNaN(agg[k])) agg[k] = null;
     });
-    _kpi3.aggregateVals = _kpi3.aggregateVals || {}; _kpi3.aggregateVals[cat] = agg;
-    _kpi3.aggregateVals = _kpi3.aggregateVals || {}; _kpi3.aggregateVals[cat] = agg;
+    _kpi3.selectedVals = _kpi3.selectedVals || {}; _kpi3.selectedVals[cat] = agg;   // это значения ОДНОЙ строки, агрегат «по всем» их не касается
   const tpi = _kpi3TilesGrid(_kpi3TpiKeys, agg, 'TPI · операционные', _kpi3TpiKeys.length);
     const smm = cat === 'member' ? '' : _kpi3TilesGrid(_kpi3SmmKeys, agg, 'SMM · соцсети', 5);
     target.innerHTML = `<div class="kpi3-pa-groups">${tpi}${smm}</div>`;
@@ -38223,13 +38292,15 @@ window._kpi3FillGoals = async () => {
   if (!hasContent) target.innerHTML = '<div class="kpi3-loading">Загружаем цели…</div>';
   else target.classList.add('kpi3-refreshing');
   const allGoals = await _kpi3FetchAllTargetsForScope(_kpi3.category);
-  _kpi3.goals = allGoals;
+  /* для кнопки «Очистить» и счётчика во вкладке держим ровно тот список, который виден:
+     раньше кнопка предлагала удалить цели, которых на экране нет */
+  _kpi3.goals = (_kpi3.category === 'member') ? allGoals.filter(g => (KPI_METRICS[g.metric_key]||{}).category !== 'smm') : allGoals;
   _kpi3UpdateClearBtn();
   if (!allGoals.length) {
     target.innerHTML = `<div class="kpi3-empty"><b>Ни одной цели.</b><br/>Начните с одной — что важно улучшить в первую очередь?<button class="kpi3-btn kpi3-btn-primary" onclick="_kpi3NewGoal()">+ Первая цель</button></div>`;
     return;
   }
-  let goals = _kpi3.category === 'member' ? allGoals.filter(g => (KPI_METRICS[g.metric_key]||{}).category !== 'smm') : allGoals;
+  let goals = _kpi3.goals.slice();
   if (_kpi3.selectedRowId) goals = goals.filter(g => g.scope_id === _kpi3.selectedRowId);
   const cat = _kpi3.category;
   const rows = _kpiScopeRows(cat);
@@ -39205,7 +39276,7 @@ window._kpi3OpenGoalModal = (existing) => {
       const v = cur ? _kpi3ExtractVal(cur[initMetric]) : null;
       if (v != null && !Number.isNaN(v)) return Math.round(v * 100) / 100;
     }
-    const agg = (_kpi3.aggregateVals && _kpi3.aggregateVals[cat]) || {};
+    const agg = (_kpi3.selectedRowId && _kpi3.selectedVals && _kpi3.selectedVals[cat]) || (_kpi3.aggregateVals && _kpi3.aggregateVals[cat]) || {};
     const av = agg[initMetric];
     if (av != null && !Number.isNaN(av)) return Math.round(av * 100) / 100;
     return null;
@@ -39353,7 +39424,7 @@ window._kpi3ModalSetMetric = (btn) => {
   let v = cur ? _kpi3ExtractVal(cur[metricKey]) : null;
   // Fallback: если конкретного row-значения нет — берём агрегат Точки А
   if (v == null || Number.isNaN(v)) {
-    const agg = (_kpi3.aggregateVals && _kpi3.aggregateVals[_kpi3.category]) || {};
+    const agg = (_kpi3.selectedRowId && _kpi3.selectedVals && _kpi3.selectedVals[_kpi3.category]) || (_kpi3.aggregateVals && _kpi3.aggregateVals[_kpi3.category]) || {};
     const av = agg[metricKey];
     if (av != null && !Number.isNaN(av)) v = av;
   }
@@ -39377,6 +39448,15 @@ window._kpi3SubmitGoal = async (existingId) => {
   if (!targetDate) {
     toast('Выберите дату цели');
     return;
+  }
+  {
+    const _m = KPI_METRICS[metricKey] || {};
+    const _b = (baseInput === '') ? null : baseVal;
+    if (_b != null && !Number.isNaN(_b)) {
+      if (tgtVal === _b) { toast('Цель совпадает с точкой А — прогресс посчитать не получится'); return; }
+      if (_m.dir === 'up'   && tgtVal < _b) { toast('Для «'+(_m.label||metricKey)+'» цель должна быть выше точки А'); return; }
+      if (_m.dir === 'down' && tgtVal > _b) { toast('Для «'+(_m.label||metricKey)+'» цель должна быть ниже точки А'); return; }
+    }
   }
   let baseline = baseVal;
   if (baseline == null || Number.isNaN(baseline)) {
@@ -39804,7 +39884,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.10-ui-tweaks';
+window.__BUILD='2026-07-25.11-team-lb-kpi';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
