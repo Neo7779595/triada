@@ -1943,6 +1943,7 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 .kb-mi .mic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:12.5px;font-weight:700;font-family:var(--mono);letter-spacing:.01em}
 .kb-mi .mt{flex:1;font-weight:500;font-size:14px;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .kb-mi .ty-badge{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:5px;flex:none;font-family:var(--mono)}
+.kb-mi .kb-mi-d{flex:none;font-size:11.5px;font-family:var(--mono);color:var(--txt-3);letter-spacing:.02em}
 .kb-empty{padding:22px 16px;text-align:center;color:var(--txt-3);font-size:13.5px;font-family:var(--mono)}
 .kb-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .kb-act{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:600;font-family:var(--font);letter-spacing:-.005em;padding:11px 14px;border-radius:11px;cursor:pointer;transition:background .14s var(--ease-out),border-color .14s,transform .12s;line-height:1;font-family:var(--font)}
@@ -25390,6 +25391,16 @@ const KB_DATA={
   'Тестовый проект':{'Контент-стратегия':[{t:'Бренд-гайд',ty:'Figma'}],'Аудит профиля':[{t:'Аудит профиля',ty:'Notion'}],'Анализ конкурентов':[{t:'Бенчмаркинг',ty:'Google Doc'}],'Контент-план':[{t:'План постов',ty:'Google Sheet'}]},
 };
 function kbCount(k){return Object.values(KB_DATA[k]||{}).reduce((s,a)=>s+a.length,0);}
+/* материалы за выбранный период: у каждого есть created_at (поле at) */
+function kbMatsView(k,cat){
+  var arr=((KB_DATA[k]||{})[cat]||[]).map(function(m,i){ return {m:m,i:i}; });
+  if(typeof _kbPerOn==='function' && _kbPerOn()) arr=arr.filter(function(x){ return _kbInPeriod(x.m.at); });
+  return arr;
+}
+function kbCountView(k){
+  if(typeof _kbPerOn!=='function' || !_kbPerOn()) return kbCount(k);
+  return Object.keys(KB_DATA[k]||{}).reduce(function(s,c){ return s+kbMatsView(k,c).length; },0);
+}
 function setKbProj(k){kbProj=String(k);renderKB();}
 /* поиск по проектам: раньше инпут был без обработчика и просто ничего не делал */
 function kbFilterProjects(q){
@@ -25471,6 +25482,7 @@ function _kbView(A){
     reports:(A.reports||[]).filter(function(r){ return _kbInPeriod(r.published_at); }),
     content:(A.content||[]).filter(function(c){ return _kbInPeriod(c.updated_at); }),
     tasks:(A.tasks||[]).filter(function(t){ return t.status==='done' && _kbInPeriod(t.completed_at); }),
+    stages:(A.stages||[]).filter(function(st){ return st.status==='done' && _kbInPeriod(st.completed_at); }),
     _full:A
   });
 }
@@ -25797,12 +25809,15 @@ function kbAutoCss(){
     +".kb-pi.arc .nm::after{content:'завершён';display:block;font-size:9.5px;font-family:var(--mono);color:var(--txt-3);letter-spacing:.06em}";
   document.head.appendChild(s);
 }
-function kbSec(title,color,body,count,id){
+function kbSec(title,color,body,count,id,note){
   var icon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>';
   return '<div class="kb-cat kb-auto-sec"'+(id?' id="'+id+'"':'')+'>'
-    +'<div class="kb-cat-h"><div class="ic" style="background:'+color+'22;color:'+color+'">'+icon+'</div><div><div class="t">'+escH(title)+'</div></div><div class="ct">'+(count==null?'':count)+'</div></div>'
+    +'<div class="kb-cat-h"><div class="ic" style="background:'+color+'22;color:'+color+'">'+icon+'</div><div><div class="t">'+escH(title)+'</div>'
+      +(note?'<div class="sub">'+escH(note)+'</div>':'')+'</div><div class="ct">'+(count==null?'':count)+'</div></div>'
     +'<div>'+(body||'<div class="kb-empty">Нет данных</div>')+'</div></div>';
 }
+/* пометка для секций, которые описывают проект целиком и по датам не режутся */
+function _kbNoPer(){ return _kbPerOn()?'вне фильтра · данные проекта целиком':''; }
 function _kbKV(k,v){ if(v==null||v===''||v==='—') return ''; return '<div class="kb-kv"><span class="k">'+escH(String(k))+'</span><span class="v">'+escH(String(v))+'</span></div>'; }
 
 function kbAutoEnsure(force){
@@ -25838,10 +25853,11 @@ async function kbLoadAuto(pid){
       SB.from('project_contracts').select('start_date,end_date').eq('project_id',pid).maybeSingle(),
       SB.from('project_services').select('service,tariff,mrr,cost,status,start_date,end_date,sort').eq('project_id',pid).order('sort'),
       SB.from('project_tasks').select('status,time_spent,timer_started,difficulty,completed_at,created_at').eq('project_id',pid),
-      SB.from('project_stages').select('status').eq('project_id',pid),
-      new Promise(function(r){ try{ briefLoad(pid, r); }catch(e){ r(); } })
+      SB.from('project_stages').select('status,completed_at').eq('project_id',pid),
+      new Promise(function(r){ try{ briefLoad(pid, r); }catch(e){ r(); } }),
+      SB.from('project_briefs').select('updated_at').eq('project_id',pid).maybeSingle()
     ]);
-    var mem=res[0], cp=res[1], rp=res[2], ct=res[3], sv=res[4], tsk=res[5], stg=res[6];
+    var mem=res[0], cp=res[1], rp=res[2], ct=res[3], sv=res[4], tsk=res[5], stg=res[6], brf=res[8];
     var firstErr=[mem,cp,rp,sv,tsk,stg].map(function(r){ return r&&r.error; }).filter(Boolean)[0];
     if(firstErr) throw firstErr;
     var ids={}; (mem.data||[]).forEach(function(m){ if(m.member_id) ids[m.member_id]=1; });
@@ -25860,7 +25876,7 @@ async function kbLoadAuto(pid){
       client:(p&&p.client_id)?(profs[p.client_id]||null):null,
       lead:(p&&p.lead_id)?(profs[p.lead_id]||null):null,
       content:cp.data||[], reports:rp.data||[], contract:ct.data||null, services:sv.data||[],
-      tasks:tsk.data||[], stages:stg.data||[], briefs:briefs, _loaded:true, _at:Date.now()
+      tasks:tsk.data||[], stages:stg.data||[], briefs:briefs, briefAt:((brf&&brf.data&&brf.data.updated_at)||''), _loaded:true, _at:Date.now()
     };
   }catch(e){ KB_AUTO[pid]={_error:String((e&&e.message)||e),_loaded:true,_at:Date.now()}; }
 }
@@ -25923,7 +25939,7 @@ function _kbBriefVal(f,v){
   var cls=(t==='long')?'kb-bq-v kb-bq-long':'kb-bq-v';
   return '<span class="'+cls+'">'+escH(String(v))+'</span>';
 }
-function _kbBriefBlock(b,bi){
+function _kbBriefBlock(b,bi,at){
   var fields=(b.fields||[]), ans=b.answers||{};
   var filled=function(f){ var v=ans[f.id]; if(v==null||v==='') return false; if(Array.isArray(v)) return !!v.length; if(typeof v==='object') return !!Object.keys(v).length; return String(v).trim()!==''; };
   var qs=fields.filter(function(f){ return f.type!=='section'; });
@@ -25951,7 +25967,7 @@ function _kbBriefBlock(b,bi){
 
   var pct=qs.length?Math.round(got.length/qs.length*100):0;
   var head='<div class="kb-sub-h kb-subh-row"><span>Бриф · '+escH(b.name||'Бриф')+'</span>'
-    +'<span class="kb-b-meta">заполнено <b>'+got.length+'</b> из '+qs.length+'</span></div>'
+    +'<span class="kb-b-meta">заполнено <b>'+got.length+'</b> из '+qs.length+(at?(' · обновлён '+escH(_kbFmtD(at))):'')+'</span></div>'
     +'<div class="kb-b-bar"><i style="width:'+pct+'%"></i></div>';
 
   var more=(got.length>KB_BRIEF_HEAD)
@@ -25991,7 +26007,16 @@ function _kbSecPassport(p,A){
       }).join('')+'</div>';
   }
 
-  var brief=(A.briefs||[]).map(_kbBriefBlock).filter(Boolean).join('');
+  var full=A._full||A;
+  var briefAt=full.briefAt||'';
+  var briefIn=!_kbPerOn()||_kbInPeriod(briefAt);
+  var brief='';
+  if(briefIn){
+    brief=(full.briefs||[]).map(function(b,i){ return _kbBriefBlock(b,i,briefAt); }).filter(Boolean).join('');
+  } else {
+    brief='<div class="kb-sub-h">Бриф</div><div class="kb-empty">За '+escH(_kbPerLabel())+' бриф не обновлялся'
+      +(briefAt?(' · последнее обновление '+escH(_kbFmtD(briefAt))):'')+'</div>';
+  }
   var body=head+ct+note+svc+brief+created;
   return kbSec('Паспорт проекта','#37E6C8', body||'<div class="kb-empty">Нет данных</div>','','kbs-pass');
 }
@@ -26026,7 +26051,7 @@ function _kbSecContacts(p,A){
   if(pc&&typeof pc==='object'&&!Array.isArray(pc)){
     Object.keys(pc).forEach(function(k){ if(k==='person'||k==='channels') return; var v=pc[k]; if(v==null||v===''||(typeof v==='object'&&!Object.keys(v).length)) return; body+=_kbKV(k, (typeof v==='object')?JSON.stringify(v):String(v)); });
   }
-  return kbSec('Контакты','#8A8FFF',body||'<div class="kb-empty">Нет контактов</div>',cnt||'','kbs-cont');
+  return kbSec('Контакты','#8A8FFF',body||'<div class="kb-empty">Нет контактов</div>',cnt||'','kbs-cont',_kbNoPer());
 }
 
 /* ── TELEGRAM ── */
@@ -26124,7 +26149,7 @@ function _kbSecTg(p,A){
   var plHead='<div class="kb-sub-h">Участники</div>';
   var plBody=people.length?people.map(_kbTgPerson).join(''):'<div class="kb-empty">Участники не указаны</div>';
 
-  return kbSec('Telegram-группы','#37E6C8', top+evHead+'<div class="kb-evs">'+evs+'</div>'+plHead+plBody, people.length||'', 'kbs-tg');
+  return kbSec('Telegram-группы','#37E6C8', top+evHead+'<div class="kb-evs">'+evs+'</div>'+plHead+plBody, people.length||'', 'kbs-tg', _kbNoPer());
 }
 
 /* ── КОНТЕНТ-ПЛАНЫ ── */
@@ -26165,10 +26190,13 @@ function _kbSecOps(p,A){
   if(_kbPerOn()){                                        // в периоде считаем только закрытые в нём задачи
     var hrsP=Math.round(spent(tk)/3600);
     var allTk=full.tasks||[];
+    var allStg=full.stages||[];
     body='<div class="kb-mtile">'
       +tile(tk.length,'Закрыто задач', _kbPerLabel())
       +tile(hrsP+' ч','Часы по ним','по закрытым')
+      +tile((A.stages||[]).length,'Закрыто этапов', _kbPerLabel())
       +tile((allTk.filter(function(t){return t.status==='done';}).length)+'/'+allTk.length,'Задачи всего','за всё время')
+      +tile((allStg.filter(function(x){return x.status==='done';}).length)+'/'+allStg.length,'Этапы всего','за всё время')
       +tile((p.pct||0)+'%','Готовность','сейчас')
       +'</div>';
   }else{
@@ -26337,7 +26365,7 @@ function _kbPeriodBar(){
       +'</div>'
       +'<button class="kb-per-x" onclick="kbSetPeriod(\'all\')" title="Сбросить фильтр">Сбросить</button>';
   }else{
-    h+='<span class="kb-per-note">фильтр по датам: отчёты, контент-планы, задачи, SMM</span>';
+    h+='<span class="kb-per-note">фильтр по датам: отчёты, контент-планы, материалы, бриф, задачи и этапы, SMM</span>';
   }
   return h+'</div>';
 }
@@ -26351,7 +26379,7 @@ function _kbNavBar(V,A){
     ['kbs-rep','Отчёты',(V.reports||[]).length],
     ['kbs-ops','Оперативка',''],
     ['kbs-smm','SMM',''],
-    ['kbs-mat','Материалы',kbCount(kbProj)]
+    ['kbs-mat','Материалы',kbCountView(kbProj)]
   ];
   return '<div class="kb-nav">'+items.map(function(it){
     return '<button class="kb-navi" onclick="kbNavTo(\''+it[0]+'\',event)">'+escH(it[1])
@@ -26382,16 +26410,20 @@ function kbAutoBlock(){
 
 function renderKB(){ kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
   const catIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M4 5a2 2 0 012-2h12a1 1 0 011 1v15a1 1 0 01-1 1H6a2 2 0 01-2-2z"/><path d="M4 17.5A2 2 0 016 16h13"/></svg>';
+  const _perOn=_kbPerOn(), _perLbl=_kbPerLabel();
   const _kbExtra=Object.keys(KB_DATA[kbProj]||{}).filter(c=>!KB_CATS.includes(c)&&((KB_DATA[kbProj]||{})[c]||[]).length);
   const cats=KB_CATS.concat(_kbExtra).map((cat,_ci)=>{
-    const items=(KB_DATA[kbProj]||{})[cat]||[], col=KB_CATCOL[cat]||KB_PAL[_ci%KB_PAL.length];
-    const itemsHtml=items.length
-      ? items.map((m,mi)=>{ const tc=KB_TYPES[m.ty]||'#9AA1AC', ab=KB_ABBR[m.ty]||'··';
-          return `<div class="kb-mi" style="cursor:pointer" onclick="kbOpenMat('${_kbEscAttr(cat)}',${mi})"><div class="mic" style="background:${tc}22;color:${tc}">${escH(ab)}</div><div class="mt">${escH(m.t)}</div><span class="ty-badge" style="background:${tc}22;color:${tc}">${escH(m.ty||'')}</span></div>`;
+    const view=kbMatsView(kbProj,cat), col=KB_CATCOL[cat]||KB_PAL[_ci%KB_PAL.length];
+    const total=((KB_DATA[kbProj]||{})[cat]||[]).length;
+    const itemsHtml=view.length
+      ? view.map(x=>{ const m=x.m, tc=KB_TYPES[m.ty]||'#9AA1AC', ab=KB_ABBR[m.ty]||'··';
+          const d=m.at?`<span class="kb-mi-d">${escH(_kbFmtD(m.at))}</span>`:'';
+          return `<div class="kb-mi" style="cursor:pointer" onclick="kbOpenMat('${_kbEscAttr(cat)}',${x.i})"><div class="mic" style="background:${tc}22;color:${tc}">${escH(ab)}</div><div class="mt">${escH(m.t)}</div>${d}<span class="ty-badge" style="background:${tc}22;color:${tc}">${escH(m.ty||'')}</span></div>`;
         }).join('')
-      : `<div class="kb-empty">Нет материалов</div>`;
+      : `<div class="kb-empty">${_perOn?('За '+escH(_perLbl)+' материалов не добавляли'+(total?(' · всего '+total):'')):'Нет материалов'}</div>`;
+    const sub=view.length?(view.length+' '+_plural(view.length,'материал','материала','материалов')+(_perOn?(' за '+_perLbl):'')):(_perOn?('за '+_perLbl+' — ничего'):'Нет материалов');
     return `<div class="kb-cat">
-      <div class="kb-cat-h"><div class="ic" style="background:${col}22;color:${col}">${catIcon}</div><div><div class="t">${escH(cat)}</div><div class="sub">${items.length?items.length+' '+_plural(items.length,'материал','материала','материалов'):'Нет материалов'}</div></div><div class="ct">${items.length}</div></div>
+      <div class="kb-cat-h"><div class="ic" style="background:${col}22;color:${col}">${catIcon}</div><div><div class="t">${escH(cat)}</div><div class="sub">${escH(sub)}</div></div><div class="ct">${view.length}</div></div>
       <div class="kb-items">${itemsHtml}</div></div>`;
   }).join('');
 
@@ -26401,10 +26433,10 @@ function renderKB(){ kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
   const _curArch=_arc.some(x=>String(x.key)===String(kbProj));
   if(_curArch) KB_ARCH_OPEN=true;                       // выбран архивный проект — раскрываем архив
   const pcard=p=>`<div class="kb-pi ${String(p.key)===String(kbProj)?'on':''}${p.st==='done'?' arc':''}" data-nm="${escH(p.name||'')}" onclick="setKbProj('${_kbEscAttr(p.key)}')"><div class="lg">${escH(p.logo||'?')}</div><div class="nm">${escH(p.name||'')}</div><div class="ct">${kbCount(p.key)}</div></div>`;
-  const _cnt=kbCount(kbProj);
+  const _cnt=kbCountView(kbProj);
 
   document.getElementById('content-ag').innerHTML=`
-    <div class="ph"><div><div class="eyebrow">Агентство · Знания</div><h1>База знаний</h1><div class="ph-pulse"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px -1px var(--accent)"></span>${_act.length} ${_plural(_act.length,'активный','активных','активных')} · ${_arc.length} в архиве · ${_cnt} ${_plural(_cnt,'материал','материала','материалов')} · «${escH(kbProjName())}»</div></div>
+    <div class="ph"><div><div class="eyebrow">Агентство · Знания</div><h1>База знаний</h1><div class="ph-pulse"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px -1px var(--accent)"></span>${_act.length} ${_plural(_act.length,'активный','активных','активных')} · ${_arc.length} в архиве · ${_cnt} ${_plural(_cnt,'материал','материала','материалов')}${_perOn?' за '+escH(_perLbl):''} · «${escH(kbProjName())}»</div></div>
     </div>
     <div class="kb-grid tb-proj">
       <div>
@@ -26420,7 +26452,7 @@ function renderKB(){ kbAutoCss(); kbCatsLoad(); kbPeriodLoad(); kbAutoEnsure();
         <div class="kb-plist kb-arch-list" style="${KB_ARCH_OPEN?'':'display:none'}">${_arc.map(pcard).join('')}</div>`:''}
         <div class="kb-empty" id="kb-pempty" style="display:none">Проект не найден</div>
       </div>
-      <div>${kbAutoBlock()}<div class="kb-auto-head" id="kbs-mat"${window.LIVE?' style="margin-top:16px"':''}>Материалы</div>${cats}</div>
+      <div>${kbAutoBlock()}<div class="kb-auto-head" id="kbs-mat"${window.LIVE?' style="margin-top:16px"':''}>Материалы${_perOn?` · <span style="color:var(--txt-3);font-weight:400">${escH(_perLbl)}</span>`:''}</div>${cats}</div>
     </div>`;
   if(KB_Q) kbFilterProjects(KB_Q);
 }
@@ -31446,7 +31478,7 @@ window.tLoadKB = async () => {
   const map = {};
   (data||[]).forEach(r => { const k = String(r.project_id==null?'':r.project_id);      // ключ — id проекта, а не имя: проекты-тёзки больше не сливают материалы
     if (!k) return;
-    (map[k] = map[k]||{}); (map[k][r.category] = map[k][r.category]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', _id:r.id }); });
+    (map[k] = map[k]||{}); (map[k][r.category] = map[k][r.category]||[]).push({ t:r.title, ty:r.kind||'Ссылка', url:r.url||'', at:r.created_at||'', _id:r.id }); });
   if (typeof KB_DATA !== 'undefined'){ Object.keys(KB_DATA).forEach(k => delete KB_DATA[k]); Object.assign(KB_DATA, map); }
   if (typeof KB_PROJECTS !== 'undefined'){ KB_PROJECTS.length = 0;
     const _visKB=(typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
@@ -39511,7 +39543,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.02-finance-fix';
+window.__BUILD='2026-07-25.03-kb-period';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
