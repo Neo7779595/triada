@@ -39810,15 +39810,26 @@ try{ console.info('доска задач:', (typeof agCanEditTasks==='function' 
     var c=document.getElementById('content-cl'); if(!c) return;
     window.__mClBrief=true;
     var pid=window.CLP&&(window.CLP.id||window.CLP.project_id);
-    var inner='';
-    try{
-      if(typeof briefClientFormHTML==='function'&&pid) inner=briefClientFormHTML(pid,false);
-    }catch(e){ inner=''; }
-    if(!inner) inner='<div class="modph" style="margin-top:8px"><h3>Бриф пока не заполнен</h3><p>Агентство ещё не опубликовало бриф по вашему проекту.</p></div>';
-    c.innerHTML='<div class="ph"><div><div class="eyebrow">Проект</div><h1>Бриф</h1></div></div><div class="m-bfc">'+inner+'</div>';
+    c.innerHTML='<div class="ph"><div><div class="eyebrow">Проект</div><h1>Бриф</h1></div></div>'
+      +'<div class="m-bfc" id="m-bfc"><div style="padding:34px 16px;text-align:center;color:var(--txt-3);font-size:13px">Загружаем бриф…</div></div>';
     document.querySelectorAll('#app-cl .nav-i').forEach(function(i){ i.classList.remove('on'); });
     window.scrollTo(0,0);
     setTimeout(sync,0);
+    function paint(){
+      if(!window.__mClBrief) return;                 /* уже ушли на другую вкладку */
+      var box=document.getElementById('m-bfc'); if(!box) return;
+      var inner='';
+      try{ if(typeof briefClientFormHTML==='function'&&pid) inner=briefClientFormHTML(pid,false); }catch(e){ inner=''; }
+      if(!inner||inner.indexOf('bfc-prev-empty')>=0)
+        inner='<div class="modph" style="margin-top:8px"><h3>Бриф пока не заполнен</h3><p>Агентство ещё не опубликовало бриф по вашему проекту — как только он появится, вы сможете заполнить его здесь.</p></div>';
+      box.innerHTML=inner;
+    }
+    /* бриф лежит в Supabase (project_briefs) — сперва загружаем, потом рисуем */
+    if(pid&&typeof window.briefReloadStructure==='function'){
+      try{ window.briefReloadStructure(pid, paint); }catch(e){ paint(); }
+    }else if(pid&&typeof window.briefLoad==='function'){
+      try{ window.briefLoad(pid, paint); }catch(e){ paint(); }
+    }else paint();
   };
 
   /* клавиатура открыта → таб-бар прячем */
