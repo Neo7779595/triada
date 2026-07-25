@@ -27179,9 +27179,25 @@ async function _giFetch(fn, params, body){
     let fresh=null;
     try{ const { data } = await SB.auth.refreshSession(); fresh = data && data.session; }catch(_){ }
     if(fresh && fresh.access_token && fresh.access_token!==session.access_token) res = await call(fresh.access_token);
-    if(res.status===401) throw new Error('Сессия устарела — обновите страницу и войдите заново');
+    if(res.status===401){ _giDeadSession(); throw new Error('Сессия завершена — открываю страницу входа'); }
   }
   return res;
+}
+
+/* Обновить токен не вышло — значит сессию отозвали окончательно (обычно потому,
+   что в другой вкладке вошли под другим сотрудником). Просто обновить страницу
+   тут не помогает: в хранилище лежит тот же мёртвый токен, а запросы к базе
+   проверяют подпись, а не сессию, поэтому кабинет продолжает рисоваться как
+   рабочий. Стираем сессию у себя и выводим на вход — иначе человек будет
+   жать кнопки впустую и видеть одну и ту же ошибку. */
+let _giDeadOnce = 0;
+function _giDeadSession(){
+  if(_giDeadOnce) return; _giDeadOnce = 1;
+  const go = function(){ setTimeout(function(){ try{ location.replace(location.pathname); }catch(_){ location.reload(); } }, 1200); };
+  try{
+    const r = (window.SB && SB.auth) ? SB.auth.signOut({ scope:'local' }) : null;
+    if(r && r.then) r.then(go, go); else go();
+  }catch(_){ go(); }
 }
 
 async function renderIntegrations(){
