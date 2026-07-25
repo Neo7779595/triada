@@ -526,6 +526,10 @@ button{font-family:inherit}
 .pf-empty:hover{border-color:var(--accent-line);color:var(--accent)}
 .pf-empty span{color:var(--accent);font-weight:600;margin-left:4px}
 .pf-cat-btn{flex:0 0 auto;padding:8px 12px!important;font-size:12.5px!important;display:flex;align-items:center;gap:7px}
+/* Шапка секции: кнопка ВНЕ <label> — иначе клик по заголовку добавляет пустую строку */
+.pf-sec-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.pf-sec-hd>label{margin:0}
+.pf-row-new{border-color:var(--accent-line);box-shadow:0 0 0 2px var(--accent-dim);transition:border-color .5s,box-shadow .5s}
 .fce-row{display:grid;grid-template-columns:1.5fr 1.1fr .9fr 30px;gap:8px;margin-bottom:7px;align-items:center}
 .fce-row-cat{grid-template-columns:1.7fr 1.3fr 30px}
 .fce-head{display:grid;grid-template-columns:1.5fr 1.1fr .9fr 30px;gap:8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin:2px 2px 7px}
@@ -11772,6 +11776,7 @@ function svcEditorHTML(showCost){
     +'.svc-i:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}'
     +'.svc-num{text-align:right;font-family:var(--mono)}'
     +'.svc-num.svc-ro{display:flex;align-items:center;justify-content:flex-end;color:var(--accent);background:var(--bg-1);cursor:default;font-weight:700}'
+    +'.svc-num.svc-mrr{color:var(--accent);font-weight:700}'
     +'.svc-i select,select.svc-i{cursor:pointer}'
     +'.svc-del{width:30px;height:34px;border:1px solid var(--line-2);border-radius:8px;background:transparent;color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:.14s}'
     +'.svc-del:hover{color:var(--neg);border-color:var(--neg)}'
@@ -11806,9 +11811,20 @@ function svcRender(){ const box=document.getElementById('svc-list'); if(!box)ret
   box.innerHTML=a.map((s,i)=>'<div class="svc-row">'
     +svcSelHTML(i,'service',so,s.service,'— услуга —')
     +svcSelHTML(i,'tariff',(typeof tariffsForSvc==='function'?tariffsForSvc(s.service).map(t=>t.name):to),s.tariff,'— выбрать —')
-    +'<div class="svc-i svc-num svc-ro" title="Доход из тарифа">'+(s.mrr?_svcMoney(s.mrr):'0')+'</div>'
+    +'<input type="text" inputmode="numeric" autocomplete="off" class="svc-i svc-num svc-mrr" value="'+(s.mrr?_svcMoney(s.mrr):'0')+'" oninput="svcMrrInput('+i+',this)" onfocus="this.select()" onblur="svcMrrBlur('+i+',this)" title="Доход по услуге, сум/мес — подставляется из тарифа, можно править вручную">'
     +'<button type="button" class="svc-del" title="Убрать услугу" onclick="svcDel('+i+')"'+(a.length<=1?' style="opacity:.4"':'')+'>✕</button>'
     +'</div>').join(''); svcRenderTot(); }
+function svcMrrInput(i,el){
+  _svcTouch();
+  const raw=String(el.value||'').replace(/[^\d]/g,'');
+  const n=raw?parseInt(raw,10):0;
+  const a=window.NP_SVCS||[]; if(a[i]) a[i].mrr=n;
+  const caretFromEnd=el.value.length-(el.selectionStart||0);
+  el.value=n?_svcMoney(n):'';
+  try{ const pos=Math.max(0,el.value.length-caretFromEnd); el.setSelectionRange(pos,pos); }catch(_){}
+  svcRenderTot();
+}
+function svcMrrBlur(i,el){ const a=window.NP_SVCS||[]; const n=(a[i]&&a[i].mrr)||0; el.value=n?_svcMoney(n):'0'; }
 function svcSelHTML(i,field,opts,cur,ph){
   ph=ph||'— выбрать —';
   const rows=['<div class="svc-sel-opt'+(cur?'':' on')+'" onclick="svcSelPick('+i+',\''+field+'\',\'\')">'+ph+'</div>']
@@ -11818,9 +11834,10 @@ function svcSelHTML(i,field,opts,cur,ph){
 function svcSelToggle(e,btn){ if(e){ e.preventDefault(); e.stopPropagation(); } const c=btn.parentNode; const wasOpen=c.classList.contains('open'); document.querySelectorAll('.svc-sel.open').forEach(x=>x.classList.remove('open')); if(!wasOpen) c.classList.add('open'); }
 function svcSelPick(i,f,v){ document.querySelectorAll('.svc-sel.open').forEach(x=>x.classList.remove('open')); svcSet(i,f,v); }
 if(!window._svcSelBound){ window._svcSelBound=1; document.addEventListener('mousedown',function(ev){ const t=ev.target; if(!(t&&t.closest&&t.closest('.svc-sel'))){ document.querySelectorAll('.svc-sel.open').forEach(x=>x.classList.remove('open')); } }); }
-function svcAdd(){ (window.NP_SVCS=window.NP_SVCS||[]).push({service:'',tariff:'',mrr:0,cost:0,status:'active'}); svcRender(); }
-function svcDel(i){ const a=window.NP_SVCS||[]; if(a.length<=1){ a[0]={service:'',tariff:'',mrr:0,cost:0,status:'active'}; } else { a.splice(i,1); } svcRender(); }
-function svcSet(i,f,v){ const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(a[i].service,v); a[i].mrr=(pr!=null?pr:0); if(i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function') npStagesReload(); svcRender(); return; } if(f==='service'){ const _valid=(typeof tariffsForSvc==='function'?tariffsForSvc(v).map(t=>t.name):[]); if(a[i].tariff && _valid.indexOf(a[i].tariff)<0){ a[i].tariff=''; a[i].mrr=0; } if(i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function') npStagesReload(); svcRender(); } }
+function svcAdd(){ _svcTouch(); (window.NP_SVCS=window.NP_SVCS||[]).push({service:'',tariff:'',mrr:0,cost:0,status:'active'}); svcRender(); }
+function svcDel(i){ _svcTouch(); const a=window.NP_SVCS||[]; if(a.length<=1){ a[0]={service:'',tariff:'',mrr:0,cost:0,status:'active'}; } else { a.splice(i,1); } svcRender(); }
+function _svcTouch(){ try{ if(PFIN) PFIN._svcDirty=true; }catch(_e){} }
+function svcSet(i,f,v){ _svcTouch(); const a=window.NP_SVCS||[]; if(!a[i])return; if(f==='mrr'||f==='cost'){ a[i][f]=Number(v)||0; svcRenderTot(); return; } a[i][f]=v; if(f==='tariff'){ const pr=svcTariffPrice(a[i].service,v); if(pr!=null) a[i].mrr=pr;   /* нет шаблона тарифа → сохраняем введённую вручную сумму */ if(i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function') npStagesReload(); svcRender(); return; } if(f==='service'){ const _valid=(typeof tariffsForSvc==='function'?tariffsForSvc(v).map(t=>t.name):[]); if(a[i].tariff && _valid.indexOf(a[i].tariff)<0){ a[i].tariff=''; } if(i===0 && document.getElementById('np-stages') && typeof npStagesReload==='function') npStagesReload(); svcRender(); } }
 function svcRenderTot(){ const el=document.getElementById('svc-tot'); if(!el)return; const sc=window.NP_SVC_SHOWCOST!==false; let inc=0,cst=0; (window.NP_SVCS||[]).forEach(s=>{inc+=Number(s.mrr)||0;cst+=Number(s.cost)||0;}); const mrg=inc>0?Math.round(100*(inc-cst)/inc):0; el.innerHTML='<span class="inc">Доход: <b>'+_svcMoney(inc)+'</b></span>'+(sc?('<span class="cst">Расход: <b>'+_svcMoney(cst)+'</b></span><span class="mrg">Маржа: <b>'+mrg+'%</b></span>'):''); if(window.PFIN && document.getElementById('pf-pl')){ window.PFIN.mrr=inc; if(typeof pfRecalc==='function')pfRecalc(); } }
 function svcCollect(){ return (window.NP_SVCS||[]).map(s=>({service:(s.service||'').trim(),tariff:(s.tariff||'').trim()||null,mrr:Number(s.mrr)||0,cost:Number(s.cost)||0,status:s.status||'active'})).filter(s=>s.service||s.mrr||s.cost); }
 function svcPrimary(list){ const a=(list||svcCollect()).slice().sort((x,y)=>(y.mrr||0)-(x.mrr||0)); return a[0]||{service:'',tariff:null}; }
@@ -22264,7 +22281,7 @@ function renderDeadlines(){
 }
 
 /* ——— OVERVIEW module · live data only (no mock) ——— */
-let OVERVIEW = { monthName:'', taskHistoryExists:false,
+var OVERVIEW = { monthName:'', taskHistoryExists:false,
   onTime:0, deadlineDone:0, v7:0, v30:0, vMonth:0, rework:0, trans:0,
   uniq7:0, uniq30:0, uniqMonth:0, redo7:0, redo30:0, redoMonth:0,
   tOnTime:0, tDeadlineDone:0, tV7:0, tV30:0, tVMonth:0, tRework:0, tTrans:0,
@@ -22852,7 +22869,7 @@ function renderCycles(){
 }
 
 /* ——— FINANCE module ——— */
-let FINANCE={ready:false};
+var FINANCE={ready:false};   // var: проверка window.FINANCE в KPI-обёртке
 function svgMarginBars(projs){
   const W=1400,H=210,padL=54,padR=30,padT=26,padB=38;
   const iW=W-padL-padR,iH=H-padT-padB,max=80;
@@ -22881,7 +22898,7 @@ function svgMarginBars(projs){
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block" preserveAspectRatio="none">${defs}${grid}${yl}${baseLine}${bars}</svg>`;
 }
 /* ——— project finance editor (in Finance window) ——— */
-let PFIN=null;
+var PFIN=null;   // var, а не let: код обращается к window.PFIN
 function openProjFinance(id){
   const list=(typeof FINANCE!=='undefined'&&FINANCE.projects)?FINANCE.projects:[];
   const p=list.find(x=>x.id===id);
@@ -22890,11 +22907,13 @@ function openProjFinance(id){
   const arr=(k,isSal)=>{ const a=Array.isArray(f[k])?JSON.parse(JSON.stringify(f[k])):[];
     return a.map(r=>{ let u=r.unit||'month';
       if(!isSal && !['month','piece','hour'].includes(u)) u='month';   // чиним категории с неверной единицей (напр. reels)
-      return { name:r.name||'', role:r.role||'', unit:u, rate:r.rate!=null?r.rate:(r.amount||0), qty:r.qty!=null?r.qty:1, manual:r.manual!=null?r.manual:(r.unit?false:true), staffId:r.staffId||null, amount:r.amount||0 }; }); };
+      let nm=r.name||'', sn=r.staffName||null;
+      if(!sn && r.staffId && r.role && nm && nm!==r.role){ sn=nm; nm=r.role; }   // легаси: раньше имя сотрудника затирало роль
+      return { name:nm, role:r.role||'', unit:u, rate:r.rate!=null?r.rate:(r.amount||0), qty:r.qty!=null?r.qty:1, manual:r.manual!=null?r.manual:(r.unit?false:true), staffId:r.staffId||null, staffName:sn, amount:r.amount||0 }; }); };
   PFIN={ id, name:p.name, logoUrl:p.logoUrl, logo:p.logo, mrr:p.mrr||0,
     salaries:arr('salaries',true), opex:arr('opex',false), projex:arr('projex',false), hours:f.hours||0, _svcs:(p._svcs||null), _svcsInit:false };
   pfRender();
-  if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_services').select('id,service,tariff,mrr,cost,status,sort').eq('project_id',id).order('sort').then(r=>{ if(r&&r.data&&r.data.length && PFIN&&PFIN.id===id){ PFIN._svcs=r.data; svcReset(r.data); } }); }catch(_e){} }
+  if(window.LIVE && typeof SB!=='undefined'){ try{ SB.from('project_services').select('id,service,tariff,mrr,cost,status,sort').eq('project_id',id).order('sort').then(r=>{ if(r&&r.data&&r.data.length && PFIN&&PFIN.id===id&&!PFIN._svcDirty){ PFIN._svcs=r.data; svcReset(r.data); } }); }catch(_e){} }
 }
 function pfTotals(){
   const sum=a=>a.reduce((s,r)=>s+(pfRowAmount(r)||0),0);
@@ -22910,12 +22929,13 @@ function pfRowAmount(r){
   return Math.round((r.qty||0)*(r.rate||0));
 }
 function _pfRowLbl(r){
-  const nm=(r.name||'—');
+  const nm=(r.name||'—')+(r.staffName?(' · '+r.staffName):'');
   if(r.manual||r.unit==='month') return nm;
   const q=r.qty||0, un=FIN_UNIT_SHORT[r.unit]||'';
   return q>0 ? `${nm} · ${q} ${un} × ${money(r.rate||0)}` : nm;
 }
-function pfAdd(list){ PFIN[list].push({name:'',role:'',unit:'month',rate:0,qty:1,amount:0,manual:false,staffId:null}); pfRender(); }
+function pfAdd(list){ PFIN[list].push({name:'',role:'',unit:'month',rate:0,qty:1,amount:0,manual:false,staffId:null,staffName:null});
+  pfRender({focusRow:{list:list,idx:PFIN[list].length-1}}); }
 function pfDel(list,i){ PFIN[list].splice(i,1); pfRender(); }
 function pfSetName(list,i,v){ PFIN[list][i].name=v; }
 function pfSetQty(list,i,v){ const r=PFIN[list][i]; r.qty=Math.max(0,parseFloat(v)||0); r.manual=false; r.amount=pfRowAmount(r); var el=document.getElementById('pfsum-'+list+'-'+i); if(el){ if(el.tagName==='INPUT') el.value=r.amount; else el.textContent=money(r.amount); } pfRecalc(); }
@@ -22934,9 +22954,13 @@ function pfPickCat(list,i,val){
   r.amount=pfRowAmount(r);
   pfRender();
 }
-function pfSetUnit(list,i,val){ const r=PFIN[list][i]; r.unit=val; r.manual=false; r.amount=pfRowAmount(r); pfRender(); }
-function pfSetStaff(list,i,val){ const r=PFIN[list][i]; r.staffId=val||null;
-  if(val){ const T=(typeof TEAM!=='undefined'?TEAM:[]); const e=T.find(x=>String(x._id)===String(val)); if(e)r.name=e.name; }
+function pfSetUnit(list,i,val){ const r=PFIN[list][i]; const prev=pfRowAmount(r); const wasMonth=(r.unit==='month'||!r.unit);
+  r.unit=val; r.manual=false;
+  if(val==='month'){ r.qty=1; r.rate=prev; }
+  else if(wasMonth){ if(!r.qty) r.qty=1; if(!r.rate) r.rate=prev; }
+  r.amount=pfRowAmount(r); pfRender(); }
+function pfSetStaff(list,i,val){ const r=PFIN[list][i]; r.staffId=val||null; r.staffName=null;
+  if(val){ const T=(typeof TEAM!=='undefined'?TEAM:[]); const e=T.find(x=>String(x._id)===String(val)); if(e)r.staffName=e.name; }
   pfRecalc();
 }
 function pfSetMrr(v){ PFIN.mrr=Math.max(0,parseInt(v,10)||0); pfRecalc(); }
@@ -23005,11 +23029,16 @@ function pfSection(list,title,sub,ph){
       +'</div>';
   };
   return '<div class="fld pf-sec" style="margin-top:6px">'
-    +'<label style="display:flex;justify-content:space-between;align-items:center">'+title+'<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="pfAdd(\''+list+'\')">+ Добавить</button></label>'
+    +'<div class="pf-sec-hd"><label>'+title+'</label><button type="button" class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="pfAdd(\''+list+'\')">+ Добавить</button></div>'
     +(rows.length?rows.map(rowHtml).join(''):'<div class="pf-empty" onclick="pfAdd(\''+list+'\')">'+ph+' <span>+ добавить</span></div>')
     +'</div>';
 }
-function pfToggleAdv(list,i){ var r=PFIN[list][i]; if(!r)return; r._adv=!r._adv; if(!r._adv && r.unit!=='month'){ r.unit='month'; }
+function pfToggleAdv(list,i){ var r=PFIN[list][i]; if(!r)return;
+  var isMonth=(r.unit==='month'||!r.unit);
+  if(!isMonth || r._adv){            // сворачиваем: фиксируем текущую сумму как «за месяц», иначе она терялась
+    var amt=pfRowAmount(r);
+    r._adv=false; r.unit='month'; r.qty=1; r.rate=amt; r.amount=amt; r.manual=false;
+  } else { r._adv=true; }
   pfRender(); }
 // компактный нативный селект в стиле платформы (без кастомного дропдауна — надёжнее в скролле модалки)
 function _pfSel(id,opts,cur,cb,ph){
@@ -23038,7 +23067,17 @@ function pfRender(_opts){
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close();PFIN=null">Отмена</button><button class="btn-add" onclick="saveProjFinance()">✓ Сохранить P&L</button></div>
   </div>`);
   svcReset( (PFIN._svcsInit ? (window.NP_SVCS||[]) : ((PFIN._svcs&&PFIN._svcs.length)?PFIN._svcs:[{service:'',tariff:'',mrr:PFIN.mrr,cost:0}])) ); PFIN._svcsInit=true;
-  requestAnimationFrame(function(){ var mb=document.querySelector('#ov-pd2 .modal-b'); if(!mb)return; if(_opts&&_opts.scrollBottom) mb.scrollTop=mb.scrollHeight; else if(_pfPrevScroll!=null) mb.scrollTop=_pfPrevScroll; });
+  requestAnimationFrame(function(){ var mb=document.querySelector('#ov-pd2 .modal-b'); if(!mb)return;
+    if(_opts&&_opts.scrollBottom){ mb.scrollTop=mb.scrollHeight; }
+    else if(_pfPrevScroll!=null){ mb.scrollTop=_pfPrevScroll; }
+    if(_opts&&_opts.focusRow){
+      var fr=_opts.focusRow; var w=document.getElementById('seldd-pfc-'+fr.list+'-'+fr.idx);
+      var row=w?w.closest('.pf-row'):null;
+      if(row){ var rb=row.getBoundingClientRect(), mbb=mb.getBoundingClientRect();
+        if(rb.bottom>mbb.bottom-4||rb.top<mbb.top+4) mb.scrollTop += (rb.bottom-mbb.bottom)+16;
+        row.classList.add('pf-row-new'); setTimeout(function(){ row.classList.remove('pf-row-new'); },900); }
+    }
+  });
   // Enter / Return → перевод на следующее поле (сохранение уже происходит по input)
   (function(){
     var modal=document.querySelector('#ov-pd2 .modal'); if(!modal||modal.__pfEnterBound)return; modal.__pfEnterBound=1;
@@ -23065,12 +23104,26 @@ async function saveProjFinance(){
   if(!PFIN) return;
   const svcsArr=svcCollect(); const prim=svcPrimary(svcsArr); PFIN.mrr=svcTotals(svcsArr).mrr;
   const t=pfTotals();
-  const clean=arr=>arr.filter(r=>(r.name&&r.name.trim())||pfRowAmount(r)>0).map(r=>({name:(r.name||'').trim(),role:r.role||'',unit:r.unit||'month',rate:r.rate||0,qty:r.qty||0,manual:!!r.manual,staffId:r.staffId||null,amount:pfRowAmount(r)}));
+  const clean=arr=>arr.filter(r=>(r.name&&r.name.trim())||pfRowAmount(r)>0).map(r=>({name:(r.name||'').trim(),role:r.role||'',unit:r.unit||'month',rate:r.rate||0,qty:r.qty||0,manual:!!r.manual,staffId:r.staffId||null,staffName:r.staffName||null,amount:pfRowAmount(r)}));
   const finance={ salaries:clean(PFIN.salaries), opex:clean(PFIN.opex), projex:clean(PFIN.projex), hours:PFIN.hours||0 };
-  if(window.LIVE&&window.tProjectUpdate){
-    try{ await SB.from('project_services').delete().eq('project_id',PFIN.id); if(svcsArr.length){ const rows=svcsArr.map((s,k)=>({project_id:PFIN.id,service:s.service||'Услуга',tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; } }catch(e){ console.error('fin services',e); toast('Услуги не сохранились'); }
-    const patch={mrr:PFIN.mrr,cost:t.cost,finance,tariff:(prim.tariff||null)}; if(prim.service)patch.service=prim.service;
-    window.tProjectUpdate(PFIN.id,patch); pd2Close(); PFIN=null; toast('P&L сохранён'); return;
+  if(window.LIVE&&window.SB){
+    const named=svcsArr.filter(s=>s.service);          // строки без названия услуги в справочник услуг не пишем
+    let svcOk=true;
+    try{ await SB.from('project_services').delete().eq('project_id',PFIN.id); if(named.length){ const rows=named.map((s,k)=>({project_id:PFIN.id,service:s.service,tariff:s.tariff,mrr:s.mrr,cost:s.cost,status:s.status||'active',sort:k})); const {error}=await SB.from('project_services').insert(rows); if(error)throw error; } }catch(e){ svcOk=false; console.error('fin services',e); toast('Услуги не сохранились'); }
+    const patch={mrr:PFIN.mrr,cost:t.cost,finance};
+    if(prim.service)patch.service=prim.service;
+    if(named.length)patch.tariff=prim.tariff||null;     // без строк услуг тариф проекта не трогаем
+    try{
+      const {error}=await SB.from('projects').update(patch).eq('id',PFIN.id); if(error)throw error;
+      pd2Close(); PFIN=null; toast(svcOk?'P&L сохранён':'P&L сохранён (услуги — нет)');
+      if(window.tLoadAll&&typeof ME!=='undefined'&&ME) await window.tLoadAll(ME.role);
+      if(window.tLoadFinance) await window.tLoadFinance();
+      const cur=document.querySelector('#app-ag .nav-i.on[data-m]');
+      const m=cur?cur.dataset.m:'finance';
+      if(m==='finance'&&typeof renderFinance==='function') renderFinance();
+      else if(m==='projects'&&typeof renderProjects==='function') renderProjects();
+    }catch(e){ toast('Ошибка: '+(e.message||e)); }
+    return;
   }
   if(typeof FINANCE!=='undefined'&&FINANCE.projects){ const p=FINANCE.projects.find(x=>x.id===PFIN.id);
     if(p){ p.mrr=PFIN.mrr; p.cost=t.cost; p.hours=PFIN.hours; p.finance=finance; p.profit=PFIN.mrr-t.cost; p.margin=PFIN.mrr>0?Math.round(100*(PFIN.mrr-t.cost)/PFIN.mrr):null; p._svcs=svcsArr; } }
@@ -23121,13 +23174,13 @@ function finCatRender(_opts){
     <div class="modal-h"><h3 style="margin:0">Справочники расходов</h3><p style="margin:3px 0 0">Настройте роли и категории один раз — дальше выбор из списка</p></div>
     <div class="modal-b" style="max-height:66vh;overflow:auto">
       <div class="fld">
-        <label style="display:flex;justify-content:space-between;align-items:center">Роли сотрудников и ставки<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatRoleAdd()">+ Роль</button></label>
+        <div class="pf-sec-hd"><label>Роли сотрудников и ставки</label><button type="button" class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatRoleAdd()">+ Роль</button></div>
         <div class="fce-head"><span>название</span><span>единица</span><span>ставка</span><span></span></div>
         ${roleRows||'<div class="pf-empty">Пока нет ролей</div>'}
         <button class="fce-add" onclick="finCatRoleAdd()"><span>+</span> добавить роль</button>
       </div>
       <div class="fld" style="margin-top:14px">
-        <label style="display:flex;justify-content:space-between;align-items:center">Категории прочих расходов<button class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatCatAdd()">+ Категория</button></label>
+        <div class="pf-sec-hd"><label>Категории прочих расходов</label><button type="button" class="btn-ghost" style="padding:4px 10px;font-size:12.5px" onclick="finCatCatAdd()">+ Категория</button></div>
         ${catRows||'<div class="pf-empty">Пока нет категорий</div>'}
         <button class="fce-add" onclick="finCatCatAdd()"><span>+</span> добавить категорию</button>
       </div>
@@ -23205,9 +23258,10 @@ function peRender(){
 }
 function savePSplit(){
   if(!PSEDIT)return;
-  if(peSumVal()!==100){ toast('Сумма долей должна быть ровно 100%'); return; }
   const clean=PSEDIT.filter(r=>r.name&&r.name.trim()).map(r=>({name:r.name.trim(),role:(r.role||'').trim(),pct:r.pct||0,color:r.color,avatar:r.avatar||null}));
   if(!clean.length){ toast('Добавьте хотя бы одного участника'); return; }
+  const _cleanSum=clean.reduce((a,r)=>a+(Number(r.pct)||0),0);
+  if(_cleanSum!==100){ toast(_cleanSum===peSumVal()?'Сумма долей должна быть ровно 100%':'Сумма долей должна быть ровно 100% — у строки без имени доля не учитывается'); return; }
   psSave(clean); PSEDIT=null; pd2Close(); renderFinance(); toast('Распределение прибыли сохранено');
 }
 
@@ -23233,7 +23287,7 @@ function finMarginChart(projs){
     const grad=p.margin>=50?'linear-gradient(180deg,#5BE3A0,#43D88C)':p.margin>=25?'linear-gradient(180deg,#EEC579,#E3B567)':'linear-gradient(180deg,#F0785C,#E0566A)';
     return `<div class="bcol"><div class="ctip"><div class="tr"><span>Маржа</span><b style="color:${col}">${p.margin}%</b></div><div class="tr"><span>Доход</span><b>${money(p.mrr)}</b></div><div class="tr"><span>Прибыль</span><b style="color:${p.profit>=0?'var(--pos)':'var(--neg)'}">${p.profit>=0?'+':''}${money(p.profit)}</b></div></div><span class="val" style="color:${col}">${p.margin}%</span><div class="bar" style="--h:${h.toFixed(1)}%;animation-delay:${i*70}ms;background:${grad}"></div></div>`;
   }).join('');
-  const xl=projs.map(p=>`<span title="${(p.name||'').replace(/"/g,'&quot;')}">${p.name.length>16?p.name.slice(0,15)+'…':p.name}</span>`).join('');
+  const xl=projs.map(p=>{const _n=String(p.name||'');return `<span title="${escH(_n)}">${escH(_n.length>16?_n.slice(0,15)+'…':_n)}</span>`;}).join('');
   const zp=v=>(v/max*100).toFixed(1);
   const zones=`<div class="mz mz-hi" style="top:0;bottom:${zp(50)}%"></div><div class="mz mz-mid" style="bottom:${zp(25)}%;height:${zp(25)}%"></div><div class="mz mz-lo" style="bottom:0;height:${zp(25)}%"></div>`;
   return `<div class="fin-chart"><div class="fin-bars">${zones}${gl}${bars}</div><div class="fin-xl">${xl}</div></div>`;
@@ -23426,7 +23480,7 @@ function renderFinance(){
         <div class="fh-ctx"><b>${F.marginPct}%</b> маржа · ${F.profit>=0?'прибыльная операция':'расходы > выручки'}</div>
       </div>
       <div class="fin-grid">
-        <div class="fg"><div class="l">MRR агентства</div><div class="gv">${money(F.totalMrr)}</div><div class="gs">${F.paying} ${F.paying===1?'клиент':'клиентов'} · /мес</div></div>
+        <div class="fg"><div class="l">MRR агентства</div><div class="gv">${money(F.totalMrr)}</div><div class="gs">${F.paying} ${_plural(F.paying,'клиент','клиента','клиентов')} · /мес</div></div>
         <div class="fg"><div class="l">Расходы</div><div class="gv neg">${money(F.totalCost)}</div><div class="gs">${F.costPct}% от выручки</div></div>
         <div class="fg"><div class="l">Время</div><div class="gv acc">${fmtHours(F.totalHours)}</div><div class="gs">часов по таймеру</div></div>
         <div class="fg"><div class="l">Концентрация прибыли</div><div class="gv">${F.profConcPct?F.profConcPct+'%':'—'}</div><div class="gs">${F.profConcTop&&F.profConcTop!=='—'?'с проекта '+F.profConcTop:(F.profit>0?'—':'прибыли пока нет')}</div></div>
@@ -23439,7 +23493,7 @@ function renderFinance(){
       const snaps=(F.snapshots||[]).slice().sort((a,b)=>String(a.period)<String(b.period)?-1:1);
       const hasHist=snaps.length>=2;
       const LB={month:1,quarter:3,year:12}, lb=LB[finPeriod]||1;
-      const baseSnap=(finPeriod==='month'&&F.prevSnap)?F.prevSnap:(snaps.length?snaps[Math.max(0,snaps.length-lb)]:null);
+      const baseSnap=(finPeriod==='month'&&F.prevSnap)?F.prevSnap:(snaps.length?snaps[Math.max(0,snaps.length-1-lb)]:null);
       let start=baseSnap?(Number(baseSnap.mrr)||0):0;
       const end=Number(F.totalMrr)||0, newM=Number(F.newMrr)||0, churnM=Number(F.churnMrr)||0;
       let resid=end-start-newM+churnM;                   // нетто расширение/сжатие базы
@@ -39455,7 +39509,7 @@ window._kpi3DPPick = (iso) => {
 
 /* ─── метка сборки: чтобы сразу видеть, какая версия развёрнута ───
    Проверить в консоли:  __BUILD           */
-window.__BUILD='2026-07-25.01-mobile-app';
+window.__BUILD='2026-07-25.02-finance-fix';
 try{ console.info('%cDETROYD build 2026-07-25.01-mobile-app','color:#37E6C8;font-weight:700'); }catch(e){}
 try{ console.info('доска задач:', (typeof agCanEditTasks==='function' && agCanEditTasks()) ? 'редактируемая' : 'только чтение'); }catch(e){}
 </script>
