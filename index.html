@@ -4415,6 +4415,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cdoc-dl svg{width:13px;height:13px}
 .cdocv-body{background:#0b0d10;padding:14px;max-height:74vh;overflow:auto}
 .cdoc-frame{width:100%;height:min(70vh,780px);border:0;border-radius:9px;background:#fff;display:block}
+/* Сценарий длиннее договора — читателю даём больше места. */
+.cdocv.cdocv-xl,#ov-pd2 .modal.cdocv-xl{width:min(1180px,96vw);max-width:min(1180px,96vw)}
+.cdocv-xl .cdoc-frame{height:min(84vh,1020px)}
+.cp-doc-chip{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--accent);font-weight:600}
+.cp-doc-chip svg{width:15px;height:15px}
 .cdoc-sheet{background:#fff;border-radius:9px;padding:38px 34px}
 .cdoc-sk{height:11px;border-radius:5px;margin-bottom:11px;
   background:linear-gradient(90deg,#ececec 25%,#f6f6f6 37%,#ececec 63%);background-size:400% 100%;animation:cdocSk 1.25s ease infinite}
@@ -18789,9 +18794,17 @@ function clCpRender(){
     var _topic=(cols[0]&&row.c)?(row.c[cols[0].id]||''):'';
     cols.forEach(function(col,ci){ const v=row.c?row.c[col.id]:'';
       var _isText=(col.type==='text' && v!=null && String(v).trim()!=='');
-      var _cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+(_isText?' cl-read':'');
-      var _at=_isText?(' data-read="'+_ddA(v)+'" data-title="'+_ddA(col.name||'')+'" data-topic="'+_ddA(_topic)+'" onclick="clCpRead(this)" onkeydown="if(event.key===\'Enter\')clCpRead(this)" role="button" tabindex="0"'):'';
-      grid+='<div class="'+_cls+'" style="width:'+cw[ci]+'px"'+_at+'>'+(typeof cpCellView==='function'?cpCellView(col,v,row):_ddH(v==null?'':v))+'</div>';
+      /* Сценарий клиент читает снимком, как договор: ячейка кликабельна,
+         пока в ней настоящий документ. Пустую показывать нечем — заводить
+         сценарии может только агентство. */
+      var _doc=(col.type==='doc' && typeof _cpDocId==='function')?_cpDocId(v):'';
+      var _cls='cp-cell'+(ci===0?' cp-c0':'')+((col.type==='num'||col.type==='money')?' cp-r':'')+((_isText||_doc)?' cl-read':'');
+      var _at=_doc?(' data-file="'+_ddA(_doc)+'" data-topic="'+_ddA(_topic)+'" onclick="clCpDoc(this)" onkeydown="if(event.key===\'Enter\')clCpDoc(this)" role="button" tabindex="0"')
+        :(_isText?(' data-read="'+_ddA(v)+'" data-title="'+_ddA(col.name||'')+'" data-topic="'+_ddA(_topic)+'" onclick="clCpRead(this)" onkeydown="if(event.key===\'Enter\')clCpRead(this)" role="button" tabindex="0"'):'');
+      var _view=(col.type==='doc')
+        ? (_doc?'<span class="cp-doc-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></svg>Открыть</span>':'')
+        : (typeof cpCellView==='function'?cpCellView(col,v,row):_ddH(v==null?'':v));
+      grid+='<div class="'+_cls+'" style="width:'+cw[ci]+'px"'+_at+'>'+_view+'</div>';
     });
     const a=cp.appr[sid+'/'+row.id]||{status:'pending',comment:''};
     grid+='<div class="cp-cell clcp-appcell" data-dec="'+_ddA(row.id)+'" style="width:240px">'+clCpRowControl(row.id,a)+'</div></div>';
@@ -29587,6 +29600,79 @@ function clDocSave(id,openInTab){
   setTimeout(()=>{ try{ document.body.removeChild(a); }catch(_e){} },0);
 }
 window.renderClDocs=renderClDocs; window.clDocOpen=clDocOpen; window.clDocSave=clDocSave;
+
+/* ─── Сценарий контент-плана в кабинете клиента ───
+   Тот же читатель, что у договоров, только крупнее: сценарий длиннее акта,
+   и листать его в маленьком окне неудобно. Живой документ Google клиенту
+   не показываем — доступа к Диску у него нет и не должно быть, поэтому
+   собираем PDF-снимок на стороне сервера. */
+const CLCPDOC={ cache:{}, open:null };
+function _clCpDocShell(title){
+  return `<div class="modal glass cdocv cdocv-xl">
+    <div class="cdocv-head">
+      <div class="cdocv-ic">${_clDocIcon}</div>
+      <div class="cdocv-t"><div class="k">Сценарий</div><div class="n">${escH(title||'Сценарий публикации')}</div></div>
+      <div class="cdocv-act" id="cdoc-act"><button class="tg-x" onclick="pd2Close()">×</button></div>
+    </div>
+    <div class="cdocv-body" id="cdoc-view">
+      <div class="cdoc-sheet" aria-label="Готовим сценарий">
+        ${['62%','96%','88%','92%','40%','0','78%','94%','86%','58%'].map(w=>w==='0'
+          ? '<div style="height:22px"></div>'
+          : `<div class="cdoc-sk" style="width:${w}"></div>`).join('')}
+      </div>
+      <div style="text-align:center;font-size:12.5px;color:var(--txt-3);margin-top:14px">Собираем сценарий — несколько секунд</div>
+    </div>
+  </div>`;
+}
+async function clCpDoc(el){
+  const P=window.CLP; if(!P) return;
+  const fileId=el&&el.getAttribute?el.getAttribute('data-file'):String(el||'');
+  if(!fileId) return;
+  const title=(el&&el.getAttribute&&el.getAttribute('data-topic'))||'Сценарий публикации';
+  CLCPDOC.open=fileId;
+  pd2Open(_clCpDocShell(title));
+  const show=(html)=>{ const v=document.getElementById('cdoc-view'); if(v) v.innerHTML=html; };
+  const fail=(msg,retry)=>show(`<div class="cdoc-note">${escH(msg)}${retry?`<div style="margin-top:16px"><button class="btn-add" onclick="clCpDoc('${escH(fileId)}')">Попробовать снова</button></div>`:''}</div>`);
+  try{
+    let hit=CLCPDOC.cache[fileId];
+    if(!hit){
+      const answer = await Promise.race([
+        _giFetch('google-docs', { action:'script_pdf' }, { file_id:fileId, project_id:P.id }),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 60000))
+      ]);
+      const { status, data } = answer || {};
+      if(status===403 || (data&&data.error==='forbidden')){ fail((data&&data.message)||'Этот сценарий вам не открыт.',false); return; }
+      if(status===401){ fail('Сессия истекла — обновите страницу и войдите заново.',false); return; }
+      if(!data || data.ok===false || !data.pdf){ fail((data&&(data.error||data.message))||'Не удалось получить сценарий.',true); return; }
+      const bin=atob(data.pdf), arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      hit={ url:URL.createObjectURL(new Blob([arr],{type:'application/pdf'})),
+            name:String(title).replace(/[\\/:*?"<>|]/g,'-')+'.pdf' };
+      CLCPDOC.cache[fileId]=hit;
+    }
+    if(CLCPDOC.open!==fileId) return;
+    const narrow=window.innerWidth<=768;
+    const dlIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>';
+    show(narrow
+      ? `<div class="cdoc-note">Сценарий готов.<div style="margin-top:14px"><button class="cdoc-dl" onclick="clCpDocSave('${escH(fileId)}',1)">Открыть сценарий</button></div></div>`
+      : `<iframe class="cdoc-frame" src="${hit.url}#toolbar=0&navpanes=0&view=FitH" title="${escH(title)}"></iframe>`);
+    const act=document.getElementById('cdoc-act');
+    if(act) act.innerHTML=`<button class="cdoc-dl" onclick="clCpDocSave('${escH(fileId)}')">${dlIcon}Скачать</button>`
+      +`<button class="tg-x" onclick="pd2Close()">×</button>`;
+  }catch(e){
+    const msg=String((e&&e.message)||e);
+    fail(msg==='timeout' ? 'Google не ответил за минуту. Попробуйте ещё раз — обычно со второго раза открывается сразу.' : msg, true);
+  }
+}
+function clCpDocSave(fileId,openInTab){
+  const hit=CLCPDOC.cache[fileId]; if(!hit) return;
+  if(openInTab){ try{ window.open(hit.url,'_blank','noopener'); }catch(_e){} return; }
+  const a=document.createElement('a');
+  a.href=hit.url; a.download=hit.name; a.style.display='none';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ try{ document.body.removeChild(a); }catch(_e){} },0);
+}
+window.clCpDoc=clCpDoc; window.clCpDocSave=clCpDocSave;
 
 function renderClUpdates(){
   const P=window.CLP, feed=(P&&P.feed)||[];
