@@ -3395,6 +3395,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 #pd-body.pd-cp-full>.pd-inner{flex:1 1 auto;min-height:0;max-width:none !important;margin:0;display:flex;flex-direction:column}
 #pd-body.pd-cp-full .cp{flex:1 1 auto;min-height:0;border-radius:0;border:0;border-top:1px solid var(--line)}
 #pd-body.pd-cp-full .cp-scroll{max-height:none !important;flex:1 1 auto;min-height:0}
+/* ── Стратегии: доска Miro тем же способом занимает весь экран раздела ── */
+#pd-body.pd-bd-full{padding:0 !important;overflow:hidden !important;display:flex;flex-direction:column}
+#pd-body.pd-bd-full>.pd-inner{flex:1 1 auto;min-height:0;max-width:none !important;margin:0;display:flex;flex-direction:column}
+#pd-body.pd-bd-full .pd-bdwrap{flex:1 1 auto;min-height:0}
 /* Тонкие, скользящие скроллбары для премиум-ощущения */
 .cp-scroll::-webkit-scrollbar{width:12px;height:12px}
 .cp-scroll::-webkit-scrollbar-track{background:transparent}
@@ -4418,6 +4422,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-newbtn:active{transform:translateY(0);box-shadow:inset 0 1px 2px rgba(0,0,0,.2),0 4px 12px -8px rgba(55,230,200,.5)}
 .pd-newbtn svg{width:15px;height:15px}
 .pd-scroll{flex:1;overflow-y:auto;padding:34px 44px 60px}
+/* Доска: узкая панель сверху, всё остальное место — рабочее поле. */
+.pd-bdwrap{display:flex;flex-direction:column;background:var(--bg)}
+.pd-bdbar{flex:0 0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:11px 44px;border-bottom:1px solid var(--line)}
+.pd-bdbar .nm{font-size:14px;font-weight:600;color:var(--txt);margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pd-bd-sw{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;color:var(--txt-2);user-select:none;transition:color .15s var(--ease)}
+.pd-bd-sw:hover{color:var(--txt)}
+.pd-bd-sw.busy{opacity:.5;pointer-events:none}
+.pd-bdwrap iframe{flex:1 1 auto;width:100%;min-height:0;border:0;display:block}
+@media(max-width:820px){.pd-bdbar{padding:10px 16px;gap:10px}}
 .pd-inner{max-width:2400px;margin:0 auto;animation:pdFade .16s ease both}
 @keyframes pdFade{from{opacity:.4}to{opacity:1}}
 .pd-scroll>.pd-inner>*{animation:riseIn .5s var(--ease-out) both}
@@ -14658,6 +14671,7 @@ function renderPd(){
   body.innerHTML=`<div class="pd-inner${_same?' norise':''}">${h}</div>`;
   body.classList.toggle('pd-kanban', pdTabCur==='kanban');
   body.classList.toggle('pd-cp-full', pdTabCur==='content');
+  body.classList.toggle('pd-bd-full', pdTabCur==='board' && !!(p&&p._miro));
   if(_same){ body.scrollTop=_pageSc;
     body.querySelectorAll('.pk-col').forEach(c=>{ const b=c.querySelector('.pk-body'); if(b&&_sc[c.dataset.st]!=null)b.scrollTop=_sc[c.dataset.st]; });
     const _cs2=body.querySelector('.cp-scroll'); if(_cs2&&_cpSc){ _cs2.scrollTop=_cpSc.t; _cs2.scrollLeft=_cpSc.l; } }
@@ -28234,19 +28248,16 @@ function _pdBoardHTML(p){
       :'<div style="opacity:.6;font-size:13px;margin-top:8px">Создать её может тот, кто вправе править проекты.</div>'}</div>`;
   }
 
-  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-      <div style="font-size:14px;font-weight:600;color:var(--txt)">${escH(b.name||'Доска проекта')}</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        ${canEdit?`<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;opacity:.85" title="Клиент увидит доску в своём кабинете. Пока тумблер выключен, доска закрыта для всех, кроме команды Miro">
-          <input type="checkbox" id="pd-board-vis" ${b.client_visible?'checked':''} onchange="pdBoardVisible(this.checked)"> Показывать клиенту</label>`:''}
-        <a class="btn-ghost" href="${escH(_miroLink(b))}" target="_blank" rel="noopener">Открыть в Miro</a>
+  return `<div class="pd-bdwrap">
+      <div class="pd-bdbar">
+        <div class="nm">${escH(b.name||'Доска проекта')}</div>
+        ${canEdit?`<div class="pd-bd-sw" id="pd-board-row" onclick="pdBoardVisible(!this.querySelector('.tgl').classList.contains('on'))" title="Клиент увидит доску в своём кабинете. Пока переключатель выключен, доска закрыта для всех, кроме команды Miro">
+          <span class="tgl${b.client_visible?' on':''}" id="pd-board-vis"><i></i></span>Показывать клиенту</div>`:''}
+        <a class="btn-ghost" href="${escH(_miroLink(b))}" target="_blank" rel="noopener" title="Закрытую доску Miro показывает только тем, кто вошёл с доступом к ней — если во встроенном окне видно приглашение войти, откройте доску здесь">Открыть в Miro</a>
         ${canEdit?'<button class="btn-ghost" onclick="pdBoardUnlink()">Отвязать</button>':''}
       </div>
-    </div>
-    <div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)">
-      <iframe src="${escH(_miroEmbed(b,false))}" style="width:100%;height:min(64vh,620px);border:0;display:block" allowfullscreen loading="lazy"></iframe>
-    </div>
-    <div style="opacity:.45;font-size:12px;margin-top:10px;line-height:1.6">Если вместо доски видно приглашение войти — откройте её кнопкой «Открыть в Miro»: закрытую доску Miro показывает только тем, кто вошёл с доступом к ней.</div>`;
+      <iframe src="${escH(_miroEmbed(b,false))}" allowfullscreen loading="lazy"></iframe>
+    </div>`;
 }
 
 async function pdBoardCreate(){
@@ -28278,16 +28289,22 @@ async function pdBoardLink(){
   }catch(e){ toast(String(e.message||e)); }
 }
 
+/* Переключатель отвечает сразу, не дожидаясь Miro: так он ощущается живым.
+   Если запрос не прошёл — возвращаем его в прежнее положение. */
 async function pdBoardVisible(on){
   const p=PROJECTS[pdIdx]; if(!p||!p._miro) return;
-  const cb=document.getElementById('pd-board-vis'); if(cb) cb.disabled=true;
+  const t=document.getElementById('pd-board-vis'), row=document.getElementById('pd-board-row');
+  if(row&&row.classList.contains('busy')) return;
+  if(t) t.classList.toggle('on', !!on);
+  if(row) row.classList.add('busy');
   try{
     const { data } = await _giFetch('miro-board', { action:'visible', project:p.id, on:on?'1':'0' });
     if(!data||!data.board) throw new Error((data&&data.message)||'Не удалось изменить доступ к доске');
     p._miro=data.board;
+    if(t) t.classList.toggle('on', !!data.board.client_visible);
     toast(on?'Доска видна клиенту':'Доска скрыта от клиента');
-  }catch(e){ toast(String(e.message||e)); if(cb) cb.checked=!on; }
-  finally{ if(cb) cb.disabled=false; }
+  }catch(e){ toast(String(e.message||e)); if(t) t.classList.toggle('on', !on); }
+  finally{ if(row) row.classList.remove('busy'); }
 }
 
 async function pdBoardUnlink(){
