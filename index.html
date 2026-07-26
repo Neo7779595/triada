@@ -13547,7 +13547,7 @@ function pdTabbar(p){
     <button class="pd-chip pd-chip-btn pd-fs-btn${_fsOn?' on':''}" id="pd-fs-btn" onclick="pdFullscreen()" title="Полный экран · Esc чтобы выйти"><svg id="pd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${_fsOn?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>'}</svg>${_fsOn?'Свернуть':'Экран'}</button>
     <div class="pd-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b id="pk-total" class="pk-total-live">${pkFmtDur(pkProjTotal())}</b> всего</div>
     <div class="pd-chip pd-chip-btn${pdTabCur==='brief'?' on':''}" onclick="pdTab('brief')" title="Бриф проекта"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Бриф</div>
-    <div class="pd-chip pd-chip-btn pd-chip-docs${pdTabCur==='docs'?' on':''}" onclick="pdTab('docs')" title="Документы: договоры и акты по проекту"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/></svg><span class="lbl">Документы</span></div>
+    ${(typeof agIsOwner==='function'&&agIsOwner())?`<div class="pd-chip pd-chip-btn pd-chip-docs${pdTabCur==='docs'?' on':''}" onclick="pdTab('docs')" title="Документы: договоры и акты. Видны только владельцу"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/></svg><span class="lbl">Документы</span></div>`:''}
     <div class="pd-chip pd-chip-btn ct-chip" onclick="contactsOpen()" title="Контакты клиента"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Контакты${ctBadge(p)}</div>
     <div class="pd-chip pd-chip-btn" onclick="tgOpenModal()" title="Telegram-уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>Telegram <span style="color:${p.tg_chat_id?'var(--pos)':'var(--txt-3)'}">${p.tg_chat_id?'✓':'○'}</span></div>
     
@@ -27811,8 +27811,9 @@ async function pdDocsLoad(p){
 }
 
 function _pdDocsHTML(p){
-  if(p._docs===undefined||PDOC.tpl===null){ pdDocsLoad(p); return '<div class="pk-empty" style="padding:44px 0">Загружаю документы…</div>'; }
   const owner=(typeof agIsOwner==='function')?agIsOwner():true;
+  if(!owner) return '<div class="pk-empty" style="padding:44px 0">Договоры и акты видит только владелец агентства.</div>';
+  if(p._docs===undefined||PDOC.tpl===null){ pdDocsLoad(p); return '<div class="pk-empty" style="padding:44px 0">Загружаю документы…</div>'; }
   const docs=p._docs||[], tpls=PDOC.tpl||[];
   const make=tpls.map(t=>`<button class="btn-add" onclick="pdDocCreate('${t.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>${escH(t.name)}</button>`).join('');
   const head=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
@@ -27828,7 +27829,7 @@ function _pdDocsHTML(p){
       <button title="Убрать из списка" onclick="event.stopPropagation();pdDocDel('${d.id}')" style="background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:17px;line-height:1;padding:0 4px">×</button>
     </div>`).join('')
     :'<div class="pk-empty" style="padding:40px 0">Документов пока нет — нажмите «Договор» или «Акт», данные проекта подставятся сами.</div>';
-  return head+rows+'<div style="opacity:.45;font-size:12px;margin-top:14px;line-height:1.6">Готовый файл лежит в папке проекта на Google Диске, в разделе «6. Документы и договоры». Команда проекта видит его там же — отдельный доступ не нужен.</div>';
+  return head+rows+'<div style="opacity:.45;font-size:12px;margin-top:14px;line-height:1.6">Файлы лежат на вашем Google Диске в закрытой папке «Договоры и акты» → «'+escH(p.name||'проект')+'». Сотрудникам она не открыта: ни в системе, ни на Диске они этих документов не видят.</div>';
 }
 
 function pdDocOpen(u){ try{ window.open(typeof _giWithUser==='function'?_giWithUser(u):u,'_blank','noopener'); }catch(_e){} }
