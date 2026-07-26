@@ -4290,6 +4290,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-chip svg{width:14px;height:14px;color:var(--txt-3);transition:color .16s var(--ease)}
 .pd-chip:not(.pd-chip-btn) svg{color:var(--accent)}
 .pd-chip b{font-family:var(--mono);color:var(--txt)}
+/* Чип «Документы» не должен утаскивать шапку карточки в прокрутку:
+   на экранах уже 1440 оставляем одну иконку, подпись — в подсказке. */
+@media(max-width:1440px){.pd-chip-docs .lbl{display:none}.pd-chip-docs{padding:8px 10px}}
 .pd-newbtn{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(0,0,0,.05)),var(--accent);color:var(--accent-ink);font-weight:600;font-size:14px;letter-spacing:.01em;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 0 rgba(0,0,0,.18),0 6px 18px -8px rgba(55,230,200,.55);transition:transform .16s var(--ease),box-shadow .16s var(--ease),filter .16s var(--ease)}
 .pd-newbtn:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.32),0 1px 0 rgba(0,0,0,.2),0 10px 26px -8px rgba(55,230,200,.7);filter:saturate(1.04)}
 .pd-newbtn:active{transform:translateY(0);box-shadow:inset 0 1px 2px rgba(0,0,0,.2),0 4px 12px -8px rgba(55,230,200,.5)}
@@ -13544,6 +13547,7 @@ function pdTabbar(p){
     <button class="pd-chip pd-chip-btn pd-fs-btn${_fsOn?' on':''}" id="pd-fs-btn" onclick="pdFullscreen()" title="Полный экран · Esc чтобы выйти"><svg id="pd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${_fsOn?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>'}</svg>${_fsOn?'Свернуть':'Экран'}</button>
     <div class="pd-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b id="pk-total" class="pk-total-live">${pkFmtDur(pkProjTotal())}</b> всего</div>
     <div class="pd-chip pd-chip-btn${pdTabCur==='brief'?' on':''}" onclick="pdTab('brief')" title="Бриф проекта"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Бриф</div>
+    <div class="pd-chip pd-chip-btn pd-chip-docs${pdTabCur==='docs'?' on':''}" onclick="pdTab('docs')" title="Документы: договоры и акты по проекту"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/></svg><span class="lbl">Документы</span></div>
     <div class="pd-chip pd-chip-btn ct-chip" onclick="contactsOpen()" title="Контакты клиента"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Контакты${ctBadge(p)}</div>
     <div class="pd-chip pd-chip-btn" onclick="tgOpenModal()" title="Telegram-уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>Telegram <span style="color:${p.tg_chat_id?'var(--pos)':'var(--txt-3)'}">${p.tg_chat_id?'✓':'○'}</span></div>
     
@@ -13704,7 +13708,7 @@ function _tgDeepLink(){
     if(typeof PROJECTS==='undefined'||!PROJECTS||!PROJECTS.length) return;
     const idx=PROJECTS.findIndex(x=>String(x.id)===String(pid));
     const _tab=u.searchParams.get('t');
-    if(idx>=0){ openProject(idx); if(_tab && typeof pdTab==='function' && ['stages','kanban','deadlines','content','smm','history','brief','reports'].indexOf(_tab)>=0){ try{ pdTab(_tab); }catch(_e){} } }
+    if(idx>=0){ openProject(idx); if(_tab && typeof pdTab==='function' && ['stages','kanban','deadlines','content','smm','history','brief','reports','docs'].indexOf(_tab)>=0){ try{ pdTab(_tab); }catch(_e){} } }
     history.replaceState(null,'',location.pathname);
   }catch(e){ console.warn('[deeplink]',e); }
 }
@@ -14406,6 +14410,8 @@ function renderPd(){
         return `<div class="act-row" style="cursor:pointer" onclick="openReportProj(${x.i})"><div class="act-ic start" style="background:#37E6C822;color:#37E6C8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg></div><div style="flex:1"><div class="act-txt">${_ddH(r.title)}</div><div class="act-tag">Опубликован · ${_dDateFull(r.published_at)}</div></div><span class="badge" style="background:#37E6C822;color:#37E6C8">${r.kind}</span><button title="Удалить" onclick="event.stopPropagation();pdReportDel('${r.id}')" style="background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:17px;line-height:1;padding:0 4px">×</button></div>`;
       }).join('')
       :'<div class="pk-empty" style="padding:40px 0">Facebook Ads отчётов пока нет — создай первый кнопкой «Отчёт»</div>');
+  } else if(pdTabCur==='docs'){
+    h=_pdDocsHTML(p);
   } else if(pdTabCur==='content'){
     h=cpRender(p);
   } else if(pdTabCur==='smm'){
@@ -27778,6 +27784,197 @@ async function giDriveAll(){
     if(log) log.innerHTML=`<div style="font-size:12.5px;color:var(--neg)">${escH(String(e.message||e))}</div>`;
   }finally{ if(btn){ btn.disabled=false; btn.textContent='Создать папки проектов'; } }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   ДОКУМЕНТЫ ПРОЕКТА · договоры и акты из шаблонов агентства.
+   Файл собирает функция google-docs и кладёт в папку «6. Документы
+   и договоры» — доступы команде наследуются от папки проекта,
+   отдельно ничего раздавать не нужно.
+   ───────────────────────────────────────────────────────────── */
+const PDOC={ tpl:null, busy:false, edit:null };
+const _pdocKindName=k=>({contract:'Договор',act:'Акт',invoice:'Счёт'}[k]||'Документ');
+const _pdocVal=id=>{ const el=document.getElementById(id); return el?String(el.value||'').trim():''; };
+/** Только настоящий владелец: реквизиты агентства директору менять нельзя. */
+function _pdocIsOwner(){ const me=(window.tMe&&window.tMe())||null; return !me || String(me.role||'')==='agency_owner' || String(me.role||'')==='superadmin'; }
+
+async function pdDocsLoad(p){
+  if(p._docsLoading) return; p._docsLoading=true;
+  try{
+    if(!window.LIVE||!window.SB){ p._docs=[]; PDOC.tpl=PDOC.tpl||[]; return; }
+    const [d,t]=await Promise.all([
+      SB.from('project_documents').select('id,kind,number,title,url,created_at').eq('project_id',p.id).order('created_at',{ascending:false}),
+      PDOC.tpl?Promise.resolve({data:PDOC.tpl}):SB.from('doc_templates').select('id,kind,name,sort').is('archived_at',null).order('sort')
+    ]);
+    p._docs=d.data||[]; PDOC.tpl=t.data||[];
+  }catch(e){ console.warn('[docs]',e); p._docs=p._docs||[]; PDOC.tpl=PDOC.tpl||[]; }
+  finally{ p._docsLoading=false; if(pdTabCur==='docs'&&typeof renderPd==='function') renderPd(); }
+}
+
+function _pdDocsHTML(p){
+  if(p._docs===undefined||PDOC.tpl===null){ pdDocsLoad(p); return '<div class="pk-empty" style="padding:44px 0">Загружаю документы…</div>'; }
+  const owner=(typeof agIsOwner==='function')?agIsOwner():true;
+  const docs=p._docs||[], tpls=PDOC.tpl||[];
+  const make=tpls.map(t=>`<button class="btn-add" onclick="pdDocCreate('${t.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>${escH(t.name)}</button>`).join('');
+  const head=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div style="font-size:14px;font-weight:600;color:var(--txt)">Документы по проекту · ${docs.length}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${make}
+      ${owner?'<button class="btn-ghost" onclick="pdocReqOpen()">Реквизиты</button>':''}
+      ${owner?'<button class="btn-ghost" onclick="pdocTplOpen()">Шаблоны</button>':''}
+    </div></div>`;
+  if(!tpls.length) return head+'<div class="pk-empty" style="padding:40px 0">Шаблонов пока нет. Владелец может завести их кнопкой «Шаблоны».</div>';
+  const rows=docs.length?docs.map(d=>`<div class="act-row" style="cursor:pointer" onclick="pdDocOpen('${escH(d.url)}')">
+      <div class="act-ic start" style="background:#37E6C822;color:#37E6C8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></svg></div>
+      <div style="flex:1;min-width:0"><div class="act-txt">${escH(d.title)}</div><div class="act-tag">${escH(_pdocKindName(d.kind))} № ${escH(d.number||'—')} · ${escH(_dDateFull?_dDateFull(d.created_at):String(d.created_at).slice(0,10))}</div></div>
+      <button title="Убрать из списка" onclick="event.stopPropagation();pdDocDel('${d.id}')" style="background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:17px;line-height:1;padding:0 4px">×</button>
+    </div>`).join('')
+    :'<div class="pk-empty" style="padding:40px 0">Документов пока нет — нажмите «Договор» или «Акт», данные проекта подставятся сами.</div>';
+  return head+rows+'<div style="opacity:.45;font-size:12px;margin-top:14px;line-height:1.6">Готовый файл лежит в папке проекта на Google Диске, в разделе «6. Документы и договоры». Команда проекта видит его там же — отдельный доступ не нужен.</div>';
+}
+
+function pdDocOpen(u){ try{ window.open(typeof _giWithUser==='function'?_giWithUser(u):u,'_blank','noopener'); }catch(_e){} }
+
+async function pdDocCreate(tplId){
+  const p=PROJECTS[pdIdx]; if(!p||PDOC.busy) return;
+  PDOC.busy=true;
+  /* Вкладку открываем сразу, до ожидания ответа: иначе браузер посчитает
+     её всплывающей и заблокирует. Пока файл собирается — показываем заставку. */
+  let tab=null; try{ tab=window.open('','_blank'); }catch(_e){}
+  if(typeof _pdTabLoader==='function') _pdTabLoader(tab,'Готовим документ','Подставляем данные проекта и создаём файл на Google Диске');
+  try{
+    const { status, data } = await _giFetch('google-docs',{action:'create'},{ project_id:p.id, template_id:tplId });
+    if(status===503||(data&&data.error==='not_configured')){ if(tab)tab.close(); toast('Google ещё не подключён — раздел «Интеграции»'); return; }
+    if(!data||data.ok===false||!data.url){ if(tab)tab.close(); toast((data&&(data.error||data.message))||'Не удалось создать документ'); return; }
+    const u=typeof _giWithUser==='function'?_giWithUser(data.url):data.url;
+    if(tab){ tab.location.replace(u); } else { window.open(u,'_blank','noopener'); }
+    if(data.missing&&data.missing.length) toast('Документ создан, но пусто в полях: '+data.missing.slice(0,4).join(', '));
+    else toast('Документ создан');
+    p._docs=undefined; pdDocsLoad(p);
+  }catch(e){ if(tab)tab.close(); toast(String(e.message||e)); }
+  finally{ PDOC.busy=false; }
+}
+
+async function pdDocDel(id){
+  const p=PROJECTS[pdIdx]; if(!p) return;
+  try{
+    const { error } = await SB.from('project_documents').delete().eq('id',id);
+    if(error) throw error;
+    p._docs=(p._docs||[]).filter(d=>String(d.id)!==String(id));
+    toast('Убрал из списка. Сам файл остался на Google Диске');
+    if(pdTabCur==='docs') renderPd();
+  }catch(e){ toast('Не удалось убрать: '+String(e.message||e)); }
+}
+
+/* ─── Реквизиты: агентства и клиента ─── */
+async function pdocReqOpen(tab){
+  const p=PROJECTS[pdIdx]; if(!p) return;
+  const which=tab||'agency';
+  let ag={};
+  if(window.LIVE&&window.SB){
+    const me=(window.tMe&&window.tMe())||{};
+    try{ const { data } = await SB.from('agencies').select('id,name,requisites').eq('id',me.agency_id).maybeSingle(); ag=data||{}; }catch(_e){}
+  }
+  PDOC.ag=ag;
+  const r=(ag.requisites)||{}, legal=((p.contacts||{}).legal)||{};
+  const f=(id,label,val,ph)=>`<label style="display:block;margin-bottom:10px"><div style="font-size:11.5px;opacity:.55;margin-bottom:4px">${escH(label)}</div><input id="${id}" value="${escH(val||'')}" placeholder="${escH(ph||'')}" style="width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;color:var(--txt);font-size:13.5px;font-family:inherit"></label>`;
+  const tabBtn=(k,l)=>`<div class="pd-chip pd-chip-btn${which===k?' on':''}" onclick="pdocReqOpen('${k}')">${l}</div>`;
+  const bodyAg=_pdocIsOwner()
+    ? f('rq-legal_name','Юридическое название',r.legal_name,'ООО «DETROYD»')
+      +f('rq-inn','ИНН',r.inn)+f('rq-address','Юридический адрес',r.address)
+      +f('rq-bank','Банк',r.bank)+f('rq-account','Расчётный счёт',r.account)+f('rq-mfo','МФО',r.mfo)
+      +f('rq-director','Руководитель (ФИО)',r.director)+f('rq-director_title','Должность',r.director_title,'Директор')
+      +f('rq-phone','Телефон',r.phone)+f('rq-email','Почта',r.email)
+      +f('rq-city','Город',r.city,'Ташкент')+f('rq-currency','Валюта',r.currency,'сум')
+    : '<div style="opacity:.6;font-size:13px;line-height:1.6">Реквизиты агентства меняет только владелец.</div>';
+  const bodyCl=f('cl-name','Юридическое название клиента',legal.name,p.name)
+    +f('cl-inn','ИНН',legal.inn)+f('cl-address','Юридический адрес',legal.address)
+    +f('cl-bank','Банк',legal.bank)+f('cl-account','Расчётный счёт',legal.account)+f('cl-mfo','МФО',legal.mfo)
+    +f('cl-director','Руководитель (ФИО)',legal.director)+f('cl-director_title','Должность',legal.director_title,'Директор');
+  pd2Open(`<div class="modal glass" style="max-width:520px">
+    <div class="modal-h"><div>Реквизиты для документов</div><button class="tg-x" onclick="pd2Close()">×</button></div>
+    <div style="display:flex;gap:8px;padding:0 20px 12px">${tabBtn('agency','Агентство')}${tabBtn('client','Клиент')}</div>
+    <div class="modal-b" style="max-height:56vh;overflow:auto">${which==='agency'?bodyAg:bodyCl}</div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdocReqSave('${which}')">Сохранить</button></div>
+  </div>`);
+}
+
+async function pdocReqSave(which){
+  const p=PROJECTS[pdIdx]; if(!p) return;
+  try{
+    if(which==='agency'){
+      if(!_pdocIsOwner()){ toast('Реквизиты агентства меняет только владелец'); return; }
+      const keys=['legal_name','inn','address','bank','account','mfo','director','director_title','phone','email','city','currency'];
+      const req={}; keys.forEach(k=>{ const v=_pdocVal('rq-'+k); if(v) req[k]=v; });
+      const { error } = await SB.from('agencies').update({ requisites:req }).eq('id',(PDOC.ag||{}).id);
+      if(error) throw error;
+    }else{
+      const keys=['name','inn','address','bank','account','mfo','director','director_title'];
+      const legal={}; keys.forEach(k=>{ const v=_pdocVal('cl-'+k); if(v) legal[k]=v; });
+      const contacts=Object.assign({},p.contacts||{},{ legal });
+      const { error } = await SB.from('projects').update({ contacts }).eq('id',p.id);
+      if(error) throw error;
+      p.contacts=contacts;
+    }
+    toast('Реквизиты сохранены'); pd2Close();
+  }catch(e){ toast('Не сохранилось: '+String(e.message||e)); }
+}
+
+/* ─── Редактор шаблонов ─── */
+async function pdocTplOpen(id){
+  if(!(typeof agIsOwner==='function'?agIsOwner():true)){ toast('Шаблоны доступны только владельцу'); return; }
+  if(!PDOC.tpl) await pdDocsLoad(PROJECTS[pdIdx]||{});
+  const list=PDOC.tpl||[];
+  if(!id){
+    pd2Open(`<div class="modal glass" style="max-width:460px">
+      <div class="modal-h"><div>Шаблоны документов</div><button class="tg-x" onclick="pd2Close()">×</button></div>
+      <div class="modal-b">${list.length?list.map(t=>`<div class="act-row" style="cursor:pointer" onclick="pdocTplOpen('${t.id}')"><div style="flex:1"><div class="act-txt">${escH(t.name)}</div><div class="act-tag">${escH(_pdocKindName(t.kind))}</div></div><span style="opacity:.4">✎</span></div>`).join('')
+        :'<div class="pk-empty" style="padding:30px 0">Шаблонов нет</div>'}
+      <div style="opacity:.45;font-size:12px;margin-top:12px;line-height:1.6">Можно вставить сюда свой договор прямо из Word — оформление сохранится. В местах, где должны подставляться данные, поставьте метки из списка справа.</div></div>
+    </div>`);
+    return;
+  }
+  const { data } = await SB.from('doc_templates').select('*').eq('id',id).maybeSingle();
+  if(!data){ toast('Шаблон не найден'); return; }
+  PDOC.edit=data;
+  let vars={};
+  const p=PROJECTS[pdIdx];
+  if(p){ try{ const r=await _giFetch('google-docs',{action:'fields'},{ project_id:p.id }); if(r&&r.data&&r.data.vars) vars=r.data.vars; }catch(_e){} }
+  const chips=Object.keys(vars).length?Object.keys(vars).map(k=>`<div class="pd-chip pd-chip-btn" style="cursor:pointer" title="${escH(vars[k]||'пусто')}" onclick="pdocTplInsert('${escH(k)}')">{{${escH(k)}}}</div>`).join('')
+    :'<div style="opacity:.5;font-size:12px">Список подстановок появится, когда откроете шаблон из карточки проекта.</div>';
+  pd2Open(`<div class="modal glass" style="max-width:900px;width:94vw">
+    <div class="modal-h"><div>${escH(data.name)}</div><button class="tg-x" onclick="pdocTplOpen()">×</button></div>
+    <div class="modal-b" style="max-height:64vh;overflow:auto">
+      <label style="display:block;margin-bottom:12px"><div style="font-size:11.5px;opacity:.55;margin-bottom:4px">Название шаблона</div>
+        <input id="tpl-name" value="${escH(data.name)}" style="width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;color:var(--txt);font-size:13.5px;font-family:inherit"></label>
+      <div style="font-size:11.5px;opacity:.55;margin-bottom:6px">Текст документа</div>
+      <div id="tpl-body" contenteditable="true" style="background:#fff;color:#111;border:1px solid var(--line);border-radius:10px;padding:18px 20px;min-height:280px;max-height:40vh;overflow:auto;font-size:13.5px;line-height:1.65">${data.body||''}</div>
+      <div style="font-size:11.5px;opacity:.55;margin:14px 0 6px">Подстановки — нажмите, чтобы вставить в текст</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+    </div>
+    <div class="modal-f"><button class="btn-ghost" onclick="pdocTplOpen()">Назад</button><button class="btn-add" onclick="pdocTplSave()">Сохранить</button></div>
+  </div>`);
+}
+function pdocTplInsert(key){
+  const el=document.getElementById('tpl-body'); if(!el) return;
+  el.focus();
+  try{ document.execCommand('insertText',false,'{{'+key+'}}'); }
+  catch(_e){ el.innerHTML+=' {{'+key+'}}'; }
+}
+async function pdocTplSave(){
+  const t=PDOC.edit; if(!t) return;
+  const el=document.getElementById('tpl-body');
+  const name=_pdocVal('tpl-name')||t.name;
+  const body=el?el.innerHTML:t.body;
+  try{
+    const { error } = await SB.from('doc_templates').update({ name, body, updated_at:new Date().toISOString() }).eq('id',t.id);
+    if(error) throw error;
+    PDOC.tpl=null; PDOC.edit=null;
+    toast('Шаблон сохранён'); pd2Close();
+    const p=PROJECTS[pdIdx]; if(p){ p._docs=undefined; pdDocsLoad(p); }
+  }catch(e){ toast('Не сохранилось: '+String(e.message||e)); }
+}
+window.pdDocCreate=pdDocCreate; window.pdDocDel=pdDocDel; window.pdDocOpen=pdDocOpen;
+window.pdocReqOpen=pdocReqOpen; window.pdocReqSave=pdocReqSave;
+window.pdocTplOpen=pdocTplOpen; window.pdocTplSave=pdocTplSave; window.pdocTplInsert=pdocTplInsert;
 
 function renderTools(){
   const linkIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg>';
