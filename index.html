@@ -16338,7 +16338,11 @@ function cpPasteHandler(e){
         if(row.c[col.id]!=null){ delete row.c[col.id]; changed=true; }
         if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; changed=true; }
       } else {
-        row.c[col.id]=val; changed=true;
+        /* В колонку сценария кладём только настоящий идентификатор документа:
+           из вставленной ссылки достаём его, мусор отбрасываем. */
+        const nv=(col.type==='doc')?(typeof _cpDocId==='function'?_cpDocId(val):val):val;
+        if(nv==='' ){ if(row.c[col.id]!=null){ delete row.c[col.id]; changed=true; } }
+        else { row.c[col.id]=nv; changed=true; }
         if(row.f && row.f[col.id]){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; }
       }
       /* Стили ячейки из внутреннего клипборда — только если совпадает с последним copy */
@@ -19088,7 +19092,11 @@ function cpFillApply(f){
       srcFmulas.push((row&&row.f&&row.f[col.id])||null);
     }
     const hasFmula=srcFmulas.some(function(f){return f!=null;});
-    const gen=hasFmula?null:cpFillSeries(srcVals,count);
+    /* Колонку сценария протягивать вниз нельзя: идентификатор документа
+       оканчивается цифрой, и «продолжение ряда» превращает его в адрес
+       несуществующего файла. У каждой строки должен быть свой документ,
+       поэтому просто оставляем ячейки пустыми — он заведётся по клику. */
+    const gen=hasFmula?null:(col.type==='doc'?new Array(count).fill(''):cpFillSeries(srcVals,count));
     for(let i=0;i<count;i++){
       let row=disp[x.r1+1+i];
       if(!row){ if(filtered)break; row={id:cpUid(),c:{}}; sh.rows.push(row); disp.push(row); }
@@ -19185,11 +19193,23 @@ function cpDocTitle(sh,row,ri){
   const theme=t?String(row.c[t.id]||'').trim():'';
   return '№'+(ri+1)+(theme?(' · '+theme.slice(0,80)):'');
 }
+/* В ячейку сценария попадает что угодно: цена, обрывок ссылки, результат
+   протягивания вниз. Google на такое отвечает страницей «не удалось открыть
+   файл», и выглядит это как поломка системы. Поэтому опознаём настоящий
+   идентификатор: принимаем и ссылку на документ, и голый id, а всё остальное
+   считаем пустой ячейкой — по клику заведётся новый документ. */
+function _cpDocId(v){
+  const s=String(v==null?'':v).trim();
+  if(!s) return '';
+  const m=s.match(/\/d\/([A-Za-z0-9_-]{25,})/)||s.match(/[?&]id=([A-Za-z0-9_-]{25,})/);
+  if(m) return m[1];
+  return /^[A-Za-z0-9_-]{25,}$/.test(s)?s:'';
+}
 async function cpDocOpen(r,c){
   const p=PROJECTS[pdIdx], sh=cpSheet();
   const row=cpRowAt(r), col=cpColAt(c);
   if(!p||!sh||!row||!col) return;
-  let id=String(row.c[col.id]||'').trim();
+  let id=_cpDocId(row.c[col.id]);
   if(!id){
     if(CPDOC.busy) return;
     CPDOC.busy=true;
