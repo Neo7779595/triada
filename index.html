@@ -27245,7 +27245,7 @@ async function _giFetch(fn, params, body){
     let fresh=null;
     try{ const { data } = await SB.auth.refreshSession(); fresh = data && data.session; }catch(_){ }
     if(fresh && fresh.access_token && fresh.access_token!==session.access_token) res = await call(fresh.access_token);
-    if(res.status===401){ _giDeadSession(); throw new Error('Сессия завершена — открываю страницу входа'); }
+    if(res.status===401){ _giDeadSession(''); throw new Error('Сессия завершена — открываю страницу входа'); }
   }
   return res;
 }
@@ -27257,14 +27257,51 @@ async function _giFetch(fn, params, body){
    рабочий. Стираем сессию у себя и выводим на вход — иначе человек будет
    жать кнопки впустую и видеть одну и ту же ошибку. */
 let _giDeadOnce = 0;
-function _giDeadSession(){
+function _giDeadSession(msg){
   if(_giDeadOnce) return; _giDeadOnce = 1;
+  if(msg && typeof toast==='function') toast(msg);
   const go = function(){ setTimeout(function(){ try{ location.replace(location.pathname); }catch(_){ location.reload(); } }, 1200); };
   try{
     const r = (window.SB && SB.auth) ? SB.auth.signOut({ scope:'local' }) : null;
     if(r && r.then) r.then(go, go); else go();
   }catch(_){ go(); }
 }
+
+/* ═══════════ ПРОВЕРКА, ЖИВА ЛИ СЕССИЯ ═══════════
+   Когда руководитель меняет сотруднику пароль, сервер уничтожает его сессии.
+   Но выданный ранее токен живёт ещё до часа, и запросы к базе его принимают —
+   они проверяют подпись, а не сессию. Поэтому кабинет продолжал бы работать
+   «по старой памяти браузера». Спрашиваем сервер напрямую: раз в две минуты
+   и каждый раз, когда человек возвращается на вкладку. */
+let _liveBusy = 0, _liveAt = 0;
+async function _sessionAlive(force){
+  if(!(window.LIVE && window.SB && SB.auth)) return;
+  if(document.hidden && !force) return;
+  const now = Date.now();
+  if(_liveBusy || (!force && now - _liveAt < 60000)) return;
+  _liveBusy = 1; _liveAt = now;
+  try{
+    const { data, error } = await SB.auth.getUser();
+    if(error){
+      /* Сеть могла моргнуть — из-за этого выкидывать человека нельзя.
+         Разлогиниваем только когда сервер явно ответил «такой сессии нет». */
+      const st = Number(error.status || 0);
+      const retryable = error.name === 'AuthRetryableFetchError' || st === 0 || st >= 500;
+      if(!retryable) _giDeadSession('Пароль изменён — войдите заново');
+      return;
+    }
+    if(!data || !data.user) _giDeadSession('Сессия завершена — войдите заново');
+  }catch(_){ /* обрыв связи: молчим и попробуем в следующий раз */ }
+  finally{ _liveBusy = 0; }
+}
+window._sessionAlive = _sessionAlive;
+
+(function(){
+  if(typeof window==='undefined') return;
+  setInterval(function(){ _sessionAlive(false); }, 120000);
+  window.addEventListener('focus', function(){ _sessionAlive(false); });
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) _sessionAlive(false); });
+})();
 
 async function renderIntegrations(){
   const el=document.getElementById('content-ag'); if(!el) return;
