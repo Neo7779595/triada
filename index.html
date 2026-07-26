@@ -184,7 +184,8 @@ button{font-family:inherit}
 .login-card{width:100%;text-align:center;position:relative;z-index:1;padding:34px 34px 28px;border-radius:22px;
   background:linear-gradient(180deg,rgba(20,27,23,.82),rgba(14,18,16,.78));backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);
   border:1px solid var(--line-2);box-shadow:0 30px 90px -30px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.04);overflow:hidden;transform-style:preserve-3d;transition:transform .3s var(--ease-out)}
-.login-card::after{content:"";position:absolute;inset:0;border-radius:22px;pointer-events:none;opacity:.6;background:radial-gradient(300px circle at var(--gx,50%) var(--gy,0%),rgba(55,230,200,.10),transparent 60%);transition:opacity .3s}
+/* Верх карточки чуть подсвечен — свет неподвижный, за курсором не ходит. */
+.login-card::after{content:"";position:absolute;inset:0;border-radius:22px;pointer-events:none;background:radial-gradient(320px circle at 50% -8%,rgba(55,230,200,.05),transparent 62%)}
 .login-card{box-shadow:calc(var(--tx,0)*-16px) calc(30px + var(--ty,0)*-10px) 90px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.045)}
 .login-card:focus-within{box-shadow:calc(var(--tx,0)*-16px) calc(34px + var(--ty,0)*-10px) 100px -28px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.06),0 0 0 1px rgba(55,230,200,.1)}
 /* бегущая световая рамка сверху */
@@ -197,8 +198,8 @@ button{font-family:inherit}
    ══════════════════════════════════════════════════════════════════ */
 .lg-card-wrap{width:100%;max-width:392px;perspective:1100px}
 /* Карточка НЕ качается сама по себе: постоянное движение под полем ввода пароля
-   раздражает и мешает попадать по кнопкам. Жизнь даёт свет — вращающееся кольцо,
-   блик под курсором и наклон от мыши: геометрия при этом стоит на месте. */
+   раздражает и мешает попадать по кнопкам. Жизнь даёт вращающееся кольцо
+   и наклон от мыши; света, который ходит за курсором, здесь нет. */
 .lc-ring{position:absolute;inset:0;border-radius:22px;padding:1.1px;pointer-events:none;z-index:2;
   background:conic-gradient(from var(--lcA,0deg),transparent 0 48%,rgba(55,230,200,.5) 64%,rgba(190,255,242,.72) 71%,rgba(55,230,200,.42) 78%,transparent 92%);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
@@ -206,8 +207,6 @@ button{font-family:inherit}
   animation:lcRing 9s linear infinite,lcRingPulse 5.5s ease-in-out infinite}
 @keyframes lcRingPulse{0%,100%{opacity:.55}50%{opacity:.95}}
 @keyframes lcRing{to{--lcA:360deg}}
-.lc-glare{position:absolute;inset:0;border-radius:22px;pointer-events:none;z-index:3;opacity:var(--glare,0);transition:opacity .4s var(--ease-out);
-  background:radial-gradient(220px circle at var(--gx,50%) var(--gy,0%),rgba(255,255,255,.10),transparent 58%);mix-blend-mode:screen}
 .lc-mark{position:relative;margin:2px 0 18px}
 .lc-brand{font-size:11px;letter-spacing:.36em;text-indent:.36em;text-transform:uppercase;color:var(--txt-3);white-space:nowrap;
   display:flex;align-items:center;justify-content:center;gap:11px;margin-bottom:16px;will-change:transform}
@@ -2740,9 +2739,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 
 /* — login entrance + ambient glow — */
 #page-login::before{content:"";position:fixed;top:-10%;left:50%;width:620px;height:420px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(55,230,200,.06),transparent 70%);animation:loginGlow 7s ease-in-out infinite;pointer-events:none}
-/* мягкий свет за курсором — единственная «дорогая» деталь, которая реагирует на человека */
-#page-login::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:var(--spot,0);transition:opacity .5s var(--ease-out);
-  background:radial-gradient(360px circle at var(--mx,50%) var(--my,50%),rgba(55,230,200,.032),transparent 68%)}
 .login-card{animation:fadeScale .8s var(--ease-out) both;position:relative}
 .lc-mark,.login-sub,.login-form,.login-demo,.login-foot{animation:riseIn .7s var(--ease-out) both}
 .login-card{animation:lgCardIn .8s var(--ease-out) both}
@@ -8632,7 +8628,6 @@ body.m-lock{overflow:hidden}
   <div class="lg-card-wrap">
   <div class="login-card">
     <span class="lc-ring" aria-hidden="true"></span>
-    <span class="lc-glare" aria-hidden="true"></span>
     <div class="lc-mark">
       <div class="lc-brand">DETROYD SYSTEM GROUP</div>
       <div class="lc-word" aria-label="DETROYD"><b>D</b><b>E</b><b>T</b><b>R</b><b>O</b><b>Y</b><b>D</b></div>
@@ -9350,7 +9345,8 @@ async function doLogin(){
     ? 'Не удалось загрузить библиотеку сервера — проверьте интернет и обновите страницу'
     : 'Сервер ещё подключается — попробуйте ещё раз через пару секунд');
 }
-/* Интерактивный свет за курсором на карточке входа — GPU-friendly, срабатывает только при движении */
+/* Наклон карточки входа за мышью и параллакс её слоёв. Света, который ходит
+   за курсором, здесь больше нет — остались только геометрия и перспектива. */
 (function lgParallax(){
   const mq=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)');
   if(mq&&mq.matches) return;
@@ -9363,19 +9359,13 @@ async function doLogin(){
       const r=card.getBoundingClientRect();
       const dx=(e.clientX-(r.left+r.width/2))/r.width, dy=(e.clientY-(r.top+r.height/2))/r.height;
       tx=Math.max(-1,Math.min(1,dx)); ty=Math.max(-1,Math.min(1,dy));
-      const sr=sec.getBoundingClientRect(), mx=e.clientX-sr.left, my=e.clientY-sr.top;
-      const near=Math.abs(dx)<1.5&&Math.abs(dy)<1.5;                                    /* курсор у карточки — включаем блик */
       if(!raf) raf=requestAnimationFrame(()=>{ raf=0;
         card.style.transform=`rotateY(${tx*4.6}deg) rotateX(${-ty*4.6}deg)`;            /* перспектива живёт на .lg-card-wrap */
         card.style.setProperty('--tx',tx.toFixed(3)); card.style.setProperty('--ty',ty.toFixed(3));
-        card.style.setProperty('--gx',(50+tx*46)+'%'); card.style.setProperty('--gy',(50+ty*46)+'%');
-        card.style.setProperty('--glare',near?'1':'0');
-        sec.style.setProperty('--mx',mx+'px'); sec.style.setProperty('--my',my+'px'); sec.style.setProperty('--spot','1');
       });
     });
     sec.addEventListener('pointerleave',()=>{ card.style.transform='';
-      card.style.setProperty('--tx','0'); card.style.setProperty('--ty','0'); card.style.setProperty('--glare','0');
-      sec.style.setProperty('--spot','0'); });
+      card.style.setProperty('--tx','0'); card.style.setProperty('--ty','0'); });
   };
   if(document.body)init(); else document.addEventListener('DOMContentLoaded',init);
 })();
