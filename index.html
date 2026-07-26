@@ -2804,8 +2804,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 #stpl-body.stpl-split .stpl-col-r{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding-bottom:24px;scrollbar-gutter:stable}
 #stpl-body.stpl-split .stpl-col-l{scrollbar-gutter:auto}
 /* у правой колонки отступа снизу нет: там прибита панель кнопок — иначе
-   под ней выглядывал бы кусок следующего этапа */
-#stpl-body.stpl-split .stpl-col-r{padding-bottom:0}
+   под ней выглядывал бы кусок следующего этапа.
+   Полосу прокрутки уводим вправо, в поле модалки: иначе она встаёт ровно
+   на крестики удаления этапа и по ним не попасть. Отрицательный внешний
+   отступ раздвигает колонку под полосу, внутренний — возвращает
+   содержимое на прежнее место, так что вёрстка не сдвигается. */
+#stpl-body.stpl-split .stpl-col-r{padding-bottom:0;margin-right:-26px;padding-right:26px}
 #stpl-body.stpl-split .stpl-col-top{position:sticky;top:0;z-index:3;background:var(--bg-1);padding-top:2px}
 #stpl-body.stpl-split .stpl-col-top::after{content:"";position:absolute;left:0;right:0;bottom:-14px;height:14px;background:linear-gradient(180deg,var(--bg-1),transparent);pointer-events:none}
 /* Тарифы и заголовок держатся сверху — видно, чьи этапы правишь */
@@ -26103,9 +26107,57 @@ function _svcHash(name){ let h=0; const s=String(name||''); for(let i=0;i<s.leng
 function svcColor(name){ const c=window.SVC_COLORS&&window.SVC_COLORS[name]; if(c)return c; return STPL_PALETTE[_svcHash(name)%STPL_PALETTE.length]; }
 function _svcChipStyle(name){ const c=svcColor(name); return 'color:'+c+';background:'+_hexA(c,.15)+';border-color:'+_hexA(c,.42); }
 function stplSetSvcColor(name,color){ if(!name)return; window.SVC_COLORS=window.SVC_COLORS||{}; window.SVC_COLORS[name]=color; _stplRefresh(); if(window.LIVE && window.tServiceSetColor){ Promise.resolve(window.tServiceSetColor(name,color)).catch(function(e){ toast('Цвет не сохранён: '+(e.message||e)); }); } }
+/* Своя палитра: пока системное окно выбора цвета открыто, вкладку
+   перерисовывать нельзя — вместе с ней исчезает сам <input type="color">,
+   и окно закрывается на первом же клике по цвету. Поэтому на ввод красим
+   точечно, без перерисовки и без обращения к серверу, а полную
+   перерисовку и сохранение делаем, когда поле теряет фокус. */
+function stplPreviewSvcColor(name,color){
+  if(!name||!color) return;
+  window.SVC_COLORS=window.SVC_COLORS||{};
+  window.SVC_COLORS[name]=color;
+  const box=document.getElementById('stpl-body'); if(!box) return;
+  const sw=box.querySelector('.stpl-sw-custom'); if(sw) sw.style.background=color;
+  const low=String(color).toLowerCase();
+  box.querySelectorAll('.stpl-swatches .stpl-sw').forEach(function(b){
+    if(b.classList.contains('stpl-sw-custom')) return;
+    b.classList.toggle('on',(b.getAttribute('title')||'').toLowerCase()===low);
+  });
+  box.querySelectorAll('.stpl-svc-row.on').forEach(function(r){
+    r.style.setProperty('--svc',color);
+    const s=r.querySelector('.stpl-svc-swatch'); if(s) s.style.background=color;
+  });
+}
+/* Сохранение без перерисовки. С запасом по времени: пока человек возит
+   по палитре, браузер шлёт change на каждое движение — на сервер уходит
+   только последнее значение. */
+let _stplColorSaveT=null;
+function stplSaveSvcColor(name,color){
+  if(!name||!color) return;
+  window.SVC_COLORS=window.SVC_COLORS||{}; window.SVC_COLORS[name]=color;
+  if(_stplColorSaveT) clearTimeout(_stplColorSaveT);
+  _stplColorSaveT=setTimeout(function(){
+    _stplColorSaveT=null;
+    if(window.LIVE && window.tServiceSetColor){
+      Promise.resolve(window.tServiceSetColor(name,color)).catch(function(e){ if(typeof toast==='function') toast('Цвет не сохранён: '+(e.message||e)); });
+    }
+  }, 600);
+}
+function stplCommitSvcColor(name,color){
+  if(!name||!color) return;
+  stplPreviewSvcColor(name,color);
+  stplSaveSvcColor(name,color);
+  _stplRefresh();
+}
+window.stplPreviewSvcColor=stplPreviewSvcColor; window.stplSaveSvcColor=stplSaveSvcColor; window.stplCommitSvcColor=stplCommitSvcColor;
 function _stplColorBar(name){ const cur=svcColor(name).toLowerCase();
   const sws=STPL_PALETTE.map(function(c){ return '<button type="button" class="stpl-sw'+(c.toLowerCase()===cur?' on':'')+'" style="background:'+c+'" onclick="stplSetSvcColor(\''+_ddEsc(name)+'\',\''+c+'\')" title="'+c+'"></button>'; }).join('');
-  const custom='<label class="stpl-sw stpl-sw-custom" style="background:'+svcColor(name)+'" title="Свой цвет"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><input type="color" value="'+svcColor(name)+'" oninput="stplSetSvcColor(\''+_ddEsc(name)+'\',this.value)"></label>';
+  const _n=_ddEsc(name);
+  const custom='<label class="stpl-sw stpl-sw-custom" style="background:'+svcColor(name)+'" title="Свой цвет"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
+    +'<input type="color" value="'+svcColor(name)+'"'
+    +' oninput="stplPreviewSvcColor(\''+_n+'\',this.value)"'
+    +' onchange="stplPreviewSvcColor(\''+_n+'\',this.value);stplSaveSvcColor(\''+_n+'\',this.value)"'
+    +' onblur="stplCommitSvcColor(\''+_n+'\',this.value)"></label>';
   return '<div class="stpl-colorbar"><span class="stpl-colorbar-l">Цвет услуги</span><div class="stpl-swatches">'+sws+custom+'</div></div>';
 }
 /* ── УСЛУГИ + ЭТАПЫ ── */
