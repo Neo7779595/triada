@@ -27384,6 +27384,27 @@ p{margin:0;font-size:12.5px;color:#9AA1AC;font-family:'Geist Mono','DM Mono','Je
   }catch(_){ /* вкладку мог перехватить блокировщик — не страшно */ }
 }
 
+/* В браузере обычно залогинено несколько аккаунтов Google, и «/u/0/» в ссылке
+   означает просто «первый по списку» — не обязательно тот, которому принадлежит
+   календарь или папка. Тогда Google открывает чужой аккаунт и предлагает
+   «добавить календарь», хотя добавлять ничего не нужно.
+   Поэтому подставляем в ссылку конкретный адрес: свою рабочую почту, а если её
+   нет — аккаунт, которым подключено агентство. */
+function _giAuthUser(){
+  const me = (window.tMe && window.tMe()) || null;
+  return (me && me.google_email) || (GI.google && GI.google.google_email) || '';
+}
+function _giWithUser(url){
+  const who = _giAuthUser();
+  if(!who) return url;
+  try{
+    const u = new URL(url);
+    u.pathname = u.pathname.replace(/\/u\/\d+\//, '/');   // путь перебивает authuser — убираем
+    u.searchParams.set('authuser', who);
+    return u.toString();
+  }catch(_){ return url; }
+}
+
 /** Кнопка «Календарь» в карточке проекта: досинхронизировать и открыть. */
 async function pdOpenCalendar(){
   const p = (typeof PROJECTS!=='undefined' && PROJECTS[pdIdx]) || null;
@@ -27394,7 +27415,7 @@ async function pdOpenCalendar(){
   const tab = window.open('', '_blank');
   _pdTabLoader(tab, 'Открываем календарь', p.name || 'Проект');
   if(btn){ btn.disabled = true; btn.style.opacity = '.6'; }
-  const go = (u) => { if(tab) tab.location = u; else window.open(u, '_blank', 'noopener'); };
+  const go = (u) => { u = _giWithUser(u); if(tab) tab.location = u; else window.open(u, '_blank', 'noopener'); };
   const sum = (d) => {
     const parts = [];
     if(d.created) parts.push('создано ' + d.created);
@@ -27450,7 +27471,7 @@ async function pdOpenDrive(){
   const tab = window.open('', '_blank');
   _pdTabLoader(tab, 'Открываем папку проекта', p.name || 'Проект');
   if(btn){ btn.disabled = true; btn.style.opacity = '.6'; }
-  const go = (u) => { if(tab) tab.location = u; else window.open(u, '_blank', 'noopener'); };
+  const go = (u) => { u = _giWithUser(u); if(tab) tab.location = u; else window.open(u, '_blank', 'noopener'); };
   const sum = (d) => {
     const bits=[];
     if(d.created) bits.push('создано разделов ' + d.created);
