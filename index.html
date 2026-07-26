@@ -1937,6 +1937,14 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 .cdd-btn:hover{border-color:rgba(138,143,255,.28)}
 .cdd.open .cdd-btn{border-color:rgba(138,143,255,.5)}
 .cdd-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Аватар в выпадающих списках: одна плашка для .cdd и .dd, чтобы
+   исполнитель и проект узнавались по лицу и логотипу, а не по строке. */
+.sel-av{position:relative;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:none;border-radius:7px;
+  font-size:11px;font-weight:700;line-height:1;overflow:hidden;margin-right:9px;vertical-align:-6px}
+.sel-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.cdd-lbl,.cdd-opt-l,.dd-v{display:inline-flex;align-items:center;min-width:0}
+.cdd-lbl>.sel-av,.cdd-opt-l>.sel-av,.dd-v>.sel-av,.dd-opt>.sel-av{vertical-align:baseline}
+.dd-opt{align-items:center}
 .cdd-chev{display:inline-flex;width:14px;height:14px;color:var(--txt-3);flex:none;transition:transform .16s}
 .cdd-chev svg{width:14px;height:14px}
 .cdd.open .cdd-chev{transform:rotate(180deg);color:var(--accent)}
@@ -5093,6 +5101,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-edit:hover{border-color:var(--accent-line);color:var(--accent)}
 .pd-subrow{display:flex;align-items:center;gap:12px;margin-top:11px;padding-left:30px;flex-wrap:wrap}
 .pd-tc{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3)}
+/* Ответственный за этап в строке под названием */
+.pd-asg{display:inline-flex;align-items:center;font-size:12px;font-weight:600;color:var(--txt-2);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.pd-asg .sel-av{width:20px;height:20px;border-radius:6px;margin-right:7px;font-size:10px}
 .pd-tc svg{width:13px;height:13px}
 .pd-tc b{font-family:var(--mono);font-weight:500;color:var(--txt-2);background:var(--bg-3);padding:2px 7px;border-radius:5px;font-size:11.5px;letter-spacing:0}
 .pd-mat{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--accent);border:1px solid var(--accent-line);background:var(--accent-dim);padding:5px 11px;border-radius:7px;text-decoration:none;cursor:pointer}.pd-mat svg{width:12px;height:12px}
@@ -13808,6 +13819,30 @@ function _ddSelPick(id,v,l){
   const cb=window._DDSEL_CB[id]; if(typeof cb==='function'){ try{ cb(v); }catch(e){} }
 }
 
+/* ═══ Аватар в выпадающих списках ═══════════════════════════════════════
+   Третьим элементом опции можно передать {img,letter,color}: сотрудника
+   и проект узнают по лицу и логотипу быстрее, чем по строке текста.
+   Данные храним в data-атрибутах кнопки, чтобы при выборе восстановить
+   картинку в подписи — раньше там ставился просто textContent. */
+window._selAv = function(av){
+  if(!av) return '';
+  const clean = v => String(v==null?'':v).replace(/["'<>]/g,'');
+  const col = clean(av.color||'#37E6C8') || '#37E6C8';
+  const ini = String(av.letter||'?').trim().slice(0,1).toUpperCase()
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const img = av.img ? ('<img src="'+clean(av.img)+'" alt="" onerror="this.remove()">') : '';
+  return '<span class="sel-av" style="background:'+col+'22;color:'+col+'">'+ini+img+'</span>';
+};
+window._selAvAttrs = function(av){
+  if(!av) return '';
+  const a = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return ' data-av-i="'+a(av.img||'')+'" data-av-t="'+a(av.letter||'')+'" data-av-c="'+a(av.color||'')+'"';
+};
+window._selAvFrom = function(el){
+  if(!el||!el.dataset) return '';
+  if(!('avT' in el.dataset) && !('avI' in el.dataset)) return '';
+  return window._selAv({ img:el.dataset.avI||'', letter:el.dataset.avT||'', color:el.dataset.avC||'' });
+};
 window._nativeSelect = function(id, options, cur, placeholder){
   // Кастомный dropdown в фирменном стиле (inline, без портала — работает в модалках)
   const opts = (options||[]).map(o => Array.isArray(o) ? o : [o, o]);
@@ -13820,12 +13855,12 @@ window._nativeSelect = function(id, options, cur, placeholder){
   return `<div class="cdd" id="cdd-${esc(id)}">
     <input type="hidden" id="${esc(id)}" value="${esc(cur)}">
     <button type="button" class="cdd-btn" onclick="event.stopPropagation();_cddToggle('${esc(id)}')">
-      <span class="cdd-lbl" id="cdd-${esc(id)}-lbl">${esc(lbl)}</span>
+      <span class="cdd-lbl" id="cdd-${esc(id)}-lbl">${co?window._selAv(co[2]):''}${esc(lbl)}</span>
       <span class="cdd-chev">${chev}</span>
     </button>
     <div class="cdd-menu">
-      ${opts.map(o => `<button type="button" class="cdd-opt${String(o[0])===cur?' on':''}" data-v="${esc(o[0])}" data-l="${esc(o[1])}" onclick="event.stopPropagation();_cddPick('${esc(id)}',this.dataset.v,this.dataset.l)">
-        <span class="cdd-opt-l">${esc(o[1])}</span>
+      ${opts.map(o => `<button type="button" class="cdd-opt${String(o[0])===cur?' on':''}" data-v="${esc(o[0])}" data-l="${esc(o[1])}"${window._selAvAttrs(o[2])} onclick="event.stopPropagation();_cddPick('${esc(id)}',this.dataset.v,this.dataset.l,this)">
+        <span class="cdd-opt-l">${window._selAv(o[2])}${esc(o[1])}</span>
         ${check}
       </button>`).join('')}
     </div>
@@ -13852,11 +13887,15 @@ window._cddToggle = function(id) {
   }
 };
 
-window._cddPick = function(id, v, l) {
+window._cddPick = function(id, v, l, srcBtn) {
   const hidden = document.getElementById(id);
   if (hidden) hidden.value = v;
   const lblEl = document.getElementById('cdd-' + id + '-lbl');
-  if (lblEl) lblEl.textContent = l;
+  if (lblEl){
+    const av = window._selAvFrom ? window._selAvFrom(srcBtn) : '';
+    if(av) lblEl.innerHTML = av + String(l==null?'':l).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    else lblEl.textContent = l;
+  }
   const wrap = document.getElementById('cdd-' + id);
   if (wrap) {
     wrap.classList.remove('open');
@@ -13888,8 +13927,8 @@ function selField(id, options, cur){
   const ck='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
   return `<div class="dd seldd" id="seldd-${id}">`
     +`<input type="hidden" id="${id}" value="${_attr(cur)}">`
-    +`<button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${co?'':'color:var(--txt-3);font-weight:500'}">${_ddH(lbl)}</span>${caret}</button>`
-    +`<div class="dd-menu">`+opts.map(o=>`<button type="button" class="dd-opt ${String(o[0])===String(cur)?'on':''}" data-v="${_attr(o[0])}" data-l="${_attr(o[1])}" onclick="selPick('${id}',this.dataset.v,this.dataset.l)">${_ddH(o[1])}${ck}</button>`).join('')+`</div></div>`;
+    +`<button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${co?'':'color:var(--txt-3);font-weight:500'}">${co?window._selAv(co[2]):''}${_ddH(lbl)}</span>${caret}</button>`
+    +`<div class="dd-menu">`+opts.map(o=>`<button type="button" class="dd-opt ${String(o[0])===String(cur)?'on':''}" data-v="${_attr(o[0])}" data-l="${_attr(o[1])}"${window._selAvAttrs(o[2])} onclick="selPick('${id}',this.dataset.v,this.dataset.l,this)">${window._selAv(o[2])}${_ddH(o[1])}${ck}</button>`).join('')+`</div></div>`;
 }
 function selToggle(id){
   const el=document.getElementById('seldd-'+id); if(!el)return;
@@ -13932,7 +13971,9 @@ function selToggle(id){
     }
   }
 }
-function selPick(id,v,l){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; } if(typeof _closePops==='function'){ _closePops(); setTimeout(_closePops,0); } if(id==='qt-proj'&&typeof _qtOnProject==='function')_qtOnProject(v); }
+function selPick(id,v,l,srcBtn){ const h=document.getElementById(id); if(h)h.value=v; const lbl=document.getElementById(id+'-lbl');
+  if(lbl){ const av=(window._selAvFrom?window._selAvFrom(srcBtn):''); if(av) lbl.innerHTML=av+_ddH(l); else lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; }
+  if(typeof _closePops==='function'){ _closePops(); setTimeout(_closePops,0); } if(id==='qt-proj'&&typeof _qtOnProject==='function')_qtOnProject(v); }
 function selSync(id){ const h=document.getElementById(id); if(!h)return; const lblEl=document.getElementById(id+'-lbl'); if(!lblEl)return; const v=h.value; let lbl=v; const menu=document.getElementById('seldd-'+id); if(menu){ menu.querySelectorAll('.dd-opt').forEach(function(o){ var on=String(o.dataset.v)===String(v); o.classList.toggle('on',on); if(on)lbl=o.dataset.l; }); } lblEl.textContent=lbl; lblEl.style.color=''; lblEl.style.fontWeight=''; }
 function _tagList(kind, fallback, cur){
   let arr=((typeof PROJECT_TAGS!=='undefined' && PROJECT_TAGS[kind])?PROJECT_TAGS[kind]:[]).slice();
@@ -14908,13 +14949,14 @@ function pdNewStage(){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ toa
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" placeholder="напр. Контент-план"></div>
       <div class="fld"><label>Статус</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
+      <div class="fld"><label>Ответственный за этап</label>${_nativeSelect('pd2-stasg', [['','— не назначен —']].concat(_avTeamOpts()), '')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-date','')}${timeField('pd2-time','')}</div></div>
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdAddStage()">Создать</button></div></div>`);
 }
 function pdAddStage(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const name=_v('pd2-name'); if(!name){toast('Введи название этапа');return;}
   const S=PROJECTS[pdIdx]._stages||[]; const idx=S.length?Math.max(...S.map(s=>s.idx||0))+1:0;
-  if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,due_date:_v('pd2-date')||null,due_time:_v('pd2-time')||null,idx}); }
+  if(window.tStageAdd) window.tStageAdd(PROJECTS[pdIdx].id,{name,status:pd2St,assignee_id:_v('pd2-stasg')||null,due_date:_v('pd2-date')||null,due_time:_v('pd2-time')||null,idx}); }
 function pdStageDel(id){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } if(window.tStageDel) window.tStageDel(id); }
 function pdSeedStages(){ if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } const names=stageSetFor(PROJECTS[pdIdx].svc, PROJECTS[pdIdx].tariff); if(window.tStageSeed) window.tStageSeed(PROJECTS[pdIdx].id,names); }
 let pdNewSt='wait';
@@ -14951,7 +14993,7 @@ async function quickTaskOpen(){
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
   window._qtSub=[];
-  const projArr=PROJECTS.filter(p=>p.status!=='done').map(p=>[String(p.id), p.name]);
+  const projArr=PROJECTS.filter(p=>p.status!=='done').map(p=>[String(p.id), p.name, _avProj(p)]);
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Добавить задачу</h3><p>Быстрое создание · выберите проект и этап</p></div>
     <div class="modal-b">
       <div class="fld"><label>Проект <span style="color:var(--neg)">*</span></label>${selField('qt-proj', projArr, '')}</div>
@@ -14985,9 +15027,21 @@ async function _qtOnProject(idStr){
     }
   }
   if(aw){
-    const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id,m.name]); if(agIsPM())return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
-    aw.innerHTML=_nativeSelect('qt-asg', [['','— не назначен —']].concat(teamArr), '');
+    aw.innerHTML=_nativeSelect('qt-asg', [['','— не назначен —']].concat(_avTeamOpts()), '');
   }
+}
+/* Аватар проекта и сотрудника для выпадающих списков. Логотип проекта
+   лежит в logoUrl, буква — в logo; у сотрудника фото в avatar и свой цвет. */
+function _avProj(p){ if(!p) return null; return { img:p.logoUrl||'', letter:(p.logo||(p.name||'?').trim().charAt(0)), color:'#37E6C8' }; }
+function _avMember(m){ if(!m) return null; return { img:m.avatar||'', letter:(m.name||'?').trim().charAt(0), color:m.color||'#37E6C8' }; }
+/* Список сотрудников для поля «Исполнитель». Не-PM видит только себя —
+   правило прежнее, вынесено в одно место, чтобы не расходилось по модалкам. */
+function _avTeamOpts(){
+  const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name, _avMember(m)]);
+  if(typeof agIsPM==='function' && agIsPM()) return all;
+  const mid=(typeof agMyId==='function')?agMyId():null;
+  const mine=all.filter(x=>String(x[0])===String(mid));
+  return mine.length?mine:all;
 }
 function quickTaskCreate(){
   const pid=_v('qt-proj');
@@ -15030,7 +15084,7 @@ async function pdNewTask(st){
   const stArr=stages.map(s=>[s.id, _stLbl(s)]);
   const _defSt=(stages.find(s=>s.status==='active')||stages[0]).id;
   window._pdSub=[]; window._pdTaskAtt=[];
-  const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
+  const teamArr=_avTeamOpts();                                                        // с аватарами: лицо узнаётся быстрее имени
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Новая задача</h3><p>${escH(p.name)} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" placeholder="напр. Смонтировать ролик"></div>
@@ -15087,7 +15141,7 @@ async function pdTaskEdit(id){
   window._pdTaskAtt=(Array.isArray(t.attachments)?t.attachments:[]).map(a=>Object.assign({}, a));
   const _stLbl2=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
   let stArr=(p._stages||[]).map(s=>[s.id,_stLbl2(s)]);
-  const teamArr=(()=>{ const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name]); if(agIsPM()) return all; const mid=agMyId(); const mine=all.filter(x=>String(x[0])===String(mid)); return mine.length?mine:all; })();
+  const teamArr=_avTeamOpts();                                                        // с аватарами: лицо узнаётся быстрее имени
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Редактировать задачу</h3><p>${escH(p.name)} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" value="${_attr(t.title)}" placeholder="напр. Смонтировать ролик"></div>
@@ -15393,6 +15447,10 @@ function renderPd(){
           const tkd=tk.filter(t=>t.status==='done').length;
           const tcount=`<span class="pd-tc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Задачи <b>${tk.length?(tkd+' / '+tk.length):'0'}</b></span>`;
           const mat=s.material_url?`<a class="pd-mat" href="${(s.material_url||'').replace(/"/g,'&quot;')}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6M10 14L21 3"/></svg>Открыть материал</a>`:'';
+          /* Ответственный за этап — рядом со счётчиком задач: видно, с кого
+             спрашивать, не открывая карточку этапа. */
+          const _sm=s.assignee_id?((typeof TEAM!=='undefined'?TEAM:[]).find(m=>String(m._id)===String(s.assignee_id))):null;
+          const asg=_sm?`<span class="pd-asg" title="Ответственный за этап">${window._selAv(_avMember(_sm))}${escH(_sm.name||'')}</span>`:'';
           let tasksHtml='';
           if(s.status==='active'&&tk.length){
             tasksHtml=`<div class="pd-tasks">`+tk.map(t=>{ const td=t.status==='done'; const chk=td?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''; return `<div class="pd-task"><span class="pd-cbx ${td?'':'empty'}">${chk}</span><span class="pd-tnm ${td?'done':''}">${escH(t.title||'Задача')}</span><span class="pd-tmr">${t.timer_started?'в работе':pkFmtDur(_taskElapsed(t))}</span></div>`; }).join('')+`</div>`;
@@ -15401,7 +15459,7 @@ function renderPd(){
             <div class="pd-rail"><div class="pd-node">${node}</div></div>
             <div class="pd-body">
               <div class="pd-brow"><span class="pd-st-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${ic}</svg></span><div class="pd-st-nm">${escH(s.name)}</div>${dd}<div class="pd-st-status">${s.status==='active'?'● '+status:status}</div>${p.status!=='done'?`<button class="pd-edit" onclick="event.stopPropagation();pdEditStage('${s.id}')">Изменить</button>`:''}</div>
-              <div class="pd-subrow">${tcount}${mat}</div>
+              <div class="pd-subrow">${tcount}${asg}${mat}</div>
               ${tasksHtml}
             </div></div>`;
         }).join('');
@@ -21716,6 +21774,7 @@ function pdEditStage(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ 
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" value="${(s.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Статус этапа</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
+      <div class="fld"><label>Ответственный за этап</label>${_nativeSelect('pd2-stasg', [['','— не назначен —']].concat(_avTeamOpts()), s.assignee_id||'')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-date', s.due_date||'')}${timeField('pd2-time', s.due_time||'')}</div></div>
       <div class="fld"><label>Ссылка на материал</label><input id="pd2-link" value="${(s.link||'').replace(/"/g,'&quot;')}" placeholder="https://… (Drive, Figma, Notion)"></div>
       <div class="fld"><label>Комментарий</label><textarea id="pd2-note" placeholder="Заметка по этапу…">${escH(s.note||'')}</textarea></div>
@@ -21725,7 +21784,7 @@ function pdEditStage(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ 
 }
 function pdSaveStage(id){
   if(!agIsPM()){ toast('Управление проектами доступно только PM'); return; } 
-  const patch={ name:_v('pd2-name')||'Этап', status:pd2St, due_date:_v('pd2-date')||null, due_time:_v('pd2-time')||null, link:_v('pd2-link')||null, note:_v('pd2-note')||null };
+  const patch={ name:_v('pd2-name')||'Этап', status:pd2St, assignee_id:_v('pd2-stasg')||null, due_date:_v('pd2-date')||null, due_time:_v('pd2-time')||null, link:_v('pd2-link')||null, note:_v('pd2-note')||null };
   if(window.tStageSave) window.tStageSave(id,patch);
 }
 
