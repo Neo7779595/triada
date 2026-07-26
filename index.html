@@ -4433,6 +4433,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* Значки идут одной группой, отделённой от переключателя тонкой чертой —
    так панель читается как «настройка · инструменты», а не как россыпь кнопок. */
 .pd-bdtools{display:flex;align-items:center;gap:6px;padding-left:12px;margin-left:2px;border-left:1px solid var(--line)}
+/* Спрашиваем прямо внутри доски, а не системным окном браузера: системное
+   в полноэкранном режиме либо не видно, либо оно из него выкидывает. */
+.pd-bdask{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:ovFade .18s ease both}
+.pd-bdask-c{width:min(430px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line-2);border-radius:16px;padding:22px 24px;box-shadow:0 24px 60px -20px rgba(0,0,0,.8);animation:rise .26s var(--spring)}
+.pd-bdask-c .t{font-size:16px;font-weight:650;color:var(--txt);letter-spacing:-.01em}
+.pd-bdask-c .d{font-size:13.5px;line-height:1.62;color:var(--txt-2);margin-top:8px}
+.pd-bdask-c .b{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.pd-bdask-x{color:var(--neg)!important;border-color:rgba(240,120,92,.35)!important}
 /* Во весь экран доска остаётся одна: панель превращается в плавающую
    стеклянную пилюлю снизу, притушенную до наведения — она не крадёт
    ни пикселя рабочего поля и не спорит с панелями самого Miro. */
@@ -28268,18 +28276,60 @@ function pdBoardClean(){
 }
 
 /* Во весь экран уводим саму доску, а не всю страницу: пропадают и шапка
-   проекта, и вкладки, и панели браузера — остаётся только рабочее поле. */
+   проекта, и вкладки, и панели браузера — остаётся только рабочее поле.
+   Если в полном экране уже была вся платформа, не выходим из него и тут же
+   не входим заново, а просто передаём полный экран доске: иначе кнопку
+   приходилось нажимать дважды. */
 function pdBoardFull(){
   const el=document.querySelector('.pd-bdwrap'); if(!el) return;
   const fsEl=document.fullscreenElement||document.webkitFullscreenElement;
-  if(!fsEl){
-    const rq=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
-    if(rq){ try{ const r=rq.call(el); if(r&&r.catch)r.catch(function(){}); }catch(_){} }
-    else if(typeof toast==='function') toast('Полный экран не поддерживается браузером');
-  } else {
+  if(fsEl===el){
     const ex=document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen;
     if(ex){ try{ ex.call(document); }catch(_){} }
+    return;
   }
+  const rq=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+  if(rq){ try{ const r=rq.call(el); if(r&&r.catch)r.catch(function(){}); }catch(_){} }
+  else if(typeof toast==='function') toast('Полный экран не поддерживается браузером');
+}
+
+/* Своё окно вопроса внутри доски. Системные confirm/alert в полноэкранном
+   режиме браузер либо прячет, либо показывает ценой выхода из него —
+   поэтому спрашиваем сами, прямо поверх доски. */
+function _pdBoardAsk(opts){
+  const wrap=document.querySelector('.pd-bdwrap'); if(!wrap) return;
+  wrap.querySelectorAll('.pd-bdask').forEach(function(n){ n.remove(); });
+  const box=document.createElement('div');
+  box.className='pd-bdask';
+  box.innerHTML='<div class="pd-bdask-c"><div class="t"></div><div class="d"></div><div class="b"></div></div>';
+  box.querySelector('.t').textContent=opts.title||'';
+  box.querySelector('.d').textContent=opts.text||'';
+  const row=box.querySelector('.b');
+  (opts.actions||[]).forEach(function(a){
+    const btn=document.createElement('button');
+    btn.className=a.kind==='main'?'btn-add':(a.kind==='danger'?'btn-ghost pd-bdask-x':'btn-ghost');
+    btn.textContent=a.label;
+    btn.onclick=function(){ box.remove(); if(a.fn) a.fn(); };
+    row.appendChild(btn);
+  });
+  box.addEventListener('click', function(e){ if(e.target===box) box.remove(); });
+  wrap.appendChild(box);
+}
+
+/* Уходить в Miro почти всегда не нужно: то же самое удобнее смотреть
+   не выходя из системы. Поэтому сначала предлагаем полный экран. */
+function pdBoardOpen(){
+  const p=PROJECTS[pdIdx]; if(!p||!p._miro) return;
+  const link=_miroLink(p._miro);
+  _pdBoardAsk({
+    title:'Открыть доску в Miro?',
+    text:'Доска откроется в новой вкладке. Чтобы не выходить из системы, удобнее полноэкранный режим — доска займёт весь монитор, а вернуться можно клавишей Esc.',
+    actions:[
+      { label:'Во весь экран здесь', kind:'main', fn:pdBoardFull },
+      { label:'Открыть в Miro', fn:function(){ window.open(link,'_blank','noopener'); } },
+      { label:'Отмена' },
+    ],
+  });
 }
 
 async function pdBoardLoad(p){
@@ -28327,7 +28377,7 @@ function _pdBoardHTML(p){
         <div class="pd-bdtools">
           <button class="pd-bdic${PD_BD_CLEAN?' on':''}" id="pd-bd-clean" onclick="pdBoardClean()" title="Чистый вид: убрать панели и баннеры Miro — на экране остаётся только сама доска"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
           <button class="pd-bdic" id="pd-bd-fs" onclick="pdBoardFull()" title="Во весь экран · Esc чтобы выйти"><svg id="pd-bd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
-          <a class="pd-bdic" href="${escH(_miroLink(b))}" target="_blank" rel="noopener" title="Открыть доску в Miro. Закрытую доску Miro показывает только тем, кто вошёл с доступом к ней — если во встроенном окне видно приглашение войти, откройте её здесь"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>
+          <button class="pd-bdic" onclick="pdBoardOpen()" title="Открыть доску в Miro в новой вкладке"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></button>
           ${canEdit?'<button class="pd-bdic pd-bdic-x" onclick="pdBoardUnlink()" title="Отвязать доску от проекта. Сама она останется в Miro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 3.6 8.5M8 12h3M3 3l18 18"/></svg></button>':''}
         </div>
       </div>
@@ -28382,9 +28432,19 @@ async function pdBoardVisible(on){
   finally{ if(row) row.classList.remove('busy'); }
 }
 
-async function pdBoardUnlink(){
+function pdBoardUnlink(){
   const p=PROJECTS[pdIdx]; if(!p||!p._miro) return;
-  if(!confirm('Отвязать доску от проекта? Сама доска останется в Miro.')) return;
+  _pdBoardAsk({
+    title:'Отвязать доску от проекта?',
+    text:'Сама доска со всем содержимым останется в Miro — из проекта пропадёт только ссылка на неё. Если доска была открыта клиенту, он её больше не увидит.',
+    actions:[
+      { label:'Отвязать', kind:'danger', fn:_pdBoardUnlinkGo },
+      { label:'Отмена' },
+    ],
+  });
+}
+async function _pdBoardUnlinkGo(){
+  const p=PROJECTS[pdIdx]; if(!p||!p._miro) return;
   try{
     const { data } = await _giFetch('miro-board', { action:'unlink', project:p.id });
     toast((data&&data.message)||'Отвязано');
