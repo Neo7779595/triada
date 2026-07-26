@@ -27664,6 +27664,14 @@ function kbPickOpen(ev){
   pop.addEventListener('click',function(e){ e.stopPropagation(); });
   pop.innerHTML=_kbPickGrid();
   wrap.appendChild(pop);
+  /* Не даём уехать за правый край экрана: если не помещается — вешаем
+     всплывашку правым краем на кнопку. */
+  requestAnimationFrame(function(){
+    try{
+      const r=pop.getBoundingClientRect();
+      if(r.right>window.innerWidth-12) pop.classList.add('to-right');
+    }catch(_e){}
+  });
 }
 function _kbPickRepaint(){ const pop=document.querySelector('#kb-pickw .kbp-pop'); if(pop) pop.innerHTML=_kbPickGrid(); }
 function kbPickNav(d){                                    // год в режиме месяца, месяц — в режиме дня
@@ -27930,23 +27938,31 @@ function kbAutoCss(){
     +".kb-per-trg{display:inline-flex;align-items:center;gap:7px;background:none;border:0;color:var(--txt);font-family:var(--mono);font-size:12px;padding:5px 9px;border-radius:7px;cursor:pointer;text-transform:capitalize;transition:all .14s var(--ease-out)}"
     +".kb-per-trg svg{color:var(--txt-3);flex:none;transition:color .14s var(--ease-out)}"
     +".kb-per-trg:hover{background:var(--bg-3)}.kb-per-trg:hover svg{color:var(--accent)}"
-    +".kbp-pop{position:absolute;top:calc(100% + 9px);left:50%;transform:translateX(-50%);z-index:95;width:268px;padding:13px;border-radius:16px;"
+    /* Календарь выравниваем по левому краю кнопки, а не по её центру:
+       кнопка стоит у самого края блока, и центрированная всплывашка
+       наполовину уходила за него. Если у правого края экрана не хватит
+       места — kbPickOpen перевесит её вправо классом .to-right. */
+    +".kbp-pop{position:absolute;top:calc(100% + 9px);left:0;z-index:95;width:268px;padding:13px;border-radius:16px;"
       +"background:linear-gradient(180deg,rgba(28,33,42,.86),rgba(15,17,22,.92));backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);"
       +"border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 60px -12px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06);animation:kbp-in .16s var(--ease-out)}"
-    +"@keyframes kbp-in{from{opacity:0;transform:translateX(-50%) translateY(-6px) scale(.97)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}"
+    +".kbp-pop.to-right{left:auto;right:0}"
+    +"@keyframes kbp-in{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}"
     +".kbp-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}"
     +".kbp-t{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:capitalize}"
     +".kbp-nav{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:var(--txt-2);width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .14s var(--ease-out)}"
     +".kbp-nav:hover{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}"
-    +".kbp-mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}"
-    +".kbp-mgrid button{background:rgba(255,255,255,.04);border:1px solid transparent;color:var(--txt-2);font-family:var(--mono);font-size:12px;padding:9px 0;border-radius:9px;cursor:pointer;transition:all .13s var(--ease-out)}"
+    +".kbp-mgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}"
+    +".kbp-mgrid button{min-width:0;background:rgba(255,255,255,.04);border:1px solid transparent;color:var(--txt-2);font-family:var(--mono);font-size:12px;padding:9px 0;border-radius:9px;cursor:pointer;transition:all .13s var(--ease-out)}"
     +".kbp-mgrid button:hover{background:rgba(255,255,255,.09);color:var(--txt)}"
     +".kbp-mgrid button.now{box-shadow:inset 0 0 0 1px var(--accent-line)}"
     +".kbp-mgrid button.sel{background:var(--accent);color:#06231e;font-weight:700;box-shadow:0 4px 14px -4px var(--accent)}"
     +".kbp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px}"
     +".kbp-dow span{text-align:center;font-size:9.5px;font-family:var(--mono);letter-spacing:.06em;color:var(--txt-3);text-transform:uppercase;padding:3px 0}"
-    +".kbp-dgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}"
-    +".kbp-dgrid button{aspect-ratio:1;background:transparent;border:1px solid transparent;color:var(--txt-2);font-family:var(--mono);font-size:12px;border-radius:8px;cursor:pointer;transition:all .12s var(--ease-out)}"
+    +".kbp-dgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}"
+    /* min-width/min-height:0 обязательны: с aspect-ratio браузер выводит
+       минимальный размер клетки из соотношения сторон, колонки раздувались
+       и последний столбец недели вылезал за край календаря. */
+    +".kbp-dgrid button{aspect-ratio:1;min-width:0;min-height:0;background:transparent;border:1px solid transparent;color:var(--txt-2);font-family:var(--mono);font-size:12px;border-radius:8px;cursor:pointer;transition:all .12s var(--ease-out)}"
     +".kbp-dgrid button:hover:not(:disabled){background:rgba(255,255,255,.09);color:var(--txt)}"
     +".kbp-dgrid button.oth{color:var(--txt-3);opacity:.32;cursor:default}"
     +".kbp-dgrid button.now{box-shadow:inset 0 0 0 1px var(--accent-line)}"
