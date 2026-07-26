@@ -245,10 +245,14 @@ button{font-family:inherit}
 .login-form{margin:30px 0 0;padding:0;border:0;display:flex;flex-direction:column;gap:11px;text-align:left}
 .field{position:relative;display:flex;align-items:center}
 .field-ic{position:absolute;left:14px;width:18px;height:18px;color:var(--txt-3);pointer-events:none;transition:color .18s,transform .18s}
-.field input{width:100%;background:rgba(10,13,11,.6);border:1px solid var(--line-2);border-radius:10px;padding:14px 14px 14px 44px;color:var(--txt);font-family:var(--font);font-size:15px;transition:border-color .18s,box-shadow .18s,background .18s}
+/* Поля входа в том же ключе, что кнопки под ними: та же подложка, рамка
+   и радиус — форма читается одним блоком, а не набором чужих деталей. */
+.field input{width:100%;background:var(--bg-1);border:1px solid var(--line-2);border-radius:11px;padding:14px 14px 14px 44px;color:var(--txt);font-family:var(--font);font-size:15px;transition:border-color .18s,box-shadow .18s,background .18s}
+.field input:hover:not(:focus){border-color:color-mix(in oklab,var(--accent) 26%,var(--line-2))}
 .field input::placeholder{color:var(--txt-3)}
 .field input:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim),0 0 24px -6px rgba(55,230,200,.4);background:rgba(10,13,11,.85)}
 .field input:focus~.field-ic,.field:focus-within .field-ic{color:var(--accent);transform:scale(1.08)}
+#lg-btn>svg{width:17px;height:17px;flex:none}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;border:0;border-radius:10px;font-weight:600;font-size:14.5px;padding:14px 16px;transition:.16s}
 .btn-primary{position:relative;overflow:hidden;background:var(--accent);color:var(--accent-ink);font-weight:700;box-shadow:0 0 0 1px var(--accent-line),0 10px 30px -10px rgba(55,230,200,.6);margin-top:4px}
 .btn-primary>span{position:relative;z-index:1}
@@ -311,18 +315,31 @@ button{font-family:inherit}
 .lg-strip-cap b{color:var(--txt-2);font-weight:600;border-bottom:1px solid var(--line-2)}
 .lg-strip:hover+.lg-strip-cap b{color:var(--accent);border-color:var(--accent-line)}
 .lg-trust{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
-.lg-trust span{font-size:11px;color:var(--txt-3);border:1px solid var(--line);border-radius:999px;padding:5px 10px;background:rgba(255,255,255,.02);white-space:nowrap}
-/* Ссылки на разделы сайта — теми же кнопками с туманностью, что и вход.
-   Раньше они жались строкой под карточкой входа и переносились по слогам. */
-.lg-nav{gap:9px;margin-top:18px}
-.lg-nav a{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:11px;
-  background:var(--bg-1);border:1px solid var(--line-2);color:var(--txt-2);
-  font-family:var(--font);font-size:12.5px;font-weight:600;line-height:1;white-space:nowrap;
-  text-decoration:none;cursor:pointer;transition:color .16s var(--ease),border-color .16s var(--ease)}
-.lg-nav a>svg{width:15px;height:15px;flex:none;color:var(--txt-3);transition:color .16s var(--ease)}
-.lg-nav a:hover{color:var(--txt);border-color:var(--accent-line)}
-.lg-nav a:hover>svg{color:var(--accent)}
-.lg-nav a>span:not([class^="gx-"]){white-space:nowrap}
+/* Ссылки на разделы сайта. Минимум: тонкая рамка, значок, подпись.
+   Вся жизнь — при наведении: мятная подсветка, лёгкий подъём и черта,
+   вырастающая слева направо. Никаких вложенных плашек. */
+.lg-nav{gap:8px;margin-top:18px}
+.lg-nav a{position:relative;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;
+  border-radius:10px;background:rgba(255,255,255,.02);border:1px solid var(--line);
+  color:var(--txt-2);font-family:var(--font);font-size:12.5px;font-weight:600;line-height:1;
+  white-space:nowrap;text-decoration:none;cursor:pointer;
+  transition:color .2s var(--ease),border-color .2s var(--ease),background .2s var(--ease),
+    transform .2s var(--ease),box-shadow .2s var(--ease)}
+.lg-nav a svg{width:15px;height:15px;flex:none;color:var(--txt-3);
+  transition:color .2s var(--ease),transform .2s var(--ease)}
+.lg-nav a::after{content:"";position:absolute;left:14px;right:14px;bottom:6px;height:1px;
+  background:var(--accent);opacity:.85;transform:scaleX(0);transform-origin:left;
+  transition:transform .3s var(--ease)}
+.lg-nav a:hover{color:var(--txt);border-color:var(--accent-line);background:var(--accent-dim);
+  transform:translateY(-1px);box-shadow:0 10px 24px -14px var(--accent)}
+.lg-nav a:hover svg{color:var(--accent);transform:scale(1.08)}
+.lg-nav a:hover::after{transform:scaleX(1)}
+.lg-nav a:active{transform:translateY(0) scale(.985)}
+.lg-nav a:focus-visible{outline:2px solid var(--accent-line);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){
+  .lg-nav a,.lg-nav a svg,.lg-nav a::after{transition:none}
+  .lg-nav a:hover{transform:none}
+}
 /* каскад появления — expo.out, шаг 70мс */
 .lg-live,.lg-h1,.lg-lead,.lg-facts,.lg-strip,.lg-strip-cap,.lg-trust{animation:lgUp .85s var(--ease-out) both}
 @keyframes lgUp{from{opacity:0;transform:translateY(20px);filter:blur(6px)}to{opacity:1;transform:none;filter:blur(0)}}
@@ -8504,10 +8521,10 @@ body.m-lock{overflow:hidden}
     </ul>
     <a class="lg-strip" href="/platform/" title="Экраны платформы — смотреть все"><span class="lg-strip-track"><i><img src="/shots/overview-sm.webp" srcset="/shots/overview-sm.webp 900w, /shots/overview-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Сводка · здоровье портфеля" loading="lazy" decoding="async"></i><i><img src="/shots/finance-sm.webp" srcset="/shots/finance-sm.webp 900w, /shots/finance-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Финансы · P&L и движение MRR" loading="lazy" decoding="async"></i><i><img src="/shots/team-sm.webp" srcset="/shots/team-sm.webp 900w, /shots/team-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Команда · рейтинг и загрузка" loading="lazy" decoding="async"></i><i><img src="/shots/deadlines-sm.webp" srcset="/shots/deadlines-sm.webp 900w, /shots/deadlines-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Дедлайны · что горит сейчас" loading="lazy" decoding="async"></i><i><img src="/shots/projects-sm.webp" srcset="/shots/projects-sm.webp 900w, /shots/projects-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Проекты · карточка клиента" loading="lazy" decoding="async"></i><i><img src="/shots/kpi-sm.webp" srcset="/shots/kpi-sm.webp 900w, /shots/kpi-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="KPI · цели и пороги" loading="lazy" decoding="async"></i><i><img src="/shots/overview-wide-sm.webp" srcset="/shots/overview-wide-sm.webp 900w, /shots/overview-wide-md.webp 1400w" sizes="262px" width="2400" height="1363" alt="Сводка · режим фокуса" loading="lazy" decoding="async"></i><i><img src="/shots/overview-sm.webp" srcset="/shots/overview-sm.webp 900w, /shots/overview-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Сводка · здоровье портфеля" loading="lazy" decoding="async"></i><i><img src="/shots/finance-sm.webp" srcset="/shots/finance-sm.webp 900w, /shots/finance-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Финансы · P&L и движение MRR" loading="lazy" decoding="async"></i><i><img src="/shots/team-sm.webp" srcset="/shots/team-sm.webp 900w, /shots/team-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Команда · рейтинг и загрузка" loading="lazy" decoding="async"></i><i><img src="/shots/deadlines-sm.webp" srcset="/shots/deadlines-sm.webp 900w, /shots/deadlines-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Дедлайны · что горит сейчас" loading="lazy" decoding="async"></i><i><img src="/shots/projects-sm.webp" srcset="/shots/projects-sm.webp 900w, /shots/projects-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="Проекты · карточка клиента" loading="lazy" decoding="async"></i><i><img src="/shots/kpi-sm.webp" srcset="/shots/kpi-sm.webp 900w, /shots/kpi-md.webp 1400w" sizes="262px" width="2400" height="1561" alt="KPI · цели и пороги" loading="lazy" decoding="async"></i><i><img src="/shots/overview-wide-sm.webp" srcset="/shots/overview-wide-sm.webp 900w, /shots/overview-wide-md.webp 1400w" sizes="262px" width="2400" height="1363" alt="Сводка · режим фокуса" loading="lazy" decoding="async"></i></span></a><div class="lg-strip-cap">Экраны рабочего кабинета · <b>смотреть все</b></div>
     <div class="lg-trust lg-nav">
-      <a class="gx" href="/platform/"><span class="gx-neb"></span><span class="gx-in"></span><span class="gx-stars"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>О платформе</span></a>
-      <a class="gx" href="/blog/"><span class="gx-neb"></span><span class="gx-in"></span><span class="gx-stars"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v5h4M9 13h6M9 17h4"/></svg><span>Блог</span></a>
-      <a class="gx" href="/privacy/"><span class="gx-neb"></span><span class="gx-in"></span><span class="gx-stars"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Конфиденциальность</span></a>
-      <a class="gx" href="/terms/"><span class="gx-neb"></span><span class="gx-in"></span><span class="gx-stars"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Условия</span></a>
+      <a href="/platform/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>О платформе</span></a>
+      <a href="/blog/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v5h4M9 13h6M9 17h4"/></svg><span>Блог</span></a>
+      <a href="/privacy/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Конфиденциальность</span></a>
+      <a href="/terms/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Условия</span></a>
     </div>
   </aside>
   <div class="lg-card-wrap">
@@ -8524,7 +8541,7 @@ body.m-lock{overflow:hidden}
     <form class="login-form" onsubmit="event.preventDefault();doLogin();return false;" novalidate>
       <div class="field"><svg class="field-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg><input id="lg-login" type="text" placeholder="Логин" aria-label="Логин" autocomplete="username"></div>
       <div class="field"><svg class="field-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><input id="lg-pass" type="password" placeholder="Пароль" aria-label="Пароль" autocomplete="current-password"></div>
-      <button class="btn btn-primary gx gx-solid" id="lg-btn" type="submit"><span class="gx-neb"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></svg><span>Войти</span></button>
+      <button class="btn btn-primary" id="lg-btn" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></svg><span>Войти</span></button>
     </form>
     <div class="lg-divider"><span>ещё нет аккаунта?</span></div>
     <button class="btn lg-reg-btn gx" onclick="_regShowPublicTariffs()" type="button">
