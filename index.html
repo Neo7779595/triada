@@ -27693,15 +27693,15 @@ function _pdDeepLink(){
   const idx=list.findIndex(function(p){ return String(p.id)===String(pid); });
   _pdDeepClearURL();                       // адрес чистим сразу, чтобы не сработало при обновлении
   if(idx<0){ toast('Проект не найден или к нему нет доступа'); return; }
-  openProject(idx);
   const task=q.get('task'), stage=q.get('stage');
-  if(task){
-    pdTab('kanban');
-    setTimeout(function(){ try{ pdTaskEdit(task); }catch(_){ } }, 350);
-  } else if(stage){
-    pdTab('stages');
-    setTimeout(function(){ _pdFlashStage(stage); }, 420);
+  /* Из календаря приводим к самой карточке и подсвечиваем её, а не открываем
+     окно редактирования: человек шёл посмотреть, где задача, а не править её.
+     dlGoto заодно снимает фильтры доски — иначе карточка может быть скрыта. */
+  if((task||stage) && typeof dlGoto==='function'){
+    dlGoto(pid, task?'task':'stage', task||stage);
+    return;
   }
+  openProject(idx);
 }
 
 /* Ждём, пока кабинет поднимется и проекты загрузятся, — иначе открывать нечего. */
