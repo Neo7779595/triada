@@ -4293,6 +4293,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* Чип «Документы» не должен утаскивать шапку карточки в прокрутку:
    на экранах уже 1440 оставляем одну иконку, подпись — в подсказке. */
 @media(max-width:1440px){.pd-chip-docs .lbl{display:none}.pd-chip-docs{padding:8px 10px}}
+/* Глазок «виден клиенту» в списке документов проекта */
+.pdoc-eye{background:none;border:0;padding:2px 6px;cursor:pointer;color:var(--txt-3);display:flex;align-items:center;transition:color .16s var(--ease)}
+.pdoc-eye svg{width:16px;height:16px}
+.pdoc-eye:hover{color:var(--txt-2)}
+.pdoc-eye.on{color:var(--pos)}
+/* Документы в кабинете клиента: карточки как у отчётов, PDF на всю ширину окна */
+.cdoc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:26px}
+.cdoc-card{cursor:pointer}
+.cdoc-frame{width:100%;height:min(70vh,760px);border:0;border-radius:12px;background:#fff;display:block}
+@media(max-width:768px){.cdoc-grid{grid-template-columns:1fr}}
 .pd-newbtn{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(0,0,0,.05)),var(--accent);color:var(--accent-ink);font-weight:600;font-size:14px;letter-spacing:.01em;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 0 rgba(0,0,0,.18),0 6px 18px -8px rgba(55,230,200,.55);transition:transform .16s var(--ease),box-shadow .16s var(--ease),filter .16s var(--ease)}
 .pd-newbtn:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.32),0 1px 0 rgba(0,0,0,.2),0 10px 26px -8px rgba(55,230,200,.7);filter:saturate(1.04)}
 .pd-newbtn:active{transform:translateY(0);box-shadow:inset 0 1px 2px rgba(0,0,0,.2),0 4px 12px -8px rgba(55,230,200,.5)}
@@ -8612,6 +8622,7 @@ body.m-lock{overflow:hidden}
       <div class="nav-i" data-cm="stages" onclick="clNav('stages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>Этапы <span class="ct">2/6</span></div>
       <div class="nav-i" data-cm="reports" onclick="clNav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6"/></svg>Отчёты <span class="ct">3</span></div>
       <div class="nav-i" data-cm="content" onclick="clNav('content')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>Контент-план</div>
+      <div class="nav-i" data-cm="documents" onclick="clNav('documents')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/></svg>Документы <span class="ct" id="cl-docs-ct" style="display:none">0</span></div>
       <div class="nav-i" data-cm="passport" onclick="clNav('passport')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Паспорт проекта</div>
       <div class="nav-i" data-cm="updates" onclick="clNav('updates')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Обновления <span class="dot-n"></span></div>
     </nav>
@@ -12035,7 +12046,7 @@ function projSettings(i){
       </div></div>
       <div class="fld"><label>Видимость для клиента <small style="color:var(--txt-3);font-weight:400;margin-left:6px">выключите модули, которые не нужно показывать</small></label>
         <div class="cl-vis" id="pj-clvis">
-          ${[['stages','Этапы'],['reports','Отчёты'],['content','Контент-план'],['passport','Паспорт'],['updates','Обновления']].map(function(m){var k=m[0],l=m[1];var _h=(p&&p.cl_hidden)||[];var on=_h.indexOf(k)<0;return '<button type="button" class="cl-vis-tog '+(on?'on':'')+'" data-mk="'+k+'" onclick="pjToggleClVis(this)"><span class="cvt-ic"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">'+(on?'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>':'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M2 2l20 20\"/>')+'</svg></span><span class="cvt-l">'+l+'</span></button>';}).join('')}
+          ${[['stages','Этапы'],['reports','Отчёты'],['content','Контент-план'],['documents','Документы'],['passport','Паспорт'],['updates','Обновления']].map(function(m){var k=m[0],l=m[1];var _h=(p&&p.cl_hidden)||[];var on=_h.indexOf(k)<0;return '<button type="button" class="cl-vis-tog '+(on?'on':'')+'" data-mk="'+k+'" onclick="pjToggleClVis(this)"><span class="cvt-ic"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">'+(on?'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>':'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M2 2l20 20\"/>')+'</svg></span><span class="cvt-l">'+l+'</span></button>';}).join('')}
         </div>
       </div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
@@ -27842,7 +27853,7 @@ async function pdDocsLoad(p){
   try{
     if(!window.LIVE||!window.SB){ p._docs=[]; PDOC.tpl=PDOC.tpl||[]; return; }
     const [d,t]=await Promise.all([
-      SB.from('project_documents').select('id,kind,number,title,url,created_at').eq('project_id',p.id).order('created_at',{ascending:false}),
+      SB.from('project_documents').select('id,kind,number,title,url,created_at,client_visible').eq('project_id',p.id).order('created_at',{ascending:false}),
       PDOC.tpl?Promise.resolve({data:PDOC.tpl}):SB.from('doc_templates').select('id,kind,name,sort').is('archived_at',null).order('sort')
     ]);
     p._docs=d.data||[]; PDOC.tpl=t.data||[];
@@ -27867,7 +27878,9 @@ function _pdDocsHTML(p){
   if(!tpls.length) return head+'<div class="pk-empty" style="padding:40px 0">Шаблонов пока нет. Владелец может завести их кнопкой «Шаблоны».</div>';
   const rows=docs.length?docs.map(d=>`<div class="act-row" style="cursor:pointer" onclick="pdDocOpen('${escH(d.url)}')">
       <div class="act-ic start" style="background:#37E6C822;color:#37E6C8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/></svg></div>
-      <div style="flex:1;min-width:0"><div class="act-txt">${escH(d.title)}</div><div class="act-tag">${escH(_pdocKindName(d.kind))} № ${escH(d.number||'—')} · ${escH(_dDateFull?_dDateFull(d.created_at):String(d.created_at).slice(0,10))}</div></div>
+      <div style="flex:1;min-width:0"><div class="act-txt">${escH(d.title)}</div><div class="act-tag">${escH(_pdocKindName(d.kind))} № ${escH(d.number||'—')} · ${escH(_dDateFull?_dDateFull(d.created_at):String(d.created_at).slice(0,10))}${d.client_visible?' · <span style="color:var(--pos)">виден клиенту</span>':''}</div></div>
+      <button class="pdoc-eye${d.client_visible?' on':''}" title="${d.client_visible?'Клиент видит этот документ в своём кабинете. Нажмите, чтобы скрыть':'Показать документ клиенту в его кабинете — только на просмотр'}" onclick="event.stopPropagation();pdDocShare('${d.id}',${d.client_visible?'false':'true'})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>${d.client_visible?'':'<path d="M2 2l20 20"/>'}</svg></button>
       <button title="Убрать из списка" onclick="event.stopPropagation();pdDocDel('${d.id}')" style="background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:17px;line-height:1;padding:0 4px">×</button>
     </div>`).join('')
     :'<div class="pk-empty" style="padding:40px 0">Документов пока нет — нажмите «Договор» или «Акт», данные проекта подставятся сами.</div>';
@@ -27894,6 +27907,21 @@ async function pdDocCreate(tplId){
     p._docs=undefined; pdDocsLoad(p);
   }catch(e){ if(tab)tab.close(); toast(String(e.message||e)); }
   finally{ PDOC.busy=false; }
+}
+
+/* Показать документ клиенту. Ссылку на Google не отдаём никогда —
+   в кабинете клиента он открывается как PDF-снимок, править нечего. */
+async function pdDocShare(id,on){
+  const p=PROJECTS[pdIdx]; if(!p) return;
+  const val=(on===true||on==='true');
+  try{
+    const { error } = await SB.from('project_documents')
+      .update({ client_visible:val, shared_at: val?new Date().toISOString():null }).eq('id',id);
+    if(error) throw error;
+    (p._docs||[]).forEach(d=>{ if(String(d.id)===String(id)) d.client_visible=val; });
+    toast(val?'Документ виден клиенту — только на просмотр':'Документ скрыт от клиента');
+    if(pdTabCur==='docs') renderPd();
+  }catch(e){ toast('Не удалось изменить: '+String(e.message||e)); }
 }
 
 async function pdDocDel(id){
@@ -28016,7 +28044,7 @@ async function pdocTplSave(){
     const p=PROJECTS[pdIdx]; if(p){ p._docs=undefined; pdDocsLoad(p); }
   }catch(e){ toast('Не сохранилось: '+String(e.message||e)); }
 }
-window.pdDocCreate=pdDocCreate; window.pdDocDel=pdDocDel; window.pdDocOpen=pdDocOpen;
+window.pdDocCreate=pdDocCreate; window.pdDocDel=pdDocDel; window.pdDocOpen=pdDocOpen; window.pdDocShare=pdDocShare;
 window.pdocReqOpen=pdocReqOpen; window.pdocReqSave=pdocReqSave;
 window.pdocTplOpen=pdocTplOpen; window.pdocTplSave=pdocTplSave; window.pdocTplInsert=pdocTplInsert;
 
@@ -28272,7 +28300,7 @@ function clNav(m){
   var _hidden=_clApplyVisibility();
   if(_hidden.indexOf(m)>=0) m='overview';
   document.querySelectorAll('#app-cl .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.cm===m));
-  if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else if(m==='passport') renderClPassport(); else renderClUpdates();
+  if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else if(m==='documents') renderClDocs(); else if(m==='passport') renderClPassport(); else renderClUpdates();
 }
 function _histFeedX(items, proj){
   const SL=s=>({wait:'ожидание',hold:'пауза',active:'в работе',done:'готово',review:'проверка'}[s]||s||'—');
@@ -28571,6 +28599,87 @@ window.clOpenReport=function(id){
   if(r.kind==='SMM'){ openSMM(Object.assign({project_id:P.id}, r), true); return; }
   openReport(r.kind, Object.assign({t:r.title, date:_dDateFull(r.published_at), _real:true}, r.payload||{}));
 };
+/* ═══════════════ ДОКУМЕНТЫ У КЛИЕНТА ═══════════════
+   Клиент видит только те договоры и акты, которые агентство ему открыло,
+   и только как PDF-снимок: сам файл лежит в закрытой папке на Диске
+   агентства, наружу уходит копия страниц. Изменить её нельзя. */
+const CLDOC = { url:null, id:null, busy:false };
+const _clDocKind = k => ({contract:'Договор', act:'Акт', invoice:'Счёт'}[k] || 'Документ');
+const _clDocIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/></svg>';
+
+function renderClDocs(){
+  const P=window.CLP, docs=(P&&P.documents)||[];
+  const host=document.getElementById('content-cl'); if(!host) return;
+  const head=`<div class="ph"><div><div class="eyebrow">Документы</div><h1>Договоры и акты</h1></div></div>`;
+  if(!docs.length){
+    host.innerHTML=head+`<div style="text-align:center;padding:64px 24px;color:var(--txt-3)">
+      <div style="width:56px;height:56px;margin:0 auto 18px;border-radius:16px;background:var(--bg-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-3)">${_clDocIcon}</div>
+      <div style="font-size:15px;font-weight:600;color:var(--txt-2);margin-bottom:6px">Документов пока нет</div>
+      <div style="font-size:13px;line-height:1.6;max-width:380px;margin:0 auto">Когда агентство подготовит договор или акт, он появится здесь. Открыть и скачать можно будет прямо отсюда.</div>
+    </div>`;
+    return;
+  }
+  const group=(kind,title)=>{
+    const list=docs.filter(d=>String(d.kind||'contract')===kind);
+    if(!list.length) return '';
+    return `<div class="rep-group-h"><span class="gbar"></span><span>${escH(title)}</span><span class="ln"></span><span class="ct">${list.length}</span></div>`
+      + `<div class="cdoc-grid">`+list.map(d=>`
+      <div class="crep cdoc-card" onclick="clDocOpen('${d.id}')">
+        <div class="crep-h"><div class="crep-ic">${_clDocIcon}</div>
+          <div class="crep-body"><div class="crep-t">${escH(d.title||'Документ')}</div>
+            <div class="crep-tags"><span class="crep-badge">${escH(_clDocKind(d.kind))} № ${escH(d.number||'—')}</span>
+              <span class="crep-date">${escH(_dDateFull?_dDateFull(d.created_at):String(d.created_at||'').slice(0,10))}</span></div>
+          </div></div>
+        <button class="crep-open" onclick="event.stopPropagation();clDocOpen('${d.id}')">Открыть →</button>
+      </div>`).join('')+`</div>`;
+  };
+  host.innerHTML=head
+    +group('contract','Договоры')+group('act','Акты')+group('invoice','Счета')
+    +`<div style="opacity:.4;font-size:12px;margin-top:22px;line-height:1.6;max-width:640px">Документы открыты только на просмотр и скачивание — редактировать их может лишь агентство. Если в документе есть неточность, напишите менеджеру.</div>`;
+}
+
+async function clDocOpen(id){
+  const P=window.CLP; if(!P||CLDOC.busy) return;
+  const d=(P.documents||[]).find(x=>String(x.id)===String(id)); if(!d) return;
+  CLDOC.busy=true;
+  if(CLDOC.url){ try{ URL.revokeObjectURL(CLDOC.url); }catch(_e){} CLDOC.url=null; }
+  pd2Open(`<div class="modal glass" style="max-width:900px;width:94vw">
+    <div class="modal-h"><div style="min-width:0"><div style="font-size:11px;letter-spacing:.08em;opacity:.45;text-transform:uppercase">${escH(_clDocKind(d.kind))} № ${escH(d.number||'—')}</div><div style="font-weight:620;font-size:15px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(d.title||'Документ')}</div></div><button class="tg-x" onclick="pd2Close()">×</button></div>
+    <div class="modal-b" id="cdoc-view" style="min-height:220px;display:flex;align-items:center;justify-content:center">
+      <div style="opacity:.5;font-size:13px">Готовим документ…</div>
+    </div>
+    <div class="modal-f" id="cdoc-foot"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button></div>
+  </div>`);
+  try{
+    const { status, data } = await _giFetch('google-docs', { action:'pdf' }, { doc_id:id });
+    const view=document.getElementById('cdoc-view'); if(!view) return;
+    if(status===403||(data&&data.error==='forbidden')){ view.innerHTML='<div style="opacity:.6;font-size:13px">Этот документ вам не открыт.</div>'; return; }
+    if(!data||data.ok===false||!data.pdf){ view.innerHTML=`<div style="opacity:.6;font-size:13px">${escH((data&&(data.error||data.message))||'Не удалось открыть документ')}</div>`; return; }
+    const bin=atob(data.pdf), arr=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    CLDOC.url=URL.createObjectURL(new Blob([arr],{type:'application/pdf'}));
+    CLDOC.id=id;
+    const name=(d.title||'Документ').replace(/[\\/:*?"<>|]/g,'-')+'.pdf';
+    /* На телефонах встроенный просмотр PDF работает через раз — там сразу
+       предлагаем открыть файл системным просмотрщиком. */
+    const narrow=window.innerWidth<=768;
+    view.style.display='block'; view.style.padding='0';
+    view.innerHTML = narrow
+      ? `<div style="padding:34px 20px;text-align:center">
+           <div style="font-size:13.5px;line-height:1.6;opacity:.7;margin-bottom:16px">Документ готов. Откройте его в просмотрщике телефона.</div>
+           <a class="btn-add" style="text-decoration:none;display:inline-flex" href="${CLDOC.url}" target="_blank" rel="noopener">Открыть документ</a>
+         </div>`
+      : `<iframe class="cdoc-frame" src="${CLDOC.url}#toolbar=0&navpanes=0" title="${escH(d.title||'Документ')}"></iframe>`;
+    const foot=document.getElementById('cdoc-foot');
+    if(foot) foot.innerHTML=`<button class="btn-ghost" onclick="pd2Close()">Закрыть</button>`
+      +`<a class="btn-add" style="text-decoration:none;display:inline-flex;align-items:center" href="${CLDOC.url}" download="${escH(name)}">Скачать PDF</a>`;
+  }catch(e){
+    const view=document.getElementById('cdoc-view');
+    if(view) view.innerHTML=`<div style="opacity:.6;font-size:13px">${escH(String(e.message||e))}</div>`;
+  }finally{ CLDOC.busy=false; }
+}
+window.renderClDocs=renderClDocs; window.clDocOpen=clDocOpen;
+
 function renderClUpdates(){
   const P=window.CLP, feed=(P&&P.feed)||[];
   if(!P || !feed.length){
@@ -28593,6 +28702,8 @@ function renderClShell(){
   const q=s=>document.querySelector('#app-cl '+s);
   const av=q('.cl-brand .av'), nm=q('.cl-brand .nm');
   const stCt=q('.nav-i[data-cm="stages"] .ct'), rpCt=q('.nav-i[data-cm="reports"] .ct'), upDot=q('.nav-i[data-cm="updates"] .dot-n');
+  const dcCt=q('.nav-i[data-cm="documents"] .ct');
+  if(dcCt){ const n=((P&&P.documents)||[]).length; dcCt.textContent=String(n); dcCt.style.display=n?'':'none'; }
   const pv=q('.cl-prog .v'), pl=q('.cl-prog .l'), pbar=q('.cl-prog .bar i');
   const hb=q('.topbar2 .pg b'), dchip=q('.topbar2 .u-chip');
   if(dchip) dchip.textContent=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
@@ -38074,12 +38185,14 @@ window.tLoadClient = async () => {
   const p = rows[0], pid = p.id;
   // 2–4) этапы + даты завершения + прогресс задач (RPC) + отчёты + история — одной параллельной волной
   //      (раньше это были 5 последовательных сетевых раундов — главный тормоз входа клиента)
-  const [rSt, rTd, rTp, rRp, rHs] = await Promise.all([
+  const [rSt, rTd, rTp, rRp, rHs, rDc] = await Promise.all([
     _safe(SB.from('project_stages').select('id,name,status,due_date,due_time,idx').eq('project_id', pid).order('idx',{ascending:true})),
     _safe(SB.from('project_stages').select('id,completed_at').eq('project_id', pid)),
     _safe(SB.rpc('client_stage_progress', { p_project: pid })),
     _safe(SB.from('reports').select('id,title,kind,payload,published_at').eq('project_id', pid).order('published_at',{ascending:false})),
-    _safe(SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id', pid).order('created_at',{ascending:false}).limit(50))
+    _safe(SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id', pid).order('created_at',{ascending:false}).limit(50)),
+    // документы, которые агентство открыло клиенту: правила базы всё равно не отдадут остальные
+    _safe(SB.from('project_documents').select('id,kind,number,title,created_at,shared_at').eq('project_id', pid).eq('client_visible', true).order('created_at',{ascending:false}))
   ]);
   let stages = (rSt && !rSt.error && rSt.data) || [];
   if (rTd && !rTd.error && rTd.data){ const m={}; rTd.data.forEach(r=>{ if(r.completed_at) m[r.id]=r.completed_at; }); stages.forEach(s=>{ s.completed_at = m[s.id]||null; }); }
@@ -38092,7 +38205,8 @@ window.tLoadClient = async () => {
     return { k, txt, tag:(h.stage_name||'—'), t:tAgo(h.created_at) }; });
   window.CLP = { id:pid, name:p.name||'', logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
     logoUrl:p.logo_url||'', svc:p.service||'', cat:p.category||'', status:p.status||'active',
-    mrr:p.mrr||0, createdAt:p.created_at||null, cl_hidden:(Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[])), allProjects:rows, stages, reports, history, feed };
+    mrr:p.mrr||0, createdAt:p.created_at||null, cl_hidden:(Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[])), allProjects:rows, stages, reports, history, feed,
+    documents:((rDc && !rDc.error && rDc.data) || []) };
 };
 
 function _bgGentleRefresh(){ try{                                                     // фон догрузился: обновляем экран, не мешая пользователю
