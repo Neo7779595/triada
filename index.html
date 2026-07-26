@@ -8791,7 +8791,7 @@ body.m-lock{overflow:hidden}
     <div class="side-top">
       <div class="cl-brand">
         <div class="av">U</div>
-        <div><div class="nm">Uzbek Doner</div><div class="on">Онлайн</div></div>
+        <div><div class="nm">DETROYD SMART</div><div class="on">Онлайн</div></div>
       </div>
     </div>
     <nav class="nav">
@@ -9791,7 +9791,7 @@ function rgbEq(a,b){return a.replace(/\s/g,'')===hex2rgb(b).replace(/\s/g,'');}
 
 /* ——— AGENCY CABINET ——— */
 let PROJECTS = [
-  {name:'Uzbek Doner',logo:'U',cat:'Фаст-фуд',svc:'SMM',pct:33,stages:'2 / 6',health:'В норме',dyn:'▲ 2 / 7д',status:'active'},
+  {name:'DETROYD SMART',logo:'D',cat:'IT компания',svc:'SMM',pct:33,stages:'2 / 6',health:'В норме',dyn:'▲ 2 / 7д',status:'active'},
   {name:'88888888',logo:'8',cat:'—',svc:'SMM',pct:50,stages:'2 / 4',health:'В норме',dyn:'▲ 2 / 7д',status:'active'},
   {name:'RESTO',logo:'R',cat:'Продакшн',svc:'PROD',pct:0,stages:'0 / 9',health:'В норме',dyn:'— 0 / 7д',status:'active'},
   {name:'Тестовый проект',logo:'Т',cat:'Кофейня',svc:'DESIGN',pct:0,stages:'0 / 4',health:'В норме',dyn:'— 0 / 7д',status:'active'},
@@ -12561,7 +12561,7 @@ function openNewProject(){
     </style>
     <div class="modal-h"><h3>Новый проект</h3><p>Карточка проекта · теги, тариф и ответственный</p></div>
     <div class="modal-b">
-      <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. Uzbek Doner"></div>
+      <div class="fld"><label>Название</label><input id="np-name" placeholder="напр. DETROYD SMART"></div>
       <div class="fld"><label>Логотип проекта</label>${avatarField('np-logo', '', '?')}</div>
       <div class="fld2">${tagCombo('np-cat','Категория (тег)',cats,'','Выбери или создай','category')}<div class="fld"><label>Ответственный</label>${selField('np-lead',leadOpts,'')}</div></div>
       <div class="fld"><label>Услуги и тарифы</label>${svcEditorHTML(false)}</div>
@@ -14761,6 +14761,25 @@ function dpOpen(id){
   if(iso){ const a=iso.split('-').map(Number); y=a[0]; m=a[1]-1; } else { y=today.getFullYear(); m=today.getMonth(); }
   _dpState[id]={y,m};
   const pop=document.createElement('div'); pop.className='dp-pop'; pop.addEventListener('click',ev=>ev.stopPropagation()); pop.innerHTML=_dpGrid(id); wrap.appendChild(pop);
+  _popFit(wrap, pop);
+}
+
+/* Календарь по умолчанию раскрывается вниз. У нижнего края окна — например,
+   у поля «Срок договора» в длинном окне нового проекта — он уходит за границу
+   экрана, и кажется, что кнопка просто не работает. Если снизу места нет,
+   раскрываем вверх, а если тесно с обеих сторон — подтягиваем прокрутку. */
+function _popFit(wrap, pop){
+  try{
+    const t=wrap.getBoundingClientRect();
+    const h=pop.offsetHeight||320;
+    const vh=window.innerHeight||document.documentElement.clientHeight;
+    const below=vh-t.bottom-12, above=t.top-12;
+    if(below<h && above>below){ pop.style.top='auto'; pop.style.bottom='calc(100% + 8px)'; }
+    const r=pop.getBoundingClientRect();
+    if(r.bottom>vh-6 || r.top<6){
+      pop.scrollIntoView({ block:'nearest', behavior:'smooth' });
+    }
+  }catch(_){ /* не критично: календарь всё равно открыт */ }
 }
 function _dpGrid(id){
   const st=_dpState[id], y=st.y, m=st.m, iso=dpVal(id), now=new Date();
@@ -14833,6 +14852,7 @@ function tpOpen(id){
   const wrap=document.getElementById('tpw-'+id); if(!wrap) return;
   const open=wrap.querySelector('.dp-pop'); _closePops(); if(open) return;
   const pop=document.createElement('div'); pop.className='dp-pop tp-pop'; pop.addEventListener('click',ev=>ev.stopPropagation()); pop.innerHTML=_tpGrid(id); wrap.appendChild(pop);
+  _popFit(wrap, pop);
 }
 function _tpSet(id,v){
   const e=document.getElementById(id); if(e) e.value=v||'';
@@ -14905,6 +14925,7 @@ function drToggle(which){
   const pop=document.createElement('div'); pop.className='dp-pop dr-pop';
   pop.addEventListener('click',ev=>ev.stopPropagation());
   pop.innerHTML=_drGrid(); w.appendChild(pop);
+  if(typeof _popFit==='function') _popFit(w, pop);
 }
 function drClose(){ const w=document.getElementById('dr-wrap-'+(window._drWhich||'team')), p=w&&w.querySelector('.dr-pop'); if(p)p.remove(); _dr.anchor=null; _dr.hover=null; }
 function _drRefresh(){ const w=document.getElementById('dr-wrap-'+(window._drWhich||'team')), p=w&&w.querySelector('.dr-pop'); if(p)p.innerHTML=_drGrid(); }
@@ -26506,10 +26527,10 @@ function saveEmp(){
 document.getElementById('e-login').addEventListener('input',e=>{document.getElementById('e-email').textContent=(e.target.value||'ivan')+'@detroyd.triada.app';});
 
 /* ——— KNOWLEDGE BASE module ——— */
-let kbProj='Uzbek Doner';                    /* ключ активного проекта: p.id в live, имя — в демо */
+let kbProj='DETROYD SMART';                    /* ключ активного проекта: p.id в live, имя — в демо */
 let KB_Q='';                                 /* строка поиска по списку проектов */
 function kbKeyOf(p){ return String((p&&(p.id!=null?p.id:p.name))||''); }
-const KB_PROJECTS=[{key:'Uzbek Doner',name:'Uzbek Doner',logo:'U',st:'active'},{key:'88888888',name:'88888888',logo:'8',st:'active'},{key:'RESTO',name:'RESTO',logo:'R',st:'active'},{key:'Тестовый проект',name:'Тестовый проект',logo:'Т',st:'active'}];
+const KB_PROJECTS=[{key:'DETROYD SMART',name:'DETROYD SMART',logo:'D',st:'active'},{key:'88888888',name:'88888888',logo:'8',st:'active'},{key:'RESTO',name:'RESTO',logo:'R',st:'active'},{key:'Тестовый проект',name:'Тестовый проект',logo:'Т',st:'active'}];
 const KB_CATS=['Контент-стратегия','Конкурентный анализ'];
 const KB_CATCOL={'Контент-стратегия':'#F0785C','Конкурентный анализ':'#37E6C8','Анализ конкурентов':'#37E6C8','Аудит профиля':'#8A8FFF','Контент-план':'#43D88C','Прочее':'#E3B567'};
 const KB_TYPES={'Miro':'#F2785C','Google Doc':'#6AA9FF','Google Sheet':'#43D88C','Figma':'#8A8FFF','Notion':'#C9CDD3','Telegram':'#37E6C8','Ссылка':'#E3B567','Другое':'#9AA1AC'};
@@ -26526,7 +26547,7 @@ function kbCatsLoad(){ if(_kbCatsLoaded) return; _kbCatsLoaded=true;
 }
 function kbCatsSave(){ try{ localStorage.setItem(kbCatsKey(), JSON.stringify({cats:KB_CATS, col:KB_CATCOL})); }catch(_e){} }
 const KB_DATA={
-  'Uzbek Doner':{'Контент-стратегия':[{t:'Контент-план · июнь',ty:'Google Sheet'},{t:'Tone of voice бренда',ty:'Google Doc'}],'Аудит профиля':[{t:'Аудит Instagram',ty:'Miro'}]},
+  'DETROYD SMART':{'Контент-стратегия':[{t:'Контент-план · июнь',ty:'Google Sheet'},{t:'Tone of voice бренда',ty:'Google Doc'}],'Аудит профиля':[{t:'Аудит Instagram',ty:'Miro'}]},
   'RESTO':{'Анализ конкурентов':[{t:'Карта конкурентов',ty:'Miro'}],'Контент-план':[{t:'Reels-сетка',ty:'Figma'}]},
   '88888888':{},
   'Тестовый проект':{'Контент-стратегия':[{t:'Бренд-гайд',ty:'Figma'}],'Аудит профиля':[{t:'Аудит профиля',ty:'Notion'}],'Анализ конкурентов':[{t:'Бенчмаркинг',ty:'Google Doc'}],'Контент-план':[{t:'План постов',ty:'Google Sheet'}]},
@@ -31828,7 +31849,7 @@ function hkPkLoad(){
 }
 function hkPkSave(){ try{ localStorage.setItem(_hkPkKey(), JSON.stringify(HK_PK)); }catch(e){} }
 /* Клавиша выдаётся один раз и держится за проектом навсегда: сначала пробуем
-   буквы из его названия (Uzbek Doner → U), потом любую свободную. */
+   буквы из его названия (DETROYD SMART → D), потом любую свободную. */
 function hkSyncKeys(){
   hkPkLoad();
   var P=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
