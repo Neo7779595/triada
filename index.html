@@ -410,6 +410,53 @@ button{font-family:inherit}
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   ЭКРАН ЗАГРУЗКИ КАБИНЕТА
+   Тот же почерк, что у заставки при переходе на Диск и в Календарь:
+   три прыгающих шарика на тёмном. Плюс знак, строка о том, что сейчас
+   происходит, и полоса, которая не врёт — шаги двигают её по факту.
+   ══════════════════════════════════════════════════════════════════ */
+.bootld{position:fixed;inset:0;z-index:900;display:none;place-items:center;text-align:center;padding:24px;
+  background:radial-gradient(120% 90% at 50% 0%,#0d1512,#06090b 62%),#06090b;
+  color:var(--txt,#e5edea);font-family:var(--font,'Inter',system-ui,sans-serif);
+  opacity:1;transition:opacity .42s cubic-bezier(.22,1,.36,1)}
+.bootld.on{display:grid}
+.bootld.out{opacity:0;pointer-events:none}
+.bootld-in{max-width:340px;animation:bootIn .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes bootIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* Знак набран градиентом по тексту. Двигать при этом сами буквы нельзя:
+   трансформация уводит глиф из области отсечения, и надпись пропадает —
+   поэтому оживляем сам градиент, а буквы стоят на месте. */
+.bootld-mark{display:flex;justify-content:center;gap:.24em;font-size:26px;font-weight:800;letter-spacing:.16em;line-height:1;
+  background:linear-gradient(100deg,#dfe9e6 8%,#fff 26%,#37E6C8 58%,#cfe6df 86%,#dfe9e6 100%);background-size:230% auto;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+  animation:bootShine 5.5s linear infinite}
+.bootld-mark b{font-weight:800}
+@keyframes bootShine{from{background-position:0% 50%}to{background-position:230% 50%}}
+.bootld-sub{margin-top:9px;font-size:9.5px;font-weight:600;letter-spacing:.42em;text-indent:.42em;color:rgba(55,230,200,.72);
+  font-family:var(--mono,'JetBrains Mono',ui-monospace,monospace)}
+.bootld-ld{height:72px;display:grid;place-items:center;margin:18px 0 4px}
+.bootld-ti{width:60px;height:30px;position:relative;transform:scale(1.55)}
+.bootld-ti .c{width:8px;height:8px;position:absolute;border-radius:50%;background:#37E6C8;box-shadow:0 0 10px rgba(55,230,200,.5);left:15%;transform-origin:50%;animation:bootJump .5s alternate infinite ease}
+.bootld-ti .c:nth-child(2){left:45%;animation-delay:.2s}
+.bootld-ti .c:nth-child(3){left:auto;right:15%;animation-delay:.3s}
+.bootld-ti .s{width:5px;height:4px;border-radius:50%;background:rgba(55,230,200,.28);position:absolute;top:30px;transform-origin:50%;filter:blur(1px);left:15%;animation:bootFlat .5s alternate infinite ease}
+.bootld-ti .s:nth-child(5){left:45%;animation-delay:.2s}
+.bootld-ti .s:nth-child(6){left:auto;right:15%;animation-delay:.3s}
+@keyframes bootJump{0%{top:20px;height:5px;border-radius:50px 50px 25px 25px;transform:scaleX(1.7)}40%{height:8px;border-radius:50%;transform:scaleX(1)}100%{top:0}}
+@keyframes bootFlat{0%{transform:scaleX(1.5)}40%{transform:scaleX(1);opacity:.7}100%{transform:scaleX(.2);opacity:.4}}
+.bootld-t{font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--txt,#e5edea);margin-bottom:8px;transition:opacity .25s var(--ease,ease)}
+.bootld-s{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8b959f;min-height:14px;
+  font-family:var(--mono,'JetBrains Mono',ui-monospace,monospace);transition:opacity .25s var(--ease,ease)}
+.bootld-fade{opacity:0}
+.bootld-bar{margin-top:20px;height:2px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
+.bootld-bar>i{display:block;height:100%;width:6%;border-radius:2px;background:linear-gradient(90deg,#37E6C8,#8A8FFF);
+  box-shadow:0 0 10px rgba(55,230,200,.4);transition:width .55s cubic-bezier(.22,1,.36,1)}
+@media(prefers-reduced-motion:reduce){
+  .bootld-ti .c,.bootld-ti .s{animation-duration:1.2s}
+  .bootld-in,.bootld-mark{animation:none}
+}
+
+/* ══════════════════════════════════════════════════════════════════
    ОКНО РЕГИСТРАЦИИ АГЕНТСТВА — мастер в стиле входа, 3 шага.
    Использует те же .lg-bg/.lg-grid/.lg-aurora/.lg-particles что и логин.
    ══════════════════════════════════════════════════════════════════ */
@@ -8776,6 +8823,44 @@ body.m-lock{overflow:hidden}
 </head>
 <body>
 
+<!-- ============ ЭКРАН ЗАГРУЗКИ КАБИНЕТА ============
+     Стоит выше всего и закрывает собой и вход, и кабинет. Показывается
+     в двух случаях: человек нажал «Войти» и страница открыта заново, когда
+     сессия ещё жива. Во втором случае включается синхронно, до первой
+     отрисовки, — поэтому экран входа больше не мелькает при обновлении. -->
+<div class="bootld" id="bootld" role="status" aria-live="polite">
+  <div class="bootld-in">
+    <div class="bootld-mark" aria-hidden="true"><b>D</b><b>E</b><b>T</b><b>R</b><b>O</b><b>Y</b><b>D</b></div>
+    <div class="bootld-sub" aria-hidden="true">SMART SYSTEM</div>
+    <div class="bootld-ld" aria-hidden="true"><div class="bootld-ti">
+      <span class="c"></span><span class="c"></span><span class="c"></span>
+      <span class="s"></span><span class="s"></span><span class="s"></span>
+    </div></div>
+    <div class="bootld-t" id="bootld-t">Открываем кабинет</div>
+    <div class="bootld-s" id="bootld-s">Проверяем доступ</div>
+    <div class="bootld-bar"><i id="bootld-bar"></i></div>
+  </div>
+</div>
+<script>
+/* Сессия лежит в localStorage — узнать о ней можно не дожидаясь сети.
+   Если она есть, включаем экран загрузки прямо здесь, до отрисовки входа. */
+(function(){
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(/^sb-.+-auth-token$/.test(k||'')){
+        var v=localStorage.getItem(k);
+        if(v && v.length>24){
+          var el=document.getElementById('bootld');
+          if(el){ el.classList.add('on'); window.__bootPending=1; }
+          break;
+        }
+      }
+    }
+  }catch(_e){}
+})();
+</script>
+
 <!-- ============ ОКНО 1 · ВХОД ============ -->
 <section id="page-login">
   <div class="lg-bg" aria-hidden="true">
@@ -9536,6 +9621,62 @@ function _initCounters(){
 }
 
 function enter(role){ document.getElementById('page-login').classList.add('hidden'); document.getElementById('app').classList.add('on'); goGeneral(); requestAnimationFrame(()=>animateCounters(document.querySelector('#app .side'))); }
+/* ═══════════ ЭКРАН ЗАГРУЗКИ КАБИНЕТА ═══════════
+   Кабинет показываем один раз и уже собранным. Пока идут запросы, человек
+   смотрит на заставку с честной строкой о том, что происходит, — вместо
+   того чтобы наблюдать, как экран трижды перерисовывается под ним. */
+const BOOTLD={ t0:0, hideT:null };
+function bootShow(title,sub){
+  const el=document.getElementById('bootld'); if(!el) return;
+  if(BOOTLD.hideT){ clearTimeout(BOOTLD.hideT); BOOTLD.hideT=null; }
+  BOOTLD.t0=BOOTLD.t0||Date.now();
+  el.classList.remove('out'); el.classList.add('on');
+  bootStep(title,sub,6);
+}
+function bootStep(title,sub,pct){
+  const t=document.getElementById('bootld-t'), s=document.getElementById('bootld-s'), b=document.getElementById('bootld-bar');
+  if(t&&title&&t.textContent!==title){ t.classList.add('bootld-fade');
+    setTimeout(function(){ t.textContent=title; t.classList.remove('bootld-fade'); },160); }
+  if(s&&sub!=null&&s.textContent!==sub){ s.classList.add('bootld-fade');
+    setTimeout(function(){ s.textContent=sub; s.classList.remove('bootld-fade'); },160); }
+  if(b&&pct!=null) b.style.width=Math.max(0,Math.min(100,pct))+'%';
+}
+/* Прячем не раньше, чем через 620 мс после появления: мигнувшая и тут же
+   исчезнувшая заставка раздражает сильнее, чем её отсутствие. */
+function bootHide(){
+  const el=document.getElementById('bootld'); if(!el||!el.classList.contains('on')) return;
+  window.__bootPending=0;
+  bootStep(null,null,100);
+  const wait=Math.max(0, 620-(Date.now()-(BOOTLD.t0||Date.now())));
+  if(BOOTLD.hideT) clearTimeout(BOOTLD.hideT);
+  BOOTLD.hideT=setTimeout(function(){
+    el.classList.add('out');
+    BOOTLD.hideT=setTimeout(function(){ el.classList.remove('on','out'); BOOTLD.t0=0; BOOTLD.hideT=null; }, 440);
+  }, wait);
+}
+window.bootShow=bootShow; window.bootStep=bootStep; window.bootHide=bootHide;
+/* Страховка. Заставка включается синхронно, ещё до того как поднимется
+   Supabase, — и если тот вообще не поднимется, висеть ей было бы вечно.
+   Двадцати секунд хватает даже на медленной связи; дальше показываем вход. */
+if(window.__bootPending){
+  let _bootTicks=0;
+  const _bootWatch=setInterval(function(){
+    _bootTicks++;
+    const el=document.getElementById('bootld');
+    if(!el || !el.classList.contains('on')){ clearInterval(_bootWatch); return; }
+    if(window.__SB_FAIL){
+      clearInterval(_bootWatch); bootHide();
+      if(typeof toast==='function') toast('Не удалось загрузить библиотеку сервера — обновите страницу');
+      return;
+    }
+    if(_bootTicks>40){
+      clearInterval(_bootWatch);
+      const open=(typeof _cabOpen==='function') && _cabOpen();
+      if(!open){ bootHide(); if(typeof toast==='function') toast('Не удалось восстановить сессию — войдите заново'); }
+      else bootHide();
+    }
+  }, 500);
+}
 async function doLogin(){
   if(window.LIVE&&window.tLogin) return window.tLogin();
   if(window.__SB_FAIL){ toast('Не удалось загрузить библиотеку сервера — проверьте интернет и обновите страницу'); return; }
@@ -10598,7 +10739,9 @@ async function _agDemoLogin(btnEl){
 
        Сессия сохранена в localStorage через signInWithPassword — после reload
        supabase-js её подхватит и routeByProfile отработает как обычный логин. */
-    if(typeof toast==='function') toast('Входим в демо-кабинет DETROYD…');
+    /* Заставку поднимаем до перезагрузки: иначе на долю секунды мелькает
+       страница входа, и переход выглядит как сбой, а не как переход. */
+    if(typeof bootShow==='function') bootShow('Открываем демо-кабинет','Готовим данные DETROYD');
     setTimeout(() => { location.reload(); }, 120);
   }catch(e){
     console.error('_agDemoLogin', e);
@@ -40325,19 +40468,29 @@ function subscribeRealtime(){
   }catch(e){ console.warn('realtime', e); }
 }
 
-async function routeByProfile(userArg){
+async function routeByProfile(userArg, opts){
+  /* boot=true — вход или открытие страницы с живой сессией. В этом режиме
+     кабинет не показываем, пока не догрузится всё: ни фоновых дозагрузок,
+     ни перерисовок под руками. Пока идёт загрузка, на экране заставка. */
+  const boot = !!(opts && opts.boot);
+  const say = (t,s,p)=>{ if(boot && typeof bootStep==='function') bootStep(t,s,p); };
   let user = userArg;
   if (!user){ const { data:{ session } } = await SB.auth.getSession(); user = session && session.user; }   // локально, без сетевого getUser
-  if (!user) return;
+  if (!user){ if(boot && typeof bootHide==='function') bootHide(); return; }
+  say('Открываем кабинет','Проверяем доступ',14);
   const { data } = await SB.from('profiles').select('*').eq('id', user.id).single();
-  if (data && data.archived_at){ toast('Доступ к системе отозван администратором'); try{ await SB.auth.signOut(); }catch(_){} window.ME=null; ME=null; return; }
+  if (data && data.archived_at){ toast('Доступ к системе отозван администратором'); try{ await SB.auth.signOut(); }catch(_){} window.ME=null; ME=null; if(boot && typeof bootHide==='function') bootHide(); return; }
   ME = data || { role:'member' };
   window.ME = ME;                    // ME — module-scope let, на window её не было: из-за этого
                                      // _skipDirect всегда был false (лишний 403 у сотрудников),
                                      // а created_by у задач не записывался вообще.
   try{ if(ME&&ME.id) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){}                      // отметка активности через безопасную RPC (только своя строка, только last_seen_at)
   if(!window._hbOn){ window._hbOn=true; setInterval(()=>{ try{ if(ME&&ME.id&&SB) SB.rpc('touch_last_seen').then(()=>{},()=>{}); }catch(_){} }, 45000); }
-  const _jobs=[ window.tLoadAll(ME.role, {fast:true}) ];                              // ядро данных — параллельно с инфо агентства
+  say('Собираем ваш кабинет', ME.role==='client'?'Загружаем данные проекта':'Загружаем проекты и команду', 34);
+  /* При обычном переходе грузим ядро и показываем кабинет сразу, остальное —
+     в фоне. При входе (boot) ждём всё: лучше на секунду дольше заставка,
+     чем кабинет, который перестраивается уже после открытия. */
+  const _jobs=[ window.tLoadAll(ME.role, boot?undefined:{fast:true}) ];               // ядро данных — параллельно с инфо агентства
   if(window.tLoadPlatformSettings) _jobs.push(window.tLoadPlatformSettings().catch(()=>{}));   // pay_url и настройки платформы — доступны всем ролям (RLS: read authenticated)
   if (ME.agency_id){ _jobs.push(
     SB.from('agencies').select('slug,accent,name,logo_url,plan,paid_until,mrr,tg_team_code,tg_team_chat_id,tg_banner_url').eq('id', ME.agency_id).single()
@@ -40353,10 +40506,15 @@ async function routeByProfile(userArg){
     );
   }
   await Promise.all(_jobs);
+  say('Почти готово','Подключаем живые обновления',82);
   if (!window._rtOn){ window._rtOn = true; subscribeRealtime(); }
+  say('Кабинет готов', ME.agencyName?String(ME.agencyName).toUpperCase():'Добро пожаловать', 96);
   if (ME.role === 'superadmin') enter('general');
   else if (ME.role === 'client') enterClient();
   else enterAgency();
+  /* Прячем заставку не в тот же кадр, что и отрисовку кабинета: даём экрану
+     нарисоваться под ней, иначе первый кадр всё равно получается рваным. */
+  if(boot && typeof bootHide==='function') requestAnimationFrame(()=>requestAnimationFrame(bootHide));
   if(typeof _tgDeepLink==='function') setTimeout(_tgDeepLink, 500);
 }
 
@@ -40366,8 +40524,12 @@ window.tLogin = async () => {
   if (!email || !pass){ toast('Введи email и пароль'); return; }
   const btn=document.getElementById('lg-btn');
   if(btn&&btn.disabled) return;                                                       // защита от двойного клика
-  const _btnTxt=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.style.opacity='.7'; btn.textContent='Входим…'; }
-  const _btnBack=()=>{ if(btn){ btn.disabled=false; btn.style.opacity=''; btn.textContent=_btnTxt||'Войти'; } };
+  const _btnLbl=btn?btn.querySelector('span'):null;
+  const _btnTxt=_btnLbl?_btnLbl.textContent:'';
+  if(btn){ btn.disabled=true; btn.style.opacity='.7'; if(_btnLbl) _btnLbl.textContent='Входим…'; }
+  const _btnBack=()=>{ if(btn){ btn.disabled=false; btn.style.opacity=''; if(_btnLbl) _btnLbl.textContent=_btnTxt||'Войти'; } };
+  const _fail=(m)=>{ if(typeof bootHide==='function') bootHide(); toast(m); _btnBack(); };
+  if(typeof bootShow==='function') bootShow('Открываем кабинет','Проверяем логин и пароль');
   // ⬤ Чистим сессию перед логином — фикс интермиттент "Invalid login credentials",
   //   когда старый истёкший/битый токен в localStorage конфликтует с новым sign-in.
   try{ await SB.auth.signOut({ scope: 'local' }); }catch(_e){}
@@ -40379,10 +40541,10 @@ window.tLogin = async () => {
       await new Promise(r => setTimeout(r, 450));
       ({ data, error } = await tryLogin());
     }
-    if (error){ toast('Вход не удался: ' + error.message); _btnBack(); return; }
-    await routeByProfile(data && data.user);                                          // user уже в ответе — без лишнего запроса getUser
+    if (error){ _fail('Вход не удался: ' + error.message); return; }
+    await routeByProfile(data && data.user, { boot:true });                           // user уже в ответе — без лишнего запроса getUser
     _btnBack();
-  }catch(e){ toast('Вход не удался: '+(e.message||e)); _btnBack(); }
+  }catch(e){ _fail('Вход не удался: '+(e.message||e)); }
 };
 window.tLogout = async () => {
   try{ window.ME = null; }catch(_e){} if (SB) await SB.auth.signOut(); };
@@ -40648,7 +40810,21 @@ window.tToolDel = async (id) => {
 if (window.LIVE){
   const lg = document.getElementById('lg-login'); if (lg) lg.setAttribute('placeholder','Email');
   if (window.tLoadLoginLinks) window.tLoadLoginLinks();                             // «О нас» / «Консультация» — до логина, через login_links()
-  (async () => { const ses = (await SB.auth.getSession()).data.session; if (ses) await routeByProfile(ses.user); })();
+  /* Открыли страницу заново. Если сессия жива — заставка уже включена
+     синхронным скриптом в начале документа, экран входа не мелькнул.
+     Если сессии нет — гасим заставку и показываем вход. */
+  (async () => {
+    try{
+      const ses = (await SB.auth.getSession()).data.session;
+      if (ses){
+        if(typeof bootShow==='function') bootShow('Открываем кабинет','Восстанавливаем сессию');
+        await routeByProfile(ses.user, { boot:true });
+      } else if(typeof bootHide==='function') bootHide();
+    }catch(e){
+      console.warn('boot', e);
+      if(typeof bootHide==='function') bootHide();
+    }
+  })();
 }
 
 /* ═══════════ KPI v3 · 3 категории · Точка А + Цели+RPM + Статистика ═══════════
