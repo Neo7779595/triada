@@ -4436,11 +4436,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* Спрашиваем прямо внутри доски, а не системным окном браузера: системное
    в полноэкранном режиме либо не видно, либо оно из него выкидывает. */
 .pd-bdask{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:ovFade .18s ease both}
-.pd-bdask-c{width:min(430px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line-2);border-radius:16px;padding:22px 24px;box-shadow:0 24px 60px -20px rgba(0,0,0,.8);animation:rise .26s var(--spring)}
-.pd-bdask-c .t{font-size:16px;font-weight:650;color:var(--txt);letter-spacing:-.01em}
-.pd-bdask-c .d{font-size:13.5px;line-height:1.62;color:var(--txt-2);margin-top:8px}
-.pd-bdask-c .b{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.pd-bdask-c{width:min(540px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line-2);border-radius:18px;padding:26px 26px 18px;box-shadow:0 30px 72px -24px rgba(0,0,0,.85);animation:rise .26s var(--spring)}
+.pd-bdask-c .t{font-size:17px;font-weight:650;color:var(--txt);letter-spacing:-.015em}
+.pd-bdask-c .d{font-size:13.5px;line-height:1.62;color:var(--txt-2);margin-top:9px}
+/* Кнопки одной строкой: отказ слева, действия справа — глаз читает
+   слева направо и последним видит то, ради чего окно открылось. */
+.pd-bdask-c .b{display:flex;gap:8px;flex-wrap:nowrap;align-items:center;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.pd-bdask-c .b button{white-space:nowrap;height:38px;padding:0 16px;border-radius:10px;font-size:13.5px;line-height:1}
+.pd-bdask-cancel{margin-right:auto}
 .pd-bdask-x{color:var(--neg)!important;border-color:rgba(240,120,92,.35)!important}
+.pd-bdask-x:hover{background:rgba(240,120,92,.1)!important}
+@media(max-width:600px){
+  .pd-bdask-c{padding:22px 20px 16px}
+  .pd-bdask-c .b{flex-wrap:wrap}
+  .pd-bdask-c .b button{flex:1 1 100%}
+  .pd-bdask-cancel{margin-right:0;order:3}
+}
 /* Во весь экран доска остаётся одна: панель превращается в плавающую
    стеклянную пилюлю снизу, притушенную до наведения — она не крадёт
    ни пикселя рабочего поля и не спорит с панелями самого Miro. */
@@ -28307,7 +28318,9 @@ function _pdBoardAsk(opts){
   const row=box.querySelector('.b');
   (opts.actions||[]).forEach(function(a){
     const btn=document.createElement('button');
-    btn.className=a.kind==='main'?'btn-add':(a.kind==='danger'?'btn-ghost pd-bdask-x':'btn-ghost');
+    btn.className=a.kind==='main'?'btn-add'
+      :a.kind==='danger'?'btn-ghost pd-bdask-x'
+      :a.kind==='cancel'?'btn-ghost pd-bdask-cancel':'btn-ghost';
     btn.textContent=a.label;
     btn.onclick=function(){ box.remove(); if(a.fn) a.fn(); };
     row.appendChild(btn);
@@ -28325,9 +28338,9 @@ function pdBoardOpen(){
     title:'Открыть доску в Miro?',
     text:'Доска откроется в новой вкладке. Чтобы не выходить из системы, удобнее полноэкранный режим — доска займёт весь монитор, а вернуться можно клавишей Esc.',
     actions:[
-      { label:'Во весь экран здесь', kind:'main', fn:pdBoardFull },
+      { label:'Отмена', kind:'cancel' },
       { label:'Открыть в Miro', fn:function(){ window.open(link,'_blank','noopener'); } },
-      { label:'Отмена' },
+      { label:'Во весь экран', kind:'main', fn:pdBoardFull },
     ],
   });
 }
@@ -28438,8 +28451,8 @@ function pdBoardUnlink(){
     title:'Отвязать доску от проекта?',
     text:'Сама доска со всем содержимым останется в Miro — из проекта пропадёт только ссылка на неё. Если доска была открыта клиенту, он её больше не увидит.',
     actions:[
+      { label:'Отмена', kind:'cancel' },
       { label:'Отвязать', kind:'danger', fn:_pdBoardUnlinkGo },
-      { label:'Отмена' },
     ],
   });
 }
