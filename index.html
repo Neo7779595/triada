@@ -769,6 +769,11 @@ button{font-family:inherit}
 }
 /* ===== Клиентский кабинет · тёплый, спокойный, простой для восприятия (scoped) ===== */
 #app-cl .content{padding:30px 34px}
+/* Раздел «Стратегии» у клиента — доска во весь экран, без полей и заголовка. */
+#app-cl #content-cl.cl-bd-full{padding:0;overflow:hidden;display:flex;flex-direction:column}
+#app-cl #content-cl.cl-bd-full>*{animation:none}
+#app-cl .cl-bdwrap{flex:1 1 auto;min-height:0;display:flex;background:var(--bg)}
+#app-cl .cl-bdwrap iframe{flex:1 1 auto;width:100%;min-height:0;border:0;display:block}
 /* приветствие — крупнее и теплее */
 #app-cl .topbar2{height:76px}
 #app-cl .topbar2 .pg{font-size:12.5px}
@@ -12226,7 +12231,7 @@ function projSettings(i){
       </div></div>
       <div class="fld"><label>Видимость для клиента <small style="color:var(--txt-3);font-weight:400;margin-left:6px">выключите модули, которые не нужно показывать</small></label>
         <div class="cl-vis" id="pj-clvis">
-          ${[['stages','Этапы'],['reports','Отчёты'],['content','Контент-план'],['documents','Документы'],['passport','Паспорт'],['updates','Обновления']].map(function(m){var k=m[0],l=m[1];var _h=(p&&p.cl_hidden)||[];var on=_h.indexOf(k)<0;return '<button type="button" class="cl-vis-tog '+(on?'on':'')+'" data-mk="'+k+'" onclick="pjToggleClVis(this)"><span class="cvt-ic"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">'+(on?'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>':'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M2 2l20 20\"/>')+'</svg></span><span class="cvt-l">'+l+'</span></button>';}).join('')}
+          ${[['stages','Этапы'],['reports','Отчёты'],['content','Контент-план'],['board','Стратегии'],['documents','Документы'],['passport','Паспорт'],['updates','Обновления']].map(function(m){var k=m[0],l=m[1];var _h=(p&&p.cl_hidden)||[];var on=_h.indexOf(k)<0;return '<button type="button" class="cl-vis-tog '+(on?'on':'')+'" data-mk="'+k+'" onclick="pjToggleClVis(this)"><span class="cvt-ic"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">'+(on?'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>':'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M2 2l20 20\"/>')+'</svg></span><span class="cvt-l">'+l+'</span></button>';}).join('')}
         </div>
       </div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
@@ -29127,6 +29132,8 @@ function clNav(m){
      этой метки поздний ответ прежнего раздела перерисовывал уже другой экран. */
   window.CL_M=m;
   document.querySelectorAll('#app-cl .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.cm===m));
+  /* Доска разворачивается во весь раздел — остальным разделам поля нужны. */
+  { const _cc=document.getElementById('content-cl'); if(_cc) _cc.classList.toggle('cl-bd-full', m==='board' && !!(window.CLP && window.CLP.board)); }
   if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else if(m==='documents') renderClDocs(); else if(m==='board') renderClBoard(); else if(m==='passport') renderClPassport(); else renderClUpdates();
 }
 function _histFeedX(items, proj){
@@ -29492,15 +29499,10 @@ function renderClBoard(){
     </div>`;
     return;
   }
+  /* Доска занимает весь экран раздела: заголовок и описание тут только
+     мешали — клиент и так знает, в каком проекте находится. */
   const src='https://miro.com/app/live-embed/'+encodeURIComponent(String(b.board_id||''))+'/?autoplay=true&embedMode=view_only_without_ui';
-  host.innerHTML=`<div class="cdoc-hero">
-      <div><div class="eyebrow">Стратегии</div>
-        <h2>${escH(b.name||'Доска проекта')}</h2>
-        <p>Рабочая доска проекта${P&&P.name?' «'+escH(P.name)+'»':''}: схемы, раскадровки и макеты. Открывается на просмотр — вносить правки может только агентство.</p></div>
-    </div>
-    <div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel);margin-top:14px">
-      <iframe src="${escH(src)}" style="width:100%;height:min(72vh,720px);border:0;display:block" allowfullscreen loading="lazy"></iframe>
-    </div>`;
+  host.innerHTML=`<div class="cl-bdwrap"><iframe src="${escH(src)}" allowfullscreen loading="lazy"></iframe></div>`;
 }
 
 /* Собранный PDF держим в памяти вкладки: повторное открытие мгновенное.
@@ -39105,6 +39107,12 @@ window.tLoadClient = async () => {
            : (q2 && !q2.error && q2.data && q2.data.length) ? q2.data : null;
   if (!rows || !rows.length){ window.CLP = null; return; }
   const p = rows[0], pid = p.id;
+  /* Модули, выключенные в «Видимости для клиента». Скрытый модуль не просто
+     убирается из меню — мы за его данными и не ходим. На стороне базы стоит
+     то же правило, так что скрытое недоступно и в обход интерфейса. */
+  const _hid = Array.isArray(p.cl_hidden) ? p.cl_hidden
+    : (typeof p.cl_hidden==='string' ? (function(){ try{ return JSON.parse(p.cl_hidden)||[]; }catch(_){ return []; } })() : []);
+  const _shown = k => _hid.indexOf(k) < 0;
   // 2–4) этапы + даты завершения + прогресс задач (RPC) + отчёты + история — одной параллельной волной
   //      (раньше это были 5 последовательных сетевых раундов — главный тормоз входа клиента)
   const [rSt, rTd, rTp, rRp, rHs, rDc, rMb] = await Promise.all([
@@ -39114,9 +39122,13 @@ window.tLoadClient = async () => {
     _safe(SB.from('reports').select('id,title,kind,payload,published_at').eq('project_id', pid).order('published_at',{ascending:false})),
     _safe(SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id', pid).order('created_at',{ascending:false}).limit(50)),
     // документы, которые агентство открыло клиенту: правила базы всё равно не отдадут остальные
-    _safe(SB.from('project_documents').select('id,kind,number,title,created_at,shared_at').eq('project_id', pid).eq('client_visible', true).order('created_at',{ascending:false})),
+    _shown('documents')
+      ? _safe(SB.from('project_documents').select('id,kind,number,title,created_at,shared_at').eq('project_id', pid).eq('client_visible', true).order('created_at',{ascending:false}))
+      : Promise.resolve(null),
     // доска Miro — только если агентство включило показ; закрытую правила базы и не отдадут
-    _safe(SB.from('miro_boards').select('board_id,name,client_visible').eq('project_id', pid).eq('client_visible', true).limit(1))
+    _shown('board')
+      ? _safe(SB.from('miro_boards').select('board_id,name,client_visible').eq('project_id', pid).eq('client_visible', true).limit(1))
+      : Promise.resolve(null)
   ]);
   let stages = (rSt && !rSt.error && rSt.data) || [];
   if (rTd && !rTd.error && rTd.data){ const m={}; rTd.data.forEach(r=>{ if(r.completed_at) m[r.id]=r.completed_at; }); stages.forEach(s=>{ s.completed_at = m[s.id]||null; }); }
