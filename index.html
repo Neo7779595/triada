@@ -27215,6 +27215,19 @@ function _toolsPaint(){
    интерфейс читает представление google_status, где секретов нет вовсе. */
 const GI = { google:null, loading:false, projects:[], busy:'' };
 
+/* Разрешения, без которых интеграция работает наполовину. Сравниваем с тем, что
+   реально выдал Google: если подключались до того, как список расширился, часть
+   действий молча падает — честнее прямо попросить обновить доступ. */
+const GI_SCOPES = [
+  ['https://www.googleapis.com/auth/calendar.app.created', 'календари проектов'],
+  ['https://www.googleapis.com/auth/calendar.acls',        'доступ к календарю для команды'],
+  ['https://www.googleapis.com/auth/drive.file',           'папки проектов'],
+];
+function _giMissingScopes(g){
+  const have = (g && Array.isArray(g.scopes)) ? g.scopes : [];
+  return GI_SCOPES.filter(s => have.indexOf(s[0]) < 0).map(s => s[1]);
+}
+
 async function _giFetch(fn, params, body){
   if(!(window.LIVE && window.SB)) throw new Error('Интеграции работают только в онлайн-режиме');
   const { data:{ session } } = await SB.auth.getSession();
@@ -27394,6 +27407,15 @@ function _giAuthUser(){
   const me = (window.tMe && window.tMe()) || null;
   return (me && me.google_email) || (GI.google && GI.google.google_email) || '';
 }
+/* Google отказал в выдаче доступа — почти всегда потому, что аккаунт агентства
+   подключали до того, как список разрешений расширился. Говорим прямо, что делать. */
+function _giProblemHint(problems){
+  if(!problems || !problems.length) return;
+  toast(problems.some(t => /календар/i.test(String(t)))
+    ? 'Календарь команде не открылся — владельцу нужно нажать «Обновить доступ» в «Интеграциях»'
+    : 'Часть доступов не выдалась — проверьте раздел «Интеграции»');
+}
+
 function _giWithUser(url){
   const who = _giAuthUser();
   if(!who) return url;
@@ -27427,12 +27449,19 @@ async function pdOpenCalendar(){
     /* Если календарь уже заведён, ссылку отдаёт база — это доли секунды.
        Открываем сразу, а сроки досинхронизируем в фоне: ждать по пять секунд
        ради того, что и так откроется, человеку незачем. */
-    const quick = await _giFetch('google-cal', { action:'calendar_link', project_id: p.id });
+    /* Заодно раздаём доступы: человек может быть в команде, но ещё без прав —
+       тогда Google встретит его словами «у вас нет доступа». Делаем это до
+       перехода, а не после, и обе проверки идут параллельно. */
+    const [quick, acc] = await Promise.all([
+      _giFetch('google-cal', { action:'calendar_link', project_id: p.id }),
+      _giFetch('google-drive', { action:'grant', project_id: p.id }).catch(function(){ return null; }),
+    ]);
     if(quick.status===503 || (quick.data && quick.data.error === 'not_configured')){
       if(tab) tab.close();
       toast('Google ещё не подключён — раздел «Интеграции»');
       return;
     }
+    if(acc && acc.data) _giProblemHint(acc.data.problems);
     if(quick.data && quick.data.connected && quick.data.subscribe){
       go(quick.data.subscribe);
       _giFetch('google-cal', { action:'sync_project' }, { project_id: p.id })
@@ -27490,6 +27519,7 @@ async function pdOpenDrive(){
       return;
     }
     if(quick.data && quick.data.exists && quick.data.link){
+      _giProblemHint(quick.data.problems);
       go(quick.data.link);
       _giFetch('google-drive', { action:'ensure' }, { project_id: p.id })
         .then(r => { const m = r && r.data ? sum(r.data) : ''; if(m) toast(m); })
@@ -27613,7 +27643,13 @@ function giPaint(){
         <div style="opacity:.7;font-size:13px;margin-top:6px">${escH(g.google_email||'аккаунт Google')}</div>
         <div style="opacity:.45;font-size:12px;margin-top:3px">${escH(sync)}${g.connected_by_name?(' · подключил '+escH(g.connected_by_name)):''}</div>
         ${broken&&g.last_error?`<div style="margin-top:10px;font-size:12.5px;color:var(--neg);opacity:.9">${escH(g.last_error)}</div>`:''}
+        ${(!broken && _giMissingScopes(g).length) ? `
+        <div style="margin-top:12px;padding:12px 14px;border:1px solid rgba(227,181,103,.3);background:rgba(227,181,103,.07);border-radius:10px;font-size:12.5px;line-height:1.6">
+          <b style="color:var(--warn);font-weight:600">Не хватает разрешений:</b> ${escH(_giMissingScopes(g).join(', '))}.
+          ${owner?'Нажмите «Обновить доступ» — Google спросит согласие ещё раз, подключение не потеряется.':'Попросите владельца агентства обновить доступ в этом разделе.'}
+        </div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          ${(owner && !broken && _giMissingScopes(g).length)?'<button class="btn-add" onclick="giConnect()" id="gi-connect">Обновить доступ</button>':''}
           <button class="btn-add" onclick="giSyncAll()" id="gi-sync">Синхронизировать календари</button>
           ${owner?'<button class="btn-ghost" onclick="giDriveAll()" id="gi-drive">Создать папки проектов</button>':''}
           ${owner&&broken?'<button class="btn-ghost" onclick="giConnect()">Переподключить</button>':''}
