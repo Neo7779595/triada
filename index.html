@@ -8831,7 +8831,7 @@ body.m-lock{overflow:hidden}
         <div class="nav-gh"><i></i>Работа</div>
         <div class="nav-i on" data-m="projects" data-tt="Проекты" onclick="agNav('projects')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 21h8"/></svg><span class="lbl">Проекты</span><span class="ct skel" id="ag-proj-ct"></span></div>
         <div class="nav-i" data-m="deadlines" data-tt="Дедлайны" onclick="agNav('deadlines')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span class="lbl">Дедлайны</span><span class="ct" id="ag-dl-ct" style="display:none"></span></div>
-        <div class="nav-i" data-m="calendar" data-tt="Расписание" onclick="agNav('calendar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4M8 13h3M8 17h6"/></svg><span class="lbl">Расписание</span></div>
+        <div class="nav-i" data-m="calendar" data-tt="Расписание" onclick="agNav('calendar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4M8 13h3M8 17h6"/></svg><span class="lbl">Расписание</span><span class="ct" id="ag-cal-ct" style="display:none"></span></div>
         <div class="nav-i" data-m="overview" data-tt="Сводка" onclick="agNav('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="lbl">Сводка</span></div>
       </div>
       <div class="nav-group">
@@ -32421,6 +32421,43 @@ function _sideMoveThumb(){
   requestAnimationFrame(function(){ thumb.classList.add('ready'); });
 }
 window.addEventListener('resize',function(){ clearTimeout(window._sideRR); window._sideRR=setTimeout(_sideMoveThumb,140); });
+/* ─── Счётчик расписания ───
+   Показываем то, что человеку ещё предстоит сегодня, а не всё, что было.
+   Кого что касается:
+     владелец, директор — все события агентства за сегодня;
+     проект-менеджер    — события проектов в его зоне доступа;
+     сотрудник          — только те, где он отмечен участником.
+   Зона доступа уже применена при загрузке (tLoadBookings), поэтому здесь
+   остаётся добавить участие для рядового сотрудника.
+   Прошедшее не считаем: как только событие закончилось, цифра уменьшается —
+   счётчик пересчитывается каждые 45 секунд вместе с остальными. */
+function agScheduleTodayCount(){
+  const list=Array.isArray(window.BOOKINGS)?window.BOOKINGS:[];
+  if(!list.length) return 0;
+  const now=Date.now();
+  const d0=new Date(); d0.setHours(0,0,0,0);
+  const dayStart=d0.getTime(), dayEnd=dayStart+86400000;
+  const me=(window.tMe&&window.tMe())||null;
+  const mid=me?String(me.id||me._id||''):'';
+  /* Рядовой сотрудник — это member без отметок «директор» и «проект-менеджер». */
+  const onlyMine=!!(me && me.role==='member' && !me.is_director && !me.is_pm);
+  let n=0;
+  for(const b of list){
+    if(!b) continue;
+    if(b.status==='cancelled'||b.status==='done') continue;
+    /* Событие на весь день занимает свои сутки целиком, даже если в базе
+       у него одинаковые начало и конец. */
+    let s=b.startsAt, e=b.endsAt||b.startsAt;
+    if(b.allDay){ const sd=new Date(b.startsAt); sd.setHours(0,0,0,0); s=sd.getTime(); e=s+86400000; }
+    if(!(s<dayEnd && e>dayStart)) continue;                       // событие не сегодняшнее
+    if(e<=now) continue;                                          // уже прошло
+    if(onlyMine && !(b.members||[]).some(m=>String(m.id)===mid)) continue;
+    n++;
+  }
+  return n;
+}
+window.agScheduleTodayCount=agScheduleTodayCount;
+
 /* Семантические счётчики */
 function _sideRefreshBadges(){
   /* Дедлайны */
@@ -32439,6 +32476,17 @@ function _sideRefreshBadges(){
   if(cal){ let live=cal.querySelector('.live');
     if(calSoon){ if(!live){ live=document.createElement('span'); live.className='live'; live.title='Событие в ближайший час'; cal.appendChild(live); } }
     else if(live){ live.remove(); } }
+  /* Сколько событий сегодня ещё впереди */
+  const calCt=document.getElementById('ag-cal-ct');
+  if(calCt){
+    let n=0; try{ n=agScheduleTodayCount(); }catch(e){}
+    if(n>0){
+      calCt.textContent=n;
+      calCt.className='ct'+(calSoon?' alert-warn':'');
+      calCt.title=n+' '+((typeof _cpPl==='function')?_cpPl(n,'событие','события','событий'):'событий')+' сегодня впереди';
+      calCt.style.display='';
+    } else { calCt.style.display='none'; calCt.className='ct'; calCt.textContent=''; calCt.title=''; }
+  }
 }
 /* Быстрые проекты — топ-3 активных */
 function _sideQuickRender(){
