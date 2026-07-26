@@ -27331,6 +27331,31 @@ async function giEnsureStatus(){
   return GI.google;
 }
 
+/* Пустая вкладка about:blank выглядит как зависший браузер, а ждать приходится
+   несколько секунд. Поэтому сразу рисуем в ней заставку — человек видит, что
+   процесс идёт, и куда именно его ведут. */
+function _pdTabLoader(tab, title, sub){
+  if(!tab) return;
+  const esc = s => String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  try{
+    tab.document.open();
+    tab.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<title>' + esc(title) + '</title><style>'
+      + 'html,body{height:100%;margin:0}'
+      + 'body{background:#08090B;color:#F0F2F5;display:grid;place-items:center;text-align:center;'
+      + 'font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}'
+      + '.s{width:38px;height:38px;margin:0 auto 20px;border-radius:50%;'
+      + 'border:2.5px solid rgba(55,230,200,.16);border-top-color:#37E6C8;animation:r .8s linear infinite}'
+      + '@keyframes r{to{transform:rotate(360deg)}}'
+      + 'h1{font-size:16.5px;font-weight:600;letter-spacing:-.01em;margin:0 0 7px}'
+      + 'p{margin:0;font-size:13px;color:#A6AEB9}'
+      + '</style></head><body><div><div class="s"></div><h1>' + esc(title) + '</h1>'
+      + '<p>' + esc(sub) + '</p></div></body></html>');
+    tab.document.close();
+  }catch(_){ /* вкладку мог перехватить блокировщик — не страшно */ }
+}
+
 /** Кнопка «Календарь» в карточке проекта: досинхронизировать и открыть. */
 async function pdOpenCalendar(){
   const p = (typeof PROJECTS!=='undefined' && PROJECTS[pdIdx]) || null;
@@ -27339,8 +27364,34 @@ async function pdOpenCalendar(){
   /* Вкладку открываем сразу, пока браузер считает это реакцией на клик:
      если открыть её после запроса, всплывающее окно будет заблокировано. */
   const tab = window.open('', '_blank');
+  _pdTabLoader(tab, 'Открываем календарь', p.name || 'Проект');
   if(btn){ btn.disabled = true; btn.style.opacity = '.6'; }
+  const go = (u) => { if(tab) tab.location = u; else window.open(u, '_blank', 'noopener'); };
+  const sum = (d) => {
+    const parts = [];
+    if(d.created) parts.push('создано ' + d.created);
+    if(d.updated) parts.push('обновлено ' + d.updated);
+    if(d.removed) parts.push('убрано ' + d.removed);
+    return parts.length ? ('Календарь обновлён: ' + parts.join(', ')) : '';
+  };
   try{
+    /* Если календарь уже заведён, ссылку отдаёт база — это доли секунды.
+       Открываем сразу, а сроки досинхронизируем в фоне: ждать по пять секунд
+       ради того, что и так откроется, человеку незачем. */
+    const quick = await _giFetch('google-cal', { action:'calendar_link', project_id: p.id });
+    if(quick.status===503 || (quick.data && quick.data.error === 'not_configured')){
+      if(tab) tab.close();
+      toast('Google ещё не подключён — раздел «Интеграции»');
+      return;
+    }
+    if(quick.data && quick.data.connected && quick.data.subscribe){
+      go(quick.data.subscribe);
+      _giFetch('google-cal', { action:'sync_project' }, { project_id: p.id })
+        .then(r => { const m = r && r.data ? sum(r.data) : ''; if(m) toast(m); })
+        .catch(function(){});
+      return;
+    }
+
     const { status, data } = await _giFetch('google-cal', { action:'sync_project' }, { project_id: p.id });
     if(status===503 || (data && data.error === 'not_configured')){
       if(tab) tab.close();
@@ -27352,12 +27403,8 @@ async function pdOpenCalendar(){
       toast((data && (data.error||data.message)) || 'Не удалось открыть календарь');
       return;
     }
-    const parts = [];
-    if(data.created) parts.push('создано ' + data.created);
-    if(data.updated) parts.push('обновлено ' + data.updated);
-    if(data.removed) parts.push('убрано ' + data.removed);
-    toast(parts.length ? ('Календарь обновлён: ' + parts.join(', ')) : 'Календарь актуален');
-    if(tab) tab.location = data.subscribe; else window.open(data.subscribe, '_blank', 'noopener');
+    toast(sum(data) || 'Календарь готов');
+    go(data.subscribe);
   }catch(e){
     if(tab) tab.close();
     toast(String(e.message||e));
@@ -27373,8 +27420,34 @@ async function pdOpenDrive(){
   const btn = document.getElementById('pd-hdr-drive');
   /* Вкладку открываем сразу, пока браузер считает это реакцией на клик. */
   const tab = window.open('', '_blank');
+  _pdTabLoader(tab, 'Открываем папку проекта', p.name || 'Проект');
   if(btn){ btn.disabled = true; btn.style.opacity = '.6'; }
+  const go = (u) => { if(tab) tab.location = u; else window.open(u, '_blank', 'noopener'); };
+  const sum = (d) => {
+    const bits=[];
+    if(d.created) bits.push('создано разделов ' + d.created);
+    if(d.renamed) bits.push('папка переименована');
+    if(d.granted) bits.push('доступ выдан ' + d.granted);
+    if(d.revoked) bits.push('доступ снят у ' + d.revoked);
+    return bits.length ? ('Папка проекта: ' + bits.join(', ')) : '';
+  };
   try{
+    /* Папка уже заведена — ссылка есть в базе, открываем мгновенно.
+       Проверку подпапок и раздачу доступов делаем следом, в фоне. */
+    const quick = await _giFetch('google-drive', { action:'link', project_id: p.id });
+    if(quick.status===503 || (quick.data && quick.data.error === 'not_configured')){
+      if(tab) tab.close();
+      toast('Google ещё не подключён — раздел «Интеграции»');
+      return;
+    }
+    if(quick.data && quick.data.exists && quick.data.link){
+      go(quick.data.link);
+      _giFetch('google-drive', { action:'ensure' }, { project_id: p.id })
+        .then(r => { const m = r && r.data ? sum(r.data) : ''; if(m) toast(m); })
+        .catch(function(){});
+      return;
+    }
+
     const { status, data } = await _giFetch('google-drive', { action:'ensure' }, { project_id: p.id });
     if(status===503 || (data && data.error === 'not_configured')){
       if(tab) tab.close();
@@ -27386,13 +27459,8 @@ async function pdOpenDrive(){
       toast((data && (data.error||data.message)) || 'Не удалось открыть папку проекта');
       return;
     }
-    const bits=[];
-    if(data.created) bits.push('создано разделов ' + data.created);
-    if(data.renamed) bits.push('папка переименована');
-    if(data.granted) bits.push('доступ выдан ' + data.granted);
-    if(data.revoked) bits.push('доступ снят у ' + data.revoked);
-    toast(bits.length ? ('Папка проекта: ' + bits.join(', ')) : 'Папка проекта открыта');
-    if(tab) tab.location = data.link; else window.open(data.link, '_blank', 'noopener');
+    toast(sum(data) || 'Папка проекта готова');
+    go(data.link);
   }catch(e){
     if(tab) tab.close();
     toast(String(e.message||e));
