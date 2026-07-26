@@ -597,6 +597,43 @@ button{font-family:inherit}
 .lg-link:hover svg{color:var(--accent)}
 .lg-link:active{transform:scale(.96)}
 .lg-link[disabled]{opacity:.55;pointer-events:none}
+
+/* ══ Кнопки входа: вращающаяся туманность по контуру ══
+   Слои лежат под содержимым: gx-neb — конический градиент, размытый до
+   свечения; gx-in — тёмная заливка, оставляющая от градиента только рамку;
+   gx-stars — редкие точки, которые оживают при наведении. Цвета берём
+   свои: мята, фиолетовый и зелёный из палитры платформы. */
+.gx{position:relative;isolation:isolate;overflow:hidden}
+/* У кнопок входа значка раньше не было — задаём ему размер сами,
+   иначе svg растягивается на всю кнопку. */
+.btn.gx{display:inline-flex;align-items:center;justify-content:center;gap:9px}
+.btn.gx>svg{width:17px;height:17px;flex:none}
+.gx>*:not(.gx-neb):not(.gx-in):not(.gx-stars){position:relative;z-index:2}
+.gx-neb,.gx-in,.gx-stars{position:absolute;pointer-events:none;border-radius:inherit}
+.gx-neb{inset:-4px;z-index:0;filter:blur(8px);opacity:.6;transition:opacity .3s var(--ease);
+  background:conic-gradient(from 0deg,
+    var(--bg) 0deg, var(--accent) 60deg, var(--violet,#8A8FFF) 120deg,
+    var(--bg) 180deg, var(--pos) 240deg, var(--accent) 300deg, var(--bg) 360deg);
+  animation:gxNebula 6s linear infinite}
+.gx-in{inset:1.5px;z-index:1;background:var(--bg-1);border-radius:inherit}
+.gx-stars{inset:0;z-index:1;opacity:.22;transition:opacity .3s var(--ease);
+  background-image:radial-gradient(circle at 18% 32%,#fff 1px,transparent 1.6px),
+    radial-gradient(circle at 78% 68%,#fff 1px,transparent 1.6px),
+    radial-gradient(circle at 42% 82%,#fff .6px,transparent 1.1px),
+    radial-gradient(circle at 64% 22%,#fff .6px,transparent 1.1px);
+  background-size:120% 120%}
+.gx:hover .gx-neb{opacity:1;animation-duration:3s}
+.gx:hover .gx-stars{opacity:.75;animation:gxStars 5s linear infinite alternate}
+.gx:active{transform:scale(.975)}
+/* Заливка кнопки остаётся своей — туманность идёт свечением вокруг. */
+.gx-solid{overflow:visible}
+.gx-solid .gx-neb{inset:-5px;z-index:-1;filter:blur(11px);opacity:.5}
+.gx-solid:hover .gx-neb{opacity:.85}
+@keyframes gxNebula{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes gxStars{0%{transform:scale(1)}100%{transform:scale(1.1) translate(-2%,-2%)}}
+@media(prefers-reduced-motion:reduce){
+  .gx-neb,.gx:hover .gx-stars{animation:none}
+}
 .lg-link.lg-link-demo{border-color:rgba(55,230,200,.28);color:var(--accent)}
 .lg-link.lg-link-demo svg{color:var(--accent)}
 .lg-hint{margin-top:10px;font-size:11.5px;line-height:1.4;color:var(--txt-3)}
@@ -8473,15 +8510,17 @@ body.m-lock{overflow:hidden}
     <form class="login-form" onsubmit="event.preventDefault();doLogin();return false;" novalidate>
       <div class="field"><svg class="field-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg><input id="lg-login" type="text" placeholder="Логин" aria-label="Логин" autocomplete="username"></div>
       <div class="field"><svg class="field-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg><input id="lg-pass" type="password" placeholder="Пароль" aria-label="Пароль" autocomplete="current-password"></div>
-      <button class="btn btn-primary" id="lg-btn" type="submit"><span>Войти</span></button>
+      <button class="btn btn-primary gx gx-solid" id="lg-btn" type="submit"><span class="gx-neb"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></svg><span>Войти</span></button>
     </form>
     <div class="lg-divider"><span>ещё нет аккаунта?</span></div>
-    <button class="btn lg-reg-btn" onclick="_regShowPublicTariffs()" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+    <button class="btn lg-reg-btn gx" onclick="_regShowPublicTariffs()" type="button">
+      <span class="gx-neb"></span><span class="gx-in"></span><span class="gx-stars"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-5h6v5"/><path d="M12 10v4M10 12h4"/></svg>
       <span>Открыть агентство</span>
     </button>
     <div class="lg-links" id="lg-links">
-      <button class="lg-link lg-link-demo" id="lg-demo-btn" type="button" onclick="lgDemo(this)" title="Войти в готовый кабинет DETROYD без регистрации">
+      <button class="lg-link lg-link-demo gx" id="lg-demo-btn" type="button" onclick="lgDemo(this)" title="Войти в готовый кабинет DETROYD без регистрации">
+        <span class="gx-neb"></span><span class="gx-in"></span><span class="gx-stars"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="2.2" y="3.4" width="19.6" height="13.2" rx="2.4"/><path d="M2.2 13.2h19.6"/>
           <path d="M8.6 21h6.8M12 16.6V21"/>
@@ -8489,7 +8528,8 @@ body.m-lock{overflow:hidden}
         </svg>
         <span class="t">Демо</span>
       </button>
-      <button class="lg-link" id="lg-consult-btn" type="button" onclick="lgConsult()" title="Написать в Telegram — ответим и подберём тариф">
+      <button class="lg-link gx" id="lg-consult-btn" type="button" onclick="lgConsult()" title="Написать в Telegram — ответим и подберём тариф">
+        <span class="gx-neb"></span><span class="gx-in"></span><span class="gx-stars"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 12.8v-1.4a8 8 0 0 1 16 0v1.4"/>
           <rect x="1.9" y="12.2" width="4.5" height="6" rx="2.05"/><rect x="17.6" y="12.2" width="4.5" height="6" rx="2.05"/>
