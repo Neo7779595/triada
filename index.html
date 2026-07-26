@@ -4436,6 +4436,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* Спрашиваем прямо внутри доски, а не системным окном браузера: системное
    в полноэкранном режиме либо не видно, либо оно из него выкидывает. */
 .pd-bdask{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);animation:ovFade .18s ease both}
+.pd-bdask.fx{position:fixed;z-index:200}
 .pd-bdask-c{width:min(540px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line-2);border-radius:18px;padding:26px 26px 18px;box-shadow:0 30px 72px -24px rgba(0,0,0,.85);animation:rise .26s var(--spring)}
 .pd-bdask-c .t{font-size:17px;font-weight:650;color:var(--txt);letter-spacing:-.015em}
 .pd-bdask-c .d{font-size:13.5px;line-height:1.62;color:var(--txt-2);margin-top:9px}
@@ -18905,9 +18906,12 @@ function cpClearSel(){
 }
 function cpFillDown(){
   const sh=cpSheet(),disp=cpDisp(sh),x=cpRect(); if(x.r1<=x.r0)return;
-  let ch=false;
+  let ch=false; const docPlan=[];
   for(let c=x.c0;c<=x.c1;c++){
     const col=sh.cols[c]; if(!col)continue;
+    /* Копировать сценарий вниз бессмысленно: все строки стали бы ссылаться
+       на один документ. Вместо этого предлагаем завести каждой свой. */
+    if(col.type==='doc'){ docPlan.push({col:col, from:x.r0+1, count:x.r1-x.r0}); continue; }
     const topRow=disp[x.r0];
     const topF=(topRow&&topRow.f&&topRow.f[col.id])||null;
     const top=topRow?topRow.c[col.id]:undefined;
@@ -18929,6 +18933,7 @@ function cpFillDown(){
     }
   }
   if(ch){ cpSave(); cpRerender(); }
+  if(docPlan.length && typeof cpDocFillAsk==='function') cpDocFillAsk(docPlan);
 }
 /* Внутренний клипборд: помнит формулы/стили выделения, чтобы при вставке сдвигать ссылки как Google Sheets */
 let _cpClip=null;
@@ -19078,7 +19083,9 @@ function cpFillStart(e){ e.preventDefault(); e.stopPropagation(); if(cpEd)return
 function cpFillMove(e){ if(!cpFill)return; const el=document.elementFromPoint(e.clientX,e.clientY); const cell=el&&el.closest?el.closest('.cp-cell'):null; if(cell&&cell.getAttribute('data-r')!=null){ const r=parseInt(cell.getAttribute('data-r'),10); if(!isNaN(r)){ cpFill.toR=Math.max(cpFill.src.r1,r); cpFillPreview(); } } }
 function cpFillPreview(){ document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); if(!cpFill)return; const x=cpFill.src; for(let r=x.r1+1;r<=cpFill.toR;r++){ for(let c=x.c0;c<=x.c1;c++){ const cell=document.querySelector('.cp-cell[data-r="'+r+'"][data-c="'+c+'"]'); if(cell)cell.classList.add('cp-fillprev'); } } }
 function cpFillEnd(){ document.removeEventListener('mousemove',cpFillMove); document.body.classList.remove('cp-filling'); document.querySelectorAll('.cp-fillprev').forEach(function(el){el.classList.remove('cp-fillprev');}); const f=cpFill; cpFill=null; if(f&&f.toR>f.src.r1)cpFillApply(f); }
+let _cpDocFillPlan=[];
 function cpFillApply(f){
+  _cpDocFillPlan=[];
   const sh=cpSheet(); let disp=cpDisp(sh); const x=f.src;
   const filtered=!!(cpQ||(sh.filt&&Object.keys(sh.filt).length));
   const count=f.toR-x.r1;
@@ -19092,10 +19099,11 @@ function cpFillApply(f){
       srcFmulas.push((row&&row.f&&row.f[col.id])||null);
     }
     const hasFmula=srcFmulas.some(function(f){return f!=null;});
-    /* Колонку сценария протягивать вниз нельзя: идентификатор документа
-       оканчивается цифрой, и «продолжение ряда» превращает его в адрес
-       несуществующего файла. У каждой строки должен быть свой документ,
-       поэтому просто оставляем ячейки пустыми — он заведётся по клику. */
+    /* Колонку сценария нельзя продолжать рядом: идентификатор документа
+       оканчивается цифрой, и «следующее значение» превращает его в адрес
+       несуществующего файла. Вместо этого оставляем ячейки пустыми и
+       предлагаем завести каждой строке свой документ — списком, за один раз. */
+    if(col.type==='doc'){ _cpDocFillPlan.push({col:col, from:x.r1+1, count:count}); }
     const gen=hasFmula?null:(col.type==='doc'?new Array(count).fill(''):cpFillSeries(srcVals,count));
     for(let i=0;i<count;i++){
       let row=disp[x.r1+1+i];
@@ -19127,7 +19135,67 @@ function cpFillApply(f){
     }
   }
   cpSel={r:x.r0,c:x.c0}; cpSelEnd={r:f.toR,c:x.c1}; cpSave(); cpRerender();
+  if(_cpDocFillPlan.length){ const plan=_cpDocFillPlan; _cpDocFillPlan=[]; cpDocFillAsk(plan); }
 }
+
+/* ─── Сценарии пачкой ───
+   Протянули колонку сценария вниз — предлагаем завести документ каждой
+   строке разом. Десять сценариев одним движением вместо десяти кликов;
+   строки, у которых документ уже есть, не трогаем. */
+function _cpPl(n,a,b,c){ n=Math.abs(n)%100; const n1=n%10; if(n>10&&n<20) return c; if(n1>1&&n1<5) return b; if(n1===1) return a; return c; }
+function cpDocFillAsk(plan){
+  const sh=cpSheet(); if(!sh) return;
+  const disp=cpDisp(sh), targets=[];
+  plan.forEach(function(g){
+    for(let i=0;i<g.count;i++){
+      const ri=g.from+i, row=disp[ri];
+      if(!row) continue;
+      if(_cpDocId(row.c[g.col.id])) continue;
+      targets.push({ ri:ri, col:g.col });
+    }
+  });
+  if(!targets.length) return;
+  _pdBoardAsk({
+    host: document.fullscreenElement||document.webkitFullscreenElement||document.body,
+    title:'Завести сценарии для '+targets.length+' '+_cpPl(targets.length,'строки','строк','строк')+'?',
+    text:'Для каждой строки создадим отдельный документ в папке сценариев проекта. Строки, где сценарий уже есть, не тронем.',
+    actions:[
+      { label:'Не надо', kind:'cancel' },
+      { label:'Завести', kind:'main', fn:function(){ cpDocBulk(targets); } },
+    ],
+  });
+}
+async function cpDocBulk(targets){
+  const p=PROJECTS[pdIdx], sh=cpSheet(); if(!p||!sh) return;
+  if(CPDOC.busy) return; CPDOC.busy=true;
+  let done=0, failed=null;
+  toast('Создаю сценарии: 0 из '+targets.length);
+  try{
+    for(let i=0;i<targets.length;i++){
+      const t=targets[i], row=cpDisp(sh)[t.ri];
+      if(!row) continue;
+      if(_cpDocId(row.c[t.col.id])) continue;
+      const { status, data } = await _giFetch('google-docs',{action:'script'},
+        { project_id:p.id, title:cpDocTitle(sh,row,t.ri) });
+      if(status===503||(data&&data.error==='not_configured')){ failed='Google ещё не подключён — раздел «Интеграции»'; break; }
+      if(!data||data.ok===false||!data.id){ failed=(data&&(data.error||data.message))||'Google не отдал документ'; break; }
+      row.c[t.col.id]=String(data.id);
+      done++;
+      /* Показываем результат по ходу дела: на десяти документах ждать
+         молча полминуты неприятно. */
+      try{ cpSave(); cpRerender(); }catch(_e){}
+      if(done<targets.length) toast('Создаю сценарии: '+done+' из '+targets.length);
+    }
+  }catch(e){ failed=String(e.message||e); }
+  finally{
+    CPDOC.busy=false;
+    try{ cpSave(); cpRerender(); }catch(_e){}
+    toast(failed
+      ? ('Создано '+done+' из '+targets.length+'. '+failed)
+      : ('Готово: '+done+' '+_cpPl(done,'сценарий','сценария','сценариев')));
+  }
+}
+window.cpDocFillAsk=cpDocFillAsk; window.cpDocBulk=cpDocBulk;
 
 /* ===================== КОНТЕНТ-ПЛАН · ресайз колонок (ширина) и строк (высота) ===================== */
 function cpColRz(e,ci){ e.preventDefault(); e.stopPropagation(); const col=cpColAt(ci); if(!col)return; cpRz={t:'col',ci:ci,x:e.clientX,w:col.w}; document.body.classList.add('cp-rzing','cp-rzing-col'); document.addEventListener('mousemove',cpRzMove); document.addEventListener('mouseup',cpRzEnd,{once:true}); }
@@ -28353,10 +28421,14 @@ function pdBoardFull(){
    режиме браузер либо прячет, либо показывает ценой выхода из него —
    поэтому спрашиваем сами, прямо поверх доски. */
 function _pdBoardAsk(opts){
-  const wrap=document.querySelector('.pd-bdwrap'); if(!wrap) return;
-  wrap.querySelectorAll('.pd-bdask').forEach(function(n){ n.remove(); });
+  const wrap=(opts&&opts.host)||document.querySelector('.pd-bdwrap')
+    ||document.fullscreenElement||document.webkitFullscreenElement||document.body;
+  if(!wrap) return;
+  document.querySelectorAll('.pd-bdask').forEach(function(n){ n.remove(); });
   const box=document.createElement('div');
-  box.className='pd-bdask';
+  /* Внутри доски окно ложится на неё, в остальных местах — поверх всей
+     страницы: у обычных контейнеров нет своей системы координат. */
+  box.className='pd-bdask'+(wrap.classList&&wrap.classList.contains('pd-bdwrap')?'':' fx');
   box.innerHTML='<div class="pd-bdask-c"><div class="t"></div><div class="d"></div><div class="b"></div></div>';
   box.querySelector('.t').textContent=opts.title||'';
   box.querySelector('.d').textContent=opts.text||'';
