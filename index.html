@@ -4296,6 +4296,34 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .clcp-mfilt.on{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
 .cp-saddbtn:hover,.cp-shidbtn:hover{color:var(--accent)}
 .cp-saddbtn svg,.cp-shidbtn svg{width:14px;height:14px}
+/* ——— Полоса таблиц проекта. Таблица — отдельный документ Google со своим
+   доступом (план клиенту показываем, конкурентов нет), поэтому она стоит над
+   содержимым, а не в одном ряду с листами: листы живут внутри таблицы. ——— */
+.cp-books{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:7px 14px;overflow-x:auto;
+  border-bottom:1px solid var(--line);background:var(--bg-1)}
+.cp-books::-webkit-scrollbar{height:0}
+.cp-book{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 11px;flex:0 0 auto;
+  border:1px solid transparent;border-radius:9px;background:none;color:var(--txt-3);cursor:pointer;
+  font-family:var(--font);font-size:13.5px;font-weight:600;white-space:nowrap;
+  transition:color .15s var(--ease),background .15s var(--ease),border-color .15s var(--ease)}
+.cp-book:hover{color:var(--txt-2);background:var(--bg-2)}
+.cp-book.on{color:var(--txt);background:var(--bg-2);border-color:var(--line-2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.cp-book .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.cp-book .nm{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.cp-book .n{font-family:var(--mono);font-size:11px;color:var(--txt-3);background:var(--bg-3);
+  border-radius:5px;padding:1px 5px;line-height:1.5}
+.cp-book.on .n{color:var(--txt-2)}
+.cp-book .cl{display:inline-flex;width:13px;height:13px;color:var(--pos);opacity:.85}
+.cp-book .cl svg{width:100%;height:100%;display:block}
+.cp-book .car{color:var(--txt-3);font-size:11px;padding-left:1px}
+.cp-book .car:hover{color:var(--txt)}
+.cp-bookadd{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px;flex:0 0 auto;
+  border:1px dashed var(--line-2);border-radius:9px;background:none;color:var(--txt-3);cursor:pointer;
+  font-family:var(--font);font-size:13px;font-weight:600;white-space:nowrap;transition:.15s var(--ease)}
+.cp-bookadd:hover{color:var(--txt-2);border-color:var(--txt-3);border-style:solid}
+.cp-bookadd svg{width:13px;height:13px}
+@media(max-width:820px){.cp-books{padding:6px 10px}.cp-book .n{display:none}}
 /* ——— Google Таблица. Единственное цветное пятно в тулбаре: цвет здесь значит
    «это внешний сервис», а не украшение. Точка справа — признак живой связи. ——— */
 .cp-mini.cp-gs{gap:8px;padding-left:11px}
@@ -16061,8 +16089,12 @@ function cpTplRows(cols){
 }
 function cpSeed(){
   const cols=cpTplCols();
-  const sh={id:cpUid(),name:'Контент-план',color:'teal',hidden:false,cols:cols,rows:cpTplRows(cols)};
-  return {active:sh.id,sheets:[sh]};
+  const b={ id:cpUid(), name:'Контент-план', color:'teal', hidden:false };
+  const now=new Date(), mm=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  /* Лист — это месяц. Первый называем текущим: дальше их просто добавляют. */
+  const sh={ id:cpUid(), book:b.id, name:CP_MONTHS[now.getMonth()]+' '+now.getFullYear(), month:mm,
+    color:'teal', hidden:false, cols:cols, rows:cpTplRows(cols) };
+  return { activeBook:b.id, active:sh.id, books:[b], sheets:[sh] };
 }
 function cpSeedEmpty(name,color){
   const cols=cpTplCols(), rows=[];
@@ -16081,15 +16113,53 @@ function cpData(p){
     p._cp=(d&&d.sheets&&d.sheets.length)?d:cpSeed();
   }
   cpEnsurePub(p._cp);
-  if(!p._cp.active||!p._cp.sheets.some(s=>s.id===p._cp.active&&!s.hidden)){
-    const f=p._cp.sheets.find(s=>!s.hidden)||p._cp.sheets[0];
-    if(f)p._cp.active=f.id;
-  }
+  cpFixBooks(p._cp);
   if(window.LIVE&&window.SB&&!p._cpLoad){ p._cpLoad=1; cpLoadServer(p); }
   if(p._cpSnap==null)p._cpSnap=JSON.stringify(p._cp);
   return p._cp;
 }
-function cpSheet(){const p=cpP();const d=cpData(p);return d.sheets.find(s=>s.id===d.active)||d.sheets[0];}
+/* ——— Таблицы и листы ———
+   Проект ведёт несколько таблиц: контент-план, конкурентный анализ,
+   исследования. Каждая таблица — отдельный документ Google со своим доступом:
+   конкурентов клиенту показывать необязательно, план — обязательно.
+   Листы внутри таблицы — её вкладки, обычно месяцы. */
+function cpBookSheets(d,bid){ return ((d&&d.sheets)||[]).filter(function(s){ return s.book===bid; }); }
+function cpBooks(d){ return ((d&&d.books)||[]).filter(function(b){ return !b.hidden; }); }
+function cpBook(d){
+  const all=(d&&d.books)||[];
+  return all.find(function(b){ return b.id===d.activeBook; })||all.find(function(b){ return !b.hidden; })||all[0]||null;
+}
+function cpBookOf(d,sh){ return ((d&&d.books)||[]).find(function(b){ return b.id===(sh&&sh.book); })||null; }
+window.cpBookOf=cpBookOf;
+function cpFixBooks(d){
+  if(!d) return d;
+  if(!Array.isArray(d.books)) d.books=[];
+  if(!d.books.length){
+    /* До этой версии документ Google заводился на каждый лист. Старые связи не
+       переносим: у таблицы свой документ со всеми листами-вкладками, и подставить
+       вместо него один из прежних файлов значило бы потерять остальные. Прежние
+       файлы остаются на Диске — платформа их просто больше не ведёт. */
+    d.books=[{ id:cpUid(), name:'Контент-план', color:'teal', hidden:false }];
+  }
+  const ids={}; d.books.forEach(function(b){ ids[b.id]=1; });
+  const first=d.books[0].id;
+  ((d.sheets)||[]).forEach(function(s){ if(!s.book||!ids[s.book]) s.book=first; if(s.gs) delete s.gs; });
+  const bk=cpBook(d); if(bk) d.activeBook=bk.id;
+  const list=cpBookSheets(d,d.activeBook);
+  const vis=list.filter(function(s){ return !s.hidden; });
+  if(!d.active||!list.some(function(s){ return s.id===d.active&&!s.hidden; })) d.active=((vis[0]||list[0])||{}).id;
+  /* Таблица без единого листа невозможна: лист — это её содержимое. */
+  if(!list.length){
+    const sh=cpSeedEmpty('Лист 1', (cpBook(d)||{}).color||'teal');
+    sh.book=d.activeBook; d.sheets.push(sh); d.active=sh.id;
+  }
+  return d;
+}
+function cpSheet(){
+  const p=cpP(); const d=cpData(p);
+  const list=cpBookSheets(d,d.activeBook);
+  return list.find(function(s){ return s.id===d.active; })||list[0]||d.sheets[0];
+}
 function cpDisp(sh){ let rows=sh.rows.slice(); if(cpQ){ const q=cpQ.toLowerCase(); rows=rows.filter(r=>sh.cols.some(c=>String(r.c[c.id]==null?'':r.c[c.id]).toLowerCase().indexOf(q)>=0)); } if(sh.filt){ Object.keys(sh.filt).forEach(function(cid){ const col=sh.cols.find(c=>c.id===cid); if(!col)return; const f=sh.filt[cid]; rows=rows.filter(r=>cpPass(col,r.c[cid],f)); }); } if(sh.sort){ const col=sh.cols.find(c=>c.id===sh.sort.col); if(col){ const dir=sh.sort.dir==='desc'?-1:1; rows.sort((a,b)=>{ const va=a.c[col.id],vb=b.c[col.id]; const ea=(va==null||va===''),eb=(vb==null||vb===''); if(ea&&eb)return 0; if(ea)return 1; if(eb)return -1; return cpCmp(col,va,vb)*dir; }); } } return rows; }
 function cpColAt(ci){return cpSheet().cols[ci];}
 function cpRowAt(ri){return cpDisp(cpSheet())[ri];}
@@ -17045,14 +17115,17 @@ function cpRender(p){
      «Стратегии» открываются доской Miro. Если таблицы у листа ещё нет, она
      заводится сама: просить человека «сначала выгрузить» незачем, работать
      он всё равно будет там. */
-  if(cpGSWant()==='gs'){
-    if(cpGSLink(sh)) return '<div class="cp">'+cpGSFrameHTML(p,sh)+'</div>';
-    if(cpGSAuto(p,sh)) return '<div class="cp">'+cpGSMakingHTML(sh)+'</div>';
+  const bk=cpBook(d);
+  if(bk&&cpGSWant()==='gs'){
+    /* Полоса таблиц остаётся и здесь: между контент-планом и конкурентным
+       анализом переключаются постоянно, а листы месяцев Google показывает сам. */
+    if(cpGSLink(bk)) return '<div class="cp">'+cpBooksBar(d)+cpGSFrameHTML(p,bk,sh)+'</div>';
+    if(cpGSAuto(p,bk)) return '<div class="cp">'+cpBooksBar(d)+cpGSMakingHTML(bk)+'</div>';
   }
   const cols=sh.cols, disp=cpDisp(sh);
   if(cpRowSel.size){ const _ids=new Set((sh.rows||[]).map(function(r){return r.id;})); cpRowSel.forEach(function(id){ if(!_ids.has(id))cpRowSel.delete(id); }); }
   const sid=sh.id, ap=p._cpAppr||{}; const showClient=!!(p._cpShared&&p._cpShared[sid])||Object.keys(ap).some(function(k){return k.indexOf(sid+'/')===0;});
-  let html='<div class="cp">';
+  let html='<div class="cp">'+cpBooksBar(d);
   /* Тулбар — две чёткие строки: сверху идентификация + статус + CTA, снизу поиск + инструменты */
   const sortChip=sh.sort?('<span class="cp-fchip">Сорт: '+_ddH(((sh.cols.find(c=>c.id===sh.sort.col))||{}).name||'')+' '+(sh.sort.dir==='asc'?'↑':'↓')+'<button onclick="cpSortClear()">✕</button></span>'):'';
   const filtChip=(sh.filt&&Object.keys(sh.filt).length)?('<span class="cp-fchip">Фильтры '+Object.keys(sh.filt).length+'<button onclick="cpClearFilters()">✕</button></span>'):'';
@@ -17092,7 +17165,7 @@ function cpRender(p){
           +'<button class="cp-mini" onclick="cpTplManager()">'+CP_IC.tpl+'Списки</button>'
           +(cpHasDocCol()?'<button class="cp-mini" onclick="cpDocDigest()" title="Собрать все сценарии листа в один документ">'+CP_IC.grid+'Сборник</button>':'')
         +'</span>'
-        +cpGSBtnHTML(sh)
+        +cpGSBtnHTML(bk)
       +'</div>'
     +'</div>'
   +'</div>';
@@ -17138,19 +17211,144 @@ function cpRender(p){
 const CP_MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 let cpMonthFilt=null, cpPickYear=null;
 function cpMonthLabel(m){ if(!m||!/^\d{4}-\d{2}$/.test(String(m)))return ''; const p=String(m).split('-'); return CP_MONTHS[(+p[1])-1]+' '+p[0]; }
-function cpSheetMonths(d){ const set={}; ((d&&d.sheets)||[]).forEach(function(s){ if(!s.hidden && s.month)set[s.month]=1; }); return Object.keys(set).sort().reverse(); }
+function cpSheetMonths(d){ const set={}; cpBookSheets(d,d&&d.activeBook).forEach(function(s){ if(!s.hidden && s.month)set[s.month]=1; }); return Object.keys(set).sort().reverse(); }
 function cpMonthFiltChip(months){ if(!months.length)return ''; const lbl=cpMonthFilt?cpMonthLabel(cpMonthFilt):'Все месяцы'; return '<button class="cp-mfilt'+(cpMonthFilt?' on':'')+'" onclick="event.stopPropagation();cpMonthFiltMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>'+_ddH(lbl)+'<span class="cp-mfilt-car">▾</span></button>'; }
 function cpMonthFiltMenu(e){ const d=cpData(cpP()); const months=cpSheetMonths(d); let h='<button class="cp-popi'+(!cpMonthFilt?' on':'')+'" onclick="cpSetMonthFilt(null)">Все месяцы</button>'; if(months.length)h+='<div class="sep"></div>'; months.forEach(function(m){ h+='<button class="cp-popi'+(cpMonthFilt===m?' on':'')+'" onclick="cpSetMonthFilt(\''+m+'\')">'+cpMonthLabel(m)+'</button>'; }); cpFloat((e.target&&e.target.closest('button'))||e.target,h); }
 function cpSetMonthFilt(m){ cpMonthFilt=m; cpCloseFloat(); const d=cpData(cpP()); const vis=(d.sheets||[]).filter(function(s){return !s.hidden&&(!m||s.month===m);}); if(vis.length&&!vis.some(function(s){return s.id===d.active;}))d.active=vis[0].id; cpRerender(); }
 function cpMonthPickHTML(){ const cur=new Date(),curM=cur.getMonth(),curY=cur.getFullYear(); let h='<div class="cp-mpick"><div class="cp-mpick-eyebrow">Контент-план за месяц</div><div class="cp-mpick-h"><button class="cp-mpick-yr" onclick="cpPickYearStep(-1)">‹</button><span class="cp-mpick-y">'+cpPickYear+'</span><button class="cp-mpick-yr" onclick="cpPickYearStep(1)">›</button></div><div class="cp-mpick-g">'; for(let i=0;i<12;i++){ const isCur=(cpPickYear===curY&&i===curM); h+='<button class="cp-mpick-m'+(isCur?' now':'')+'" onclick="cpCreateMonthSheet('+cpPickYear+','+i+')">'+CP_MONTHS[i].slice(0,3)+'</button>'; } h+='</div></div>'; return h; }
 function cpMonthPicker(anchor){ if(cpPickYear==null)cpPickYear=new Date().getFullYear(); cpFloat(anchor,cpMonthPickHTML()); }
 function cpPickYearStep(d){ if(cpPickYear==null)cpPickYear=new Date().getFullYear(); cpPickYear+=d; const pop=document.querySelector('.cp-pop'); if(pop)pop.innerHTML=cpMonthPickHTML(); }
-function cpCreateMonthSheet(y,m){ cpCloseFloat(); const d=cpData(cpP()); const mm=y+'-'+String(m+1).padStart(2,'0'); const sh=cpSeedEmpty(CP_MONTHS[m]+' '+y, CP_PALK[d.sheets.length%CP_PALK.length]); sh.month=mm; d.sheets.push(sh); d.active=sh.id; cpMonthFilt=null; cpSel={r:0,c:0}; cpQ=''; cpSave(); cpRerender(); }
+function cpCreateMonthSheet(y,m){ cpCloseFloat(); const d=cpData(cpP()); const mm=y+'-'+String(m+1).padStart(2,'0'); const sh=cpSeedEmpty(CP_MONTHS[m]+' '+y, CP_PALK[cpBookSheets(d,d.activeBook).length%CP_PALK.length]); sh.month=mm; sh.book=d.activeBook; d.sheets.push(sh); d.active=sh.id; cpMonthFilt=null; cpSel={r:0,c:0}; cpQ=''; cpSave(); cpRerender(); }
+/* Полоса таблиц проекта. Стоит над содержимым, потому что таблица — это
+   отдельный документ со своим доступом, а не вкладка внутри одного. */
+function cpBooksBar(d){
+  const list=cpBooks(d), can=cpGSCan();
+  let h='<div class="cp-books">';
+  list.forEach(function(b){
+    const on=b.id===d.activeBook, n=cpBookSheets(d,b.id).filter(function(s){return !s.hidden;}).length;
+    h+='<button class="cp-book'+(on?' on':'')+'" onclick="cpBookPick(\''+b.id+'\')" ondblclick="cpBookRename(\''+b.id+'\')">'
+      +'<span class="dot" style="background:'+cpColorCss(b.color)+'"></span>'
+      +'<span class="nm">'+_ddH(b.name||'Таблица')+'</span>'
+      +'<span class="n">'+n+'</span>'
+      +(b.gs&&b.gs.cl?'<span class="cl" title="Открыта клиенту">'+CP_IC.eye+'</span>':'')
+      +(on?'<span class="car" onclick="event.stopPropagation();cpBookMenu(event,\''+b.id+'\')">▾</span>':'')
+      +'</button>';
+  });
+  if(can) h+='<button class="cp-bookadd" onclick="cpBookNew()">'+CP_IC.plus+'Таблица</button>';
+  h+='</div>';
+  return h;
+}
+function cpBookPick(id){
+  const d=cpData(cpP()); if(d.activeBook===id) return;
+  if(cpEd){ cpStore(); cpEd=null; }
+  d.activeBook=id; d.active=null; cpSel={r:0,c:0}; cpQ=''; cpMonthFilt=null;
+  cpFixBooks(d); cpSave(); cpRerender();
+}
+function cpBookMenu(e,id){
+  const d=cpData(cpP()); const b=(d.books||[]).find(function(x){return x.id===id;}); if(!b) return;
+  const can=cpGSCan();
+  let h='<div class="ttl">'+_ddH(b.name||'Таблица')+'</div>';
+  h+='<button class="cp-popi" onclick="cpBookRename(\''+id+'\')">Переименовать</button>';
+  if(can&&b.gs&&b.gs.id){
+    h+='<button class="cp-popi" onclick="cpGSOpen()">Открыть в Google</button>';
+    h+='<button class="cp-popi'+(b.gs.cl?' on':'')+'" onclick="cpBookClient(\''+id+'\','+(b.gs.cl?'false':'true')+')">'
+      +(b.gs.cl?'Скрыть от клиента':'Показывать клиенту')+'</button>';
+  }
+  h+='<div class="cp-sw">'+CP_PALK.map(function(k){ return '<i style="background:'+cpColorCss(k)+'" onclick="cpBookColor(\''+id+'\',\''+k+'\')"></i>'; }).join('')+'</div>';
+  if(can&&(d.books||[]).length>1) h+='<div class="sep"></div><button class="cp-popi" onclick="cpBookDel(\''+id+'\')" style="color:var(--neg)">Удалить таблицу</button>';
+  cpFloat((e.target&&e.target.closest('.cp-book'))||e.target,h);
+}
+function cpBookColor(id,k){ const d=cpData(cpP()); const b=(d.books||[]).find(function(x){return x.id===id;}); if(b)b.color=k; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpBookRename(id){
+  cpCloseFloat();
+  const d=cpData(cpP()); const b=(d.books||[]).find(function(x){return x.id===id;}); if(!b) return;
+  pd2Open('<div class="modal" style="max-width:440px">'
+    +'<div class="modal-h"><h3>Название таблицы</h3><p>Так она называется и здесь, и в Google — файл переименуется при следующей выгрузке.</p></div>'
+    +'<div class="modal-b"><input id="cp-bookname" class="cp-plane-in" value="'+_ddA(b.name||'')+'" placeholder="Например: Конкурентный анализ"></div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button>'
+      +'<button class="btn-add" onclick="cpBookRenameGo(\''+id+'\')">Сохранить</button></div></div>');
+  setTimeout(function(){ const i=document.getElementById('cp-bookname'); if(i){ i.focus(); i.select(); } },30);
+}
+function cpBookRenameGo(id){
+  const i=document.getElementById('cp-bookname'); const t=(i&&i.value||'').trim();
+  const d=cpData(cpP()); const b=(d.books||[]).find(function(x){return x.id===id;});
+  if(b&&t) b.name=t;
+  pd2Close(); cpSave(); cpRerender();
+}
+function cpBookNew(){
+  cpCloseFloat();
+  pd2Open('<div class="modal" style="max-width:460px">'
+    +'<div class="modal-h"><h3>Новая таблица проекта</h3><p>Отдельный документ Google со своим доступом. Внутри — листы: месяцы, этапы, что угодно.</p></div>'
+    +'<div class="modal-b"><input id="cp-bookname" class="cp-plane-in" placeholder="Например: Конкурентный анализ">'
+      +'<div class="cp-gsw q" style="margin-top:12px">'+CP_GS_IC.info
+      +'<span>Клиенту новая таблица не видна, пока это не включить отдельно — доступы у таблиц не общие.</span></div></div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button>'
+      +'<button class="btn-add" onclick="cpBookNewGo()">Создать</button></div></div>');
+  setTimeout(function(){ const i=document.getElementById('cp-bookname'); if(i)i.focus(); },30);
+}
+function cpBookNewGo(){
+  const i=document.getElementById('cp-bookname'); const t=(i&&i.value||'').trim();
+  if(!t){ toast('Дайте таблице название'); return; }
+  const d=cpData(cpP());
+  const b={ id:cpUid(), name:t, color:CP_PALK[(d.books||[]).length%CP_PALK.length], hidden:false };
+  const sh=cpSeedEmpty('Лист 1', b.color); sh.book=b.id;
+  d.books.push(b); d.sheets.push(sh); d.activeBook=b.id; d.active=sh.id;
+  cpSel={r:0,c:0}; cpQ=''; cpMonthFilt=null;
+  pd2Close(); cpSave(); cpRerender();
+  toast('Таблица «'+t+'» создана');
+}
+function cpBookDel(id){
+  cpCloseFloat();
+  const d=cpData(cpP()); const b=(d.books||[]).find(function(x){return x.id===id;});
+  if(!b||(d.books||[]).length<2){ toast('Нельзя удалить единственную таблицу'); return; }
+  const n=cpBookSheets(d,id).length;
+  pd2Open('<div class="modal" style="max-width:470px">'
+    +'<div class="modal-h"><h3>Удалить таблицу «'+_ddH(b.name||'')+'»?</h3>'
+    +'<p>Вместе с ней из системы уйдут '+n+' '+_plural(n,'лист','листа','листов')+' и решения клиента по ним.</p></div>'
+    +'<div class="modal-b"><div class="cp-gsw q">'+CP_GS_IC.info
+      +'<span>Сам документ останется на Google Диске агентства — удаляем только связь и наши данные.</span></div></div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button>'
+      +'<button class="btn-add" onclick="cpBookDelGo(\''+id+'\')" style="background:var(--neg)">Удалить</button></div></div>');
+}
+function cpBookDelGo(id){
+  const p=cpP(), d=cpData(p);
+  const gone=cpBookSheets(d,id).map(function(s){ return s.id; });
+  if(window.LIVE&&window.SB&&p){
+    try{ _giFetch('google-sheets',{action:'unlink'},{ project_id:p.id, book_id:id }).catch(function(){}); }catch(_e){}
+    gone.forEach(function(sid){
+      try{
+        window.SB.from('content_shares').delete().eq('project_id',p.id).eq('sheet_id',sid).then(function(){},function(){});
+        window.SB.from('content_approvals').delete().eq('project_id',p.id).eq('sheet_id',sid).then(function(){},function(){});
+      }catch(_e){}
+      if(p._cpShared) delete p._cpShared[sid];
+    });
+  }
+  d.books=(d.books||[]).filter(function(x){ return x.id!==id; });
+  d.sheets=(d.sheets||[]).filter(function(s){ return s.book!==id; });
+  d.activeBook=null; d.active=null; cpFixBooks(d);
+  pd2Close(); cpSave(); cpRerender();
+  toast('Таблица удалена');
+}
+async function cpBookClient(id,on){
+  cpCloseFloat();
+  const p=cpP(), d=cpData(p);
+  const b=(d.books||[]).find(function(x){ return x.id===id; }); if(!b||!b.gs||!b.gs.id) return;
+  try{
+    const { status, data } = await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, book_id:id, on:on?1:0 });
+    if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
+    if(!data||data.ok===false){ cpGSFail(b,data,'Не удалось изменить доступ'); return; }
+    cpGSMark(b,Object.assign({},b.gs,{ cl:!!on }));
+    cpRerender();
+    const anySent=cpBookSheets(d,id).some(function(s){ return !!(p._cpShared&&p._cpShared[s.id]); });
+    if(on&&!anySent) cpGSNeedSend(b);
+    else toast(on?'Клиент увидит эту таблицу':'Таблица закрыта: доступ по ссылке снят');
+  }catch(e){ toast(String(e.message||e)); }
+}
 function cpSheetsBar(d){
   const months=cpSheetMonths(d);
   let h='<div class="cp-sheets">';
   h+=cpMonthFiltChip(months);
-  d.sheets.filter(s=>!s.hidden && (!cpMonthFilt||s.month===cpMonthFilt)).forEach(s=>{
+  cpBookSheets(d,d.activeBook).filter(s=>!s.hidden && (!cpMonthFilt||s.month===cpMonthFilt)).forEach(s=>{
     const on=s.id===d.active, editing=cpShEd===s.id;
     h+='<div class="cp-stab'+(on?' on':'')+'"'+(on?' style="box-shadow:inset 0 2px 0 '+cpColorCss(s.color)+'"':'')+' onclick="cpSwitch(\''+s.id+'\')" ondblclick="cpShRename(\''+s.id+'\')">';
     if(editing){ h+='<input id="cp-shed" class="cp-shed" value="'+_ddA(s.name)+'" onkeydown="cpShKey(event,\''+s.id+'\')" onblur="cpShCommit(\''+s.id+'\')" onclick="event.stopPropagation()">'; }
@@ -19074,16 +19272,16 @@ function cpSheetMenu(e,id){
   h+='<div class="sep"></div><button class="cp-popi" onclick="cpShDel(\''+id+'\')" style="color:var(--neg)">Удалить лист</button>';
   cpFloat(e.target,h);
 }
-function cpShDup(id){ const d=cpData(cpP()); const i=d.sheets.findIndex(s=>s.id===id); if(i<0)return; const cp=JSON.parse(JSON.stringify(d.sheets[i])); cp.id=cpUid(); cp.name=d.sheets[i].name+' копия'; cp.hidden=false; delete cp.gs; /* копия не наследует связь с Google: иначе два листа писали бы в одну таблицу */ cp.cols.forEach(c=>{const old=c.id;c.id=cpUid();cp.rows.forEach(r=>{if(old in r.c){r.c[c.id]=r.c[old];delete r.c[old];}});}); cp.rows.forEach(r=>r.id=cpUid()); d.sheets.splice(i+1,0,cp); d.active=cp.id; cpCloseFloat(); cpSave(); cpRerender(); }
-function cpShHide(id){ const d=cpData(cpP()); if(d.sheets.filter(s=>!s.hidden).length<=1){toast('Нельзя скрыть последний видимый лист');cpCloseFloat();return;} const s=d.sheets.find(x=>x.id===id); if(s)s.hidden=true; if(d.active===id)d.active=(d.sheets.find(x=>!x.hidden)||{}).id; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpShDup(id){ const d=cpData(cpP()); const i=d.sheets.findIndex(s=>s.id===id); if(i<0)return; /* копия остаётся в той же таблице и получает свою вкладку при выгрузке */ const cp=JSON.parse(JSON.stringify(d.sheets[i])); cp.id=cpUid(); cp.name=d.sheets[i].name+' копия'; cp.hidden=false; delete cp.gs; delete cp.gid; /* копия не наследует связь с Google: иначе два листа писали бы в одну таблицу */ cp.cols.forEach(c=>{const old=c.id;c.id=cpUid();cp.rows.forEach(r=>{if(old in r.c){r.c[c.id]=r.c[old];delete r.c[old];}});}); cp.rows.forEach(r=>r.id=cpUid()); d.sheets.splice(i+1,0,cp); d.active=cp.id; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpShHide(id){ const d=cpData(cpP()); if(cpBookSheets(d,d.activeBook).filter(s=>!s.hidden).length<=1){toast('Нельзя скрыть последний видимый лист');cpCloseFloat();return;} const s=d.sheets.find(x=>x.id===id); if(s)s.hidden=true; if(d.active===id)d.active=(cpBookSheets(d,d.activeBook).find(x=>!x.hidden)||{}).id; cpCloseFloat(); cpSave(); cpRerender(); }
 function cpShColor(id,k){ const s=cpData(cpP()).sheets.find(x=>x.id===id); if(s)s.color=k; cpCloseFloat(); cpSave(); cpRerender(); }
-function cpShDel(id){ const p=cpP(); const d=cpData(p); if(d.sheets.length<=1){toast('Нельзя удалить единственный лист');cpCloseFloat();return;} const _gone=d.sheets.find(x=>x.id===id); if(p&&_gone&&_gone.gs&&_gone.gs.id&&window.LIVE&&window.SB){ /* лист удаляют — снимаем и связь, иначе она останется висеть на несуществующем листе. Саму таблицу на Диске не трогаем. */ try{ _giFetch('google-sheets',{action:'unlink'},{project_id:p.id,sheet_id:id}).catch(function(){}); }catch(_e){} } d.sheets=d.sheets.filter(x=>x.id!==id); if(d.active===id)d.active=(d.sheets.find(x=>!x.hidden)||d.sheets[0]).id; if(p&&p._cpShared)delete p._cpShared[id]; if(window.LIVE&&window.SB&&p){ try{ window.SB.from('content_shares').delete().eq('project_id',p.id).eq('sheet_id',id).then(function(){},function(e){console.warn('cp shdel share',e);}); window.SB.from('content_approvals').delete().eq('project_id',p.id).eq('sheet_id',id).then(function(){},function(_e){}); }catch(_e){} } cpCloseFloat(); cpSave(); cpRerender(); }
+function cpShDel(id){ const p=cpP(); const d=cpData(p); if(cpBookSheets(d,d.activeBook).length<=1){toast('В таблице должен остаться хотя бы один лист');cpCloseFloat();return;} /* Вкладку в Google не трогаем: документ принадлежит таблице целиком, а лишняя вкладка безобиднее потерянных данных. */ d.sheets=d.sheets.filter(x=>x.id!==id); if(d.active===id){const _l=cpBookSheets(d,d.activeBook); d.active=((_l.find(x=>!x.hidden)||_l[0])||{}).id;} if(p&&p._cpShared)delete p._cpShared[id]; if(window.LIVE&&window.SB&&p){ try{ window.SB.from('content_shares').delete().eq('project_id',p.id).eq('sheet_id',id).then(function(){},function(e){console.warn('cp shdel share',e);}); window.SB.from('content_approvals').delete().eq('project_id',p.id).eq('sheet_id',id).then(function(){},function(_e){}); }catch(_e){} } cpCloseFloat(); cpSave(); cpRerender(); }
 function cpHiddenMenu(e){
-  const d=cpData(cpP()); const hid=d.sheets.filter(s=>s.hidden);
+  const d=cpData(cpP()); const hid=cpBookSheets(d,d.activeBook).filter(s=>s.hidden);
   let h='<div class="ttl">Скрытые листы</div>'+hid.map(s=>'<button class="cp-popi" onclick="cpShUnhide(\''+s.id+'\')"><span class="cp-sdot" style="background:'+cpColorCss(s.color)+'"></span>'+_ddH(s.name)+'</button>').join('');
   cpFloat(e.target,h);
 }
-function cpShUnhide(id){ const s=cpData(cpP()).sheets.find(x=>x.id===id); if(s)s.hidden=false; cpData(cpP()).active=id; cpCloseFloat(); cpSave(); cpRerender(); }
+function cpShUnhide(id){ const d=cpData(cpP()); const s=d.sheets.find(x=>x.id===id); if(s){s.hidden=false; d.activeBook=s.book;} d.active=id; cpCloseFloat(); cpSave(); cpRerender(); }
 
 /* ---- search ---- */
 function cpSearch(v){ cpQ=v; cpSel={r:0,c:0}; cpRerender(); const i=document.getElementById('cp-q'); if(i){i.focus(); try{const L=v.length;i.setSelectionRange(L,L);}catch(_e){}} }
@@ -19116,7 +19314,7 @@ function cpDoImport(){
   }
   const rows=body.map(r=>{const o={id:cpUid(),c:{}};cols.forEach((col,i)=>{const v=(r[i]||'').trim();if(v)o.c[col.id]=v;});return o;});
   if(!rows.length)rows.push({id:cpUid(),c:{}});
-  const d=cpData(cpP()); const sh={id:cpUid(),name:'Импорт '+(d.sheets.length+1),color:CP_PALK[d.sheets.length%CP_PALK.length],hidden:false,cols,rows};
+  const d=cpData(cpP()); const _n=cpBookSheets(d,d.activeBook).length; const sh={id:cpUid(),book:d.activeBook,name:'Импорт '+(_n+1),color:CP_PALK[_n%CP_PALK.length],hidden:false,cols,rows};
   d.sheets.push(sh); d.active=sh.id; cpSel={r:0,c:0}; cpSave(); pd2Close(); cpRerender(); toast('Импортировано строк: '+rows.length);
 }
 /* --- сортировка + drag --- */
@@ -19328,7 +19526,7 @@ async function cpImportXlsx(input){
       made.push(cpSheetFromWs(nm,ws,shared,dateXf,hidden));
     }
     if(!made.length){ toast('В файле не нашлось листов'); return; }
-    const d=cpData(cpP()); made.forEach(function(s){ d.sheets.push(s); });
+    const d=cpData(cpP()); made.forEach(function(s){ s.book=d.activeBook; d.sheets.push(s); });
     d.active=(made.find(function(s){return !s.hidden;})||made[0]).id;
     cpSel={r:0,c:0}; cpQ=''; cpSave(); pd2Close(); cpRerender();
     toast('Импортировано листов: '+made.length);
@@ -19353,17 +19551,19 @@ async function cpSendSheet(){
   const p=cpP(), sh=cpSheet();
   if(!(window.LIVE&&window.SB)){ toast('Для отправки клиенту нужен онлайн-режим (Supabase)'); return; }
   try{
-    /* Отправка клиенту и есть решение показать. Если у листа заведена таблица
-       Google, открываем заодно и её — иначе клиент получит наш снимок, а
-       таблицу, в которой всё ведётся, не увидит. */
-    if(sh.gs&&sh.gs.id&&!sh.gs.cl){
+    /* Отправка клиенту и есть решение показать. Если у таблицы заведён документ
+       Google, открываем заодно и его — иначе клиент получит наш снимок, а
+       таблицу, в которой всё ведётся, не увидит. Доступ открывается на всю
+       таблицу: вкладки одного документа поделить нельзя. */
+    const _d=cpData(p), _bk=cpBookOf(_d,sh);
+    if(_bk&&_bk.gs&&_bk.gs.id&&!_bk.gs.cl){
       try{
-        const r=await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, sheet_id:sh.id, on:1 });
-        if(r&&r.data&&r.data.ok!==false) cpGSMark(sh,Object.assign({},sh.gs,{ cl:true }));
+        const r=await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, book_id:_bk.id, on:1 });
+        if(r&&r.data&&r.data.ok!==false) cpGSMark(_bk,Object.assign({},_bk.gs,{ cl:true }));
       }catch(_e){ console.warn('cp share gs',_e); }
     }
     const me=(window.tMe&&window.tMe())||{};
-    const snap=cpShareSnap(sh);
+    const snap=cpShareSnap(sh,_bk);
     const res=await window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:sh.id,name:sh.name,data:snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'});
     if(res&&res.error)throw res.error;
     p._cpShared=p._cpShared||{}; p._cpShared[sh.id]={at:new Date().toISOString(),hash:cpHash(JSON.stringify(snap))};
@@ -19393,22 +19593,40 @@ const CP_GS_IC={
    уходит: иначе поля расходятся, и клиент видит то месяц, то нет. */
 /* Доступ открыт, но лист клиенту ни разу не отправляли — в его кабинете
    раздела просто нет. Говорим об этом сразу и предлагаем отправить. */
-function cpGSNeedSend(sh){
+function cpGSNeedSend(bk){
   pd2Open('<div class="modal" style="max-width:480px">'
-    +'<div class="modal-h"><h3>Доступ открыт, но лист клиенту не отправлен</h3>'
-    +'<p>Таблица «'+_ddH(sh.name||'Лист')+'» теперь открывается по ссылке. Но в кабинете клиента её ещё нет: лист ни разу не отправляли на согласование.</p></div>'
+    +'<div class="modal-h"><h3>Доступ открыт, но клиенту ничего не отправлено</h3>'
+    +'<p>Таблица «'+_ddH(bk.name||'')+'» теперь открывается по ссылке. Но в кабинете клиента её ещё нет: ни один её лист не отправляли на согласование.</p></div>'
     +'<div class="modal-b"><div class="cp-gsw q">'+CP_GS_IC.info
       +'<span>Отправка открывает клиенту сам лист — и вместе с ним таблицу. Пока этого не сделано, у клиента в разделе «Контент-план» пусто.</span></div></div>'
     +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Позже</button>'
-      +'<button class="btn-add" onclick="pd2Close();cpSendSheet()">Отправить клиенту</button></div></div>');
+      +'<button class="btn-add" onclick="pd2Close();cpSendSheet()">Отправить текущий лист</button></div></div>');
 }
-function cpShareSnap(sh){
+/* Снимок листа для клиента. Один сборщик на все места, откуда снимок уходит:
+   иначе поля расходятся, и клиент видит то месяц, то нет. */
+function cpShareSnap(sh,bk){
   const s={ id:sh.id, name:sh.name, color:sh.color, month:sh.month||null,
     cols:sh.cols, rows:sh.rows, cm:sh.cm||[], cf:sh.cf||[], headM:sh.headM||[] };
-  /* Адрес таблицы кладём только когда её явно открыли клиенту. В остальных
-     случаях ему незачем знать даже адрес — ссылка и есть доступ. */
-  if(sh.gs&&sh.gs.id&&sh.gs.cl) s.gs={ id:sh.gs.id };
+  /* Адрес таблицы кладём только когда её явно открыли клиенту, и вместе с
+     вкладкой этого листа: без gid клиент попадёт на первый месяц, а не на свой. */
+  if(bk&&bk.gs&&bk.gs.id&&bk.gs.cl){ s.gs={ id:bk.gs.id, book:bk.name||'' }; if(sh.gid!=null) s.gs.gid=sh.gid; }
   return s;
+}
+/* Всё, что уходит в Google при выгрузке таблицы: сама таблица и её листы. */
+function cpGSPayload(d,bk){
+  return { id:bk.id, name:bk.name,
+    sheets: cpBookSheets(d,bk.id).filter(function(s){ return !s.hidden; }).map(function(s){
+      return { id:s.id, name:s.name, gid:(s.gid==null?null:s.gid),
+        cols:(s.cols||[]).map(function(c){ return {id:c.id,name:c.name,type:c.type,sys:c.sys||null}; }),
+        rows:(s.rows||[]).map(function(r){ return {id:r.id,c:r.c||{}}; }) };
+    }) };
+}
+/* Ответ сервера привязывает наши листы к вкладкам Google. Держим эту привязку
+   у себя: по ней окно открывается сразу на нужном месяце, а переименование
+   листа меняет название вкладки, а не заводит ещё одну. */
+function cpGSTabs(d,bk,tabs){
+  if(!tabs) return;
+  cpBookSheets(d,bk.id).forEach(function(s){ if(tabs[s.id]!=null) s.gid=tabs[s.id]; });
 }
 /* Право то же, что на редактирование проектов, — контент-план ведёт команда
    проекта. Тот же список проверяет и функция на сервере: кнопку прячем, чтобы
@@ -19421,23 +19639,29 @@ function cpGSCan(){
   const pm=me.permissions||me.perms||{};
   return !!(pm.projects&&pm.projects.edit);
 }
-function cpGSLink(sh){ return (sh&&sh.gs&&sh.gs.id)?sh.gs:null; }
-function cpGSUrl(gs){ return (gs&&gs.url)||('https://docs.google.com/spreadsheets/d/'+(gs&&gs.id)+'/edit'); }
+/* Связь с Google живёт у таблицы, а не у листа: один документ Google на всю
+   таблицу проекта, листы внутри него — вкладки. */
+function cpGSLink(bk){ return (bk&&bk.gs&&bk.gs.id)?bk.gs:null; }
+function cpGSBookLink(){ try{ return cpGSLink(cpBook(cpData(cpP()))); }catch(_e){ return null; } }
+function cpGSUrl(gs,gid){
+  const u=(gs&&gs.url)||('https://docs.google.com/spreadsheets/d/'+(gs&&gs.id)+'/edit');
+  return (gid==null)?u:(u.split('#')[0]+'#gid='+encodeURIComponent(String(gid)));
+}
 /* Связь живёт в самих данных плана, а не в локальном кэше: так её видит вся
    команда и не приходится спрашивать сервер на каждой перерисовке. Пишем в обход
    cpSave — служебная отметка не должна занимать шаг в истории отмены. */
-function cpGSMark(sh,gs){
-  const p=cpP(); if(!p||!sh) return;
-  if(gs) sh.gs=gs; else delete sh.gs;
+function cpGSMark(bk,gs){
+  const p=cpP(); if(!p||!bk) return;
+  if(gs) bk.gs=gs; else delete bk.gs;
   try{ p._cpSnap=JSON.stringify(p._cp); }catch(_e){}
   cpPersist(p);
 }
-function cpGSBtnHTML(sh){
+function cpGSBtnHTML(bk){
   if(!(window.LIVE&&window.SB)) return '';
   if(!cpGSCan()) return '';
-  const gs=cpGSLink(sh);
+  const gs=cpGSLink(bk);
   return '<button class="cp-mini cp-gs'+(gs?' on':'')+'" onclick="cpGSMenu(event)" title="'
-    +(gs?'Лист связан с Google Таблицей':'Выгрузить лист в Google Таблицы')+'">'
+    +(gs?'Таблица связана с документом Google':'Завести документ Google для этой таблицы')+'">'
     +'<span class="cp-gs-g">'+GI_MARK.google+'</span><span>Google</span>'
     +(gs?'<i class="cp-gs-dot"></i>':'')+'</button>';
 }
@@ -19451,8 +19675,8 @@ function cpGSWhen(gs){
   return (gs.dir==='pull'?'Загружено из Google ':'Выгружено ')+when;
 }
 function cpGSMenu(e){
-  const sh=cpSheet(); if(!sh) return;
-  const gs=cpGSLink(sh);
+  const d=cpData(cpP()); const bk=cpBook(d); if(!bk) return;
+  const gs=cpGSLink(bk);
   const btn=(e&&(e.currentTarget||(e.target.closest&&e.target.closest('.cp-mini'))))||e.target;
   const row=function(cls,ic,t,s,on){
     return '<button class="cp-popi'+(cls?' '+cls:'')+'"'+(on?(' onclick="'+on+'"'):' disabled')+'>'
@@ -19462,15 +19686,15 @@ function cpGSMenu(e){
      после вставки, и позднее расширение увело бы меню за край экрана. */
   let h='<div class="cp-gs-pop">'
     +'<div class="cp-gs-h"><span class="g">'+GI_MARK.google+'</span><span class="tx">'
-    +'<b>Google Таблица</b><span>'+(gs?_ddH(cpGSWhen(gs)):'Лист ещё не выгружен')+'</span></span></div>';
+    +'<b>'+_ddH(bk.name||'Таблица')+'</b><span>'+(gs?_ddH(cpGSWhen(gs)):'Документ ещё не заведён')+'</span></span></div>';
   /* Пункт «открыть здесь» показываем всегда, даже когда открывать ещё нечего:
      иначе о самой возможности узнаёшь только после первой выгрузки. */
   h+=row('',CP_GS_IC.frame,'Открыть таблицу здесь',
-        gs?'Google Таблица вместо нашей, не выходя из системы':'Заведём таблицу и откроем её здесь','cpGSShow()')+'<div class="sep"></div>';
+        gs?'Документ Google вместо нашей таблицы, не выходя из системы':'Заведём документ и откроем его здесь','cpGSShow()')+'<div class="sep"></div>';
   h+=row('',CP_GS_IC.up,'Выгрузить в Google',
-        gs?'Перезапишет таблицу данными листа':'Создаст таблицу в папке проекта','cpGSPush()');
+        gs?'Перезапишет все листы таблицы':'Создаст документ в папке проекта','cpGSPush()');
   h+=row('',CP_GS_IC.down,'Загрузить из Google',
-        gs?'Перезапишет лист данными таблицы':'Сначала нужно выгрузить лист',gs?'cpGSPull()':'');
+        gs?'Перезапишет текущий лист данными его вкладки':'Сначала нужно выгрузить таблицу',gs?'cpGSPull()':'');
   if(gs){
     h+='<div class="sep"></div>';
     h+=row('',CP_GS_IC.open,'Открыть в новой вкладке','В самом Google, отдельным окном браузера','cpGSOpen()');
@@ -19483,8 +19707,10 @@ function cpGSMenu(e){
 }
 function cpGSOpen(){
   cpCloseFloat();
-  const gs=cpGSLink(cpSheet()); if(!gs) return;
-  let u=cpGSUrl(gs); try{ if(typeof _giWithUser==='function') u=_giWithUser(u); }catch(_e){}
+  const gs=cpGSBookLink(); if(!gs) return;
+  const sh=cpSheet();
+  let u=cpGSUrl(gs,sh&&sh.gid!=null?sh.gid:null);
+  try{ if(typeof _giWithUser==='function') u=_giWithUser(u); }catch(_e){}
   window.open(u,'_blank','noopener');
 }
 
@@ -19509,77 +19735,77 @@ function cpGSSetView(v){ cpGSView=v; try{ localStorage.setItem('cp_gs_view',v); 
    Чистый вид убирает шапку и меню Google — так таблица занимает весь экран.
    authuser подставляем свой: у людей часто несколько аккаунтов Google, и по
    умолчанию окно открывается не тем, у кого есть доступ. */
-function cpGSEmbed(gs,clean){
+function cpGSEmbed(gs,clean,gid){
   const u='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(String(gs&&gs.id||''))+'/edit?usp=sharing'
-    +(clean?'&rm=minimal&widget=true&headers=false':'');
+    +(clean?'&rm=minimal&widget=true&headers=false':'')
+    +(gid==null?'':'#gid='+encodeURIComponent(String(gid)));
   try{ return (typeof _giWithUser==='function')?_giWithUser(u):u; }catch(_e){ return u; }
 }
 /* Автозаведение таблицы. Состояние держим отдельно от данных плана: неудача
    не должна уехать в базу и застрять у всей команды, а повторять попытку на
    каждой перерисовке — значит забросать Google запросами. */
 const _cpGSAuto={};
-function cpGSAuto(p,sh){
+function cpGSAuto(p,bk){
   if(!(window.LIVE&&window.SB)) return false;
-  if(!p||!sh||!sh.id) return false;
-  if(!cpGSCan()) return false;              /* без права на проекты таблицу не заводим */
-  const k=p.id+'/'+sh.id;
+  if(!p||!bk||!bk.id) return false;
+  if(!cpGSCan()) return false;              /* без права на проекты документ не заводим */
+  const k=p.id+'/'+bk.id;
   if(_cpGSAuto[k]==='fail') return false;   /* уже не вышло — показываем нашу таблицу */
   if(_cpGSAuto[k]==='run') return true;
   _cpGSAuto[k]='run';
-  cpGSAutoRun(p,sh,k);
+  cpGSAutoRun(p,bk,k);
   return true;
 }
-async function cpGSAutoRun(p,sh,k){
+async function cpGSAutoRun(p,bk,k){
   try{
-    const payload={ id:sh.id, name:sh.name,
-      cols:(sh.cols||[]).map(function(c){ return {id:c.id,name:c.name,type:c.type,sys:c.sys||null}; }),
-      rows:(sh.rows||[]).map(function(r){ return {id:r.id,c:r.c||{}}; }) };
-    const { status, data } = await _giFetch('google-sheets',{action:'push'},{ project_id:p.id, sheet:payload });
+    const d=cpData(p);
+    const { status, data } = await _giFetch('google-sheets',{action:'push'},{ project_id:p.id, book:cpGSPayload(d,bk) });
     if(data&&data.ok!==false&&data.spreadsheet_id){
       delete _cpGSAuto[k];
-      cpGSMark(sh,{ id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' });
+      cpGSTabs(d,bk,data.tabs);
+      cpGSMark(bk,{ id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' });
       cpRerender();
-      cpGSSyncClient(p,sh);
+      cpGSSyncClient(p,bk);
       return;
     }
     _cpGSAuto[k]='fail'; cpRerender();
     if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
-    cpGSFail(sh,data,'Не удалось завести таблицу в Google');
+    cpGSFail(bk,data,'Не удалось завести документ в Google');
   }catch(e){
     _cpGSAuto[k]='fail'; cpRerender();
     toast(String(e.message||e));
   }
 }
-/* Лист, который клиент уже видит, должен показывать ту же таблицу, что и мы.
-   Иначе у него остаётся снимок прошлой жизни плана, а работа идёт в Google.
-   Листы, клиенту не отправленные, не трогаем: доступ по ссылке — решение,
-   а не побочный эффект. */
-async function cpGSSyncClient(p,sh){
-  if(!p||!sh||!sh.gs||!sh.gs.id||sh.gs.cl) return;
-  if(!(p._cpShared&&p._cpShared[sh.id])) return;
+/* Таблица, чьи листы клиент уже видит, должна показывать ему тот же документ,
+   в котором работаем мы. Таблицы, из которых клиенту ничего не отправляли,
+   не трогаем: доступ по ссылке — решение, а не побочный эффект. */
+async function cpGSSyncClient(p,bk){
+  if(!p||!bk||!bk.gs||!bk.gs.id||bk.gs.cl) return;
+  const d=cpData(p);
+  const sent=cpBookSheets(d,bk.id).some(function(s){ return !!(p._cpShared&&p._cpShared[s.id]); });
+  if(!sent) return;
   try{
-    const r=await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, sheet_id:sh.id, on:1 });
-    if(r&&r.data&&r.data.ok!==false){ cpGSMark(sh,Object.assign({},sh.gs,{ cl:true })); cpRerender(); }
+    const r=await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, book_id:bk.id, on:1 });
+    if(r&&r.data&&r.data.ok!==false){ cpGSMark(bk,Object.assign({},bk.gs,{ cl:true })); cpRerender(); }
   }catch(e){ console.warn('cp gs client sync',e); }
 }
-function cpGSMakingHTML(sh){
+function cpGSMakingHTML(bk){
   return '<div class="cp-gswrap"><div class="cp-gsmake">'
     +'<span class="cp-gsmake-g">'+GI_MARK.google+'</span>'
-    +'<b>Заводим таблицу в Google</b>'
-    +'<span>Лист «'+_ddH(sh.name||'')+'» — в папке проекта на Диске агентства</span>'
+    +'<b>Заводим документ в Google</b>'
+    +'<span>Таблица «'+_ddH(bk.name||'')+'» — в папке проекта на Диске агентства</span>'
     +'<span class="cp-gsmake-bar"><i></i></span></div></div>';
 }
 function cpGSShow(){
   cpCloseFloat();
-  const sh=cpSheet(); if(!sh) return;
-  try{ const p=cpP(); if(p) delete _cpGSAuto[p.id+'/'+sh.id]; }catch(_e){}   /* просят вручную — пробуем заново */
+  try{ const p=cpP(), bk=cpBook(cpData(p)); if(p&&bk) delete _cpGSAuto[p.id+'/'+bk.id]; }catch(_e){}   /* просят вручную — пробуем заново */
   cpGSSetView('gs');
 }
 function cpGSHide(){ cpGSSetView('own'); }
 function cpGSCleanToggle(){
   cpGSClean=!cpGSClean;
-  const f=document.querySelector('.cp-gsfr'), gs=cpGSLink(cpSheet());
-  if(f&&gs) f.src=cpGSEmbed(gs,cpGSClean);
+  const f=document.querySelector('.cp-gsfr'), gs=cpGSBookLink(), sh=cpSheet();
+  if(f&&gs) f.src=cpGSEmbed(gs,cpGSClean,sh&&sh.gid!=null?sh.gid:null);
   const b=document.getElementById('cp-gs-clean'); if(b) b.classList.toggle('on',cpGSClean);
   toast(cpGSClean?'Чистый вид: только сетка':'Панели Google вернулись');
 }
@@ -19594,8 +19820,8 @@ function cpGSFull(){
   if(rq){ try{ const r=rq.call(el); if(r&&r.catch)r.catch(function(){}); }catch(_e){} }
   else toast('Полный экран не поддерживается браузером');
 }
-function cpGSFrameHTML(p,sh){
-  const gs=cpGSLink(sh); const can=cpGSCan(); const cl=!!(gs&&gs.cl);
+function cpGSFrameHTML(p,bk,sh){
+  const gs=cpGSLink(bk); const can=cpGSCan(); const cl=!!(gs&&gs.cl);
   const ic=function(id,cls,title,on,svg){
     return '<button class="pd-bdic'+(cls?' '+cls:'')+'"'+(id?' id="'+id+'"':'')+' onclick="'+on+'" title="'+title+'">'+svg+'</button>';
   };
@@ -19605,7 +19831,7 @@ function cpGSFrameHTML(p,sh){
   return '<div class="cp-gswrap">'
     +'<div class="cp-gsbar">'
       +'<span class="cp-gsttl"><span class="g">'+GI_MARK.google+'</span><span class="tx">'
-        +'<b>'+_ddH(sh.name||'Лист')+'</b><i>'+_ddH(cpGSWhen(gs))+'</i></span></span>'
+        +'<b>'+_ddH(bk.name||'Таблица')+'</b><i>'+_ddH(cpGSWhen(gs))+'</i></span></span>'
       +(can?('<div class="pd-bd-sw" onclick="cpGSClient('+(cl?'false':'true')+')" title="Клиент увидит эту таблицу в своём кабинете — только для чтения, по ссылке и без аккаунта Google">'
         +'<span class="tgl'+(cl?' on':'')+'" id="cp-gs-vis"><i></i></span>Показывать клиенту</div>'):'')
       +'<div class="cp-gstools">'
@@ -19622,39 +19848,40 @@ function cpGSFrameHTML(p,sh){
       +'</div>'
     +'</div>'
     +'<div class="cp-gsfall"><span>Если таблица не появилась, Google не разрешил открыть её в окне — нажмите «Открыть в Google». Проверьте, что вы вошли в тот аккаунт, которым подключено агентство.</span></div>'
-    +'<iframe class="cp-gsfr" src="'+_ddA(cpGSEmbed(gs,cpGSClean))+'" title="Google Таблица" allowfullscreen loading="lazy" allow="clipboard-read; clipboard-write; fullscreen"></iframe>'
+    +'<iframe class="cp-gsfr" src="'+_ddA(cpGSEmbed(gs,cpGSClean,sh&&sh.gid!=null?sh.gid:null))+'" title="Google Таблица" allowfullscreen loading="lazy" allow="clipboard-read; clipboard-write; fullscreen"></iframe>'
   +'</div>';
 }
 /* Клиенту таблица открывается по ссылке и без аккаунта Google — иначе он её
    просто не увидит. Поэтому решение всегда явное, переключателем, и по
    умолчанию выключено: ссылка на таблицу — это доступ для всех, у кого она есть. */
 async function cpGSClient(on){
-  const p=cpP(), sh=cpSheet(); if(!p||!sh||!cpGSLink(sh)) return;
+  const p=cpP(); if(!p) return;
+  const d=cpData(p), bk=cpBook(d); if(!bk||!cpGSLink(bk)) return;
   const row=document.querySelector('.cp-gswrap .pd-bd-sw'); if(row) row.classList.add('busy');
   try{
-    const { status, data } = await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, sheet_id:sh.id, on:on?1:0 });
+    const { status, data } = await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, book_id:bk.id, on:on?1:0 });
     if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
-    if(!data||data.ok===false){ cpGSFail(sh,data,'Не удалось изменить доступ'); return; }
+    if(!data||data.ok===false){ cpGSFail(bk,data,'Не удалось изменить доступ'); return; }
     /* cpGSMark сохраняет план, а сохранение плана заодно пересылает снимки
        уже открытых клиенту листов — вместе с новым доступом к таблице. */
-    cpGSMark(sh,Object.assign({},cpGSLink(sh)||{},{ cl:!!on }));
+    cpGSMark(bk,Object.assign({},cpGSLink(bk)||{},{ cl:!!on }));
     cpRerender();
-    /* Клиент читает лист из снимка content_shares. Если лист ему ни разу не
-       отправляли, снимка нет — доступ в Google открыт, а в кабинете пусто.
-       Молча оставлять это нельзя: человек уверен, что всё показал. */
-    const sent=!!(p._cpShared&&p._cpShared[sh.id]);
-    if(on&&!sent) cpGSNeedSend(sh);
-    else toast(on?'Клиент увидит таблицу в своём кабинете':'Таблица закрыта: доступ по ссылке снят');
+    /* Клиент читает лист из снимка content_shares. Если из этой таблицы ему
+       ни разу ничего не отправляли, снимка нет — доступ в Google открыт, а в
+       кабинете пусто. Молча оставлять это нельзя. */
+    const sent=cpBookSheets(d,bk.id).some(function(s){ return !!(p._cpShared&&p._cpShared[s.id]); });
+    if(on&&!sent) cpGSNeedSend(bk);
+    else toast(on?'Клиент увидит эту таблицу в своём кабинете':'Таблица закрыта: доступ по ссылке снят');
   }catch(e){ toast(String(e.message||e)); }
   finally{ const r2=document.querySelector('.cp-gswrap .pd-bd-sw'); if(r2) r2.classList.remove('busy'); }
 }
 /* Ошибки Google приходят разные, а человеку важны две вещи: почему не вышло и
    что сделать. Отдельно ловим случай «таблицу удалили» — связь тогда снимает
    сама функция, и в интерфейсе она тоже должна пропасть, а не висеть мёртвой. */
-function cpGSFail(sh,data,fallback){
+function cpGSFail(bk,data,fallback){
   const msg=(data&&(data.error||data.message))||fallback;
   if(data&&data.code==='api_disabled'){ cpGSApiOff(data.enable_url||''); return; }
-  if(/удалена в Google/i.test(String(msg))){ cpGSMark(sh,null); cpRerender(); }
+  if(/удалена в Google|удалён в Google/i.test(String(msg))){ cpGSMark(bk,null); cpRerender(); }
   toast(String(msg));
 }
 /* Sheets API включается один раз на весь проект Google Cloud, и сделать это
@@ -19680,47 +19907,51 @@ function cpGSLoading(t,s){
 /* ---- выгрузка ---- */
 function cpGSPush(){
   cpCloseFloat();
-  const p=cpP(), sh=cpSheet(); if(!p||!sh) return;
-  const gs=cpGSLink(sh);
+  const p=cpP(); if(!p) return;
+  const d=cpData(p), bk=cpBook(d), sh=cpSheet(); if(!bk||!sh) return;
+  const gs=cpGSLink(bk);
+  const list=cpBookSheets(d,bk.id).filter(function(s){ return !s.hidden; });
+  const rowsN=list.reduce(function(a,s){ return a+((s.rows||[]).length); },0);
   let notes='';
-  if(sh.filt&&Object.keys(sh.filt).length)
-    notes+='<div class="cp-gsw">'+CP_GS_IC.warn+'<span>В листе включён фильтр. Выгрузятся <b>все</b> строки, включая скрытые.</span></div>';
-  if(sh.sort)
+  if(list.some(function(s){ return s.filt&&Object.keys(s.filt).length; }))
+    notes+='<div class="cp-gsw">'+CP_GS_IC.warn+'<span>В листах включены фильтры. Выгрузятся <b>все</b> строки, включая скрытые.</span></div>';
+  if(list.some(function(s){ return !!s.sort; }))
     notes+='<div class="cp-gsw q">'+CP_GS_IC.info+'<span>Сортировка на экране на выгрузку не влияет — строки уйдут в исходном порядке.</span></div>';
-  if((sh.cols||[]).some(function(c){return c.type==='doc';}))
+  if(list.some(function(s){ return (s.cols||[]).some(function(c){ return c.type==='doc'; }); }))
     notes+='<div class="cp-gsw q">'+CP_GS_IC.info+'<span>Сценарии уйдут ссылками на документы. Обратно эта колонка не тянется — тексты в безопасности.</span></div>';
   /* Про оформление предупреждаем, только когда есть чему пропасть: лишняя
      строка в окне подтверждения обесценивает те, что действительно важны. */
-  const dressed=((sh.cm||[]).length?'комментарии':'')||((sh.cf||[]).length?'правила подсветки':'')
-    ||((sh.headM||[]).length||(sh.rows||[]).some(function(r){return r.m&&r.m.length;})?'объединённые ячейки':'');
+  const has=function(f){ return list.some(f); };
+  const dressed=(has(function(s){return (s.cm||[]).length;})?'комментарии':'')
+    ||(has(function(s){return (s.cf||[]).length;})?'правила подсветки':'')
+    ||(has(function(s){return (s.headM||[]).length||(s.rows||[]).some(function(r){return r.m&&r.m.length;});})?'объединённые ячейки':'');
   if(dressed)
-    notes+='<div class="cp-gsw q">'+CP_GS_IC.info+'<span>В таблицу уходят только значения — '+dressed+' и оформление остаются здесь.</span></div>';
+    notes+='<div class="cp-gsw q">'+CP_GS_IC.info+'<span>В документ уходят только значения — '+dressed+' и оформление остаются здесь.</span></div>';
   pd2Open('<div class="modal" style="max-width:520px">'
-    +'<div class="modal-h"><h3>Выгрузить лист в Google</h3><p>'
-    +(gs?'Всё, что сейчас в связанной таблице, будет заменено данными листа «'+_ddH(sh.name)+'».'
-        :'Создадим таблицу в папке проекта на Диске и запишем в неё лист «'+_ddH(sh.name)+'».')+'</p></div>'
+    +'<div class="modal-h"><h3>Выгрузить таблицу в Google</h3><p>'
+    +(gs?'Все вкладки связанного документа будут заменены листами таблицы «'+_ddH(bk.name)+'».'
+        :'Создадим документ в папке проекта на Диске и запишем в него листы таблицы «'+_ddH(bk.name)+'».')+'</p></div>'
     +'<div class="modal-b">'
       +'<div class="cp-gsx">'
-        +'<div class="cp-gsx-i"><b>'+(sh.rows||[]).length+'</b><span>'+_plural((sh.rows||[]).length,'строка','строки','строк')+'</span></div>'
-        +'<div class="cp-gsx-i"><b>'+(sh.cols||[]).length+'</b><span>'+_plural((sh.cols||[]).length,'колонка','колонки','колонок')+'</span></div>'
-        +'<div class="cp-gsx-i"><b>'+(gs?'Замена':'Новая')+'</b><span>'+(gs?'существующей таблицы':'таблица в папке проекта')+'</span></div>'
+        +'<div class="cp-gsx-i"><b>'+list.length+'</b><span>'+_plural(list.length,'лист','листа','листов')+' → вкладки</span></div>'
+        +'<div class="cp-gsx-i"><b>'+rowsN+'</b><span>'+_plural(rowsN,'строка','строки','строк')+' всего</span></div>'
+        +'<div class="cp-gsx-i"><b>'+(gs?'Замена':'Новый')+'</b><span>'+(gs?'существующего документа':'документ в папке проекта')+'</span></div>'
       +'</div>'+notes+'</div>'
     +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button>'
-      +'<button class="btn-add" onclick="cpGSPushGo()">'+(gs?'Перезаписать в Google':'Создать таблицу')+'</button></div></div>');
+      +'<button class="btn-add" onclick="cpGSPushGo()">'+(gs?'Перезаписать в Google':'Создать документ')+'</button></div></div>');
 }
 async function cpGSPushGo(){
-  const p=cpP(), sh=cpSheet(); if(!p||!sh) return;
-  cpGSLoading('Выгружаем в Google','Лист «'+_ddH(sh.name)+'»');
+  const p=cpP(); if(!p) return;
+  const d=cpData(p), bk=cpBook(d); if(!bk) return;
+  cpGSLoading('Выгружаем в Google','Таблица «'+_ddH(bk.name)+'»');
   try{
-    const payload={ id:sh.id, name:sh.name,
-      cols:(sh.cols||[]).map(function(c){ return {id:c.id,name:c.name,type:c.type,sys:c.sys||null}; }),
-      rows:(sh.rows||[]).map(function(r){ return {id:r.id,c:r.c||{}}; }) };
-    const { status, data } = await _giFetch('google-sheets',{action:'push'},{ project_id:p.id, sheet:payload });
+    const { status, data } = await _giFetch('google-sheets',{action:'push'},{ project_id:p.id, book:cpGSPayload(d,bk) });
     if(status===503||(data&&data.error==='not_configured')){ pd2Close(); toast('Google ещё не подключён — раздел «Интеграции»'); return; }
-    if(!data||data.ok===false){ pd2Close(); cpGSFail(sh,data,'Не удалось выгрузить лист'); return; }
-    cpGSMark(sh,Object.assign({},cpGSLink(sh)||{},
+    if(!data||data.ok===false){ pd2Close(); cpGSFail(bk,data,'Не удалось выгрузить таблицу'); return; }
+    cpGSTabs(d,bk,data.tabs);
+    cpGSMark(bk,Object.assign({},cpGSLink(bk)||{},
       { id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' }));
-    cpGSSyncClient(p,sh);
+    cpGSSyncClient(p,bk);
     pd2Close();
     /* Выгрузили — сразу показываем результат в окне здесь. Уводить в новую
        вкладку после того, как окно появилось в самой системе, незачем. */
@@ -19792,13 +20023,16 @@ function _cpGSPlan(sh,data){
 }
 async function cpGSPull(){
   cpCloseFloat();
-  const p=cpP(), sh=cpSheet(); if(!p||!sh) return;
-  if(!cpGSLink(sh)){ toast('Сначала выгрузите лист в Google'); return; }
-  cpGSLoading('Читаем таблицу','Лист «'+_ddH(sh.name)+'»');
+  const p=cpP(); if(!p) return;
+  const d=cpData(p), bk=cpBook(d), sh=cpSheet(); if(!bk||!sh) return;
+  if(!cpGSLink(bk)){ toast('Сначала выгрузите таблицу в Google'); return; }
+  cpGSLoading('Читаем таблицу','Вкладка «'+_ddH(sh.name)+'»');
   try{
-    const { status, data } = await _giFetch('google-sheets',{action:'pull'},{ project_id:p.id, sheet_id:sh.id });
+    const { status, data } = await _giFetch('google-sheets',{action:'pull'},
+      { project_id:p.id, book_id:bk.id, sheet_id:sh.id, gid:(sh.gid==null?null:sh.gid), title:sh.name });
     if(status===503||(data&&data.error==='not_configured')){ pd2Close(); toast('Google ещё не подключён — раздел «Интеграции»'); return; }
-    if(!data||data.ok===false){ pd2Close(); cpGSFail(sh,data,'Не удалось прочитать таблицу'); return; }
+    if(!data||data.ok===false){ pd2Close(); cpGSFail(bk,data,'Не удалось прочитать таблицу'); return; }
+    if(data.gid!=null&&sh.gid!==data.gid){ sh.gid=data.gid; }
     window._CP_GS_PULL={ sheet:sh.id, data:data };
     const pl=_cpGSPlan(sh,data);
     let notes='';
@@ -19849,7 +20083,8 @@ function cpGSPullApply(){
   if(cpSel.r>=cpDisp(sh).length) cpSel.r=Math.max(0,cpDisp(sh).length-1);
   /* Отметку о синхронизации ставим до cpSave — иначе она попадёт в следующий шаг
      истории, а не в этот, и Ctrl+Z вернул бы строки, оставив чужую дату. */
-  sh.gs=Object.assign({},cpGSLink(sh)||{},{ at:new Date().toISOString(), dir:'pull' });
+  const _bk=cpBook(cpData(p));
+  if(_bk&&_bk.gs) _bk.gs=Object.assign({},_bk.gs,{ at:new Date().toISOString(), dir:'pull' });
   window._CP_GS_PULL=null;
   cpSave(); pd2Close(); cpRerender();
   toast('Загружено из Google · '+pl.rows+' '+_plural(pl.rows,'строка','строки','строк')
@@ -19858,20 +20093,22 @@ function cpGSPullApply(){
 /* ---- отвязать ---- */
 function cpGSUnlink(){
   cpCloseFloat();
-  const sh=cpSheet(); if(!sh||!cpGSLink(sh)) return;
+  const bk=cpBook(cpData(cpP())); if(!bk||!cpGSLink(bk)) return;
   pd2Open('<div class="modal" style="max-width:460px">'
-    +'<div class="modal-h"><h3>Отвязать таблицу</h3><p>Лист «'+_ddH(sh.name)+'» перестанет быть связан с Google.</p></div>'
+    +'<div class="modal-h"><h3>Отвязать документ Google</h3><p>Таблица «'+_ddH(bk.name)+'» перестанет быть связана с ним.</p></div>'
     +'<div class="modal-b"><div class="cp-gsw q">'+CP_GS_IC.info
-      +'<span>Сама таблица останется на Диске агентства — мы удаляем только связь. Выгрузить лист заново можно в любой момент, тогда появится новая таблица.</span></div></div>'
+      +'<span>Сам документ останется на Диске агентства — мы удаляем только связь и закрываем доступ по ссылке. Выгрузить таблицу заново можно в любой момент, тогда появится новый документ.</span></div></div>'
     +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button>'
       +'<button class="btn-add" onclick="cpGSUnlinkGo()" style="background:var(--neg)">Отвязать</button></div></div>');
 }
 async function cpGSUnlinkGo(){
-  const p=cpP(), sh=cpSheet(); if(!p||!sh) return;
-  try{ await _giFetch('google-sheets',{action:'unlink'},{ project_id:p.id, sheet_id:sh.id }); }
+  const p=cpP(); if(!p) return;
+  const d=cpData(p), bk=cpBook(d); if(!bk) return;
+  try{ await _giFetch('google-sheets',{action:'unlink'},{ project_id:p.id, book_id:bk.id }); }
   catch(e){ console.warn('gs unlink',e); }
-  cpGSMark(sh,null); pd2Close(); cpRerender();
-  toast('Связь снята. Таблица осталась на Диске.');
+  cpBookSheets(d,bk.id).forEach(function(s){ delete s.gid; });
+  cpGSMark(bk,null); pd2Close(); cpRerender();
+  toast('Связь снята. Документ остался на Диске.');
 }
 
 /* ===================== КОНТЕНТ-ПЛАН · кабинет клиента ===================== */
@@ -20398,11 +20635,14 @@ function clCpGSRender(sh,tabs){
   const box=document.getElementById('content-cl'); if(!box) return;
   const gs=clCpGS(sh); if(!gs) return;
   /* Только чтение: план ведёт агентство, клиент его смотрит и согласовывает.
-     Адрес /preview открывается и без аккаунта Google — у клиента его обычно нет. */
-  const src='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(String(gs.id))+'/preview';
+     Адрес /preview открывается и без аккаунта Google — у клиента его обычно нет.
+     gid ведёт сразу на вкладку этого листа: в документе их столько же, сколько
+     месяцев, и попадать всегда на первый — значит каждый раз искать свой. */
+  const src='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(String(gs.id))+'/preview'
+    +(gs.gid==null?'':'#gid='+encodeURIComponent(String(gs.gid)));
   box.classList.add('cl-gs-full');
   box.innerHTML='<div class="clcp-gsbar">'+clCpGSSwitch(sh)
-    +'<div class="nm">'+_ddH(sh.name||'Контент-план')+'</div>'+(tabs||'')+'</div>'
+    +'<div class="nm">'+_ddH(gs.book||sh.name||'Контент-план')+'</div>'+(tabs||'')+'</div>'
     +'<div class="clcp-gswrap"><iframe src="'+_ddA(src)+'" title="Контент-план в Google Таблицах" loading="lazy" allowfullscreen></iframe></div>';
 }
 function clCpPick(i){ window.CL_CP.sel=i; clCpRender(); }
@@ -20531,7 +20771,7 @@ function cpSheetApprHTML(p,sh){
 
 /* ===================== КОНТЕНТ-ПЛАН · мощные фичи (undo, диапазон, буфер) ===================== */
 function cpPersist(p){ try{localStorage.setItem(cpKeyLS(p),JSON.stringify(p._cp));}catch(e){} if(window.LIVE&&window.SB){ try{ const me=(window.tMe&&window.tMe())||{}; window.SB.from('content_plans').upsert({project_id:p.id,data:p._cp,updated_at:new Date().toISOString(),updated_by:me.id||null},{onConflict:'project_id'}).then(function(){},function(e){console.warn('cp save',e);});
-    if(p._cpShared){ const _exist={}; (p._cp.sheets||[]).forEach(function(_s){_exist[_s.id]=1;}); Object.keys(p._cpShared).forEach(function(_sid){ if(!_exist[_sid]){ window.SB.from('content_shares').delete().eq('project_id',p.id).eq('sheet_id',_sid).then(function(){},function(e){console.warn('cp unshare',e);}); window.SB.from('content_approvals').delete().eq('project_id',p.id).eq('sheet_id',_sid).then(function(){},function(_e){}); delete p._cpShared[_sid]; } }); (p._cp.sheets||[]).forEach(function(_sh){ if(p._cpShared[_sh.id]){ const _snap=cpShareSnap(_sh); p._cpShared[_sh.id]={at:new Date().toISOString(),hash:cpHash(JSON.stringify(_snap))}; window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:_sh.id,name:_sh.name,data:_snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'}).then(function(){},function(e){console.warn('cp resync',e);}); } }); } }catch(e){console.warn(e);} } }
+    if(p._cpShared){ const _exist={}; (p._cp.sheets||[]).forEach(function(_s){_exist[_s.id]=1;}); Object.keys(p._cpShared).forEach(function(_sid){ if(!_exist[_sid]){ window.SB.from('content_shares').delete().eq('project_id',p.id).eq('sheet_id',_sid).then(function(){},function(e){console.warn('cp unshare',e);}); window.SB.from('content_approvals').delete().eq('project_id',p.id).eq('sheet_id',_sid).then(function(){},function(_e){}); delete p._cpShared[_sid]; } }); (p._cp.sheets||[]).forEach(function(_sh){ if(p._cpShared[_sh.id]){ const _snap=cpShareSnap(_sh,cpBookOf(p._cp,_sh)); p._cpShared[_sh.id]={at:new Date().toISOString(),hash:cpHash(JSON.stringify(_snap))}; window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:_sh.id,name:_sh.name,data:_snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'}).then(function(){},function(e){console.warn('cp resync',e);}); } }); } }catch(e){console.warn(e);} } }
 function cpUndo(){ const p=cpP(); if(!p||!(p._cpUndo&&p._cpUndo.length))return; if(cpEd)cpEd=null; p._cpRedo=p._cpRedo||[]; p._cpRedo.push(JSON.stringify(p._cp)); const prev=p._cpUndo.pop(); var d; try{d=JSON.parse(prev);}catch(e){return;} p._cp=d; p._cpSnap=prev; cpSel={r:0,c:0}; cpSelEnd=null; cpPersist(p); cpRerender(); if(typeof toast==='function')toast('Отменено'); }
 function cpRedo(){ const p=cpP(); if(!p||!(p._cpRedo&&p._cpRedo.length))return; if(cpEd)cpEd=null; p._cpUndo=p._cpUndo||[]; p._cpUndo.push(JSON.stringify(p._cp)); const nx=p._cpRedo.pop(); var d; try{d=JSON.parse(nx);}catch(e){return;} p._cp=d; p._cpSnap=nx; cpSel={r:0,c:0}; cpSelEnd=null; cpPersist(p); cpRerender(); }
 function cpRect(){ const a=cpSel, b=cpSelEnd||cpSel; return {r0:Math.min(a.r,b.r),r1:Math.max(a.r,b.r),c0:Math.min(a.c,b.c),c1:Math.max(a.c,b.c)}; }
@@ -21374,7 +21614,7 @@ function cpPlanApply(id){
   cols.push({id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]});
   let rows=(t.rows||[]).map(function(r){ const nr={id:cpUid(),c:{}}; if(r.c)Object.keys(r.c).forEach(function(oid){ if(idMap[oid])nr.c[idMap[oid]]=r.c[oid]; }); return nr; });
   while(rows.length<3) rows.push({id:cpUid(),c:{}});
-  const sh={id:cpUid(),name:t.name||'Контент-план',color:CP_PALK[d.sheets.length%CP_PALK.length],hidden:false,cols:cols,rows:rows};
+  const sh={id:cpUid(),book:d.activeBook,name:t.name||'Контент-план',color:CP_PALK[cpBookSheets(d,d.activeBook).length%CP_PALK.length],hidden:false,cols:cols,rows:rows};
   d.sheets.push(sh); d.active=sh.id; if(typeof cpMonthFilt!=='undefined')cpMonthFilt=null; cpSel={r:0,c:0}; cpQ='';
   pd2Close(); cpCloseFloat(); cpSave(); cpRerender();
   if(typeof toast==='function')toast('Создан лист из шаблона «'+t.name+'»');
