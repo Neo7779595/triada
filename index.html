@@ -11618,7 +11618,7 @@ function myProfileOpen(){
             ? ('Доступы к папкам и календарям проектов приходят на <b style="color:var(--txt)">'+escH(me.google_email)+'</b>.')
             : 'Нажмите — и система сама возьмёт адрес из вашего аккаунта Google. Вводить вручную ничего не нужно.'}</div>
         </div>
-        <button type="button" class="pm2-pwd-btn" id="pm2-gm-btn" onclick="pm2GoogleMail()">${me.google_email?'Сменить':'Подключить'}</button>
+        <button type="button" class="pm2-pwd-btn" id="pm2-gm-btn" onclick="pm2GoogleMail(this.dataset.force==='1')" data-force="${me.google_email?'1':'0'}">${me.google_email?'Сменить':'Подключить'}</button>
       </div>
       <div class="pm2-me-color">
         <span class="pm2-me-lbl">Ваш цвет</span>
@@ -11719,12 +11719,16 @@ async function pm2Save(field, rawVal){
    сообщает нам только его адрес — ни диска, ни календаря мы не просим,
    а выданный токен функция сразу аннулирует. Руками вводить нечего,
    и опечататься в адресе невозможно. */
-async function pm2GoogleMail(){
+async function pm2GoogleMail(force){
   const btn=document.getElementById('pm2-gm-btn');
   const was=btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.textContent='Открываю Google…'; }
   try{
-    const { status, data } = await _giFetch('google-auth', { action:'me_start' });
+    /* Меняем адрес — просим Google показать выбор аккаунта. В обычном случае
+       выбор не навязываем: у кого вход уже есть, тот не увидит вообще ничего. */
+    const params={ action:'me_start' };
+    if(force) params.force='1';
+    const { status, data } = await _giFetch('google-auth', params);
     if(status===503){ toast((data&&data.message)||'Интеграция с Google ещё не настроена'); return; }
     if(!data||!data.url) throw new Error((data&&data.message)||'Не удалось получить ссылку на Google');
     const w=window.open(data.url,'google-mail','width=520,height=680');
@@ -11740,7 +11744,7 @@ async function pm2GoogleMail(){
           me.google_email=mail;
           const s=document.getElementById('pm2-gm-s');
           if(s) s.innerHTML='Доступы к папкам и календарям проектов приходят на <b style="color:var(--txt)">'+escH(mail)+'</b>.';
-          if(btn) btn.textContent='Сменить';
+          if(btn){ btn.textContent='Сменить'; btn.dataset.force='1'; }
           toast('Рабочая почта: '+mail);
         }
       }catch(_){ }
