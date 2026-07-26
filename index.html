@@ -8746,6 +8746,7 @@ body.m-lock{overflow:hidden}
       <div class="nav-i" data-cm="reports" onclick="clNav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M14 2v6h6"/></svg>Отчёты <span class="ct">3</span></div>
       <div class="nav-i" data-cm="content" onclick="clNav('content')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16M15 4v16"/></svg>Контент-план</div>
       <div class="nav-i" data-cm="documents" onclick="clNav('documents')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/></svg>Документы <span class="ct" id="cl-docs-ct" style="display:none">0</span></div>
+      <div class="nav-i" data-cm="board" onclick="clNav('board')" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 9h8M8 13h5M12 18v3"/></svg>Доска</div>
       <div class="nav-i" data-cm="passport" onclick="clNav('passport')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Паспорт проекта</div>
       <div class="nav-i" data-cm="updates" onclick="clNav('updates')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Обновления <span class="dot-n"></span></div>
     </nav>
@@ -13727,6 +13728,7 @@ function pdTabbar(p){
     <div class="pd-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><b id="pk-total" class="pk-total-live">${pkFmtDur(pkProjTotal())}</b> всего</div>
     <div class="pd-chip pd-chip-btn${pdTabCur==='brief'?' on':''}" onclick="pdTab('brief')" title="Бриф проекта"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>Бриф</div>
     ${(typeof agCanDocs==='function'&&agCanDocs())?`<div class="pd-chip pd-chip-btn pd-chip-docs${pdTabCur==='docs'?' on':''}" onclick="pdTab('docs')" title="Документы: договоры и акты"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/></svg><span class="lbl">Документы</span></div>`:''}
+    <div class="pd-chip pd-chip-btn${pdTabCur==='board'?' on':''}" onclick="pdTab('board')" title="Доска Miro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 9h8M8 13h5M12 18v3"/></svg><span class="lbl">Доска</span></div>
     <div class="pd-chip pd-chip-btn ct-chip" onclick="contactsOpen()" title="Контакты клиента"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Контакты${ctBadge(p)}</div>
     <div class="pd-chip pd-chip-btn" onclick="tgOpenModal()" title="Telegram-уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3L2 11l6 2 2 6 3-4 5 4z"/></svg>Telegram <span style="color:${p.tg_chat_id?'var(--pos)':'var(--txt-3)'}">${p.tg_chat_id?'✓':'○'}</span></div>
     
@@ -14633,6 +14635,8 @@ function renderPd(){
       :'<div class="pk-empty" style="padding:40px 0">Facebook Ads отчётов пока нет — создай первый кнопкой «Отчёт»</div>');
   } else if(pdTabCur==='docs'){
     h=_pdDocsHTML(p);
+  } else if(pdTabCur==='board'){
+    h=_pdBoardHTML(p);
   } else if(pdTabCur==='content'){
     h=cpRender(p);
   } else if(pdTabCur==='smm'){
@@ -27597,7 +27601,7 @@ function _toolsPaint(){
    Подключение внешних сервисов на уровне агентства. Токены живут только
    в edge-функциях и в таблице google_accounts, куда браузеру ходу нет:
    интерфейс читает представление google_status, где секретов нет вовсе. */
-const GI = { google:null, loading:false, projects:[], busy:'' };
+const GI = { google:null, miro:null, loading:false, projects:[], busy:'' };
 
 /* Разрешения, без которых интеграция работает наполовину. Сравниваем с тем, что
    реально выдал Google: если подключались до того, как список расширился, часть
@@ -27709,6 +27713,7 @@ async function renderIntegrations(){
       <div style="font-size:clamp(19px,2vw,25px);font-weight:650;letter-spacing:-.02em">Интеграции</div>
       <div style="opacity:.6;font-size:13.5px;margin-top:6px;line-height:1.6">Подключите внешние сервисы один раз — дальше кнопки появятся внутри проектов, отчётов и контент-плана.</div>
       <div id="gi-google" style="margin-top:22px"><div style="opacity:.5;font-size:13px;padding:20px 0">Проверяю подключение…</div></div>
+      <div id="gi-miro" style="margin-top:14px"></div>
     </div></div>`;
 
   await giLoad();
@@ -27986,8 +27991,15 @@ async function giLoad(){
       GI.google=(data&&data[0])||null;
     }
   }catch(_){ GI.google=null; }
+  try{
+    if(window.LIVE && window.SB){
+      const { data } = await SB.from('miro_status').select('*').limit(1);
+      GI.miro=(data&&data[0])||null;
+    }
+  }catch(_){ GI.miro=null; }
   GI.loading=false;
   giPaint();
+  miroPaint();
 }
 
 function giPaint(){
@@ -28089,6 +28101,184 @@ async function giDisconnect(){
     const { data } = await _giFetch('google-auth', { action:'revoke' });
     toast((data&&data.message)||'Отключено');
     GI.google=null; giPaint();
+  }catch(e){ toast(String(e.message||e)); }
+}
+
+/* ═══════════════ MIRO ═══════════════
+   Одна доска на проект. Создаётся по кнопке в карточке проекта, клиенту
+   показывается только по отдельному тумблеру — до этого доска закрыта.
+   Токены лежат в miro_accounts, куда браузеру ходу нет: интерфейс читает
+   представление miro_status, где секретов нет вовсе. */
+async function miroEnsureStatus(){
+  if(GI._miroLoaded) return GI.miro;
+  GI._miroLoaded = 1;
+  try{
+    if(window.LIVE && window.SB){
+      const { data } = await SB.from('miro_status').select('*').limit(1);
+      GI.miro = (data&&data[0]) || null;
+    }
+  }catch(_){ GI.miro = null; }
+  return GI.miro;
+}
+
+function miroPaint(){
+  const box=document.getElementById('gi-miro'); if(!box) return;
+  const m=GI.miro;
+  const owner=agIsOwner();
+  const card=(inner,tone)=>`<div style="border:1px solid ${tone||'var(--line)'};border-radius:var(--r);background:var(--panel);padding:20px 22px">${inner}</div>`;
+  const logo=`<div style="width:38px;height:38px;border-radius:10px;background:#FFD02F;display:grid;place-items:center;flex:none;font-weight:700;font-size:17px;font-family:var(--mono);color:#050505">M</div>`;
+
+  if(!m){
+    box.innerHTML=card(`
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        ${logo}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:620;font-size:15px">Miro</div>
+          <div style="opacity:.6;font-size:13px;margin-top:5px;line-height:1.6">Доска на каждый проект: раскадровки, схемы, макеты. Клиенту доску можно показать одним тумблером — регистрация в Miro ему не нужна.</div>
+          ${owner?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+            <button class="btn-add" onclick="miroConnect()" id="miro-connect">Подключить Miro</button>
+          </div>
+          <div style="opacity:.45;font-size:12px;margin-top:12px;line-height:1.6">На бесплатном тарифе Miro редактируемыми остаются только три последние доски команды — для доски на каждый проект нужен платный тариф.</div>`
+          :`<div style="margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:13px;opacity:.7;line-height:1.6">Miro пока не подключён. Подключить его может владелец агентства — попросите его зайти в этот раздел.</div>`}
+        </div>
+      </div>`);
+    return;
+  }
+
+  const broken=m.status!=='active';
+  box.innerHTML=card(`
+    <div style="display:flex;gap:14px;align-items:flex-start">
+      ${logo}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="font-weight:620;font-size:15px">Miro</div>
+          <span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;padding:3px 9px;border-radius:99px;background:${broken?'rgba(240,120,92,.13)':'rgba(67,216,140,.13)'};color:${broken?'var(--neg)':'var(--pos)'};border:1px solid ${broken?'rgba(240,120,92,.3)':'rgba(67,216,140,.3)'}">${broken?'нужно переподключить':'подключён'}</span>
+        </div>
+        <div style="opacity:.7;font-size:13px;margin-top:6px">${escH(m.team_name||'команда Miro')}</div>
+        <div style="opacity:.45;font-size:12px;margin-top:3px">${m.connected_by_name?('подключил '+escH(m.connected_by_name)):'доски создаются из карточки проекта'}</div>
+        ${broken&&m.last_error?`<div style="margin-top:10px;font-size:12.5px;color:var(--neg);opacity:.9">${escH(m.last_error)}</div>`:''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          ${owner?'<button class="btn-ghost" onclick="miroConnect()" title="Пройти согласие Miro заново. Созданные доски останутся на месте">Переподключить</button>':''}
+          ${owner?'<button class="btn-ghost" onclick="miroDisconnect()">Отключить</button>':''}
+        </div>
+      </div>
+    </div>`, broken?'rgba(240,120,92,.3)':'var(--line)');
+}
+
+async function miroConnect(){
+  const b=document.getElementById('miro-connect'); if(b){ b.disabled=true; b.textContent='Открываю Miro…'; }
+  try{
+    const { status, data } = await _giFetch('miro-auth', { action:'start' });
+    if(status===503){ toast((data&&data.message)||'Интеграция с Miro ещё не настроена'); return; }
+    if(!data||!data.url) throw new Error((data&&data.message)||'Не удалось получить ссылку на Miro');
+    const w=window.open(data.url,'miro-oauth','width=560,height=720');
+    if(!w){ location.href=data.url; return; }
+    const onMsg=(e)=>{ if(e.data&&e.data.miro){ window.removeEventListener('message',onMsg); GI._miroLoaded=0; setTimeout(giLoad,600); } };
+    window.addEventListener('message',onMsg);
+    const t=setInterval(()=>{ if(w.closed){ clearInterval(t); window.removeEventListener('message',onMsg); GI._miroLoaded=0; giLoad(); } },900);
+  }catch(e){ toast(String(e.message||e)); }
+  finally{ if(b){ b.disabled=false; b.textContent='Подключить Miro'; } }
+}
+
+async function miroDisconnect(){
+  if(!confirm('Отключить Miro? Созданные доски останутся в Miro, но система перестанет на них ссылаться.')) return;
+  try{
+    const { data } = await _giFetch('miro-auth', { action:'revoke' });
+    toast((data&&data.message)||'Отключено');
+    GI.miro=null; GI._miroLoaded=0; miroPaint();
+  }catch(e){ toast(String(e.message||e)); }
+}
+
+/* ─── Доска в карточке проекта ───
+   Ссылку на доску собираем сами из board_id и проверяем схему у сохранённой:
+   в href попадает только адрес miro.com, что бы ни лежало в базе. */
+function _miroLink(b){
+  const raw=String((b&&b.view_link)||'');
+  if(/^https:\/\/miro\.com\//.test(raw)) return raw;
+  return 'https://miro.com/app/board/'+encodeURIComponent(String((b&&b.board_id)||''));
+}
+function _miroEmbed(b, plain){
+  const u='https://miro.com/app/live-embed/'+encodeURIComponent(String((b&&b.board_id)||''))+'/?autoplay=true';
+  return plain ? (u+'&embedMode=view_only_without_ui') : u;
+}
+
+async function pdBoardLoad(p){
+  if(!p || p._miroBusy) return;
+  p._miroBusy=1;
+  try{
+    await miroEnsureStatus();
+    if(window.LIVE && window.SB){
+      const { data } = await SB.from('miro_boards').select('*').eq('project_id', p.id).limit(1);
+      p._miro=(data&&data[0])||null;
+    } else p._miro=null;
+  }catch(_){ p._miro=null; }
+  p._miroBusy=0;
+  if(pdTabCur==='board') renderPd();
+}
+
+function _pdBoardHTML(p){
+  if(p._miro===undefined){ pdBoardLoad(p); return '<div class="pk-empty" style="padding:44px 0">Загружаю доску…</div>'; }
+  const b=p._miro;
+  const canEdit=(typeof agCanEdit==='function')?agCanEdit('projects'):false;
+
+  if(!GI.miro){
+    return `<div class="pk-empty" style="padding:44px 0;line-height:1.7">Miro не подключён.<br>
+      <span style="opacity:.6;font-size:13px">Подключается один раз на всё агентство — раздел «Интеграции».</span></div>`;
+  }
+  if(!b){
+    return `<div class="pk-empty" style="padding:44px 0;line-height:1.7">У проекта пока нет доски.
+      ${canEdit?`<div style="margin-top:16px"><button class="btn-add" id="pd-board-new" onclick="pdBoardCreate()">Создать доску</button></div>
+      <div style="opacity:.5;font-size:12.5px;margin-top:12px;max-width:440px;margin-left:auto;margin-right:auto">Доска создаётся в вашей команде Miro и остаётся у вас, даже если отключить интеграцию. На бесплатном тарифе Miro редактируемыми остаются только три последние доски.</div>`
+      :'<div style="opacity:.6;font-size:13px;margin-top:8px">Создать её может тот, кто вправе править проекты.</div>'}</div>`;
+  }
+
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:600;color:var(--txt)">${escH(b.name||'Доска проекта')}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        ${canEdit?`<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;opacity:.85" title="Клиент увидит доску в своём кабинете. Пока тумблер выключен, доска закрыта для всех, кроме команды Miro">
+          <input type="checkbox" id="pd-board-vis" ${b.client_visible?'checked':''} onchange="pdBoardVisible(this.checked)"> Показывать клиенту</label>`:''}
+        <a class="btn-ghost" href="${escH(_miroLink(b))}" target="_blank" rel="noopener">Открыть в Miro</a>
+        ${canEdit?'<button class="btn-ghost" onclick="pdBoardUnlink()">Отвязать</button>':''}
+      </div>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)">
+      <iframe src="${escH(_miroEmbed(b,false))}" style="width:100%;height:min(64vh,620px);border:0;display:block" allowfullscreen loading="lazy"></iframe>
+    </div>
+    <div style="opacity:.45;font-size:12px;margin-top:10px;line-height:1.6">Если вместо доски видно приглашение войти — откройте её кнопкой «Открыть в Miro»: закрытую доску Miro показывает только тем, кто вошёл с доступом к ней.</div>`;
+}
+
+async function pdBoardCreate(){
+  const p=PROJECTS[pdIdx]; if(!p) return;
+  const btn=document.getElementById('pd-board-new'); if(btn){ btn.disabled=true; btn.textContent='Создаю доску…'; }
+  try{
+    const { status, data } = await _giFetch('miro-board', { action:'ensure', project:p.id });
+    if(status===503||(data&&data.error==='not_configured')){ toast('Miro ещё не настроен — раздел «Интеграции»'); return; }
+    if(!data||!data.board) throw new Error((data&&data.message)||'Не удалось создать доску');
+    p._miro=data.board; renderPd();
+    toast(data.created?'Доска создана':'Доска уже была');
+  }catch(e){ toast(String(e.message||e)); }
+  finally{ const x=document.getElementById('pd-board-new'); if(x){ x.disabled=false; x.textContent='Создать доску'; } }
+}
+
+async function pdBoardVisible(on){
+  const p=PROJECTS[pdIdx]; if(!p||!p._miro) return;
+  const cb=document.getElementById('pd-board-vis'); if(cb) cb.disabled=true;
+  try{
+    const { data } = await _giFetch('miro-board', { action:'visible', project:p.id, on:on?'1':'0' });
+    if(!data||!data.board) throw new Error((data&&data.message)||'Не удалось изменить доступ к доске');
+    p._miro=data.board;
+    toast(on?'Доска видна клиенту':'Доска скрыта от клиента');
+  }catch(e){ toast(String(e.message||e)); if(cb) cb.checked=!on; }
+  finally{ if(cb) cb.disabled=false; }
+}
+
+async function pdBoardUnlink(){
+  const p=PROJECTS[pdIdx]; if(!p||!p._miro) return;
+  if(!confirm('Отвязать доску от проекта? Сама доска останется в Miro.')) return;
+  try{
+    const { data } = await _giFetch('miro-board', { action:'unlink', project:p.id });
+    toast((data&&data.message)||'Отвязано');
+    p._miro=null; renderPd();
   }catch(e){ toast(String(e.message||e)); }
 }
 
@@ -28619,6 +28809,13 @@ function _clApplyVisibility(){
     var k=n.dataset.cm; if(!k||k==='overview') return;
     n.style.display=(hidden.indexOf(k)>=0)?'none':'';
   });
+  /* Доску клиент видит, только когда агентство её открыло: нет доски —
+     нет и пункта в меню, а прямая ссылка уводит на обзор. */
+  if(!(P && P.board)){
+    var _bn=document.querySelector('#app-cl .nav-i[data-cm="board"]');
+    if(_bn) _bn.style.display='none';
+    if(hidden.indexOf('board')<0) hidden=hidden.concat(['board']);
+  }
   return hidden;
 }
 function clNav(m){
@@ -28630,7 +28827,7 @@ function clNav(m){
      этой метки поздний ответ прежнего раздела перерисовывал уже другой экран. */
   window.CL_M=m;
   document.querySelectorAll('#app-cl .nav-i').forEach(n=>n.classList.toggle('on',n.dataset.cm===m));
-  if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else if(m==='documents') renderClDocs(); else if(m==='passport') renderClPassport(); else renderClUpdates();
+  if(m==='overview') renderClOverview(); else if(m==='stages') renderClStages(); else if(m==='reports') renderClReports(); else if(m==='content') renderClContent(); else if(m==='documents') renderClDocs(); else if(m==='board') renderClBoard(); else if(m==='passport') renderClPassport(); else renderClUpdates();
 }
 function _histFeedX(items, proj){
   const SL=s=>({wait:'ожидание',hold:'пауза',active:'в работе',done:'готово',review:'проверка'}[s]||s||'—');
@@ -28978,6 +29175,32 @@ function renderClDocs(){
       </article>`).join('')+`</div>`;
   };
   host.innerHTML=hero+group('contract','Договоры')+group('act','Акты')+group('invoice','Счета');
+}
+
+/* ═══ Доска проекта в кабинете клиента ═══
+   Встраиваем в режиме «только просмотр без интерфейса Miro»: клиенту не нужен
+   аккаунт Miro, а править он ничего не может. Адрес собираем из board_id сами —
+   в разметку не попадает ничего, кроме адреса miro.com. */
+function renderClBoard(){
+  const P=window.CLP, b=(P&&P.board)||null;
+  const host=document.getElementById('content-cl'); if(!host) return;
+  if(!b){
+    host.innerHTML=`<div style="text-align:center;padding:74px 24px;color:var(--txt-3)">
+      <div style="width:60px;height:60px;margin:0 auto 20px;border-radius:18px;background:var(--bg-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--txt-3)"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 9h8M8 13h5M12 18v3"/></svg></div>
+      <div style="font-size:16px;font-weight:620;color:var(--txt-2);margin-bottom:8px">Доски пока нет</div>
+      <div style="font-size:13.5px;line-height:1.65;max-width:400px;margin:0 auto">Когда агентство откроет рабочую доску проекта, она появится здесь.</div>
+    </div>`;
+    return;
+  }
+  const src='https://miro.com/app/live-embed/'+encodeURIComponent(String(b.board_id||''))+'/?autoplay=true&embedMode=view_only_without_ui';
+  host.innerHTML=`<div class="cdoc-hero">
+      <div><div class="eyebrow">Доска</div>
+        <h2>${escH(b.name||'Доска проекта')}</h2>
+        <p>Рабочая доска проекта${P&&P.name?' «'+escH(P.name)+'»':''}: схемы, раскадровки и макеты. Открывается на просмотр — вносить правки может только агентство.</p></div>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel);margin-top:14px">
+      <iframe src="${escH(src)}" style="width:100%;height:min(72vh,720px);border:0;display:block" allowfullscreen loading="lazy"></iframe>
+    </div>`;
 }
 
 /* Собранный PDF держим в памяти вкладки: повторное открытие мгновенное.
@@ -38584,14 +38807,16 @@ window.tLoadClient = async () => {
   const p = rows[0], pid = p.id;
   // 2–4) этапы + даты завершения + прогресс задач (RPC) + отчёты + история — одной параллельной волной
   //      (раньше это были 5 последовательных сетевых раундов — главный тормоз входа клиента)
-  const [rSt, rTd, rTp, rRp, rHs, rDc] = await Promise.all([
+  const [rSt, rTd, rTp, rRp, rHs, rDc, rMb] = await Promise.all([
     _safe(SB.from('project_stages').select('id,name,status,due_date,due_time,idx').eq('project_id', pid).order('idx',{ascending:true})),
     _safe(SB.from('project_stages').select('id,completed_at').eq('project_id', pid)),
     _safe(SB.rpc('client_stage_progress', { p_project: pid })),
     _safe(SB.from('reports').select('id,title,kind,payload,published_at').eq('project_id', pid).order('published_at',{ascending:false})),
     _safe(SB.from('stage_history').select('stage_name,old_status,new_status,created_at').eq('project_id', pid).order('created_at',{ascending:false}).limit(50)),
     // документы, которые агентство открыло клиенту: правила базы всё равно не отдадут остальные
-    _safe(SB.from('project_documents').select('id,kind,number,title,created_at,shared_at').eq('project_id', pid).eq('client_visible', true).order('created_at',{ascending:false}))
+    _safe(SB.from('project_documents').select('id,kind,number,title,created_at,shared_at').eq('project_id', pid).eq('client_visible', true).order('created_at',{ascending:false})),
+    // доска Miro — только если агентство включило показ; закрытую правила базы и не отдадут
+    _safe(SB.from('miro_boards').select('board_id,name,client_visible').eq('project_id', pid).eq('client_visible', true).limit(1))
   ]);
   let stages = (rSt && !rSt.error && rSt.data) || [];
   if (rTd && !rTd.error && rTd.data){ const m={}; rTd.data.forEach(r=>{ if(r.completed_at) m[r.id]=r.completed_at; }); stages.forEach(s=>{ s.completed_at = m[s.id]||null; }); }
@@ -38605,7 +38830,8 @@ window.tLoadClient = async () => {
   window.CLP = { id:pid, name:p.name||'', logo:p.logo||((p.name||'?')[0]||'?').toUpperCase(),
     logoUrl:p.logo_url||'', svc:p.service||'', cat:p.category||'', status:p.status||'active',
     mrr:p.mrr||0, createdAt:p.created_at||null, cl_hidden:(Array.isArray(p.cl_hidden)?p.cl_hidden:(typeof p.cl_hidden==='string'?(function(){try{return JSON.parse(p.cl_hidden)||[];}catch(_){return [];}})():[])), allProjects:rows, stages, reports, history, feed,
-    documents:((rDc && !rDc.error && rDc.data) || []) };
+    documents:((rDc && !rDc.error && rDc.data) || []),
+    board:((rMb && !rMb.error && rMb.data && rMb.data[0]) || null) };
 };
 
 function _bgGentleRefresh(){ try{                                                     // фон догрузился: обновляем экран, не мешая пользователю
