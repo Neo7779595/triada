@@ -4423,8 +4423,24 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pd-newbtn svg{width:15px;height:15px}
 .pd-scroll{flex:1;overflow-y:auto;padding:34px 44px 60px}
 /* Доска: узкая панель сверху, всё остальное место — рабочее поле. */
-.pd-bdwrap{display:flex;flex-direction:column;background:var(--bg)}
-.pd-bdbar{flex:0 0 auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:11px 44px;border-bottom:1px solid var(--line)}
+.pd-bdwrap{display:flex;flex-direction:column;background:var(--bg);position:relative}
+.pd-bdbar{flex:0 0 auto;display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:7px 44px;border-bottom:1px solid var(--line)}
+.pd-bdic{width:30px;height:30px;flex:none;display:grid;place-items:center;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:9px;cursor:pointer;transition:.15s var(--ease)}
+.pd-bdic svg{width:16px;height:16px}
+.pd-bdic:hover{color:var(--txt);background:var(--bg-3)}
+.pd-bdic.on{color:var(--accent);border-color:var(--accent-line);background:var(--accent-dim)}
+/* Во весь экран доска остаётся одна: панель превращается в плавающую
+   стеклянную пилюлю снизу, притушенную до наведения — она не крадёт
+   ни пикселя рабочего поля и не спорит с панелями самого Miro. */
+.pd-bdwrap:fullscreen{background:var(--bg)}
+.pd-bdwrap:fullscreen iframe{position:absolute;inset:0;width:100%;height:100%}
+.pd-bdwrap:fullscreen .pd-bdbar{position:absolute;z-index:5;left:50%;bottom:18px;transform:translateX(-50%);
+  width:auto;max-width:calc(100vw - 32px);flex-wrap:nowrap;padding:8px 12px;border:1px solid var(--line-2);
+  border-radius:999px;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);box-shadow:0 16px 44px -14px rgba(0,0,0,.75);
+  opacity:.32;transition:opacity .28s var(--ease)}
+.pd-bdwrap:fullscreen .pd-bdbar:hover{opacity:1}
+.pd-bdwrap:fullscreen .pd-bdbar .nm{margin-right:4px;max-width:230px}
 .pd-bdbar .nm{font-size:14px;font-weight:600;color:var(--txt);margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pd-bd-sw{display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;color:var(--txt-2);user-select:none;transition:color .15s var(--ease)}
 .pd-bd-sw:hover{color:var(--txt)}
@@ -13702,6 +13718,14 @@ function pdFsSync(){
   var ov=document.getElementById('ov-proj'); if(ov) ov.classList.toggle('pd-fs',on);
   var b=document.getElementById('pd-fs-btn'); if(b) b.classList.toggle('on',on);
   var ic=document.getElementById('pd-fs-ic'); if(ic) ic.innerHTML=on?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+  /* Кнопка доски: подсвечиваем и меняем значок на «свернуть». Выход из
+     полного экрана делает браузер по Esc — подсказываем это один раз. */
+  var bb=document.getElementById('pd-bd-fs'); if(bb) bb.classList.toggle('on',on);
+  var bi=document.getElementById('pd-bd-fs-ic'); if(bi) bi.innerHTML=on?'<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>':'<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+  var fe=document.fullscreenElement||document.webkitFullscreenElement;
+  if(on && !window._pdBdFsHint && fe && fe.classList && fe.classList.contains('pd-bdwrap')){
+    window._pdBdFsHint=1; if(typeof toast==='function') toast('Esc — выйти из полноэкранного режима');
+  }
 }
 if(!window._pdFsBound){ window._pdFsBound=1; document.addEventListener('fullscreenchange',pdFsSync); document.addEventListener('webkitfullscreenchange',pdFsSync); }
 function agFullscreen(){
@@ -28218,6 +28242,34 @@ function _miroEmbed(b, plain){
   return plain ? (u+'&embedMode=view_only_without_ui') : u;
 }
 
+/* Чистый вид: Miro отдаёт доску без своих панелей и баннеров. Работать так
+   нельзя, зато видно всё поле целиком — удобно показывать и разбирать.
+   Помним выбор на сессию, чтобы не переключать в каждом проекте. */
+let PD_BD_CLEAN=false;
+function pdBoardClean(){
+  PD_BD_CLEAN=!PD_BD_CLEAN;
+  const p=PROJECTS[pdIdx];
+  const f=document.querySelector('.pd-bdwrap iframe');
+  if(f && p && p._miro) f.src=_miroEmbed(p._miro, PD_BD_CLEAN);
+  const b=document.getElementById('pd-bd-clean'); if(b) b.classList.toggle('on', PD_BD_CLEAN);
+  if(typeof toast==='function') toast(PD_BD_CLEAN?'Чистый вид: только доска':'Панели Miro вернулись');
+}
+
+/* Во весь экран уводим саму доску, а не всю страницу: пропадают и шапка
+   проекта, и вкладки, и панели браузера — остаётся только рабочее поле. */
+function pdBoardFull(){
+  const el=document.querySelector('.pd-bdwrap'); if(!el) return;
+  const fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!fsEl){
+    const rq=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+    if(rq){ try{ const r=rq.call(el); if(r&&r.catch)r.catch(function(){}); }catch(_){} }
+    else if(typeof toast==='function') toast('Полный экран не поддерживается браузером');
+  } else {
+    const ex=document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen;
+    if(ex){ try{ ex.call(document); }catch(_){} }
+  }
+}
+
 async function pdBoardLoad(p){
   if(!p || p._miroBusy) return;
   p._miroBusy=1;
@@ -28253,10 +28305,12 @@ function _pdBoardHTML(p){
         <div class="nm">${escH(b.name||'Доска проекта')}</div>
         ${canEdit?`<div class="pd-bd-sw" id="pd-board-row" onclick="pdBoardVisible(!this.querySelector('.tgl').classList.contains('on'))" title="Клиент увидит доску в своём кабинете. Пока переключатель выключен, доска закрыта для всех, кроме команды Miro">
           <span class="tgl${b.client_visible?' on':''}" id="pd-board-vis"><i></i></span>Показывать клиенту</div>`:''}
+        <button class="pd-bdic${PD_BD_CLEAN?' on':''}" id="pd-bd-clean" onclick="pdBoardClean()" title="Чистый вид: убрать панели и баннеры Miro — на экране остаётся только сама доска"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button class="pd-bdic" id="pd-bd-fs" onclick="pdBoardFull()" title="Во весь экран · Esc чтобы выйти"><svg id="pd-bd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
         <a class="btn-ghost" href="${escH(_miroLink(b))}" target="_blank" rel="noopener" title="Закрытую доску Miro показывает только тем, кто вошёл с доступом к ней — если во встроенном окне видно приглашение войти, откройте доску здесь">Открыть в Miro</a>
         ${canEdit?'<button class="btn-ghost" onclick="pdBoardUnlink()">Отвязать</button>':''}
       </div>
-      <iframe src="${escH(_miroEmbed(b,false))}" allowfullscreen loading="lazy"></iframe>
+      <iframe src="${escH(_miroEmbed(b,PD_BD_CLEAN))}" allowfullscreen loading="lazy"></iframe>
     </div>`;
 }
 
