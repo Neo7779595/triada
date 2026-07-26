@@ -27337,21 +27337,60 @@ async function giEnsureStatus(){
 function _pdTabLoader(tab, title, sub){
   if(!tab) return;
   const esc = s => String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  /* Дорожки платы: слева четыре входа, справа четыре выхода. Цвета берём
+     из палитры системы, а не радужные — бирюза ведущая, остальные подсвечивают. */
+  const T = [
+    ['M100 100 H200 V210 H311', '#8A8FFF', 0],
+    ['M80 180 H180 V230 H311',  '#6AA9FF', -0.5],
+    ['M60 260 H150 V250 H311',  '#37E6C8', -1.1],
+    ['M100 350 H200 V270 H311', '#43D88C', -1.7],
+    ['M700 90 H560 V210 H489',  '#37E6C8', -0.3],
+    ['M740 160 H580 V230 H489', '#E3B567', -0.9],
+    ['M720 250 H590 V250 H489', '#F0785C', -1.4],
+    ['M680 340 H570 V270 H489', '#6AA9FF', -2.0],
+  ];
+  const dots = [[100,100],[80,180],[60,260],[100,350],[700,90],[740,160],[720,250],[680,340]];
+  const pins = (x) => [205,225,245,265].map(y =>
+    '<rect x="'+x+'" y="'+y+'" width="8" height="10" rx="2" fill="url(#pin)"/>').join('');
+  const traces = T.map(t =>
+    '<path d="'+t[0]+'" class="bg"/><path d="'+t[0]+'" class="fl" style="stroke:'+t[1]+';color:'+t[1]+';animation-delay:'+t[2]+'s"/>').join('');
+
   try{
     tab.document.open();
-    tab.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8">'
-      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
-      + '<title>' + esc(title) + '</title><style>'
-      + 'html,body{height:100%;margin:0}'
-      + 'body{background:#08090B;color:#F0F2F5;display:grid;place-items:center;text-align:center;'
-      + 'font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}'
-      + '.s{width:38px;height:38px;margin:0 auto 20px;border-radius:50%;'
-      + 'border:2.5px solid rgba(55,230,200,.16);border-top-color:#37E6C8;animation:r .8s linear infinite}'
-      + '@keyframes r{to{transform:rotate(360deg)}}'
-      + 'h1{font-size:16.5px;font-weight:600;letter-spacing:-.01em;margin:0 0 7px}'
-      + 'p{margin:0;font-size:13px;color:#A6AEB9}'
-      + '</style></head><body><div><div class="s"></div><h1>' + esc(title) + '</h1>'
-      + '<p>' + esc(sub) + '</p></div></body></html>');
+    tab.document.write(`<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)}</title><style>
+html,body{height:100%;margin:0}
+body{background:#0A0B0D;color:#F0F2F5;display:grid;place-items:center;text-align:center;padding:24px;box-sizing:border-box;
+ font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.w{width:min(680px,100%)}
+svg{width:100%;height:auto;display:block}
+.bg{stroke:#22262E;stroke-width:1.8;fill:none}
+.fl{stroke-width:1.8;fill:none;stroke-dasharray:40 400;stroke-dashoffset:438;
+ filter:drop-shadow(0 0 6px currentColor);animation:flow 3s cubic-bezier(.5,0,.9,1) infinite}
+@keyframes flow{to{stroke-dashoffset:0}}
+h1{font-size:16.5px;font-weight:600;letter-spacing:-.01em;margin:6px 0 7px}
+p{margin:0;font-size:12.5px;color:#9AA1AC;font-family:'Geist Mono','DM Mono','JetBrains Mono',ui-monospace,monospace;
+ letter-spacing:.08em;text-transform:uppercase}
+@media(prefers-reduced-motion:reduce){.fl{animation-duration:6s}}
+</style></head><body><div class="w">
+<svg viewBox="40 68 720 304" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Загрузка">
+<defs>
+<linearGradient id="chip" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#171A20"/><stop offset="100%" stop-color="#0C0E12"/></linearGradient>
+<linearGradient id="pin" x1="1" y1="0" x2="0" y2="0">
+<stop offset="0%" stop-color="#8B939F"/><stop offset="50%" stop-color="#5C636D"/><stop offset="100%" stop-color="#3A4048"/></linearGradient>
+</defs>
+${traces}
+<rect x="315" y="190" width="170" height="100" rx="20" ry="20" fill="url(#chip)"
+ stroke="rgba(255,255,255,.10)" stroke-width="2"/>
+<g>${pins(307)}</g><g>${pins(485)}</g>
+<text x="400" y="246" text-anchor="middle" fill="#EEF1F4" font-size="20" font-weight="600" letter-spacing="2.5"
+ font-family="'Geist Mono','DM Mono','JetBrains Mono',ui-monospace,monospace">ЗАГРУЗКА</text>
+${dots.map(d=>'<circle cx="'+d[0]+'" cy="'+d[1]+'" r="5" fill="#0A0B0D" stroke="#22262E" stroke-width="1.5"/>').join('')}
+</svg>
+<h1>${esc(title)}</h1><p>${esc(sub)}</p>
+</div></body></html>`);
     tab.document.close();
   }catch(_){ /* вкладку мог перехватить блокировщик — не страшно */ }
 }
