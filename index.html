@@ -19324,8 +19324,25 @@ function cpGSOpen(){
    сама функция, и в интерфейсе она тоже должна пропасть, а не висеть мёртвой. */
 function cpGSFail(sh,data,fallback){
   const msg=(data&&(data.error||data.message))||fallback;
+  if(data&&data.code==='api_disabled'){ cpGSApiOff(data.enable_url||''); return; }
   if(/удалена в Google/i.test(String(msg))){ cpGSMark(sh,null); cpRerender(); }
   toast(String(msg));
+}
+/* Sheets API включается один раз на весь проект Google Cloud, и сделать это
+   может только владелец — из консоли. Показываем окном, а не подсказкой:
+   ссылку надо открыть, а подсказка исчезнет через две секунды. */
+function cpGSApiOff(url){
+  const u=url||'https://console.cloud.google.com/apis/library/sheets.googleapis.com';
+  pd2Open('<div class="modal" style="max-width:520px">'
+    +'<div class="modal-h"><h3>Осталось включить Google Sheets API</h3>'
+    +'<p>Папки и документы работают, а таблицы — отдельная служба Google, и в проекте Google Cloud она пока выключена.</p></div>'
+    +'<div class="modal-b">'
+      +'<div class="cp-gsw q">'+CP_GS_IC.info+'<span>Откройте страницу службы и нажмите <b>Enable</b> (Включить). Через минуту вернитесь и повторите выгрузку.</span></div>'
+      +'<div class="cp-gsw q" style="margin-top:8px">'+CP_GS_IC.info
+        +'<span>Разрешения и экран согласия это <b>не затрагивает</b> — состав доступов остаётся прежним, заявка на проверку в Google не пострадает.</span></div>'
+    +'</div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Закрыть</button>'
+      +'<a class="btn-add" href="'+_ddA(u)+'" target="_blank" rel="noopener" style="text-decoration:none" onclick="pd2Close()">Открыть в Google Cloud</a></div></div>');
 }
 function cpGSLoading(t,s){
   pd2Open('<div class="modal" style="max-width:420px"><div class="modal-h"><h3>'+t+'</h3><p>'+s+'</p></div>'
