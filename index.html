@@ -4421,8 +4421,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* Клиент: таблица занимает весь раздел, переключатель — над ней */
 #app-cl #content-cl.cl-gs-full{padding:0;overflow:hidden;display:flex;flex-direction:column}
 #app-cl #content-cl.cl-gs-full>*{animation:none}
-#app-cl .clcp-gswrap{flex:1 1 auto;min-height:0;display:flex;background:var(--bg)}
-#app-cl .clcp-gswrap iframe{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#fff}
+/* Таблица Google у клиента — светлый лист на тёмном кабинете. Без оправы он
+   читается как дыра в интерфейсе, поэтому кладём его в карточку: поля,
+   скругление, волосяная рамка и мягкая тень под ней. */
+#app-cl .clcp-gswrap{flex:1 1 auto;min-height:0;display:flex;padding:0 30px 26px}
+#app-cl .clcp-gscard{flex:1 1 auto;min-height:0;display:flex;position:relative;
+  border-radius:16px;overflow:hidden;background:#fff;border:1px solid var(--line-2);
+  box-shadow:0 28px 64px -28px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.04)}
+#app-cl .clcp-gscard iframe{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#fff}
+@media(max-width:900px){#app-cl .clcp-gswrap{padding:0 14px 16px}#app-cl .clcp-gscard{border-radius:12px}}
 .clcp-vsw{display:inline-flex;align-items:center;gap:3px;padding:3px;background:var(--bg-2);
   border:1px solid var(--line);border-radius:11px}
 .clcp-vsw button{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px;border:0;border-radius:8px;
@@ -4432,9 +4439,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .clcp-vsw button.on{background:var(--bg-1);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line-2)}
 .clcp-vsw button .g{width:14px;height:14px;flex:0 0 auto}
 .clcp-vsw button .g svg{width:100%;height:100%;display:block}
-.clcp-gsbar{display:flex;align-items:center;gap:12px;padding:12px 34px;border-bottom:1px solid var(--line);flex:0 0 auto}
-.clcp-gsbar .nm{font-size:14px;font-weight:600;color:var(--txt);margin-right:auto;min-width:0;
+.clcp-gsbar{display:flex;align-items:center;gap:12px;padding:20px 30px 14px;flex:0 0 auto;flex-wrap:wrap}
+.clcp-gsbar .sp{flex:1 1 auto}
+.clcp-gsbar .clcp-tabs{margin:0}
+.clcp-gsnm{display:inline-flex;align-items:center;gap:9px;min-width:0;margin-right:2px}
+.clcp-gsnm .d{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto}
+.clcp-gsnm b{font-size:14.5px;font-weight:620;color:var(--txt);letter-spacing:-.01em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clcp-gsnm i{font-style:normal;font-size:12px;color:var(--txt-3);white-space:nowrap}
+.clcp-gsopen{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;flex:0 0 auto;
+  border:1px solid var(--line-2);border-radius:10px;background:var(--bg-1);color:var(--txt-2);
+  font-size:13.5px;font-weight:600;text-decoration:none;font-family:var(--font);white-space:nowrap;
+  transition:.15s var(--ease)}
+.clcp-gsopen:hover{color:var(--txt);background:var(--bg-2);transform:translateY(-1px)}
+.clcp-gsopen svg{width:14px;height:14px}
+@media(max-width:900px){.clcp-gsbar{padding:14px 14px 10px;gap:9px}.clcp-gsnm i{display:none}}
 .cp-pop{position:fixed;z-index:2000;background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:5px;min-width:178px;box-shadow:0 16px 44px rgba(0,0,0,.55)}
 .cp-pop .cp-dpcal{width:248px;padding:6px 8px 8px}
 .cp-popi{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;color:var(--txt-2);font-size:14px;padding:7px 9px;border-radius:7px;cursor:pointer;text-align:left;font-family:var(--font)}
@@ -20131,7 +20150,25 @@ async function renderClContent(){
       ((r2&&r2.data)||[]).forEach(function(x){ appr[x.sheet_id+'/'+x.row_id]={status:x.status,comment:x.comment}; });
     }
   }catch(e){ console.warn('cl cp load',e); }
-  const _m0=clCpMonths(shares); window.CL_CP={shares:shares, appr:appr, sel:0, monthFilt:(_m0&&_m0.length?_m0[0]:null)};
+  /* Раздел перечитывается и при возврате в него, и по фокусу окна. Клиент при
+     этом не должен терять место: помним, какой лист он смотрел и какой месяц
+     выбрал — если они ещё существуют. */
+  const _prev=window.CL_CP||null;
+  const _want=(_prev&&_prev.shares&&_prev.shares[_prev.sel])?_prev.shares[_prev.sel].sheet_id:null;
+  const _m0=clCpMonths(shares);
+  const _mKeep=(_prev&&_prev.monthFilt&&_m0.indexOf(_prev.monthFilt)>=0)?_prev.monthFilt:(_m0&&_m0.length?_m0[0]:null);
+  window.CL_CP={shares:shares, appr:appr, sel:0, want:_want, monthFilt:_mKeep};
+  /* Агентство отправляет план, пока кабинет открыт. Ждать от клиента
+     перезагрузки страницы неправильно — перечитываем, когда он возвращается
+     к окну: одного запроса за возврат фокуса достаточно. */
+  if(!window._clCpFocusHook){
+    window._clCpFocusHook=1;
+    document.addEventListener('visibilitychange',function(){
+      if(document.visibilityState!=='visible') return;
+      if(window.CL_M!=='content') return;
+      if(typeof renderClContent==='function') renderClContent();
+    });
+  }
   clCpRender();
 }
 function clCpSeg(rowId,a){
@@ -20569,6 +20606,7 @@ function clCpRender(){
   let _vis=cp.monthFilt?_all.filter(function(s){return clCpShareMonth(s)===cp.monthFilt;}):_all.slice();
   _vis.sort(function(a,b){return String(b.shared_at||'').localeCompare(String(a.shared_at||''));});
   if(!_vis.length){ box.innerHTML=ph+clCpMonthBar(_cmonths)+'<div style="text-align:center;padding:46px 24px;color:var(--txt-3)">За «'+_ddH(cpMonthLabel(cp.monthFilt)||'выбранный месяц')+'» планов нет.</div>'; return; }
+  if(cp.want){ const _i=_vis.findIndex(function(s){ return s.sheet_id===cp.want; }); if(_i>=0)cp.sel=_i; cp.want=null; }
   cp.sel=Math.min(cp.sel||0, _vis.length-1);
   const share=_vis[cp.sel], sh=share.data||{}, sid=share.sheet_id;
   const cols=sh.cols||[], rows=sh.rows||[];
@@ -20643,12 +20681,24 @@ function clCpGSRender(sh,tabs){
      Адрес /preview открывается и без аккаунта Google — у клиента его обычно нет.
      gid ведёт сразу на вкладку этого листа: в документе их столько же, сколько
      месяцев, и попадать всегда на первый — значит каждый раз искать свой. */
-  const src='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(String(gs.id))+'/preview'
-    +(gs.gid==null?'':'#gid='+encodeURIComponent(String(gs.gid)));
+  const hash=(gs.gid==null?'':'#gid='+encodeURIComponent(String(gs.gid)));
+  const base='https://docs.google.com/spreadsheets/d/'+encodeURIComponent(String(gs.id));
+  const src=base+'/preview'+hash;
+  const ext='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>';
+  const book=String(gs.book||'').trim();
   box.classList.add('cl-gs-full');
   box.innerHTML='<div class="clcp-gsbar">'+clCpGSSwitch(sh)
-    +'<div class="nm">'+_ddH(gs.book||sh.name||'Контент-план')+'</div>'+(tabs||'')+'</div>'
-    +'<div class="clcp-gswrap"><iframe src="'+_ddA(src)+'" title="Контент-план в Google Таблицах" loading="lazy" allowfullscreen></iframe></div>';
+    +'<span class="clcp-gsnm"><i class="d"></i><b>'+_ddH(book||sh.name||'Контент-план')+'</b>'
+      +(book&&sh.name&&book!==sh.name?('<i>· '+_ddH(sh.name)+'</i>'):'')+'</span>'
+    +(tabs||'')
+    +'<span class="sp"></span>'
+    /* Окно в кабинете — для быстрого взгляда. Разбираться в широкой таблице
+       удобнее на весь экран, поэтому выход в Google всегда под рукой. */
+    +'<a class="clcp-gsopen" href="'+_ddA(base+'/edit'+hash)+'" target="_blank" rel="noopener">'+ext+'Открыть во весь экран</a>'
+    +'</div>'
+    +'<div class="clcp-gswrap"><div class="clcp-gscard">'
+      +'<iframe src="'+_ddA(src)+'" title="Контент-план в Google Таблицах" loading="lazy" allowfullscreen></iframe>'
+    +'</div></div>';
 }
 function clCpPick(i){ window.CL_CP.sel=i; clCpRender(); }
 function cpSheetMonthFromDates(d){
