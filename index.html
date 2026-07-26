@@ -5834,6 +5834,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .tg-add:hover{filter:brightness(1.08)}
 .tg-add svg{width:18px;height:18px}
 .tg-hint{padding:0 22px 20px;font-size:13px;color:var(--txt-3);line-height:1.5}
+/* Пока человек выбирает группу в Telegram, окно ждёт и обновится само.
+   До нажатия строки нет — обещать ожидание, которого ещё не начали, незачем. */
+.tg-wait{display:none;align-items:center;gap:9px;margin:0 22px 12px;padding:11px 13px;border-radius:11px;
+  background:var(--accent-dim);color:var(--accent);font-size:13px;line-height:1.45}
+.tg-wait.on{display:flex}
+.tg-wait-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto;
+  animation:tgWaitPulse 1.15s var(--ease) infinite}
+@keyframes tgWaitPulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.tg-wait-dot{animation:none}}
 .tg-hint code{font-family:var(--mono);background:var(--bg-3);padding:2px 7px;border-radius:5px;color:var(--txt-2);font-size:12.5px}
 .tg-glist{padding:0 22px;display:flex;flex-direction:column;gap:7px}
 .tg-grow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg-1);border:1px solid var(--line);border-radius:10px}
@@ -14945,6 +14954,7 @@ async function tgTeamModal(){
   let sched=[];
   try{ sched=await tgSchedLoad(); }catch(e){ sched=[]; }
   const linked=groups.length>0;
+  window._TG_TEAM_N=groups.length;   /* сколько групп уже было — по этому числу ловим новую */
   const schedRows = sched.map(sc=>{
     const h=tgSchedHuman(sc).split(' · '); const ttl=(h[0]||'')+' · '+(h[1]||''); const cap=h[2]||'';
     return `<div class="tgw-row"><span class="tgw-ic muted">${IC_CLK}</span><span class="tgw-tx"><b>${ttl}</b><i>${cap}</i></span><label class="tgw-toggle"><input type="checkbox" ${sc.enabled?'checked':''} onchange="tgSchedToggle(${sc.id},this.checked)"><span class="kn"></span></label><button class="tgw-trash" onclick="tgSchedDelete(${sc.id})" aria-label="Удалить правило">${IC_TRASH}</button></div>`;
@@ -14971,7 +14981,7 @@ async function tgTeamModal(){
       <div class="tg-bh" style="margin-top:2px">Подключённые группы</div>
       <div class="tgw-group">
         ${rows}
-        <a class="tgw-act" href="${grpLink}" target="_blank" rel="noopener"><span class="tgw-ic accent">${IC_PLUS}</span><span class="tgw-tx"><b>Добавить группу</b><i>команда, директора или инвесторы</i></span><span class="tgw-go">${GO}</span></a>
+        <a class="tgw-act" href="${grpLink}" target="_blank" rel="noopener" onclick="tgGroupIntent('team',null)"><span class="tgw-ic accent">${IC_PLUS}</span><span class="tgw-tx"><b>Добавить группу</b><i>команда, директора или инвесторы</i></span><span class="tgw-go">${GO}</span></a>
         ${clashNote}
       </div>
 
@@ -15014,7 +15024,8 @@ async function tgTeamModal(){
         <div class="tg-step"><span class="tg-sn">1</span><span>Создайте рабочую группу (команда, директора или инвесторы)</span></div>
         <div class="tg-step"><span class="tg-sn">2</span><span>Нажмите кнопку и выберите группу — бот привяжется сам. Так можно добавить несколько групп.</span></div>
       </div>
-      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener">${ICON}Добавить бота в группу</a>
+      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener" onclick="tgGroupIntent('team',null)">${ICON}Добавить бота в группу</a>
+      <div class="tg-wait" id="tg-wait"><span class="tg-wait-dot"></span>Ждём, когда бот попадёт в группу — окно обновится само</div>
       <div class="tg-hint">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
     `}
   </div>`);
@@ -15060,13 +15071,67 @@ function tgOpenModal(){
         <div class="tg-step"><span class="tg-sn">1</span><span>Создайте Telegram-группу с клиентом</span></div>
         <div class="tg-step"><span class="tg-sn">2</span><span>Нажмите кнопку и выберите эту группу — бот добавится и привяжется сам</span></div>
       </div>
-      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener">${ICON}Добавить бота в группу</a>
+      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener" onclick="tgGroupIntent('project')">${ICON}Добавить бота в группу</a>
+      <div class="tg-wait" id="tg-wait"><span class="tg-wait-dot"></span>Ждём, когда бот попадёт в группу — окно обновится само</div>
       <div class="tg-hint">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
     `}
   </div>`);
   if(linked) setTimeout(()=>_tgClashCheck(p),0);
 }
 window.tgOpenModal=tgOpenModal;
+/* Telegram не передаёт боту код из ссылки «?startgroup=» — в чат приходит
+   только событие «бота добавили». Поэтому намерение записываем здесь: кто и
+   какую группу собирается привязать. Бот, попав в чат, найдёт эту запись по
+   тому, кто его добавил, и привяжет группу сам. */
+async function tgLinkIntent(kind,pid){
+  const me=(typeof tMe==='function')?tMe():null;
+  if(!window.SB||!me||!me.id||!me.agency_id) return;
+  try{
+    const {error}=await SB.from('tg_link_intents').insert({agency_id:me.agency_id,project_id:pid||null,kind:kind,profile_id:me.id});
+    if(error) throw error;
+  }catch(e){ console.warn('tg intent',e); }
+}
+window.tgLinkIntent=tgLinkIntent;
+var _tgWaitT=null;
+function tgWaitStop(){ if(_tgWaitT){ clearInterval(_tgWaitT); _tgWaitT=null; } }
+/* Привязка происходит не у нас, а в Telegram, и вернуться в окно человек может
+   раньше, чем бот доберётся до группы. Поэтому ждём сами и обновляем окно —
+   иначе оно так и висит с надписью «Группа не подключена». */
+function tgGroupIntent(kind){
+  /* Проект берём тем же путём, что и само окно, а не подставляем в разметку:
+     подставленный id у нового проекта превращался в строку «undefined»,
+     и заявка уходила в базу заведомо битой. */
+  let pid=null;
+  if(kind!=='team'){
+    const p=(typeof PROJECTS!=='undefined'&&typeof pdIdx!=='undefined')?PROJECTS[pdIdx]:null;
+    pid=p&&p.id;
+    if(!pid) return;
+  }
+  tgLinkIntent(kind,pid);
+  tgWaitStop();
+  const box=document.getElementById('tg-wait'); if(box) box.classList.add('on');
+  let n=0;
+  _tgWaitT=setInterval(async function(){
+    if(++n>60 || !document.getElementById('tg-wait')){ tgWaitStop(); return; }   // 3 минуты — дальше уже не ждут
+    try{
+      if(kind==='team'){
+        const me=(typeof tMe==='function')?tMe():null; if(!me) return;
+        const {data}=await SB.from('telegram_team_groups').select('chat_id').eq('agency_id',me.agency_id);
+        if((data||[]).length>((window._TG_TEAM_N)||0)){ tgWaitStop(); if(typeof toast==='function')toast('Группа привязана'); if(typeof tgTeamModal==='function')tgTeamModal(); }
+        return;
+      }
+      const {data}=await SB.from('projects').select('tg_chat_id,tg_linked_at').eq('id',pid).maybeSingle();
+      if(data&&data.tg_chat_id){
+        tgWaitStop();
+        const p=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(x){return String(x.id)===String(pid);});
+        if(p){ p.tg_chat_id=data.tg_chat_id; p.tg_linked_at=data.tg_linked_at; }
+        if(typeof toast==='function') toast('Группа привязана');
+        tgOpenModal();
+      }
+    }catch(_e){}
+  },3000);
+}
+window.tgGroupIntent=tgGroupIntent;
 /* Если клиентская группа проекта заодно числится рабочей группой агентства,
    в неё летят внутренние сводки. Предупреждаем прямо в окне проекта. */
 async function _tgClashCheck(p){
