@@ -4344,11 +4344,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-gswrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;background:var(--bg);position:relative}
 .cp-gsbar{flex:0 0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 22px;
   border-bottom:1px solid var(--line);position:relative;z-index:2;background:var(--bg)}
-.cp-gsback{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px 0 10px;border:1px solid var(--line-2);
-  background:var(--bg-1);color:var(--txt-2);border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;
-  font-family:var(--font);white-space:nowrap;transition:.15s var(--ease)}
-.cp-gsback:hover{color:var(--txt);background:var(--bg-3)}
-.cp-gsback svg{width:15px;height:15px}
 .cp-gsttl{display:flex;align-items:center;gap:10px;min-width:0;margin-right:auto}
 .cp-gsttl .g{width:17px;height:17px;flex:0 0 auto}
 .cp-gsttl .g svg{width:100%;height:100%;display:block}
@@ -16975,7 +16970,7 @@ function cpRender(p){
   /* Связанный лист вкладка открывает самой таблицей Google — как «Стратегии»
      открываются доской Miro. Вкладки листов внизу остаются, чтобы
      переключаться, не выходя из режима. */
-  if(cpGSLink(sh) && cpGSWant()==='gs') return '<div class="cp">'+cpGSFrameHTML(p,sh)+cpSheetsBar(d)+'</div>';
+  if(cpGSLink(sh) && cpGSWant()==='gs') return '<div class="cp">'+cpGSFrameHTML(p,sh)+'</div>';
   const cols=sh.cols, disp=cpDisp(sh);
   if(cpRowSel.size){ const _ids=new Set((sh.rows||[]).map(function(r){return r.id;})); cpRowSel.forEach(function(id){ if(!_ids.has(id))cpRowSel.delete(id); }); }
   const sid=sh.id, ap=p._cpAppr||{}; const showClient=!!(p._cpShared&&p._cpShared[sid])||Object.keys(ap).some(function(k){return k.indexOf(sid+'/')===0;});
@@ -19455,12 +19450,15 @@ function cpGSFrameHTML(p,sh){
   const ext='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>';
   return '<div class="cp-gswrap">'
     +'<div class="cp-gsbar">'
-      +'<button class="cp-gsback" onclick="cpGSHide()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Наша таблица</button>'
       +'<span class="cp-gsttl"><span class="g">'+GI_MARK.google+'</span><span class="tx">'
         +'<b>'+_ddH(sh.name||'Лист')+'</b><i>'+_ddH(cpGSWhen(gs))+'</i></span></span>'
       +(can?('<div class="pd-bd-sw" onclick="cpGSClient('+(cl?'false':'true')+')" title="Клиент увидит эту таблицу в своём кабинете — только для чтения, по ссылке и без аккаунта Google">'
         +'<span class="tgl'+(cl?' on':'')+'" id="cp-gs-vis"><i></i></span>Показывать клиенту</div>'):'')
       +'<div class="cp-gstools">'
+        /* Единственный путь назад к нашей таблице — со всеми листами,
+           согласованием и сценариями. Значок скромный, но он обязан быть:
+           без него раздел платформы становится недостижим. */
+        +ic('','','Вернуться к нашей таблице — листы, согласование, сценарии','cpGSHide()',CP_GS_IC.frame)
         +ic('cp-gs-clean',cpGSClean?'on':'','Чистый вид: убрать шапку и меню Google — на экране остаётся только сетка','cpGSCleanToggle()',eye)
         +(can?ic('','','Загрузить правки из этой таблицы в наш лист','cpGSPull()',CP_GS_IC.down):'')
         +ic('','','Во весь экран · Esc чтобы выйти','cpGSFull()',fsIc)
