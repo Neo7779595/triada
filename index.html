@@ -3460,10 +3460,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-lnk-fav{width:15px;height:15px;border-radius:3px;flex:none;object-fit:contain;background:var(--bg-3)}
 
 .cp-lnk svg{width:12px;height:12px}
-.cp-chk{width:16px;height:16px;border:1.5px solid var(--line-2);border-radius:4px;display:inline-block;cursor:pointer;position:relative}
+.cp-chk{width:21px;height:21px;border:1.6px solid var(--line-2);border-radius:6px;display:inline-block;cursor:pointer;position:relative;
+  transition:border-color .14s var(--ease),background .14s var(--ease)}
 .cp-chk.on{background:var(--accent);border-color:var(--accent)}
-.cp-chk.on::after{content:"";position:absolute;left:4.5px;top:1px;width:4px;height:8px;border:solid var(--accent-ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
-.cp-cchk{justify-content:center}
+.cp-chk.on::after{content:"";position:absolute;left:6.5px;top:2.5px;width:5px;height:10px;border:solid var(--accent-ink);border-width:0 2.2px 2.2px 0;transform:rotate(45deg)}
+/* Вся клетка — область нажатия: попадать в квадратик 16px было мучением */
+.cp-cchk{justify-content:center;cursor:pointer}
+.cp-cchk:hover .cp-chk{border-color:var(--accent)}
 .cp-chk-pop{animation:cpPubPop .34s ease}
 @keyframes cpPubPop{0%{transform:scale(.78)}45%{transform:scale(1.16)}100%{transform:scale(1)}}
 /* премиальный чип «Статус публикации» */
@@ -4298,6 +4301,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pdoc-eye svg{width:16px;height:16px}
 .pdoc-eye:hover{color:var(--txt-2)}
 .pdoc-eye.on{color:var(--pos)}
+/* Вариант статуса в выпадающем списке: сам вариант плюс крестик справа */
+.cp-popi-row{display:flex;align-items:center;gap:2px}
+.cp-popi-row .cp-popi{flex:1;min-width:0}
+.cp-popx{flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;
+  border:0;background:none;color:var(--txt-3);border-radius:7px;opacity:0;transition:opacity .14s var(--ease),color .14s var(--ease),background .14s var(--ease)}
+.cp-popx svg{width:12px;height:12px}
+.cp-popi-row:hover .cp-popx{opacity:1}
+.cp-popx:hover{color:var(--neg);background:rgba(240,120,92,.12)}
 /* Заготовки карточек проектов на время загрузки — форма та же, скачка порядка нет */
 .pjsk{display:grid;grid-template-columns:300px 1fr;gap:18px;padding:20px;margin-bottom:14px;
   border:1px solid var(--line);border-radius:16px;background:var(--bg-1)}
@@ -17638,7 +17649,11 @@ function cpChipCarOpen(e,el){ if(e){ e.stopPropagation(); e.preventDefault(); } 
 function cpSelectMenu(r,c,anchor){
   const col=cpColAt(c);
   let h='<div class="ttl">Статус</div>';
-  (col.opts||[]).forEach(o=>{ const pal=CP_PAL[o.c]; h+='<button class="cp-popi" onclick="cpSetSelect('+r+','+c+',\''+_ddA(o.v)+'\')"><span class="cp-chip" style="background:'+pal[0]+';color:'+pal[1]+'"><span class="d"></span>'+_ddH(o.v)+'</span></button>'; });
+  /* У каждого варианта крестик: список статусов со временем зарастает, а убрать
+     лишний было нечем — приходилось пересоздавать колонку. */
+  (col.opts||[]).forEach((o,oi)=>{ const pal=CP_PAL[o.c];
+    h+='<div class="cp-popi-row"><button class="cp-popi" onclick="cpSetSelect('+r+','+c+',\''+_ddA(o.v)+'\')"><span class="cp-chip" style="background:'+pal[0]+';color:'+pal[1]+'"><span class="d"></span>'+_ddH(o.v)+'</span></button>'
+      +'<button class="cp-popx" title="Удалить вариант" onclick="event.stopPropagation();cpDelOpt('+c+','+oi+','+r+')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'; });
   h+='<button class="cp-popi" onclick="cpClearSelect('+r+','+c+')" style="color:var(--txt-3)">Очистить</button>';
   h+='<div class="sep"></div><div class="cp-newopt"><input id="cp-newopt" placeholder="+ новый вариант" onkeydown="if(event.key===\'Enter\'){cpAddOpt('+c+','+r+',this.value)}" onclick="event.stopPropagation()"></div>';
   cpFloat(anchor,h);
@@ -17646,6 +17661,17 @@ function cpSelectMenu(r,c,anchor){
 }
 function cpSetSelect(r,c,v){ const row=cpRowAt(r),col=cpColAt(c); if(row){row.c[col.id]=v;cpSave();} cpCloseFloat(); cpRerender(); }
 function cpClearSelect(r,c){ const row=cpRowAt(r),col=cpColAt(c); if(row){ delete row.c[col.id]; if(row.f&&row.f[col.id]!=null){ delete row.f[col.id]; if(!Object.keys(row.f).length) delete row.f; } cpSave(); } cpCloseFloat(); cpRerender(); }
+/* Убрать вариант из списка и вычистить его из ячеек: иначе в таблице остались бы
+   значения, которых в списке уже нет, и чип рисовался бы серым «неизвестно». */
+function cpDelOpt(c,oi,r){
+  const sh=cpSheet(), col=cpColAt(c); if(!col||!col.opts||!col.opts[oi]) return;
+  const val=col.opts[oi].v;
+  col.opts.splice(oi,1);
+  (sh.rows||[]).forEach(function(row){ if(row.c && row.c[col.id]===val) delete row.c[col.id]; });
+  cpSave(); cpCloseFloat(); cpRerender();
+  if(typeof toast==='function') toast('Вариант «'+val+'» убран');
+}
+window.cpDelOpt=cpDelOpt;
 function cpAddOpt(c,r,v){ v=(v||'').trim(); if(!v)return; const col=cpColAt(c); col.opts=col.opts||[]; if(!col.opts.some(o=>o.v===v)){ col.opts.push({v,c:CP_PALK[col.opts.length%CP_PALK.length]}); } const row=cpRowAt(r); if(row){row.c[col.id]=v;} cpSave(); cpCloseFloat(); cpRerender(); }
 
 /* ---- date cell · кастомный календарь (тот же, что в дедлайнах/датах проекта) ---- */
