@@ -15973,39 +15973,101 @@ let cpRowSel=new Set(); let cpRowAnchor=null;
 let cpColSel=new Set(); let cpColAnchor=null;
 let cpCellDrag=null, cpCellJustDragged=false;
 
+/* ——— Модель контент-плана DeTroyd System 1.5 ———
+   Структура, с которой агентство начинает работу: один набор колонок и на
+   первый лист плана, и на каждый следующий месяц. В исходной модели часть
+   заголовков объединена над двумя колонками (цель, бюджет, расходы) —
+   здесь они разведены на отдельные колонки, иначе половина значений
+   осталась бы без собственного заголовка. */
+function cpTplCols(){
+  const c=(name,type,w,opts,extra)=>Object.assign({id:cpUid(),name:name,type:type,w:w,opts:opts||[]},extra||{});
+  return [
+    c('ТЕМА ПУБЛИКАЦИИ','text',280),
+    c('ЛОКАЦИЯ СЪЁМОК','text',180),
+    c('КАЛЕНДАРЬ СЪЁМОК','select',168,[{v:'ОПЕРАТОР',c:'blue'},{v:'ФОТОГРАФ',c:'violet'}]),
+    c('КОПИЛАЙН','text',160),
+    c('ТИП ПУБЛИКАЦИИ','select',158,[{v:'МОУШН',c:'violet'},{v:'СТАТИКА',c:'blue'},{v:'ВИДЕО',c:'teal'}]),
+    c('ОФФЕР','text',160),
+    c('ТРИГГЕР','text',160),
+    c('CTA','text',140),
+    c('ЦЕЛЬ КОНТЕНТА','text',210),
+    c('ЗАДАЧА ТРАФИКА','text',190),
+    c('БЮДЖЕТ НА ТАРГЕТ','money',152,[],{cur:'usd'}),
+    c('СРОК ОТКРУТКИ','text',130),
+    c('ТЗ','doc',120),
+    c('СЦЕНАРИЙ','doc',132),
+    c('СТАТУС ПУБЛИКАЦИИ','select',204,[{v:'ИДЕЯ',c:'gray'},{v:'ПИШЕТСЯ СЦЕНАРИЙ',c:'violet'},{v:'НА СЪЁМКЕ',c:'blue'},{v:'НА МОНТАЖЕ',c:'amber'},{v:'ГОТОВО',c:'teal'},{v:'ОПУБЛИКОВАНО',c:'green'}]),
+    c('ДАТА ПУБЛИКАЦИИ','date',150),
+    /* «Готовый пост» — системная колонка публикации: по ней считается процент
+       опубликованного и по ней же клиент открывает вышедший материал. */
+    c('ГОТОВЫЙ ПОСТ','check',176,[],{sys:'pub'}),
+    c('РАСХОДЫ','text',170),
+    c('СУММА РАСХОДОВ','money',148),
+    c('АНАЛИТИКА','text',160),
+    c('ЗАМЕТКИ И ИНСАЙТЫ','long',240)
+  ];
+}
+const CP_TPL_LIST=[
+  ['Внешность не главный показатель','МОУШН'],
+  ['Чеклист для заказчиков ремонта','СТАТИКА'],
+  ['Почему цена ремонта может меняться в процессе работ?','СТАТИКА'],
+  ['День из жизни прораба','СТАТИКА'],
+  ['Разбираем план: почему этот дизайн-проект хорош, а этот — вреден','ВИДЕО'],
+  ['Важные рекомендации по кадастру и документам','ВИДЕО'],
+  ['Наши партнёры','ВИДЕО'],
+  ['Обзор объекта 1','ВИДЕО'],
+  ['Обзор объекта 2','ВИДЕО'],
+  ['Обзор объекта 3','ВИДЕО'],
+  ['Помощь при поиске локаций и покупке земли','ВИДЕО'],
+  ['А вы думали о детях при ремонте?','ВИДЕО'],
+  ['Ремонт глазами нейромаркетолога для B2B','ВИДЕО'],
+  ['Демонстрация качества используемых материалов в объектах','ВИДЕО'],
+  ['Знакомство с командой','ВИДЕО']
+];
+function cpTplRows(cols){
+  const by={}; cols.forEach(function(c){ by[c.name]=c.id; });
+  /* В модели публикации идут день за днём. Ритм сохраняем, а отсчёт ведём от
+     завтрашнего дня: план с прошлогодними датами пришлось бы переписывать
+     целиком, прежде чем им пользоваться. */
+  const p=function(x){ return String(x).padStart(2,'0'); };
+  const base=new Date(); base.setHours(12,0,0,0); base.setDate(base.getDate()+1);
+  const day=function(i){ const d=new Date(base.getTime()); d.setDate(base.getDate()+i);
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); };
+  return CP_TPL_LIST.map(function(it,i){
+    const r={id:cpUid(),c:{}};
+    const set=function(n,v){ if(v!=null&&v!==''&&by[n]) r.c[by[n]]=v; };
+    set('ТЕМА ПУБЛИКАЦИИ',it[0]);
+    set('ТИП ПУБЛИКАЦИИ',it[1]);
+    set('ДАТА ПУБЛИКАЦИИ',day(i));
+    if(i===0){
+      /* Первая строка заполнена целиком — она показывает, что писать в каждую
+         колонку. Остальные оставлены темами: их и предстоит разобрать. */
+      set('ЛОКАЦИЯ СЪЁМОК','Офис Premium Build');
+      set('КАЛЕНДАРЬ СЪЁМОК','ОПЕРАТОР');
+      set('ЦЕЛЬ КОНТЕНТА','ДЕМОНСТРАЦИЯ ЭКСПЕРТНОСТИ');
+      set('ЗАДАЧА ТРАФИКА','ПЕРЕГОН ТРАФИКА В ТГ');
+      set('БЮДЖЕТ НА ТАРГЕТ','75');
+      set('СРОК ОТКРУТКИ','7д');
+      set('СТАТУС ПУБЛИКАЦИИ','ПИШЕТСЯ СЦЕНАРИЙ');
+      set('РАСХОДЫ','АРЕНДА СТУДИИ');
+      set('СУММА РАСХОДОВ','450000');
+      set('АНАЛИТИКА','ПОКАЗАТЕЛИ');
+    }else{
+      if(i===1) set('КАЛЕНДАРЬ СЪЁМОК','ФОТОГРАФ');
+      set('СТАТУС ПУБЛИКАЦИИ','ИДЕЯ');
+    }
+    return r;
+  });
+}
 function cpSeed(){
-  const c=(name,type,w,opts)=>({id:cpUid(),name,type,w,opts:opts||[]});
-  const cols=[
-    c('Тема публикации','text',230),
-    c('Дата съёмок','date',112),
-    c('Тип','select',120,[{v:'Моушн',c:'violet'},{v:'Статика',c:'blue'},{v:'Видео',c:'teal'}]),
-    c('Цель контента','text',180),
-    c('Бюджет','money',104),
-    c('ТЗ','link',96),
-    c('Сценарий','link',112),
-    c('Статус','select',182,[{v:'Идея',c:'gray'},{v:'Пишется сценарий',c:'violet'},{v:'На монтаже',c:'amber'},{v:'Опубликовано',c:'green'}]),
-    c('Дата публикации','date',124),
-    c('Готовый пост','link',124),
-    c('Расходы','money',112),
-    {id:cpUid(),name:'Статус публикации',type:'check',w:172,sys:'pub',opts:[]}
-  ];
-  const mk=(vals)=>{const r={id:cpUid(),c:{}};cols.forEach((col,i)=>{if(vals[i]!=null&&vals[i]!=='')r.c[col.id]=vals[i];});return r;};
-  const rows=[
-    mk(['Внешность не главный показатель','2026-03-05','Моушн','Демонстрация экспертности','$75','https://','https://','Пишется сценарий','2026-04-20','https://','450 000']),
-    mk(['Чеклист для заказчиков ремонта','2026-03-06','Статика','Прогрев аудитории','','https://','','Опубликовано','2026-04-21','https://','']),
-    mk(['День из жизни прораба','2026-03-08','Статика','Лояльность','$50','https://','https://','На монтаже','2026-04-23','','120 000']),
-    mk(['Разбираем дизайн-проект','2026-03-09','Видео','Экспертность','$120','https://','https://','Идея','2026-04-24','','']),
-    mk(['Наши партнёры','2026-03-11','Видео','Доверие','','','','Идея','2026-04-26','','']),
-    {id:cpUid(),c:{}}
-  ];
-  const sh={id:cpUid(),name:'Контент-план',color:'teal',hidden:false,cols,rows};
+  const cols=cpTplCols();
+  const sh={id:cpUid(),name:'Контент-план',color:'teal',hidden:false,cols:cols,rows:cpTplRows(cols)};
   return {active:sh.id,sheets:[sh]};
 }
 function cpSeedEmpty(name,color){
-  const c=(nm,type,w,opts)=>({id:cpUid(),name:nm,type,w,opts:opts||[]});
-  const cols=[c('Название','text',230),c('Дата','date',120),c('Статус','select',170,[{v:'Идея',c:'gray'},{v:'В работе',c:'amber'},{v:'Готово',c:'green'}])];
-  const rows=[{id:cpUid(),c:{}},{id:cpUid(),c:{}},{id:cpUid(),c:{}}];
-  return {id:cpUid(),name:name||'Новый лист',color:color||'gray',hidden:false,cols,rows};
+  const cols=cpTplCols(), rows=[];
+  for(let i=0;i<6;i++) rows.push({id:cpUid(),c:{}});
+  return {id:cpUid(),name:name||'Новый лист',color:color||'gray',hidden:false,cols:cols,rows:rows};
 }
 /* «Статус публикации» больше не форсится — только приводим ширину, если её вручную вставили и она уже задана */
 function cpEnsurePub(d){ if(!d||!d.sheets)return; d.sheets.forEach(function(s){ if(!s.cols)return; var pc=s.cols.find(function(c){return c.sys==='pub';}); if(pc && pc.w<160) pc.w=172; }); }
@@ -19477,6 +19539,7 @@ async function cpGSAutoRun(p,sh,k){
       delete _cpGSAuto[k];
       cpGSMark(sh,{ id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' });
       cpRerender();
+      cpGSSyncClient(p,sh);
       return;
     }
     _cpGSAuto[k]='fail'; cpRerender();
@@ -19486,6 +19549,18 @@ async function cpGSAutoRun(p,sh,k){
     _cpGSAuto[k]='fail'; cpRerender();
     toast(String(e.message||e));
   }
+}
+/* Лист, который клиент уже видит, должен показывать ту же таблицу, что и мы.
+   Иначе у него остаётся снимок прошлой жизни плана, а работа идёт в Google.
+   Листы, клиенту не отправленные, не трогаем: доступ по ссылке — решение,
+   а не побочный эффект. */
+async function cpGSSyncClient(p,sh){
+  if(!p||!sh||!sh.gs||!sh.gs.id||sh.gs.cl) return;
+  if(!(p._cpShared&&p._cpShared[sh.id])) return;
+  try{
+    const r=await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, sheet_id:sh.id, on:1 });
+    if(r&&r.data&&r.data.ok!==false){ cpGSMark(sh,Object.assign({},sh.gs,{ cl:true })); cpRerender(); }
+  }catch(e){ console.warn('cp gs client sync',e); }
 }
 function cpGSMakingHTML(sh){
   return '<div class="cp-gswrap"><div class="cp-gsmake">'
@@ -19645,6 +19720,7 @@ async function cpGSPushGo(){
     if(!data||data.ok===false){ pd2Close(); cpGSFail(sh,data,'Не удалось выгрузить лист'); return; }
     cpGSMark(sh,Object.assign({},cpGSLink(sh)||{},
       { id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' }));
+    cpGSSyncClient(p,sh);
     pd2Close();
     /* Выгрузили — сразу показываем результат в окне здесь. Уводить в новую
        вкладку после того, как окно появилось в самой системе, незачем. */
