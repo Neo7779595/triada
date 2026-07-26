@@ -4367,6 +4367,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
   padding:30px;color:var(--txt-3);font-size:13.5px;line-height:1.6;pointer-events:none}
 .cp-gsfall span{max-width:420px}
 .cp-gsfr{position:relative;z-index:1}
+/* Таблица заводится сама при первом входе — экран ожидания в том же
+   почерке, что и заставка входа: знак, строка о деле и живая полоса. */
+.cp-gsmake{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:0;text-align:center;padding:40px 24px}
+.cp-gsmake-g{width:34px;height:34px;margin-bottom:16px;opacity:.9}
+.cp-gsmake-g svg{width:100%;height:100%;display:block}
+.cp-gsmake b{font-size:16px;font-weight:620;color:var(--txt);letter-spacing:-.01em}
+.cp-gsmake>span:not(.cp-gsmake-g):not(.cp-gsmake-bar){font-size:13px;color:var(--txt-3);margin-top:7px;max-width:380px;line-height:1.5}
+.cp-gsmake-bar{width:180px;height:2px;margin-top:20px;border-radius:2px;background:var(--line-2);overflow:hidden;display:block}
+.cp-gsmake-bar i{display:block;width:38%;height:100%;border-radius:2px;background:var(--accent);
+  animation:cpGSMake 1.15s var(--ease) infinite}
+@keyframes cpGSMake{0%{transform:translateX(-105%)}100%{transform:translateX(300%)}}
 .cp-gsopen{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border:1px solid var(--line-2);
   background:var(--bg-2);color:var(--txt-2);border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;
   font-family:var(--font);white-space:nowrap;transition:.15s var(--ease)}
@@ -16967,10 +16979,14 @@ function cpRender(p){
   cpRecomputeSheet(sh);
   /* Пересчёт min/max для scale-правил условного форматирования */
   cpCFRecomputeCache(sh);
-  /* Связанный лист вкладка открывает самой таблицей Google — как «Стратегии»
-     открываются доской Miro. Вкладки листов внизу остаются, чтобы
-     переключаться, не выходя из режима. */
-  if(cpGSLink(sh) && cpGSWant()==='gs') return '<div class="cp">'+cpGSFrameHTML(p,sh)+'</div>';
+  /* Контент-план ведётся в Google. Вкладка открывается самой таблицей — как
+     «Стратегии» открываются доской Miro. Если таблицы у листа ещё нет, она
+     заводится сама: просить человека «сначала выгрузить» незачем, работать
+     он всё равно будет там. */
+  if(cpGSWant()==='gs'){
+    if(cpGSLink(sh)) return '<div class="cp">'+cpGSFrameHTML(p,sh)+'</div>';
+    if(cpGSAuto(p,sh)) return '<div class="cp">'+cpGSMakingHTML(sh)+'</div>';
+  }
   const cols=sh.cols, disp=cpDisp(sh);
   if(cpRowSel.size){ const _ids=new Set((sh.rows||[]).map(function(r){return r.id;})); cpRowSel.forEach(function(id){ if(!_ids.has(id))cpRowSel.delete(id); }); }
   const sid=sh.id, ap=p._cpAppr||{}; const showClient=!!(p._cpShared&&p._cpShared[sid])||Object.keys(ap).some(function(k){return k.indexOf(sid+'/')===0;});
@@ -19275,6 +19291,15 @@ async function cpSendSheet(){
   const p=cpP(), sh=cpSheet();
   if(!(window.LIVE&&window.SB)){ toast('Для отправки клиенту нужен онлайн-режим (Supabase)'); return; }
   try{
+    /* Отправка клиенту и есть решение показать. Если у листа заведена таблица
+       Google, открываем заодно и её — иначе клиент получит наш снимок, а
+       таблицу, в которой всё ведётся, не увидит. */
+    if(sh.gs&&sh.gs.id&&!sh.gs.cl){
+      try{
+        const r=await _giFetch('google-sheets',{action:'share'},{ project_id:p.id, sheet_id:sh.id, on:1 });
+        if(r&&r.data&&r.data.ok!==false) cpGSMark(sh,Object.assign({},sh.gs,{ cl:true }));
+      }catch(_e){ console.warn('cp share gs',_e); }
+    }
     const me=(window.tMe&&window.tMe())||{};
     const snap=cpShareSnap(sh);
     const res=await window.SB.from('content_shares').upsert({project_id:p.id,sheet_id:sh.id,name:sh.name,data:snap,shared_at:new Date().toISOString(),shared_by:me.id||null},{onConflict:'project_id,sheet_id'});
@@ -19378,10 +19403,10 @@ function cpGSMenu(e){
     +'<b>Google Таблица</b><span>'+(gs?_ddH(cpGSWhen(gs)):'Лист ещё не выгружен')+'</span></span></div>';
   /* Пункт «открыть здесь» показываем всегда, даже когда открывать ещё нечего:
      иначе о самой возможности узнаёшь только после первой выгрузки. */
-  if(gs) h+=row('',CP_GS_IC.frame,'Открыть таблицу здесь','Google Таблица вместо нашей, не выходя из системы','cpGSShow()')+'<div class="sep"></div>';
+  h+=row('',CP_GS_IC.frame,'Открыть таблицу здесь',
+        gs?'Google Таблица вместо нашей, не выходя из системы':'Заведём таблицу и откроем её здесь','cpGSShow()')+'<div class="sep"></div>';
   h+=row('',CP_GS_IC.up,'Выгрузить в Google',
-        gs?'Перезапишет таблицу данными листа':'Создаст таблицу и откроет её здесь','cpGSPush()');
-  if(!gs) h+=row('',CP_GS_IC.frame,'Открыть таблицу здесь','Появится после первой выгрузки','');
+        gs?'Перезапишет таблицу данными листа':'Создаст таблицу в папке проекта','cpGSPush()');
   h+=row('',CP_GS_IC.down,'Загрузить из Google',
         gs?'Перезапишет лист данными таблицы':'Сначала нужно выгрузить лист',gs?'cpGSPull()':'');
   if(gs){
@@ -19427,9 +19452,52 @@ function cpGSEmbed(gs,clean){
     +(clean?'&rm=minimal&widget=true&headers=false':'');
   try{ return (typeof _giWithUser==='function')?_giWithUser(u):u; }catch(_e){ return u; }
 }
+/* Автозаведение таблицы. Состояние держим отдельно от данных плана: неудача
+   не должна уехать в базу и застрять у всей команды, а повторять попытку на
+   каждой перерисовке — значит забросать Google запросами. */
+const _cpGSAuto={};
+function cpGSAuto(p,sh){
+  if(!(window.LIVE&&window.SB)) return false;
+  if(!p||!sh||!sh.id) return false;
+  if(!cpGSCan()) return false;              /* без права на проекты таблицу не заводим */
+  const k=p.id+'/'+sh.id;
+  if(_cpGSAuto[k]==='fail') return false;   /* уже не вышло — показываем нашу таблицу */
+  if(_cpGSAuto[k]==='run') return true;
+  _cpGSAuto[k]='run';
+  cpGSAutoRun(p,sh,k);
+  return true;
+}
+async function cpGSAutoRun(p,sh,k){
+  try{
+    const payload={ id:sh.id, name:sh.name,
+      cols:(sh.cols||[]).map(function(c){ return {id:c.id,name:c.name,type:c.type,sys:c.sys||null}; }),
+      rows:(sh.rows||[]).map(function(r){ return {id:r.id,c:r.c||{}}; }) };
+    const { status, data } = await _giFetch('google-sheets',{action:'push'},{ project_id:p.id, sheet:payload });
+    if(data&&data.ok!==false&&data.spreadsheet_id){
+      delete _cpGSAuto[k];
+      cpGSMark(sh,{ id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' });
+      cpRerender();
+      return;
+    }
+    _cpGSAuto[k]='fail'; cpRerender();
+    if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
+    cpGSFail(sh,data,'Не удалось завести таблицу в Google');
+  }catch(e){
+    _cpGSAuto[k]='fail'; cpRerender();
+    toast(String(e.message||e));
+  }
+}
+function cpGSMakingHTML(sh){
+  return '<div class="cp-gswrap"><div class="cp-gsmake">'
+    +'<span class="cp-gsmake-g">'+GI_MARK.google+'</span>'
+    +'<b>Заводим таблицу в Google</b>'
+    +'<span>Лист «'+_ddH(sh.name||'')+'» — в папке проекта на Диске агентства</span>'
+    +'<span class="cp-gsmake-bar"><i></i></span></div></div>';
+}
 function cpGSShow(){
   cpCloseFloat();
-  const sh=cpSheet(); if(!sh||!cpGSLink(sh)) return;
+  const sh=cpSheet(); if(!sh) return;
+  try{ const p=cpP(); if(p) delete _cpGSAuto[p.id+'/'+sh.id]; }catch(_e){}   /* просят вручную — пробуем заново */
   cpGSSetView('gs');
 }
 function cpGSHide(){ cpGSSetView('own'); }
