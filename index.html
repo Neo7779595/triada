@@ -5029,6 +5029,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .tgw-banner-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .tgw-banner-ctl{display:flex;gap:7px;flex:0 0 auto}
 .tgw-danger:hover{color:var(--neg)!important;border-color:var(--neg-dim)!important;background:var(--neg-dim)!important}
+.tg-clash{margin:0 22px 14px;padding:13px 15px;border-radius:12px;background:var(--neg-dim);border:1px solid var(--neg-line,transparent);font-size:13px;line-height:1.55;color:var(--txt-2)}
+.tg-clash b{display:block;font-size:14px;color:var(--neg);margin-bottom:4px}
+.tg-clash .tg-unlink{margin-top:10px}
+/* конфликт: чат одновременно рабочий и клиентский */
+.tgw-row.tgw-clash{background:var(--neg-dim)}
+.tgw-ic.danger{background:var(--neg-dim);color:var(--neg);box-shadow:inset 0 0 0 1px var(--neg-line,var(--neg-dim))}
+.tgw-row.tgw-clash .tgw-tx i{color:var(--neg)}
+.tgw-clash-ctl{display:flex;gap:7px;flex:0 0 auto}
+.tgw-note{padding:12px 15px;font-size:13px;line-height:1.55;color:var(--txt-2);border-top:1px solid var(--line)}
+.tgw-note b{color:var(--txt)}
 .tgw-empty{padding:14px 15px;font-size:13.5px;color:var(--txt-3);line-height:1.5}
 .tgw-subwrap{padding:0 22px;margin-bottom:4px}
 #ov-npteam{z-index:70}
@@ -13757,6 +13767,16 @@ async function tgTeamModal(){
   const GO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   let groups=[];
   try{ if(window.SB){ const {data}=await window.SB.from('telegram_team_groups').select('chat_id,title,linked_at').eq('agency_id',me.agency_id).order('linked_at'); groups=data||[]; } }catch(e){ console.warn('tg groups',e); }
+  /* Один и тот же чат не может быть и рабочим, и клиентским: в командных сводках
+     видно нагрузку людей и закрытые задачи — клиенту это показывать нельзя. */
+  const clash={};
+  try{
+    if(window.SB && groups.length){
+      const ids=groups.map(g=>String(g.chat_id));
+      const {data}=await window.SB.from('projects').select('id,name,tg_chat_id').in('tg_chat_id',ids);
+      (data||[]).forEach(p=>{ clash[String(p.tg_chat_id)]=p; });
+    }
+  }catch(e){ console.warn('tg clash',e); }
   let sched=[];
   try{ sched=await tgSchedLoad(); }catch(e){ sched=[]; }
   const linked=groups.length>0;
@@ -13766,7 +13786,15 @@ async function tgTeamModal(){
   }).join('');
   const _plG=(n)=>{ const m=n%10,h=n%100; if(m===1&&h!==11)return 'группа'; if(m>=2&&m<=4&&(h<10||h>=20))return 'группы'; return 'групп'; };
   const _plP=(n)=>{ const m=n%10,h=n%100; if(m===1&&h!==11)return 'подключена'; if(m>=2&&m<=4&&(h<10||h>=20))return 'подключены'; return 'подключено'; };
-  const rows=groups.map(g=>`<div class="tgw-row"><span class="tgw-ic muted">${IC_GRP}</span><span class="tgw-tx"><b>${_ddH(g.title||'Рабочая группа')}</b><i>рабочая группа</i></span><button class="tg-unlink" onclick="tgTeamUnlink('${String(g.chat_id).replace(/[^0-9-]/g,'')}')">Отвязать</button></div>`).join('');
+  const IC_WARN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 9v5M12 17.4v.1"/></svg>';
+  const rows=groups.map(g=>{
+    const cid=String(g.chat_id).replace(/[^0-9-]/g,'');
+    const cl=clash[String(g.chat_id)];
+    if(!cl) return `<div class="tgw-row"><span class="tgw-ic muted">${IC_GRP}</span><span class="tgw-tx"><b>${_ddH(g.title||'Рабочая группа')}</b><i>рабочая группа</i></span><button class="tg-unlink" onclick="tgTeamUnlink('${cid}')">Отвязать</button></div>`;
+    return `<div class="tgw-row tgw-clash"><span class="tgw-ic danger">${IC_WARN}</span><span class="tgw-tx"><b>${_ddH(g.title||'Рабочая группа')}</b><i>сюда же привязан проект «${_ddH(cl.name||'')}» — в чате может быть клиент</i></span><div class="tgw-clash-ctl"><button class="tg-unlink" onclick="tgClashDropProject('${cl.id}')">Убрать проект</button><button class="tg-unlink tgw-danger" onclick="tgTeamUnlink('${cid}')">Убрать сводки</button></div></div>`;
+  }).join('');
+  const clashN=groups.filter(g=>clash[String(g.chat_id)]).length;
+  const clashNote=clashN?`<div class="tgw-note"><b>Один чат — одна роль.</b> В рабочие группы уходят внутренние сводки: нагрузка сотрудников, закрытые задачи, сроки. Если в том же чате сидит клиент проекта, он всё это видит. «Убрать проект» — чат останется рабочим, клиентские уведомления по проекту прекратятся. «Убрать сводки» — чат останется клиентским.</div>`:'';
   pd2Open(`<div class="modal tg-modal">
     <div class="tg-head">
       <div class="tg-hic">${ICON}</div>
@@ -13779,6 +13807,7 @@ async function tgTeamModal(){
       <div class="tgw-group">
         ${rows}
         <a class="tgw-act" href="${grpLink}" target="_blank" rel="noopener"><span class="tgw-ic accent">${IC_PLUS}</span><span class="tgw-tx"><b>Добавить группу</b><i>команда, директора или инвесторы</i></span><span class="tgw-go">${GO}</span></a>
+        ${clashNote}
       </div>
 
       <div class="tg-bh">Командные сводки</div>
@@ -13846,6 +13875,7 @@ function tgOpenModal(){
       <span class="tg-dot"></span><b>${linked?'Группа подключена':'Группа не подключена'}</b>
       ${linked?`<button class="tg-unlink" onclick="tgUnlink()">Отвязать</button>`:''}
     </div>
+    <div id="tg-clash-slot"></div>
     ${linked?`
       <div class="tg-bh"><span>Что получает клиент</span><span class="tg-autosave" id="tg-autosave">сохраняется автоматически</span></div>
       <div class="tg-evs">
@@ -13869,8 +13899,30 @@ function tgOpenModal(){
       <div class="tg-hint">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
     `}
   </div>`);
+  if(linked) setTimeout(()=>_tgClashCheck(p),0);
 }
 window.tgOpenModal=tgOpenModal;
+/* Если клиентская группа проекта заодно числится рабочей группой агентства,
+   в неё летят внутренние сводки. Предупреждаем прямо в окне проекта. */
+async function _tgClashCheck(p){
+  if(!window.SB||!p||!p.tg_chat_id) return;
+  try{
+    const {data}=await SB.from('telegram_team_groups').select('chat_id,title').eq('chat_id',String(p.tg_chat_id)).limit(1);
+    const g=(data||[])[0]; if(!g) return;
+    const slot=document.getElementById('tg-clash-slot'); if(!slot) return;
+    slot.innerHTML=`<div class="tg-clash"><b>Сюда же уходят командные сводки</b>Этот чат отмечен как рабочая группа агентства «${_ddH(g.title||'Рабочая группа')}» — клиент видит нагрузку сотрудников и закрытые задачи. Уберите чат из рабочих групп или заведите для проекта отдельную группу.<button class="tg-unlink tgw-danger" onclick="tgClashDropTeam('${String(g.chat_id).replace(/[^0-9-]/g,'')}')">Убрать из рабочих групп</button></div>`;
+  }catch(e){ /* не критично */ }
+}
+async function tgClashDropTeam(chatId){
+  const me=(typeof tMe==='function')?tMe():null; if(!me||!SB) return;
+  try{
+    const {error}=await SB.from('telegram_team_groups').delete().eq('agency_id',me.agency_id).eq('chat_id',String(chatId));
+    if(error) throw error;
+    toast('Чат убран из рабочих групп');
+    const slot=document.getElementById('tg-clash-slot'); if(slot) slot.innerHTML='';
+  }catch(e){ toast('Не удалось убрать'); }
+}
+window.tgClashDropTeam=tgClashDropTeam;
 function _tgDeepLink(){
   try{
     const u=new URL(location.href); const pid=u.searchParams.get('p'); if(!pid) return;
@@ -33165,6 +33217,20 @@ async function tgTeamUnlink(chatId){
   }catch(e){ toast('Ошибка отвязки'); }
 }
 window.tgTeamUnlink=tgTeamUnlink;
+/* Чат остаётся рабочим — снимаем с него клиентский проект. */
+async function tgClashDropProject(projectId){
+  if(!SB||!projectId) return;
+  try{
+    const {error}=await SB.from('projects').update({tg_chat_id:null,tg_linked_at:null}).eq('id',projectId);
+    if(error) throw error;
+    const _pl=((typeof PROJECTS!=='undefined'&&PROJECTS)||window.PROJECTS||[]);
+    const lp=_pl.find(x=>String(x.id)===String(projectId));
+    if(lp){ lp.tg_chat_id=null; lp.tg_linked_at=null; }
+    toast('Проект отвязан от чата');
+    if(typeof tgTeamModal==='function') tgTeamModal();
+  }catch(e){ toast('Не удалось отвязать проект'); }
+}
+window.tgClashDropProject=tgClashDropProject;
 async function tgTeamDone(){
   const me=(typeof tMe==='function')?tMe():null; if(!me||!me.agency_id||!SB) return;
   const res=document.getElementById('tgt-done-res'); if(res){ res.textContent='Считаем и отправляем…'; res.style.color='var(--txt-3)'; }
