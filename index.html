@@ -4425,10 +4425,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 /* Доска: узкая панель сверху, всё остальное место — рабочее поле. */
 .pd-bdwrap{display:flex;flex-direction:column;background:var(--bg);position:relative}
 .pd-bdbar{flex:0 0 auto;display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:7px 44px;border-bottom:1px solid var(--line)}
-.pd-bdic{width:30px;height:30px;flex:none;display:grid;place-items:center;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:9px;cursor:pointer;transition:.15s var(--ease)}
+.pd-bdic{width:30px;height:30px;flex:none;display:grid;place-items:center;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-2);border-radius:9px;cursor:pointer;transition:.15s var(--ease);text-decoration:none}
 .pd-bdic svg{width:16px;height:16px}
 .pd-bdic:hover{color:var(--txt);background:var(--bg-3)}
 .pd-bdic.on{color:var(--accent);border-color:var(--accent-line);background:var(--accent-dim)}
+.pd-bdic-x:hover{color:var(--neg);border-color:rgba(240,120,92,.38);background:rgba(240,120,92,.09)}
+/* Значки идут одной группой, отделённой от переключателя тонкой чертой —
+   так панель читается как «настройка · инструменты», а не как россыпь кнопок. */
+.pd-bdtools{display:flex;align-items:center;gap:6px;padding-left:12px;margin-left:2px;border-left:1px solid var(--line)}
 /* Во весь экран доска остаётся одна: панель превращается в плавающую
    стеклянную пилюлю снизу, притушенную до наведения — она не крадёт
    ни пикселя рабочего поля и не спорит с панелями самого Miro. */
@@ -28186,6 +28190,11 @@ function miroPaint(){
   }
 
   const broken=m.status!=='active';
+  /* Команда разработчика заводится вместе с приложением Miro и годится только
+     для проверок: на всех её досках Miro рисует водяной знак «Developer team»,
+     и клиент его увидит. Отличаем по типу команды, который Miro отдаёт вместе
+     с токеном, и просим переподключиться на рабочую. */
+  const devTeam=/dev/i.test(String(m.team_type||''));
   box.innerHTML=card(`
     <div style="display:flex;gap:14px;align-items:flex-start">
       ${logo}
@@ -28197,6 +28206,9 @@ function miroPaint(){
         <div style="opacity:.7;font-size:13px;margin-top:6px">${escH(m.team_name||'команда Miro')}</div>
         <div style="opacity:.45;font-size:12px;margin-top:3px">${m.connected_by_name?('подключил '+escH(m.connected_by_name)):'доски создаются из карточки проекта'}</div>
         ${broken&&m.last_error?`<div style="margin-top:10px;font-size:12.5px;color:var(--neg);opacity:.9">${escH(m.last_error)}</div>`:''}
+        ${devTeam?`<div style="margin-top:12px;padding:12px 14px;border:1px solid rgba(227,181,103,.3);background:rgba(227,181,103,.07);border-radius:10px;font-size:12.5px;line-height:1.6">
+          <b style="color:var(--warn);font-weight:600">Подключена команда разработчика.</b> На её досках Miro рисует водяной знак «Developer team» — его увидит и клиент. ${owner?'Нажмите «Переподключить» и выберите на экране Miro рабочую команду.':'Попросите владельца агентства переподключить Miro и выбрать рабочую команду.'}
+        </div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
           ${owner?'<button class="btn-ghost" onclick="miroConnect()" title="Пройти согласие Miro заново. Созданные доски останутся на месте">Переподключить</button>':''}
           ${owner?'<button class="btn-ghost" onclick="miroDisconnect()">Отключить</button>':''}
@@ -28294,8 +28306,15 @@ function _pdBoardHTML(p){
       <span style="opacity:.6;font-size:13px">Подключается один раз на всё агентство — раздел «Интеграции».</span></div>`;
   }
   if(!b){
+    /* Показываем, в какую именно команду Miro уйдёт доска: у человека их
+       обычно несколько, и промах виден только постфактум — по водяному
+       знаку или по тому, что доски не видно коллегам. */
+    const team=GI.miro && GI.miro.team_name ? escH(GI.miro.team_name) : '';
+    const dev=/dev/i.test(String((GI.miro&&GI.miro.team_type)||''));
     return `<div class="pk-empty" style="padding:44px 0;line-height:1.7">У проекта пока нет доски.
       ${canEdit?`<div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn-add" id="pd-board-new" onclick="pdBoardCreate()">Создать доску</button><button class="btn-ghost" onclick="pdBoardLink()">Привязать существующую</button></div>
+      ${team?`<div style="opacity:.6;font-size:12.5px;margin-top:14px">Команда Miro: <b style="color:var(--txt);font-weight:600">${team}</b></div>`:''}
+      ${dev?`<div style="max-width:460px;margin:12px auto 0;padding:11px 14px;border:1px solid rgba(227,181,103,.3);background:rgba(227,181,103,.07);border-radius:10px;font-size:12.5px;line-height:1.6;text-align:left">Это команда разработчика: Miro нарисует на доске водяной знак «Developer team», его увидит и клиент. Смените команду в разделе «Интеграции».</div>`:''}
       <div style="opacity:.5;font-size:12.5px;margin-top:12px;max-width:460px;margin-left:auto;margin-right:auto">Доска создаётся в вашей команде Miro и остаётся у вас, даже если отключить интеграцию. На бесплатном тарифе Miro новую доску через интеграцию завести нельзя — заведите её прямо в Miro и привяжите ссылкой.</div>`
       :'<div style="opacity:.6;font-size:13px;margin-top:8px">Создать её может тот, кто вправе править проекты.</div>'}</div>`;
   }
@@ -28305,10 +28324,12 @@ function _pdBoardHTML(p){
         <div class="nm">${escH(b.name||'Доска проекта')}</div>
         ${canEdit?`<div class="pd-bd-sw" id="pd-board-row" onclick="pdBoardVisible(!this.querySelector('.tgl').classList.contains('on'))" title="Клиент увидит доску в своём кабинете. Пока переключатель выключен, доска закрыта для всех, кроме команды Miro">
           <span class="tgl${b.client_visible?' on':''}" id="pd-board-vis"><i></i></span>Показывать клиенту</div>`:''}
-        <button class="pd-bdic${PD_BD_CLEAN?' on':''}" id="pd-bd-clean" onclick="pdBoardClean()" title="Чистый вид: убрать панели и баннеры Miro — на экране остаётся только сама доска"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button class="pd-bdic" id="pd-bd-fs" onclick="pdBoardFull()" title="Во весь экран · Esc чтобы выйти"><svg id="pd-bd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
-        <a class="btn-ghost" href="${escH(_miroLink(b))}" target="_blank" rel="noopener" title="Закрытую доску Miro показывает только тем, кто вошёл с доступом к ней — если во встроенном окне видно приглашение войти, откройте доску здесь">Открыть в Miro</a>
-        ${canEdit?'<button class="btn-ghost" onclick="pdBoardUnlink()">Отвязать</button>':''}
+        <div class="pd-bdtools">
+          <button class="pd-bdic${PD_BD_CLEAN?' on':''}" id="pd-bd-clean" onclick="pdBoardClean()" title="Чистый вид: убрать панели и баннеры Miro — на экране остаётся только сама доска"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="pd-bdic" id="pd-bd-fs" onclick="pdBoardFull()" title="Во весь экран · Esc чтобы выйти"><svg id="pd-bd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+          <a class="pd-bdic" href="${escH(_miroLink(b))}" target="_blank" rel="noopener" title="Открыть доску в Miro. Закрытую доску Miro показывает только тем, кто вошёл с доступом к ней — если во встроенном окне видно приглашение войти, откройте её здесь"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></a>
+          ${canEdit?'<button class="pd-bdic pd-bdic-x" onclick="pdBoardUnlink()" title="Отвязать доску от проекта. Сама она останется в Miro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 3.6 8.5M8 12h3M3 3l18 18"/></svg></button>':''}
+        </div>
       </div>
       <iframe src="${escH(_miroEmbed(b,PD_BD_CLEAN))}" allowfullscreen loading="lazy"></iframe>
     </div>`;
