@@ -27672,15 +27672,32 @@ function kbPickNav(d){                                    // год в режи�
   _kbPickRepaint();
 }
 function kbPickApply(v){ _closePops(); kbSetPeriodVal(v); }
+/* Режим периода живёт внутри календаря: переключение перерисовывает только
+   всплывашку и подпись кнопки — иначе сводка перерисуется и календарь
+   закроется на первом же клике. */
+function kbPickMode(m){
+  if(KB_PERIOD.mode===m) return;
+  const now=new Date();
+  if(m==='month') KB_PERIOD={mode:'month', v:_kbIso(now).slice(0,7)};
+  else KB_PERIOD={mode:'day', v:_kbIso(now)};
+  kbPeriodSave();
+  const t=document.querySelector('#kb-pickw .kb-per-trg span'); if(t) t.textContent=_kbPerLabel();
+  const w=document.getElementById('kb-pickw'); if(w) w.classList.add('is-on');
+  const v=String(KB_PERIOD.v||'');
+  _kbPick={ y:Number(v.slice(0,4))||now.getFullYear(), m:(Number(v.slice(5,7))||now.getMonth()+1)-1 };
+  _kbPickRepaint();
+}
 function _kbPickGrid(){
-  const nav='<div class="kbp-h">'
+  const mode=function(m,l){ return '<button class="kbp-m'+(KB_PERIOD.mode===m?' on':'')+'" onclick="kbPickMode(\''+m+'\')">'+l+'</button>'; };
+  const modes='<div class="kbp-modes">'+mode('month','Месяц')+mode('day','День')+'</div>';
+  const nav=modes+'<div class="kbp-h">'
     +'<button class="kbp-nav" onclick="kbPickNav(-1)" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 18l-6-6 6-6"/></svg></button>'
     +'<div class="kbp-t">'+(KB_PERIOD.mode==='month'?_kbPick.y:(KB_MONTHS[_kbPick.m]+' '+_kbPick.y))+'</div>'
     +'<button class="kbp-nav" onclick="kbPickNav(1)" aria-label="Вперёд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg></button>'
   +'</div>';
   const t=_kbToday(), tY=Number(t.slice(0,4)), tM=Number(t.slice(5,7))-1;
 
-  if(KB_PERIOD.mode==='month'){
+  if(KB_PERIOD.mode!=='day'){                    // 'all' тоже показываем месяцами: выбор месяца сразу включает фильтр
     let cells='';
     for(let i=0;i<12;i++){
       const iso=_kbPick.y+'-'+_kbPad(i+1);
@@ -27941,14 +27958,27 @@ function kbAutoCss(){
     +".kb-per-nav.up{transform:rotate(-90deg)}"
     +".kb-per-nav:hover{color:var(--accent);background:var(--bg-3)}"
     +".kb-per-cur{font-family:var(--mono);font-size:11.5px;color:var(--accent);text-transform:capitalize}"
-    +".kb-per-x{background:none;border:1px solid var(--line-2);color:var(--txt-3);border-radius:999px;padding:4px 10px;font-family:var(--mono);font-size:10.5px;cursor:pointer;transition:all .14s var(--ease-out)}"
-    +".kb-per-x:hover{border-color:var(--neg);color:var(--neg)}"
-    +".kb-per-note{font-family:var(--mono);font-size:10.5px;color:var(--txt-3)}"
-    +".kb-nav{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 14px;border-bottom:1px solid var(--line);margin-bottom:2px}"
-    +".kb-navi{display:inline-flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--line);color:var(--txt-2);border-radius:999px;padding:5px 11px;font-size:11.5px;cursor:pointer;transition:all .14s var(--ease-out);white-space:nowrap}"
-    +".kb-navi:hover{border-color:var(--accent-line);color:var(--accent);transform:translateY(-1px)}"
-    +".kb-navi b{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--txt-3);background:var(--bg-3);border-radius:5px;padding:1px 5px}"
-    +".kb-navi:hover b{color:var(--accent)}"
+    +".kb-per-note{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);letter-spacing:.01em}"
+    /* Кнопка периода: стрелки примыкают к подписи и читаются как одна деталь */
+    +".kb-per-pick.is-on .kb-per-trg{color:var(--accent)}"
+    +".kb-per-pick.is-on .kb-per-trg svg:not(.cv){color:var(--accent)}"
+    +".kb-per-trg .cv{opacity:.55;margin-left:1px}"
+    +".kb-per-trg:hover .cv{opacity:1}"
+    /* Оглавление сводки: подписи, а не кнопки. Активную держит черта снизу */
+    +".kb-nav{display:flex;gap:2px;flex-wrap:wrap;align-items:center;padding:2px 12px 0;border-bottom:1px solid var(--line);margin-bottom:2px}"
+    +".kb-navi{position:relative;display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--txt-3);padding:9px 10px 11px;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.004em;cursor:pointer;white-space:nowrap;transition:color .22s var(--ease-out)}"
+    +".kb-navi::after{content:'';position:absolute;left:10px;right:10px;bottom:-1px;height:1.5px;border-radius:2px 2px 0 0;background:var(--accent);transform:scaleX(0);transform-origin:center;transition:transform .32s cubic-bezier(.22,1,.36,1)}"
+    +".kb-navi:hover{color:var(--txt-2)}"
+    +".kb-navi.on{color:var(--txt)}"
+    +".kb-navi.on::after{transform:scaleX(1)}"
+    +".kb-navi b{font-family:var(--mono);font-size:9.5px;font-weight:700;color:var(--txt-3);background:rgba(255,255,255,.05);border-radius:5px;padding:1.5px 5px;transition:color .22s var(--ease-out),background .22s var(--ease-out)}"
+    +".kb-navi.on b{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}"
+    +"@media(prefers-reduced-motion:reduce){.kb-navi::after{transition:none}}"
+    /* Переключатель «месяц / день» — внутри календаря, а не снаружи */
+    +".kbp-modes{display:flex;gap:2px;padding:3px;margin:0 0 8px;background:rgba(255,255,255,.03);border:1px solid var(--line-2);border-radius:9px}"
+    +".kbp-m{flex:1;background:none;border:0;color:var(--txt-3);font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 8px;border-radius:7px;cursor:pointer;transition:all .16s var(--ease-out)}"
+    +".kbp-m:hover{color:var(--txt-2)}"
+    +".kbp-m.on{background:rgba(255,255,255,.06);color:var(--accent)}"
     +".kb-flash{animation:kb-fl 900ms var(--ease-out)}"
     +"@keyframes kb-fl{0%,100%{box-shadow:0 0 0 0 transparent}18%{box-shadow:0 0 0 2px var(--accent-line)}}"
     +".kb-arc-tag{margin-left:8px;background:var(--bg-3);color:var(--txt-3);border-radius:999px;padding:2px 8px;font-size:9.5px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}"
@@ -28513,23 +28543,27 @@ function _kbSecSmm(p,A){
 }
 
 /* панель периода: всё время / месяц / день + быстрые пресеты */
+/* Период — одна кнопка вместо семи. Режим («месяц» или «день») и сброс
+   переехали внутрь всплывающего календаря: там они и так были, снаружи
+   дублировались. Стрелки соседнего периода примыкают к кнопке и читаются
+   как одна деталь, а не как три отдельные. */
 function _kbPeriodBar(){
-  var seg=function(m,l){ return '<button class="'+(KB_PERIOD.mode===m?'on':'')+'" onclick="kbSetPeriod(\''+m+'\')">'+l+'</button>'; };
-  var h='<div class="kb-per"><div class="kb-seg">'+seg('all','Всё время')+seg('month','Месяц')+seg('day','День')+'</div>';
-  if(_kbPerOn()){
-    var cal='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 9.5h18"/></svg>';
-    h+='<div class="kb-per-pick" id="kb-pickw">'
-      +'<button class="kb-per-nav" onclick="kbPeriodShift(-1)" title="Предыдущий период">'+_KBIC.chev+'</button>'
-      +'<button class="kb-per-trg" onclick="kbPickOpen(event)" title="Выбрать период">'+cal+'<span>'+escH(_kbPerLabel())+'</span></button>'
-      +'<button class="kb-per-nav up" onclick="kbPeriodShift(1)" title="Следующий период">'+_KBIC.chev+'</button>'
-      +'</div>'
-      +'<button class="kb-per-x" onclick="kbSetPeriod(\'all\')" title="Сбросить фильтр">Сбросить</button>';
-  }else{
-    h+='<span class="kb-per-note">фильтр по датам: отчёты, контент-планы, материалы, бриф, задачи и этапы, SMM</span>';
-  }
-  return h+'</div>';
+  var on=_kbPerOn();
+  var cal='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 9.5h18"/></svg>';
+  var caret='<svg class="cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M6 9l6 6 6-6"/></svg>';
+  var h='<div class="kb-per">'
+    +'<div class="kb-per-pick'+(on?' is-on':'')+'" id="kb-pickw">'
+      +(on?'<button class="kb-per-nav" onclick="kbPeriodShift(-1)" title="Предыдущий период">'+_KBIC.chev+'</button>':'')
+      +'<button class="kb-per-trg" onclick="kbPickOpen(event)" title="Период сводки">'+cal+'<span>'+escH(on?_kbPerLabel():'Всё время')+'</span>'+caret+'</button>'
+      +(on?'<button class="kb-per-nav up" onclick="kbPeriodShift(1)" title="Следующий период">'+_KBIC.chev+'</button>':'')
+    +'</div>'
+    +'<span class="kb-per-note">'+(on?'фильтр применён к отчётам, контент-планам, материалам, задачам и SMM':'период фильтрует отчёты, контент-планы, материалы, задачи и SMM')+'</span>'
+  +'</div>';
+  return h;
 }
-/* навигация по секциям — чтобы длинная сводка не листалась вслепую */
+/* Навигация по разделам сводки. Восемь плашек читались как восемь действий,
+   хотя это оглавление — теперь это тихие подписи с чертой под активной.
+   Активную подсвечивает не клик, а сама прокрутка. */
 function _kbNavBar(V,A){
   var items=[
     ['kbs-pass','Паспорт',''],
@@ -28541,10 +28575,31 @@ function _kbNavBar(V,A){
     ['kbs-smm','SMM',''],
     ['kbs-mat','Материалы',kbCountView(kbProj)]
   ];
-  return '<div class="kb-nav">'+items.map(function(it){
-    return '<button class="kb-navi" onclick="kbNavTo(\''+it[0]+'\',event)">'+escH(it[1])
+  return '<div class="kb-nav" id="kb-nav">'+items.map(function(it,i){
+    return '<button class="kb-navi'+(i===0?' on':'')+'" data-sec="'+it[0]+'" onclick="kbNavTo(\''+it[0]+'\',event)">'+escH(it[1])
       +(it[2]!==''&&it[2]!=null?'<b>'+it[2]+'</b>':'')+'</button>';
   }).join('')+'</div>';
+}
+/* Подсветка активного раздела при прокрутке. Наблюдаем за секциями и
+   отмечаем верхнюю видимую — без обработчика scroll и пересчёта на каждый
+   кадр. Наблюдатель пересоздаётся при каждой отрисовке сводки. */
+function kbNavSpy(){
+  try{ if(window._kbSpy){ window._kbSpy.disconnect(); window._kbSpy=null; } }catch(_e){}
+  var nav=document.getElementById('kb-nav'); if(!nav||!window.IntersectionObserver) return;
+  var btns=[].slice.call(nav.querySelectorAll('.kb-navi'));
+  var secs=btns.map(function(b){ return document.getElementById(b.dataset.sec); });
+  var vis={};
+  var mark=function(){
+    var first=-1;
+    for(var i=0;i<secs.length;i++){ if(secs[i]&&vis[secs[i].id]){ first=i; break; } }
+    if(first<0) return;
+    btns.forEach(function(b,i){ b.classList.toggle('on', i===first); });
+  };
+  window._kbSpy=new IntersectionObserver(function(rows){
+    rows.forEach(function(r){ vis[r.target.id]=r.isIntersecting; });
+    mark();
+  },{ rootMargin:'-96px 0px -60% 0px', threshold:0 });
+  secs.forEach(function(s){ if(s) window._kbSpy.observe(s); });
 }
 function kbAutoBlock(){
   if(!window.LIVE||!window.SB) return '';
@@ -28561,6 +28616,8 @@ function kbAutoBlock(){
   if(A._error) return head(btn(false,'Повторить'))
     +'<div class="kb-cat kb-auto-sec"><div class="kb-items"><div class="kb-empty">Не удалось загрузить данные: '+escH(A._error)+'</div></div></div>';
   var V=_kbView(A);
+  /* подсветку разделов включаем после отрисовки — к этому моменту секции уже в DOM */
+  setTimeout(function(){ try{ kbNavSpy(); }catch(_e){} }, 60);
   return head(btn(!!A._loading, A._loading?'Обновляем…':'Обновить'))
     +_kbPeriodBar()
     +_kbNavBar(V,A)
