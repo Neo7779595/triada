@@ -20156,7 +20156,9 @@ async function renderClContent(){
   const _prev=window.CL_CP||null;
   const _want=(_prev&&_prev.shares&&_prev.shares[_prev.sel])?_prev.shares[_prev.sel].sheet_id:null;
   const _m0=clCpMonths(shares);
-  const _mKeep=(_prev&&_prev.monthFilt&&_m0.indexOf(_prev.monthFilt)>=0)?_prev.monthFilt:(_m0&&_m0.length?_m0[0]:null);
+  /* Месяц сам собой больше не выбирается: у клиента теперь несколько таблиц,
+     и открывать раздел уже отфильтрованным — значит прятать половину. */
+  const _mKeep=(_prev&&_prev.monthFilt&&_m0.indexOf(_prev.monthFilt)>=0)?_prev.monthFilt:null;
   window.CL_CP={shares:shares, appr:appr, sel:0, want:_want, monthFilt:_mKeep};
   /* Агентство отправляет план, пока кабинет открыт. Ждать от клиента
      перезагрузки страницы неправильно — перечитываем, когда он возвращается
@@ -20603,15 +20605,27 @@ function clCpRender(){
     return;
   }
   const _all=cp.shares, _cmonths=clCpMonths(_all);
-  let _vis=cp.monthFilt?_all.filter(function(s){return clCpShareMonth(s)===cp.monthFilt;}):_all.slice();
+  /* Лист без дат месяцу не принадлежит — и прятать его фильтром нельзя.
+     Раньше конкурентный анализ или пустой лист исчезали у клиента молча:
+     месяц подставлялся сам, а они под него не подходили. */
+  let _vis=cp.monthFilt?_all.filter(function(s){ const m=clCpShareMonth(s); return !m||m===cp.monthFilt; }):_all.slice();
   _vis.sort(function(a,b){return String(b.shared_at||'').localeCompare(String(a.shared_at||''));});
   if(!_vis.length){ box.innerHTML=ph+clCpMonthBar(_cmonths)+'<div style="text-align:center;padding:46px 24px;color:var(--txt-3)">За «'+_ddH(cpMonthLabel(cp.monthFilt)||'выбранный месяц')+'» планов нет.</div>'; return; }
   if(cp.want){ const _i=_vis.findIndex(function(s){ return s.sheet_id===cp.want; }); if(_i>=0)cp.sel=_i; cp.want=null; }
-  cp.sel=Math.min(cp.sel||0, _vis.length-1);
-  const share=_vis[cp.sel], sh=share.data||{}, sid=share.sheet_id;
+  /* Номер листа зажимаем с обеих сторон: список меняется под руками, и один
+     промах индекса раньше валил весь раздел вместо того, чтобы показать первый. */
+  cp.sel=Math.max(0,Math.min(cp.sel||0, _vis.length-1));
+  const share=_vis[cp.sel]||_vis[0], sh=(share&&share.data)||{}, sid=share&&share.sheet_id;
   const cols=sh.cols||[], rows=sh.rows||[];
   let tabs='';
-  if(_vis.length>1){ tabs='<div class="clcp-tabs">'+_vis.map(function(s,i){return '<button class="clcp-tab'+(i===cp.sel?' on':'')+'" onclick="clCpPick('+i+')">'+_ddH(s.name||('Лист '+(i+1)))+'</button>';}).join('')+'</div>'; }
+  /* Листы приходят из разных таблиц, и называться могут одинаково — «Лист 1»
+     и «Лист 1». Подписываем таблицей, иначе выбирать не из чего. */
+  const _tabLbl=function(s,i){
+    const b=String((s.data&&s.data.gs&&s.data.gs.book)||'').trim();
+    const n=String(s.name||('Лист '+(i+1)));
+    return (!b||b===n)?n:(b+' · '+n);
+  };
+  if(_vis.length>1){ tabs='<div class="clcp-tabs">'+_vis.map(function(s,i){return '<button class="clcp-tab'+(i===cp.sel?' on':'')+'" onclick="clCpPick('+i+')">'+_ddH(_tabLbl(s,i))+'</button>';}).join('')+'</div>'; }
   if(clCpGS(sh) && clCpWant()==='gs'){ clCpGSRender(sh,tabs); return; }
   const sa=cp.appr[sid+'/__sheet__']||{status:'pending',comment:''};
   let _okN=0; rows.forEach(function(row){ if((cp.appr[sid+'/'+row.id]||{}).status==='approved')_okN++; });
