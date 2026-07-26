@@ -28227,8 +28227,8 @@ function _pdBoardHTML(p){
   }
   if(!b){
     return `<div class="pk-empty" style="padding:44px 0;line-height:1.7">У проекта пока нет доски.
-      ${canEdit?`<div style="margin-top:16px"><button class="btn-add" id="pd-board-new" onclick="pdBoardCreate()">Создать доску</button></div>
-      <div style="opacity:.5;font-size:12.5px;margin-top:12px;max-width:440px;margin-left:auto;margin-right:auto">Доска создаётся в вашей команде Miro и остаётся у вас, даже если отключить интеграцию. На бесплатном тарифе Miro редактируемыми остаются только три последние доски.</div>`
+      ${canEdit?`<div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn-add" id="pd-board-new" onclick="pdBoardCreate()">Создать доску</button><button class="btn-ghost" onclick="pdBoardLink()">Привязать существующую</button></div>
+      <div style="opacity:.5;font-size:12.5px;margin-top:12px;max-width:460px;margin-left:auto;margin-right:auto">Доска создаётся в вашей команде Miro и остаётся у вас, даже если отключить интеграцию. На бесплатном тарифе Miro новую доску через интеграцию завести нельзя — заведите её прямо в Miro и привяжите ссылкой.</div>`
       :'<div style="opacity:.6;font-size:13px;margin-top:8px">Создать её может тот, кто вправе править проекты.</div>'}</div>`;
   }
 
@@ -28258,6 +28258,22 @@ async function pdBoardCreate(){
     toast(data.created?'Доска создана':'Доска уже была');
   }catch(e){ toast(String(e.message||e)); }
   finally{ const x=document.getElementById('pd-board-new'); if(x){ x.disabled=false; x.textContent='Создать доску'; } }
+}
+
+/* Бесплатный тариф Miro не даёт создать доску через API. Доску заводят руками
+   в Miro и привязывают сюда ссылкой — дальше всё работает как у созданной. */
+async function pdBoardLink(){
+  const p=PROJECTS[pdIdx]; if(!p) return;
+  const raw=prompt('Вставьте ссылку на доску Miro\n\nОткройте доску в Miro и скопируйте адрес из строки браузера.');
+  if(raw===null) return;
+  const link=String(raw).trim(); if(!link) return;
+  try{
+    const { status, data } = await _giFetch('miro-board', { action:'link', project:p.id, board:link });
+    if(status===503||(data&&data.error==='not_configured')){ toast('Miro ещё не настроен — раздел «Интеграции»'); return; }
+    if(!data||!data.board) throw new Error((data&&data.message)||'Не удалось привязать доску');
+    p._miro=data.board; renderPd();
+    toast('Доска привязана');
+  }catch(e){ toast(String(e.message||e)); }
 }
 
 async function pdBoardVisible(on){
