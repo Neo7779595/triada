@@ -11611,14 +11611,12 @@ function myProfileOpen(){
         <label class="pm2-fld"><span>Телефон</span><input type="tel" id="pm2-ph" value="${escH(me.phone||'')}" placeholder="+998 90 000 00 00" maxlength="30" onblur="pm2Save('phone', this.value)"></label>
         <label class="pm2-fld"><span>Telegram</span><input type="text" id="pm2-tg" value="${escH(me.tg_username||'')}" placeholder="@username" maxlength="60" onblur="pm2Save('tg_username', this.value)"></label>
       </div>
-      <div class="pm2-me-pwd" style="margin-top:12px">
-        <div class="pm2-me-pwd-l">
-          <div class="pm2-me-pwd-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M4 7l8 6 8-6"/></svg>Рабочая почта Google</div>
-          <div class="pm2-me-pwd-s" id="pm2-gm-s">${me.google_email
-            ? ('Доступы к папкам и календарям проектов приходят на <b style="color:var(--txt)">'+escH(me.google_email)+'</b>.')
-            : 'Нажмите — и система сама возьмёт адрес из вашего аккаунта Google. Вводить вручную ничего не нужно.'}</div>
-        </div>
-        <button type="button" class="pm2-pwd-btn" id="pm2-gm-btn" onclick="pm2GoogleMail(this.dataset.force==='1')" data-force="${me.google_email?'1':'0'}">${me.google_email?'Сменить':'Подключить'}</button>
+      <div class="pm2-me-grid" style="grid-template-columns:1fr;margin-top:10px">
+        <label class="pm2-fld"><span>Рабочая почта Google</span><input type="email" id="pm2-gm" value="${escH(me.google_email||'')}" placeholder="ivan@gmail.com" maxlength="120" autocomplete="off" spellcheck="false" onblur="pm2Save('google_email', this.value)"></label>
+      </div>
+      <div class="pm2-me-note" id="pm2-gm-s" style="margin-top:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="flex:1;min-width:180px">На неё придут доступы к папкам и календарям ваших проектов.</span>
+        <button type="button" class="pm2-pwd-btn" id="pm2-gm-btn" onclick="pm2GoogleMail(this.dataset.force==='1')" data-force="${me.google_email?'1':'0'}">Взять из Google</button>
       </div>
       <div class="pm2-me-color">
         <span class="pm2-me-lbl">Ваш цвет</span>
@@ -11683,11 +11681,18 @@ function myProfileOpen(){
 async function pm2Save(field, rawVal){
   const me=(window.tMe&&window.tMe())||null;
   if(!me || !window.SB){ toast('Нет соединения'); return; }
-  const ALLOWED = ['full_name','phone','tg_username','birthday','color'];
+  const ALLOWED = ['full_name','phone','tg_username','birthday','color','google_email'];
   if(ALLOWED.indexOf(field)<0){ console.warn('pm2Save: field not allowed', field); return; }
   let val = rawVal;
   if(typeof val==='string'){
     val = val.trim();
+    if(field==='google_email'){
+      val = val.toLowerCase();
+      /* Пустое поле — законный вариант: доступы просто не раздаются.
+         А вот внутренний логин Google не примет — говорим сразу. */
+      if(val && /\.triada\.app$/.test(val)){ _pm2Hint('Это логин в системе, а не почта Google','err'); return; }
+      if(val && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)){ _pm2Hint('Проверьте адрес — похоже, опечатка','err'); return; }
+    }
     if(field==='tg_username') val = val.replace(/^@/,'').replace(/^https?:\/\/(t\.me|telegram\.me)\//i,'').replace(/\/$/,'') || null;
     if(field==='phone') val = val.replace(/[^\d+\s\-()]/g,'') || null;
     if(field==='full_name' && !val){ toast('Имя не может быть пустым'); return; }
@@ -11742,9 +11747,9 @@ async function pm2GoogleMail(force){
         const mail=pr&&pr.google_email;
         if(mail){
           me.google_email=mail;
-          const s=document.getElementById('pm2-gm-s');
-          if(s) s.innerHTML='Доступы к папкам и календарям проектов приходят на <b style="color:var(--txt)">'+escH(mail)+'</b>.';
-          if(btn){ btn.textContent='Сменить'; btn.dataset.force='1'; }
+          const inp=document.getElementById('pm2-gm'); if(inp) inp.value=mail;
+          if(btn) btn.dataset.force='1';
+          _pm2Hint('Сохранено ✓','ok');
           toast('Рабочая почта: '+mail);
         }
       }catch(_){ }
