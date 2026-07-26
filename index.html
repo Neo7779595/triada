@@ -4298,6 +4298,33 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pdoc-eye svg{width:16px;height:16px}
 .pdoc-eye:hover{color:var(--txt-2)}
 .pdoc-eye.on{color:var(--pos)}
+/* Ячейка «Сценарий» и полноэкранная читалка Google-документа */
+.cp-doc{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 8px;border-radius:7px;
+  border:1px dashed var(--line-2);color:var(--txt-3);font-size:12px;font-weight:500;white-space:nowrap}
+.cp-doc svg{width:13px;height:13px;flex:none}
+.cp-doc.on{border-style:solid;border-color:rgba(55,230,200,.28);background:rgba(55,230,200,.1);color:var(--accent)}
+.cp-cell:hover .cp-doc{border-color:var(--accent);color:var(--accent)}
+#ov-cpdoc{position:fixed;inset:0;z-index:90;display:none;background:rgba(5,6,8,.86);backdrop-filter:blur(4px)}
+#ov-cpdoc.on{display:block}
+.cpdoc-w{position:absolute;inset:18px;display:flex;flex-direction:column;border:1px solid var(--line-2);
+  border-radius:14px;overflow:hidden;background:var(--bg-1);box-shadow:0 40px 100px -30px rgba(0,0,0,.9)}
+.cpdoc-h{display:flex;align-items:center;gap:11px;padding:10px 13px;border-bottom:1px solid var(--line);flex:none}
+.cpdoc-ic{width:30px;height:30px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:rgba(55,230,200,.11);color:var(--accent);border:1px solid rgba(55,230,200,.22)}
+.cpdoc-ic svg{width:15px;height:15px}
+.cpdoc-t{flex:1;min-width:0}
+.cpdoc-t .k{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--txt-3)}
+.cpdoc-t .n{font-size:13px;font-weight:620;color:var(--txt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cpdoc-nav{display:flex;align-items:center;gap:6px;flex:none}
+.cpdoc-b{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;padding:0;cursor:pointer;
+  border:1px solid var(--line-2);border-radius:8px;background:rgba(255,255,255,.03);color:var(--txt-2);
+  font-size:12px;font-weight:600;text-decoration:none;transition:color .14s var(--ease),border-color .14s var(--ease),background .14s var(--ease)}
+.cpdoc-b.wide{width:auto;padding:0 11px}
+.cpdoc-b svg{width:15px;height:15px}
+.cpdoc-b:hover{color:var(--txt);border-color:var(--accent);background:rgba(55,230,200,.1)}
+.cpdoc-b[disabled]{opacity:.32;pointer-events:none}
+.cpdoc-f{flex:1;width:100%;border:0;background:#fff}
+@media(max-width:768px){.cpdoc-w{inset:0;border-radius:0}}
 /* ═══ Документы в кабинете клиента ═══
    Тон и плотность — как у «Этапов»: тёмные карточки на var(--bg-1),
    тонкая линия рамки, компактные отступы. Никаких светлых заливок. */
@@ -14756,8 +14783,8 @@ function pd2Close(){const ov=document.getElementById('ov-pd2');ov.classList.remo
   if(typeof CLDOC!=='undefined') CLDOC.open=null;   /* окно закрыли — поздний ответ рисовать некуда */}
 
 /* ===================== КОНТЕНТ-ПЛАН (v1) ===================== */
-const CP_TYPES=[['text','Текст'],['long','Текст +'],['num','Число'],['money','Деньги'],['date','Дата'],['select','Статус'],['check','Чек'],['link','Ссылка']];
-const CP_TYNAME={text:'Текст',long:'Текст +',num:'Число',money:'Деньги',date:'Дата',select:'Статус',check:'Чек',link:'Ссылка'};
+const CP_TYPES=[['text','Текст'],['long','Текст +'],['num','Число'],['money','Деньги'],['date','Дата'],['select','Статус'],['check','Чек'],['link','Ссылка'],['doc','Сценарий']];
+const CP_TYNAME={text:'Текст',long:'Текст +',num:'Число',money:'Деньги',date:'Дата',select:'Статус',check:'Чек',link:'Ссылка',doc:'Сценарий'};
 const CP_PAL={gray:['rgba(255,255,255,.06)','var(--txt-2)'],teal:['var(--accent-dim)','var(--accent)'],violet:['rgba(138,143,255,.16)','#9D9DFF'],amber:['rgba(240,180,80,.16)','var(--warn)'],green:['rgba(80,210,140,.15)','var(--pos)'],red:['rgba(255,110,110,.15)','var(--neg)'],blue:['rgba(90,162,255,.15)','#7FB4FF']};
 const CP_PALK=Object.keys(CP_PAL);
 const CP_IC={tpl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',merge:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 12H4M9 12l2.5-2.5M9 12l2.5 2.5M15 12h5M15 12l-2.5-2.5M15 12l-2.5 2.5"/></svg>',plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',dots:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>',up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>',
@@ -14871,7 +14898,7 @@ function _cpFmtNum(v, nf, dp){
   return _ddH(s);
 }
 function cpCellView(col,v,row){
-  if(v==null||v===''){ if(col.type==='check'){ v=false; } else if(col.type==='select'){ return cpChipEmpty(col); } else { return ''; } }
+  if(v==null||v===''){ if(col.type==='check'){ v=false; } else if(col.type==='select'){ return cpChipEmpty(col); } else if(col.type==='doc'){ return cpDocChip(''); } else { return ''; } }
   if(col.type==='select') return cpChip(col,v);
   if(col.type==='check'){
     if(col.sys==='pub'){
@@ -14883,6 +14910,7 @@ function cpCellView(col,v,row){
     return '<span class="cp-chk'+(v?' on':'')+'"></span>';
   }
   if(col.type==='link'){ if(v==null||v==='')return ''; const _lk=cpLinkParse(v); return '<span class="cp-lnk" onclick="event.stopPropagation();cpLinkClick(this)" data-u="'+_ddA(_lk.url)+'" data-t="'+_ddA(_lk.label)+'">'+_lnkFav(_lk.url)+'<span class="cp-lnk-t">'+_ddH(_lk.label||'Открыть')+'</span></span>'; }
+  if(col.type==='doc') return cpDocChip(v);
   if(col.type==='date') return '<span class="cp-mono">'+_ddH(cpFmtDate(v))+'</span>';
   const st=(row&&row.st&&row.st[col.id])||null;
   const nf=st&&st.nf; const dp=st&&(st.dp!=null?st.dp:null);
@@ -15773,7 +15801,7 @@ function cpHeadMergeInfo(sh){
   return {anchorW:anchorW,covered:covered,members:members};
 }
 function CP_TYICON(t){
-  const m={text:'<path d="M4 7h16M4 12h10M4 17h7"/>',long:'<path d="M4 6h16M4 10h16M4 14h12M4 18h8"/>',num:'<path d="M6 4l-1 16M14 4l-1 16M4 9h16M3 15h16"/>',money:'<path d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H8m0 0h8a2.5 2.5 0 0 1 0 5H8"/>',date:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',select:'<circle cx="12" cy="12" r="8"/><path d="M9 12l2 2 4-4"/>',check:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/>',link:'<path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1"/>'};
+  const m={text:'<path d="M4 7h16M4 12h10M4 17h7"/>',long:'<path d="M4 6h16M4 10h16M4 14h12M4 18h8"/>',num:'<path d="M6 4l-1 16M14 4l-1 16M4 9h16M3 15h16"/>',money:'<path d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H8m0 0h8a2.5 2.5 0 0 1 0 5H8"/>',date:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>',select:'<circle cx="12" cy="12" r="8"/><path d="M9 12l2 2 4-4"/>',check:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/>',link:'<path d="M10 14a4 4 0 0 0 6 0l2-2a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-2 2a4 4 0 0 0 6 6l1-1"/>',doc:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'};
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'+(m[t]||m.text)+'</svg>';
 }
 
@@ -15824,6 +15852,7 @@ function cpRender(p){
         +'<span class="cp-btngroup">'
           +'<button class="cp-mini" onclick="cpPlanGallery()">'+CP_IC.grid+'Таблицы</button>'
           +'<button class="cp-mini" onclick="cpTplManager()">'+CP_IC.tpl+'Списки</button>'
+          +(cpHasDocCol()?'<button class="cp-mini" onclick="cpDocDigest()" title="Собрать все сценарии листа в один документ">'+CP_IC.grid+'Сборник</button>':'')
         +'</span>'
       +'</div>'
     +'</div>'
@@ -16023,6 +16052,7 @@ function cpEdit(r,c,init){
   if(col.type==='select'){ cpRerender(); setTimeout(()=>{const cell=cpCellEl(r,c); if(cell)cpSelectMenu(r,c,cell);},0); return; }
   if(col.type==='date'){ cpRerender(); setTimeout(()=>{const cell=cpCellEl(r,c); if(cell)cpDateMenu(r,c,cell);},0); return; }
   if(col.type==='link'){ cpLinkEdit(r,c); return; }
+  if(col.type==='doc'){ cpDocOpen(r,c); return; }
   cpEd={r,c}; cpRerender();
   setTimeout(()=>{ const i=document.getElementById('cp-ed'); if(i){ if(init!=null){i.value=init;} i.focus(); if(init==null&&i.select){i.select();} else { try{const L=i.value.length;i.setSelectionRange(L,L);}catch(_e){} } } },0);
 }
@@ -17712,6 +17742,7 @@ const CP_ADD_TYPES=[
   ['select','Список','Выбор из вариантов'],
   ['check','Флажок','Да / нет'],
   ['link','Ссылка','URL или Telegram'],
+  ['doc','Сценарий','Google-документ на каждую публикацию'],
 ];
 function cpAddCol(ev){
   const btn = (ev && (ev.currentTarget || ev.target)) || document.querySelector('.cp-mini[onclick*="cpAddCol"]') || document.querySelector('.cp-addcol');
@@ -17740,7 +17771,8 @@ function cpAddColOfType(t){
     date:{name:'Дата',w:120,opts:[]},
     select:{name:'Список',w:160,opts:[{v:'Вариант',c:'gray'}]},
     check:{name:'Флажок',w:90,opts:[]},
-    link:{name:'Ссылка',w:180,opts:[]}
+    link:{name:'Ссылка',w:180,opts:[]},
+    doc:{name:'Сценарий',w:150,opts:[]}
   };
   const d=defaults[t]||defaults.text;
   const col={id:cpUid(),name:d.name,type:t,w:d.w,opts:d.opts};
@@ -18933,6 +18965,114 @@ function cpLinkView(url,label){
     +'<button class="cp-lkm-x" onclick="pd2Close()">Закрыть</button></div>';
   pd2Open(h);
 }
+/* ═══════════════ СЦЕНАРИИ · Google-документ в ячейке ═══════════════
+   Колонка типа «Сценарий»: в ячейке лежит id Google-документа, у каждой
+   публикации свой файл в папке проекта «Сценарии» — значит команда правит
+   его теми же доступами, что и остальные материалы. Документ открывается
+   встроенным во весь экран, стрелками можно идти по строкам подряд. */
+const CPDOC={ busy:false, r:null, c:null };
+function cpHasDocCol(){ try{ const sh=cpSheet(); return !!(sh&&sh.cols&&sh.cols.some(x=>x.type==='doc')); }catch(_e){ return false; } }
+function cpDocChip(v){
+  const has=!!String(v||'').trim();
+  return '<span class="cp-doc'+(has?' on':'')+'">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>'
+    +'<span>'+(has?'Открыть':'Написать')+'</span></span>';
+}
+/** Заголовок документа: номер строки и тема публикации из первой текстовой колонки. */
+function cpDocTitle(sh,row,ri){
+  const t=(sh.cols||[]).find(x=>x.type==='text'||x.type==='long');
+  const theme=t?String(row.c[t.id]||'').trim():'';
+  return '№'+(ri+1)+(theme?(' · '+theme.slice(0,80)):'');
+}
+async function cpDocOpen(r,c){
+  const p=PROJECTS[pdIdx], sh=cpSheet();
+  const row=cpRowAt(r), col=cpColAt(c);
+  if(!p||!sh||!row||!col) return;
+  let id=String(row.c[col.id]||'').trim();
+  if(!id){
+    if(CPDOC.busy) return;
+    CPDOC.busy=true;
+    toast('Создаю документ сценария…');
+    try{
+      const { status, data } = await _giFetch('google-docs',{action:'script'},
+        { project_id:p.id, title:cpDocTitle(sh,row,r) });
+      if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
+      if(!data||data.ok===false||!data.id){ toast((data&&(data.error||data.message))||'Не удалось создать документ'); return; }
+      id=String(data.id);
+      row.c[col.id]=id; cpSave(); cpRerender();
+    }catch(e){ toast(String(e.message||e)); return; }
+    finally{ CPDOC.busy=false; }
+  }
+  cpDocView(id,r,c);
+}
+/* Соседние строки той же колонки — чтобы пройти сценарии подряд, не выходя. */
+function cpDocNeighbours(r,c){
+  const sh=cpSheet(); if(!sh) return {prev:null,next:null,total:0,pos:0};
+  const rows=cpDisp(sh)||[];
+  return { prev:(r>0?r-1:null), next:(r<rows.length-1?r+1:null), total:rows.length, pos:r+1 };
+}
+function cpDocView(id,r,c){
+  CPDOC.r=r; CPDOC.c=c;
+  const sh=cpSheet(), row=cpRowAt(r);
+  const nb=cpDocNeighbours(r,c);
+  const url=(typeof _giWithUser==='function'?_giWithUser('https://docs.google.com/document/d/'+id+'/edit?embedded=true&rm=minimal')
+                                            :'https://docs.google.com/document/d/'+id+'/edit?embedded=true&rm=minimal');
+  let ov=document.getElementById('ov-cpdoc');
+  if(!ov){ ov=document.createElement('div'); ov.id='ov-cpdoc'; document.body.appendChild(ov); }
+  ov.innerHTML='<div class="cpdoc-w">'
+    +'<div class="cpdoc-h">'
+      +'<div class="cpdoc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div>'
+      +'<div class="cpdoc-t"><div class="k">Сценарий · '+nb.pos+' из '+nb.total+'</div>'
+        +'<div class="n">'+_ddH(cpDocTitle(sh,row,r))+'</div></div>'
+      +'<div class="cpdoc-nav">'
+        +'<button class="cpdoc-b" '+(nb.prev===null?'disabled':'onclick="cpDocGo(-1)"')+' title="Предыдущий сценарий"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>'
+        +'<button class="cpdoc-b" '+(nb.next===null?'disabled':'onclick="cpDocGo(1)"')+' title="Следующий сценарий"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>'
+        +'<a class="cpdoc-b wide" href="'+_ddA(url.replace("&embedded=true","").replace("?embedded=true&","?"))+'" target="_blank" rel="noopener" title="Открыть в Google Документах">В Google</a>'
+        +'<button class="cpdoc-b" onclick="cpDocClose()" title="Закрыть · Esc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>'
+      +'</div></div>'
+    +'<iframe class="cpdoc-f" src="'+_ddA(url)+'" title="Сценарий"></iframe>'
+  +'</div>';
+  ov.classList.add('on');
+  document.addEventListener('keydown',cpDocKey);
+}
+function cpDocGo(step){
+  const r=CPDOC.r, c=CPDOC.c; if(r==null) return;
+  cpDocClose();
+  setTimeout(function(){ cpDocOpen(r+step,c); },60);
+}
+function cpDocKey(e){ if(e.key==='Escape'){ cpDocClose(); } }
+function cpDocClose(){
+  const ov=document.getElementById('ov-cpdoc');
+  if(ov){ ov.classList.remove('on'); ov.innerHTML=''; }
+  document.removeEventListener('keydown',cpDocKey);
+}
+/** Сборник: все сценарии листа по порядку в одном документе — отправить клиенту или прочитать подряд. */
+async function cpDocDigest(){
+  const p=PROJECTS[pdIdx], sh=cpSheet(); if(!p||!sh) return;
+  const cols=(sh.cols||[]).filter(x=>x.type==='doc');
+  const rows=cpDisp(sh)||[];
+  const items=[];
+  rows.forEach(function(row,i){
+    cols.forEach(function(col){
+      const id=String(row.c[col.id]||'').trim();
+      if(id) items.push({ id:id, title:cpDocTitle(sh,row,i) });
+    });
+  });
+  if(!items.length){ toast('Сценариев пока нет — напишите хотя бы один'); return; }
+  if(CPDOC.busy) return; CPDOC.busy=true;
+  toast('Собираю '+items.length+' сценариев в один документ…');
+  try{
+    const { status, data } = await _giFetch('google-docs',{action:'digest'},
+      { project_id:p.id, title:'Сценарии · '+(sh.name||'лист'), items:items });
+    if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
+    if(!data||data.ok===false||!data.url){ toast((data&&(data.error||data.message))||'Не удалось собрать сборник'); return; }
+    toast('Сборник готов');
+    window.open(typeof _giWithUser==='function'?_giWithUser(data.url):data.url,'_blank','noopener');
+  }catch(e){ toast(String(e.message||e)); }
+  finally{ CPDOC.busy=false; }
+}
+window.cpDocOpen=cpDocOpen; window.cpDocGo=cpDocGo; window.cpDocClose=cpDocClose; window.cpDocDigest=cpDocDigest; window.cpHasDocCol=cpHasDocCol;
+
 function cpLinkEdit(r,c){
   const col=cpColAt(c),row=cpRowAt(r); if(!col||!row)return; cpSel={r:r,c:c};
   const lk=cpLinkParse(row.c[col.id]);
