@@ -16972,11 +16972,10 @@ function cpRender(p){
   cpRecomputeSheet(sh);
   /* Пересчёт min/max для scale-правил условного форматирования */
   cpCFRecomputeCache(sh);
-  /* Режим Google: вместо нашей таблицы в том же месте открывается сама
-     таблица Google — как доска Miro в «Стратегиях». Вкладки листов внизу
-     остаются, чтобы переключаться, не выходя из режима. */
-  if(cpGSOn) cpGSOn=cpGSLink(sh)?sh.id:null;   /* перешли на лист без связи — выходим из режима */
-  if(cpGSOn===sh.id) return '<div class="cp">'+cpGSFrameHTML(p,sh)+cpSheetsBar(d)+'</div>';
+  /* Связанный лист вкладка открывает самой таблицей Google — как «Стратегии»
+     открываются доской Miro. Вкладки листов внизу остаются, чтобы
+     переключаться, не выходя из режима. */
+  if(cpGSLink(sh) && cpGSWant()==='gs') return '<div class="cp">'+cpGSFrameHTML(p,sh)+cpSheetsBar(d)+'</div>';
   const cols=sh.cols, disp=cpDisp(sh);
   if(cpRowSel.size){ const _ids=new Set((sh.rows||[]).map(function(r){return r.id;})); cpRowSel.forEach(function(id){ if(!_ids.has(id))cpRowSel.delete(id); }); }
   const sid=sh.id, ap=p._cpAppr||{}; const showClient=!!(p._cpShared&&p._cpShared[sid])||Object.keys(ap).some(function(k){return k.indexOf(sid+'/')===0;});
@@ -19400,8 +19399,18 @@ function cpGSOpen(){
    Лист открывается там же, где стояла наша таблица: выходить из системы,
    чтобы поправить пару ячеек, незачем. Панель сверху — та же, что у доски
    Miro, чтобы не заводить второй язык для одного и того же действия. */
-let cpGSOn=null;      /* id листа, открытого в режиме Google */
+/* Какой таблицей открывать вкладку. По умолчанию — оригинальной таблицей
+   Google, как «Стратегии» открываются самой доской Miro: если лист связан,
+   человек пришёл работать в Google, а не смотреть на наш пересказ.
+   Выбор запоминаем — переключаться каждый раз не нужно. */
+let cpGSView=null;    /* 'gs' | 'own' | null (ещё не выбирали) */
 let cpGSClean=false;  /* чистый вид: без синей шапки Google, только сетка */
+function cpGSWant(){
+  if(cpGSView) return cpGSView;
+  try{ const v=localStorage.getItem('cp_gs_view'); if(v==='own'||v==='gs'){ cpGSView=v; return v; } }catch(_e){}
+  return 'gs';
+}
+function cpGSSetView(v){ cpGSView=v; try{ localStorage.setItem('cp_gs_view',v); }catch(_e){} cpRerender(); }
 
 /* Полный редактор даём по умолчанию: человек пришёл работать, а не смотреть.
    Чистый вид убирает шапку и меню Google — так таблица занимает весь экран.
@@ -19415,9 +19424,9 @@ function cpGSEmbed(gs,clean){
 function cpGSShow(){
   cpCloseFloat();
   const sh=cpSheet(); if(!sh||!cpGSLink(sh)) return;
-  cpGSOn=sh.id; cpRerender();
+  cpGSSetView('gs');
 }
-function cpGSHide(){ cpGSOn=null; cpRerender(); }
+function cpGSHide(){ cpGSSetView('own'); }
 function cpGSCleanToggle(){
   cpGSClean=!cpGSClean;
   const f=document.querySelector('.cp-gsfr'), gs=cpGSLink(cpSheet());
@@ -19557,7 +19566,7 @@ async function cpGSPushGo(){
     pd2Close();
     /* Выгрузили — сразу показываем результат в окне здесь. Уводить в новую
        вкладку после того, как окно появилось в самой системе, незачем. */
-    cpGSOn=sh.id; cpRerender();
+    cpGSSetView('gs');
     toast(data.truncated?('Выгружено (взяли первые '+data.rows+' строк)')
                         :((data.created?'Таблица создана · ':'Таблица обновлена · ')+data.rows+' '+_plural(data.rows,'строка','строки','строк')));
   }catch(e){ pd2Close(); toast(String(e.message||e)); }
@@ -19684,9 +19693,6 @@ function cpGSPullApply(){
      истории, а не в этот, и Ctrl+Z вернул бы строки, оставив чужую дату. */
   sh.gs=Object.assign({},cpGSLink(sh)||{},{ at:new Date().toISOString(), dir:'pull' });
   window._CP_GS_PULL=null;
-  /* Загружали ради результата — его и показываем. Остаться в окне Google
-     после загрузки значит не увидеть, что именно приехало. */
-  cpGSOn=null;
   cpSave(); pd2Close(); cpRerender();
   toast('Загружено из Google · '+pl.rows+' '+_plural(pl.rows,'строка','строки','строк')
     +(pl.del?(' · удалено '+pl.del):'')+(pl.add?(' · добавлено '+pl.add):''));
