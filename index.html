@@ -109,6 +109,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 }
 /* Инпуты внутри поисковых обёрток и других контейнеров с рамкой — фокус на обёртке */
 .search input:focus-visible,.tools-search input:focus-visible,.np-pick-q:focus-visible,.fce-name:focus-visible,.pf-amt-wrap input:focus-visible,.cyc-search-wrap input:focus-visible{outline:none}
+/* Поле глобального поиска занимает всю ширину окна поиска — прямоугольная
+   обводка вокруг него читалась как лишняя рамка внутри рамки. Фокус там
+   и так очевиден: окно открылось именно ради ввода. */
+.cmdk-in input:focus,.cmdk-in input:focus-visible{outline:none !important;box-shadow:none !important}
 .search:focus-within{outline:2px solid var(--accent);outline-offset:2px;border-radius:9px}
 /* Мягкое свечение на инпутах при фокусе */
 input:not([type="checkbox"]):not([type="radio"]):focus,textarea:focus,select:focus{
@@ -5598,9 +5602,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .sched-day{flex:1;padding:8px 0;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-3);border-radius:7px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:.12s}
 .sched-day.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .sched-row{display:flex;gap:7px;align-items:stretch}
-.sched-seg{display:flex;flex:1;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
-.sched-seg button{flex:1;padding:8px 6px;border:none;background:var(--bg-2);color:var(--txt-3);font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;transition:.12s}
-.sched-seg button.on{background:var(--accent-dim);color:var(--accent)}
+/* Переключатель внутри редактора расписания. Раньше правила были записаны
+   на голый .sched-seg и перебивали переключатель вида «Неделя / Месяц /
+   Команда»: активной кнопке доставалась своя заливка, и она перекрашивалась
+   рывком, пока бегунок ехал — на экране получались две подсветки сразу.
+   Ограничиваем правила своей строкой .sched-row. */
+.sched-row .sched-seg{display:flex;flex:1;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;padding:0;height:auto;gap:0}
+.sched-row .sched-seg button{flex:1;padding:8px 6px;border:none;background:var(--bg-2);color:var(--txt-3);font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;transition:.12s;border-radius:0;height:auto}
+.sched-row .sched-seg button.on{background:var(--accent-dim);color:var(--accent)}
 .sched-hour{padding:8px 8px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);border-radius:8px;font-family:var(--font);font-size:13.5px;cursor:pointer}
 .sched-add-btn{padding:8px 14px;border:none;background:var(--accent);color:var(--accent-ink);border-radius:8px;font-family:var(--font);font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
 .sched-add-btn:hover{filter:brightness(1.08)}
@@ -5677,15 +5686,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .np-team-btn svg{flex:none;width:16px;height:16px}
 .np-chips{display:flex;flex-wrap:wrap;gap:6px}
 /* Множественные ответственные — метка главного */
-.np-chip[data-main="1"]{background:var(--accent-dim);border-color:var(--accent-line);color:var(--accent)}
-.np-chip .np-chip-main{color:var(--accent);font-size:12px;margin-right:4px}
-.np-chip-star{background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:14px;padding:0 4px;line-height:1;margin-left:2px;transition:color .14s}
-.np-chip-star:hover{color:var(--accent)}
-.np-chip{display:inline-flex;align-items:center;gap:7px;padding:4px 6px 4px 4px;border:1px solid var(--line-2);border-radius:20px;font-size:13.5px;color:var(--txt)}
-.np-chip-av{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;overflow:hidden}
+/* Плашки участников: прямоугольные с мягкими углами, как всё остальное
+   в интерфейсе. Все внутренние элементы — одного размера (22px) и на
+   одинаковых отступах, поэтому звезда, аватар и крестик стоят на одной
+   линии и по краям остаётся ровно одинаковое поле. */
+.np-chip{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 8px;border:1px solid var(--line-2);border-radius:11px;font-size:13.5px;color:var(--txt);
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008));box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+  transition:border-color .22s var(--ease),background .22s var(--ease)}
+.np-chip:hover{border-color:rgba(255,255,255,.16)}
+.np-chip[data-main="1"]{background:linear-gradient(180deg,color-mix(in oklab,var(--accent) 12%,transparent),color-mix(in oklab,var(--accent) 5%,transparent));border-color:var(--accent-line);color:var(--accent)}
+.np-chip .np-chip-main{width:22px;height:22px;flex:none;display:inline-flex;align-items:center;justify-content:center;color:var(--accent);font-size:13px;line-height:1;margin:0}
+.np-chip-star{width:22px;height:22px;flex:none;display:inline-flex;align-items:center;justify-content:center;background:none;border:0;color:var(--txt-3);cursor:pointer;font-size:13px;line-height:1;padding:0;margin:0;border-radius:7px;transition:color .16s,background .16s}
+.np-chip-star:hover{color:var(--accent);background:rgba(255,255,255,.05)}
+.np-chip-av{width:22px;height:22px;flex:none;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;overflow:hidden}
 .np-chip-av img{width:100%;height:100%;object-fit:cover}
-.np-chip-x{border:none;background:transparent;color:var(--txt-3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px}
-.np-chip-x:hover{color:#F0785C}
+.np-chip-x{width:22px;height:22px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--txt-3);cursor:pointer;font-size:15px;line-height:1;padding:0;border-radius:7px;transition:color .16s,background .16s}
+.np-chip-x:hover{color:#F0785C;background:rgba(240,120,92,.1)}
 .np-team-dept{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-3);margin:6px 2px 1px}
 .np-team-deptbtn{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:8px 10px 8px 11px;margin:11px 0 4px;border:1px solid var(--line-2);border-radius:9px;background:var(--bg-2);cursor:pointer;font:inherit;text-align:left;transition:.14s}
 .np-team-deptbtn:hover{border-color:var(--accent-line);background:var(--bg-3)}
@@ -6555,7 +6571,11 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .cmdk-it{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:9px;cursor:pointer;position:relative;transition:background .12s}
 .cmdk-it.on{background:color-mix(in srgb,var(--accent) 8%,var(--bg-2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent)}
 .cmdk-it.on::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:2.5px;border-radius:3px;background:var(--accent);opacity:.85}
-.cmdk-it .bd{width:30px;height:30px;border-radius:8px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px;color:var(--txt-2);flex:0 0 auto;overflow:hidden}
+/* position:relative обязателен: logoFill вставляет картинку с inset:0,
+   и без своего контекста позиционирования она растягивалась на всю строку
+   результата, а не на плашку 30×30. */
+.cmdk-it .bd{position:relative;width:30px;height:30px;border-radius:8px;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13.5px;color:var(--txt-2);flex:0 0 auto;overflow:hidden}
+.cmdk-it .bd-img{background:var(--bg-3);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .cmdk-it .bd-ic svg{width:16px;height:16px}
 .cmdk-it .bd-ic.kind-project{background:rgba(55,230,200,.14);color:var(--accent)}
 .cmdk-it .bd-ic.kind-stage{background:rgba(55,230,200,.12);color:var(--accent)}
@@ -13196,7 +13216,19 @@ function contractBadgeHTML(p){
 function setAgFilter(f){agFilter=f;renderProjects();}
 /* ---- плавный скользящий бегунок для сегментированных переключателей ---- */
 window._segmPos = window._segmPos || {};
-function _segmKey(seg){ var b=seg.querySelector('button'); var oc=(b&&b.getAttribute('onclick'))||''; return (oc.split('(')[0])||seg.className; }
+/* Ключ должен быть уникальным для каждого переключателя и одинаковым между
+   перерисовками. Раньше брали только имя обработчика первой кнопки — а если
+   его нет, ключом становился класс «segm», общий для всех переключателей:
+   они делили одну запомненную позицию, и бегунок выезжал из чужого места.
+   Добавляем к ключу подписи кнопок — они и различают переключатели. */
+function _segmKey(seg){
+  var b=seg.querySelector('button');
+  var oc=(b&&b.getAttribute('onclick'))||'';
+  var fn=(oc.split('(')[0])||'';
+  var labels='';
+  try{ labels=[].slice.call(seg.querySelectorAll('button,.stpl-tab')).map(function(x){ return (x.textContent||'').trim(); }).join('|'); }catch(_e){}
+  return (fn||seg.className)+'::'+labels;
+}
 function segmSyncOne(seg,solid){
   var th=seg.querySelector('.segm-thumb');
   if(!th || th.parentNode!==seg){ th=document.createElement('span'); th.className='segm-thumb'+(solid?' solid':''); seg.insertBefore(th, seg.firstChild); }
@@ -23838,9 +23870,15 @@ function cmdkRender(){
     html+=`<div class="cmdk-g"><span>${gr.g}</span><span class="cmdk-gc">${gr.items.length}</span></div>`;
     gr.items.forEach(it=>{
       const i=flatIdx++;
-      const badge = it.ic
-        ? `<div class="bd bd-ic kind-${it.kind||'x'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${it.ic}</svg></div>`
-        : `<div class="bd">${it.avatar?logoFill(it.avatar,(it.badge||'?')):(it.logoUrl?logoFill(it.logoUrl,(it.badge||'?')):_esc(it.badge||'?'))}</div>`;
+      /* Фото важнее значка: логотип проекта и лицо сотрудника узнаются
+         быстрее, чем одинаковые для всех иконки. Значок остаётся там,
+         где картинки нет, — и там же остаётся цвет по типу результата. */
+      const _img = it.avatar || it.logoUrl || '';
+      const badge = _img
+        ? `<div class="bd bd-img">${logoFill(_img,(it.badge||'?'))}</div>`
+        : (it.ic
+          ? `<div class="bd bd-ic kind-${it.kind||'x'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${it.ic}</svg></div>`
+          : `<div class="bd bd-let kind-${it.kind||'x'}"${it.color?` style="color:${it.color};background:${it.color}22"`:''}>${_esc(it.badge||'?')}</div>`);
       const parent = it.parent ? `<span class="cmdk-parent"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${_esc(it.parent)}</span>` : '';
       const sub = it.sub ? `<span class="cmdk-kind k-${it.kind||'x'}">${_esc(it.sub)}</span>` : '';
       const people = it.people ? `<span class="cmdk-people"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5"/><path d="M16 5.5a3 3 0 0 1 0 5.8M17.5 19c0-2-.8-3.4-2-4.3"/></svg>${_esc(it.people)}</span>` : '';
@@ -30864,7 +30902,7 @@ const MOD_INFO={
 let SCH_VIEW='week', SCH_ANCHOR=null, _schEditId=null, _schMembers=[];
 let _schDate=null, _schT1='10:00', _schT2='11:00', _schAllDay=false, _schCalY=0, _schCalM=0, _schPanel=null, _schMemQ='', _schRouteLoc='', _schAttach=[], _schFileExpiry=604800;
 let SCH_FILT_Q='', SCH_FILT_MID='all', SCH_FILT_OPEN=false;
-let _schBodyFade=false, _schThumbSrcX=null;
+let _schBodyFade=false, _schThumbSrcX=null;   // {x,w} — откуда стартует бегунок переключателя вида
 const SCH_EXP=[[3600,'1 час'],[86400,'1 день'],[604800,'7 дней'],[2592000,'30 дней']];
 const _SCH_MONG=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 const SCH_KINDS=[['shoot','Съёмка','#37E6C8'],['meeting','Встреча','#8A8FFF'],['call','Звонок','#43D88C'],['montage','Монтаж','#E3B567'],['task','Работа','#22C3E6'],['other','Другое','#8A97A6']];
@@ -31024,16 +31062,22 @@ function _schPositionThumb(){
   const thumb=seg.querySelector('.sched-seg-thumb'); if(!thumb) return;
   const active=seg.querySelector('button.on'); if(!active){ thumb.style.width='0'; return; }
   const targetX=active.offsetLeft, targetW=active.offsetWidth;
-  const srcX=_schThumbSrcX; _schThumbSrcX=null;
-  if(srcX!=null && Math.abs(srcX-targetX)>1){
-    /* Стартуем со старой позиции, анимируемся к новой */
+  const src=_schThumbSrcX; _schThumbSrcX=null;
+  if(src && (Math.abs(src.x-targetX)>1 || Math.abs(src.w-targetW)>1)){
+    /* Стартуем со старых координат — и с позиции, и с ширины. Раньше
+       ширина сразу ставилась конечной: подписи «Неделя», «Месяц»
+       и «Команда» разной длины, поэтому бегунок сначала прыгал в размере
+       и только потом ехал. Теперь оба свойства едут вместе.
+       Принудительный reflow надёжнее одного requestAnimationFrame:
+       без него браузер иногда склеивает стартовые и конечные стили
+       в один кадр, и перехода не видно вовсе. */
     thumb.classList.remove('anim');
-    thumb.style.left=srcX+'px';
+    thumb.style.left=src.x+'px';
+    thumb.style.width=src.w+'px';
+    void thumb.offsetWidth;                                   // фиксируем стартовые координаты в текущем стиле
+    thumb.classList.add('anim');
+    thumb.style.left=targetX+'px';
     thumb.style.width=targetW+'px';
-    requestAnimationFrame(function(){
-      thumb.classList.add('anim');
-      thumb.style.left=targetX+'px';
-    });
   } else {
     thumb.classList.remove('anim');
     thumb.style.left=targetX+'px';
@@ -31166,7 +31210,7 @@ function schView(v){
   if(SCH_VIEW===newV) return;
   /* Запоминаем позицию активной кнопки — тумблер поедет от неё к новой */
   const seg=document.querySelector('.sched-seg');
-  if(seg){ const cur=seg.querySelector('button.on'); if(cur) _schThumbSrcX=cur.offsetLeft; }
+  if(seg){ const cur=seg.querySelector('button.on'); if(cur) _schThumbSrcX={x:cur.offsetLeft, w:cur.offsetWidth}; }
   SCH_VIEW=newV;
   _schBodyFade=true;
   _schPaint();
