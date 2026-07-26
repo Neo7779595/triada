@@ -4304,7 +4304,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .cp-doc svg{width:13px;height:13px;flex:none}
 .cp-doc.on{border-style:solid;border-color:rgba(55,230,200,.28);background:rgba(55,230,200,.1);color:var(--accent)}
 .cp-cell:hover .cp-doc{border-color:var(--accent);color:var(--accent)}
-#ov-cpdoc{position:fixed;inset:0;z-index:90;display:none;background:rgba(5,6,8,.86);backdrop-filter:blur(4px)}
+#ov-cpdoc{position:fixed;inset:0;z-index:220;display:none;background:rgba(5,6,8,.86);backdrop-filter:blur(4px)}
 #ov-cpdoc.on{display:block}
 .cpdoc-w{position:absolute;inset:18px;display:flex;flex-direction:column;border:1px solid var(--line-2);
   border-radius:14px;overflow:hidden;background:var(--bg-1);box-shadow:0 40px 100px -30px rgba(0,0,0,.9)}
@@ -15951,7 +15951,7 @@ function cpClick(e,r,c){
     if(e){ e.preventDefault(); e.stopPropagation(); }
     return;
   }
-  if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); cpColSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ if(col.sys==='pub'){ cpPubMenu(r,c,e); return; } cpToggle(r,c); return; } cpRerender();
+  if(cpEd){cpStore();cpEd=null;} cpRowSel=new Set(); cpColSel=new Set(); const col=cpColAt(c); if(e&&e.shiftKey){ cpSelEnd={r:r,c:c}; cpRerender(); return; } cpSel={r,c}; cpSelEnd=null; if(col.type==='check'){ if(col.sys==='pub'){ cpPubMenu(r,c,e); return; } cpToggle(r,c); return; } if(col.type==='doc'){ cpRerender(); cpDocOpen(r,c); return; } cpRerender();
 }
 let _cpEditSwitch=false;
 function cpCellDown(e,r,c){
@@ -18999,7 +18999,8 @@ async function cpDocOpen(r,c){
       if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
       if(!data||data.ok===false||!data.id){ toast((data&&(data.error||data.message))||'Не удалось создать документ'); return; }
       id=String(data.id);
-      row.c[col.id]=id; cpSave(); cpRerender();
+      row.c[col.id]=id;
+      try{ cpSave(); cpRerender(); }catch(_e){ console.warn('cp doc rerender',_e); }
     }catch(e){ toast(String(e.message||e)); return; }
     finally{ CPDOC.busy=false; }
   }
@@ -19017,8 +19018,10 @@ function cpDocView(id,r,c){
   const nb=cpDocNeighbours(r,c);
   const url=(typeof _giWithUser==='function'?_giWithUser('https://docs.google.com/document/d/'+id+'/edit?embedded=true&rm=minimal')
                                             :'https://docs.google.com/document/d/'+id+'/edit?embedded=true&rm=minimal');
+  const host=document.fullscreenElement||document.webkitFullscreenElement||document.body;
   let ov=document.getElementById('ov-cpdoc');
-  if(!ov){ ov=document.createElement('div'); ov.id='ov-cpdoc'; document.body.appendChild(ov); }
+  if(!ov){ ov=document.createElement('div'); ov.id='ov-cpdoc'; }
+  if(ov.parentNode!==host) host.appendChild(ov);
   ov.innerHTML='<div class="cpdoc-w">'
     +'<div class="cpdoc-h">'
       +'<div class="cpdoc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div>'
