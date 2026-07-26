@@ -20174,7 +20174,7 @@ function clCpRender(){
   const cols=sh.cols||[], rows=sh.rows||[];
   let tabs='';
   if(_vis.length>1){ tabs='<div class="clcp-tabs">'+_vis.map(function(s,i){return '<button class="clcp-tab'+(i===cp.sel?' on':'')+'" onclick="clCpPick('+i+')">'+_ddH(s.name||('Лист '+(i+1)))+'</button>';}).join('')+'</div>'; }
-  if(cp.gs){ if(clCpGS(sh)){ clCpGSRender(sh,tabs); return; } cp.gs=0; }
+  if(clCpGS(sh) && clCpWant()==='gs'){ clCpGSRender(sh,tabs); return; }
   const sa=cp.appr[sid+'/__sheet__']||{status:'pending',comment:''};
   let _okN=0; rows.forEach(function(row){ if((cp.appr[sid+'/'+row.id]||{}).status==='approved')_okN++; });
   const _pub=cpPubBarHTML(cols,rows);
@@ -20211,20 +20211,31 @@ function clCpRender(){
     +'<div class="clcp-bar-r" id="clcp-sheetbar-host">'+clCpSheetCluster(sa,{ok:_okN,total:rows.length})+'</div></div>';
   box.innerHTML=ph+_bar+'<div id="clcp-cmhost">'+clCpSheetComment(sa)+'</div>'+grid;
 }
-/* Агентство может открыть клиенту саму таблицу Google — тогда рядом с
-   согласованием появляется второй вид. Решения по строкам живут только в
-   нашем виде, поэтому подменять его целиком нельзя: это переключатель. */
+/* Агентство может открыть клиенту саму таблицу Google. Тогда раздел
+   открывается ею на весь экран — как «Стратегии» открываются доской.
+   Решения по строкам живут только в нашем виде, поэтому он никуда не
+   девается: переключатель стоит в той же панели, а выбор запоминается. */
+let _clCpView=null;   /* 'gs' | 'own' | null (ещё не выбирали) */
 function clCpGS(sh){ return (sh&&sh.gs&&sh.gs.id)?sh.gs:null; }
+function clCpWant(){
+  if(_clCpView) return _clCpView;
+  try{ const v=localStorage.getItem('cl_cp_view'); if(v==='own'||v==='gs'){ _clCpView=v; return v; } }catch(_e){}
+  return 'gs';
+}
 function clCpGSSwitch(sh){
   if(!clCpGS(sh)) return '';
-  const on=!!(window.CL_CP&&window.CL_CP.gs);
+  const on=clCpWant()==='gs';
   const gi=(typeof GI_MARK!=='undefined'&&GI_MARK.google)||'';
   return '<div class="clcp-vsw">'
     +'<button class="'+(on?'':'on')+'" onclick="clCpView(0)">Согласование</button>'
     +'<button class="'+(on?'on':'')+'" onclick="clCpView(1)"><span class="g">'+gi+'</span>Таблица</button>'
     +'</div>';
 }
-function clCpView(on){ if(!window.CL_CP)return; window.CL_CP.gs=on?1:0; clCpRender(); }
+function clCpView(on){
+  _clCpView=on?'gs':'own';
+  try{ localStorage.setItem('cl_cp_view',_clCpView); }catch(_e){}
+  clCpRender();
+}
 function clCpGSRender(sh,tabs){
   const box=document.getElementById('content-cl'); if(!box) return;
   const gs=clCpGS(sh); if(!gs) return;
