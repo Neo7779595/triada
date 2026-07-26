@@ -19304,6 +19304,17 @@ const CP_GS_IC={
 };
 /* Снимок листа для клиента. Один сборщик на все три места, откуда снимок
    уходит: иначе поля расходятся, и клиент видит то месяц, то нет. */
+/* Доступ открыт, но лист клиенту ни разу не отправляли — в его кабинете
+   раздела просто нет. Говорим об этом сразу и предлагаем отправить. */
+function cpGSNeedSend(sh){
+  pd2Open('<div class="modal" style="max-width:480px">'
+    +'<div class="modal-h"><h3>Доступ открыт, но лист клиенту не отправлен</h3>'
+    +'<p>Таблица «'+_ddH(sh.name||'Лист')+'» теперь открывается по ссылке. Но в кабинете клиента её ещё нет: лист ни разу не отправляли на согласование.</p></div>'
+    +'<div class="modal-b"><div class="cp-gsw q">'+CP_GS_IC.info
+      +'<span>Отправка открывает клиенту сам лист — и вместе с ним таблицу. Пока этого не сделано, у клиента в разделе «Контент-план» пусто.</span></div></div>'
+    +'<div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Позже</button>'
+      +'<button class="btn-add" onclick="pd2Close();cpSendSheet()">Отправить клиенту</button></div></div>');
+}
 function cpShareSnap(sh){
   const s={ id:sh.id, name:sh.name, color:sh.color, month:sh.month||null,
     cols:sh.cols, rows:sh.rows, cm:sh.cm||[], cf:sh.cf||[], headM:sh.headM||[] };
@@ -19485,7 +19496,12 @@ async function cpGSClient(on){
        уже открытых клиенту листов — вместе с новым доступом к таблице. */
     cpGSMark(sh,Object.assign({},cpGSLink(sh)||{},{ cl:!!on }));
     cpRerender();
-    toast(on?'Клиент увидит таблицу в своём кабинете':'Таблица закрыта: доступ по ссылке снят');
+    /* Клиент читает лист из снимка content_shares. Если лист ему ни разу не
+       отправляли, снимка нет — доступ в Google открыт, а в кабинете пусто.
+       Молча оставлять это нельзя: человек уверен, что всё показал. */
+    const sent=!!(p._cpShared&&p._cpShared[sh.id]);
+    if(on&&!sent) cpGSNeedSend(sh);
+    else toast(on?'Клиент увидит таблицу в своём кабинете':'Таблица закрыта: доступ по ссылке снят');
   }catch(e){ toast(String(e.message||e)); }
   finally{ const r2=document.querySelector('.cp-gswrap .pd-bd-sw'); if(r2) r2.classList.remove('busy'); }
 }
