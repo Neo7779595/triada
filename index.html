@@ -28367,8 +28367,16 @@ async function _giFetch(fn, params, body){
    проверяют подпись, а не сессию, поэтому кабинет продолжает рисоваться как
    рабочий. Стираем сессию у себя и выводим на вход — иначе человек будет
    жать кнопки впустую и видеть одну и ту же ошибку. */
+/* Открыт ли вообще какой-нибудь кабинет. Пока человек стоит на экране входа,
+   отзывать «сессию» не у кого: сессии нет по определению. */
+function _cabOpen(){
+  return ['app','app-ag','app-cl'].some(function(id){
+    const el=document.getElementById(id); return !!(el && el.classList.contains('on'));
+  });
+}
 let _giDeadOnce = 0;
 function _giDeadSession(msg){
+  if(!_cabOpen()) return;                                                             // мы и так на входе — ни сообщения, ни перезагрузки
   if(_giDeadOnce) return; _giDeadOnce = 1;
   if(msg && typeof toast==='function') toast(msg);
   const go = function(){ setTimeout(function(){ try{ location.replace(location.pathname); }catch(_){ location.reload(); } }, 1200); };
@@ -28388,17 +28396,28 @@ let _liveBusy = 0, _liveAt = 0;
 async function _sessionAlive(force){
   if(!(window.LIVE && window.SB && SB.auth)) return;
   if(document.hidden && !force) return;
+  /* Проверять нечего, пока человек не вошёл. Раньше проверка шла и на экране
+     входа: сессии там нет, getUser() честно отвечал ошибкой, а мы принимали
+     её за отзыв доступа — показывали «Пароль изменён» и перезагружали
+     страницу прямо посреди набора логина и пароля. */
+  if(!window.ME || !_cabOpen()) return;
   const now = Date.now();
   if(_liveBusy || (!force && now - _liveAt < 60000)) return;
   _liveBusy = 1; _liveAt = now;
   try{
+    /* Нет сохранённой сессии — и спрашивать сервер не о чем. */
+    let _sess = null;
+    try{ const s = await SB.auth.getSession(); _sess = s && s.data && s.data.session; }catch(_e){}
+    if(!_sess) return;
     const { data, error } = await SB.auth.getUser();
     if(error){
       /* Сеть могла моргнуть — из-за этого выкидывать человека нельзя.
          Разлогиниваем только когда сервер явно ответил «такой сессии нет». */
       const st = Number(error.status || 0);
       const retryable = error.name === 'AuthRetryableFetchError' || st === 0 || st >= 500;
-      if(!retryable) _giDeadSession('Пароль изменён — войдите заново');
+      /* Причина может быть разной — сменили пароль, вышли в другой вкладке,
+         администратор отозвал доступ. Не гадаем вслух, говорим по факту. */
+      if(!retryable) _giDeadSession('Сессия больше не действует — войдите заново');
       return;
     }
     if(!data || !data.user) _giDeadSession('Сессия завершена — войдите заново');
