@@ -2651,7 +2651,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .stpl-tab.on{background:transparent!important;box-shadow:none!important;color:var(--accent-ink)!important}
 .segm-thumb.solid{background:var(--accent);border-radius:10px;box-shadow:0 6px 20px -8px var(--accent),inset 0 1px 0 rgba(255,255,255,.25)}
 #stpl-body{min-height:440px;max-height:62vh;overflow-y:auto;overflow-x:hidden;padding:30px 38px 10px}
-@media(max-width:980px){#ov-pd2 .modal.stpl-modal{max-width:92vw}.stpl-two{grid-template-columns:1fr;gap:26px}.stpl-col-l{border-right:none;padding-right:0;border-bottom:1px solid var(--line);padding-bottom:24px}.stpl-col-r{padding-left:0}}
+@media(max-width:980px){#ov-pd2 .modal.stpl-modal{max-width:92vw}.stpl-two{grid-template-columns:1fr;gap:26px}.stpl-col-l{border-right:none;padding-right:0;border-bottom:1px solid var(--line);padding-bottom:24px}.stpl-col-r{padding-left:0}
+  /* в одну колонку раздельная прокрутка теряет смысл — возвращаем общую */
+  #stpl-body.stpl-split{display:block;overflow-y:auto;padding-bottom:10px}
+  #stpl-body.stpl-split .stpl-col-l,#stpl-body.stpl-split .stpl-col-r{overflow:visible;min-height:auto}
+  #stpl-body.stpl-split .stpl-col-top,#stpl-body.stpl-split .stpl-col-rtop,#stpl-body.stpl-split .stpl-col-r .stpl-stage-acts{position:static;background:none}
+  #stpl-body.stpl-split .stpl-col-top::after,#stpl-body.stpl-split .stpl-col-rtop::after{display:none}}
 .stpl-sec-h{display:flex;align-items:center;gap:12px;font-size:13px;text-transform:uppercase;letter-spacing:.13em;color:var(--txt-3);font-weight:600;padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid var(--line)}
 .stpl-sec-h>span:first-child{margin-right:auto}
 .stpl-sec-h .cnt{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent-line);border-radius:20px;padding:4px 13px;font-size:13.5px;letter-spacing:0;font-family:var(--mono);font-weight:600}
@@ -2697,6 +2702,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .stpl-stage input:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 4px var(--accent-dim)}
 .stpl-stage .stpl-del{width:36px;height:36px}
 .stpl-stage-acts{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:18px;border-top:1px solid var(--line)}
+/* ── Вкладка «Услуги и этапы»: колонки листаются каждая сама по себе ──
+   Тело вкладки само не прокручивается — прокрутка живёт внутри колонок.
+   Поэтому список услуг слева не уезжает, пока читаешь этапы справа,
+   и наоборот. Шапка со списком услуг и поле добавления держатся сверху,
+   кнопки этапов — снизу: сохранять можно, не докручивая длинный список. */
+#stpl-body.stpl-split{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+#stpl-body.stpl-split .stpl-two{flex:1 1 auto;min-height:0}
+#stpl-body.stpl-split .stpl-col-l,
+#stpl-body.stpl-split .stpl-col-r{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding-bottom:24px;scrollbar-gutter:stable}
+#stpl-body.stpl-split .stpl-col-l{scrollbar-gutter:auto}
+/* у правой колонки отступа снизу нет: там прибита панель кнопок — иначе
+   под ней выглядывал бы кусок следующего этапа */
+#stpl-body.stpl-split .stpl-col-r{padding-bottom:0}
+#stpl-body.stpl-split .stpl-col-top{position:sticky;top:0;z-index:3;background:var(--bg-1);padding-top:2px}
+#stpl-body.stpl-split .stpl-col-top::after{content:"";position:absolute;left:0;right:0;bottom:-14px;height:14px;background:linear-gradient(180deg,var(--bg-1),transparent);pointer-events:none}
+/* Тарифы и заголовок держатся сверху — видно, чьи этапы правишь */
+#stpl-body.stpl-split .stpl-col-rtop{position:sticky;top:0;z-index:3;background:var(--bg-1);padding-top:2px}
+#stpl-body.stpl-split .stpl-col-rtop .stpl-stages-h{margin-bottom:10px}
+#stpl-body.stpl-split .stpl-col-rtop::after{content:"";position:absolute;left:0;right:0;bottom:-12px;height:12px;background:linear-gradient(180deg,var(--bg-1),transparent);pointer-events:none}
+#stpl-body.stpl-split .stpl-col-r .stpl-stage-acts{position:sticky;bottom:0;z-index:3;background:var(--bg-1);padding-bottom:14px}
+#stpl-body.stpl-split .stpl-col-l::-webkit-scrollbar,
+#stpl-body.stpl-split .stpl-col-r::-webkit-scrollbar{width:8px}
 .stpl-tform{display:flex;flex-direction:column;gap:18px;max-width:560px;animation:stplIn .32s var(--ease-out) both}
 .stpl-tform .fld label{display:block;font-size:12.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--txt-3);font-weight:600;margin-bottom:8px}
 .stpl-tform .fld input{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:12px;color:var(--txt);font-family:var(--font);font-size:15.5px;padding:14px 16px;transition:.15s}
@@ -12451,7 +12478,7 @@ function projSettings(i){
       </div></div>
       <div class="fld"><label>Видимость для клиента <small style="color:var(--txt-3);font-weight:400;margin-left:6px">выключите модули, которые не нужно показывать</small></label>
         <div class="cl-vis" id="pj-clvis">
-          ${[['stages','Этапы'],['reports','Отчёты'],['content','Контент-план'],['board','Стратегии'],['documents','Документы'],['passport','Паспорт'],['updates','Обновления']].map(function(m){var k=m[0],l=m[1];var _h=(p&&p.cl_hidden)||[];var on=_h.indexOf(k)<0;return '<button type="button" class="cl-vis-tog '+(on?'on':'')+'" data-mk="'+k+'" onclick="pjToggleClVis(this)"><span class="cvt-ic"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">'+(on?'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>':'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M2 2l20 20\"/>')+'</svg></span><span class="cvt-l">'+l+'</span></button>';}).join('')}
+          ${[['stages','Этапы'],['reports','Отчёты'],['content','Контент-план'],['board','Стратегии'],['documents','Документы'],['passport','Паспорт']].map(function(m){var k=m[0],l=m[1];var _h=(p&&p.cl_hidden)||[];var on=_h.indexOf(k)<0;return '<button type="button" class="cl-vis-tog '+(on?'on':'')+'" data-mk="'+k+'" onclick="pjToggleClVis(this)"><span class="cvt-ic"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">'+(on?'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>':'<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M2 2l20 20\"/>')+'</svg></span><span class="cvt-l">'+l+'</span></button>';}).join('')}
         </div>
       </div>
       <div class="fld"><label>Статус</label><div class="st-seg" style="grid-template-columns:repeat(2,1fr)" id="pj-stseg">
@@ -25857,6 +25884,8 @@ function openTemplatesSettings(){
 }
 function stplTab(t){ _stplTab=t; document.querySelectorAll('.stpl-tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t)); _stplRefresh(); }
 function _stplRefresh(){ const b=document.getElementById('stpl-body'); if(!b) return;
+  /* На вкладке услуг прокрутка уходит внутрь колонок — тело вкладки замирает */
+  b.classList.toggle('stpl-split', _stplTab==='service');
   b.innerHTML = _stplTab==='category'?_stplCatBody() : _stplTab==='service'?_stplSvcBody() : _stplTariffBody();
 }
 
@@ -25921,10 +25950,12 @@ function _stplSvcBody(){
   const _hint=_stplTariff?'Свои этапы этого тарифа. Оставьте пустыми — подставятся базовые этапы услуги.':'Подставляются для тарифов без своих этапов и для услуг без тарифов.';
   return `<div class="stpl-two">
     <div class="stpl-col-l">
-      <div class="stpl-col-h"><span>Услуги</span><span class="cnt" style="background:var(--bg-3);border-radius:20px;padding:2px 9px;color:var(--txt-2);letter-spacing:0">${svcs.length}</span></div>
-      <div class="stpl-add">
-        <input id="stpl-svc-new" placeholder="Новая услуга" onkeydown="if(event.key==='Enter')stplSvcAdd()">
-        <button class="btn-add sm" onclick="stplSvcAdd()" title="Добавить услугу"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <div class="stpl-col-top">
+        <div class="stpl-col-h"><span>Услуги</span><span class="cnt" style="background:var(--bg-3);border-radius:20px;padding:2px 9px;color:var(--txt-2);letter-spacing:0">${svcs.length}</span></div>
+        <div class="stpl-add">
+          <input id="stpl-svc-new" placeholder="Новая услуга" onkeydown="if(event.key==='Enter')stplSvcAdd()">
+          <button class="btn-add sm" onclick="stplSvcAdd()" title="Добавить услугу"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
       </div>
       <div class="stpl-svclist">${svcs.length?svcs.map(s=>{ const u=_stplUsedSvc(s), own=!!(window.STAGE_TPL&&window.STAGE_TPL[s]);
         return `<div class="stpl-svc-row ${s===_stplSvc?'on':''}" onclick="stplPickSvc('${_attr(s)}')" style="--svc:${svcColor(s)}">
@@ -25936,7 +25967,7 @@ function _stplSvcBody(){
       }).join(''):'<div class="tc-empty">Услуг пока нет</div>'}</div>
     </div>
     <div class="stpl-col-r">
-      ${_stplSvc?`${_stplColorBar(_stplSvc)}${tfChips}<div class="stpl-stages-h">${_title}</div>
+      ${_stplSvc?`${_stplColorBar(_stplSvc)}<div class="stpl-col-rtop">${tfChips}<div class="stpl-stages-h">${_title}</div></div>
         <div class="stpl-hint" style="margin:-2px 0 8px">${_hint}</div>
         <div class="stpl-stages" id="stpl-stages">${stages.map((st,i)=>`<div class="stpl-stage"><span class="stpl-stnum">${i+1}</span><input value="${_attr(st)}" oninput="_stplStages[${i}]=this.value" onkeydown="stplStageKey(event,${i})" placeholder="Название этапа"><button class="stpl-del" onclick="stplStageDel(${i})" title="Удалить этап"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('')||('<div class="tc-empty">Этапов нет — добавьте'+(_stplTariff?' (или оставьте пусто — будут базовые)':'')+'</div>')}</div>
         <div class="stpl-stage-acts"><button class="btn-ghost sm" onclick="stplStageAdd()">+ Добавить этап</button><button class="btn-add sm2" onclick="stplStagesSave()">Сохранить этапы</button></div>`
