@@ -19371,9 +19371,12 @@ function cpGSMenu(e){
   let h='<div class="cp-gs-pop">'
     +'<div class="cp-gs-h"><span class="g">'+GI_MARK.google+'</span><span class="tx">'
     +'<b>Google Таблица</b><span>'+(gs?_ddH(cpGSWhen(gs)):'Лист ещё не выгружен')+'</span></span></div>';
+  /* Пункт «открыть здесь» показываем всегда, даже когда открывать ещё нечего:
+     иначе о самой возможности узнаёшь только после первой выгрузки. */
   if(gs) h+=row('',CP_GS_IC.frame,'Открыть таблицу здесь','Google Таблица вместо нашей, не выходя из системы','cpGSShow()')+'<div class="sep"></div>';
   h+=row('',CP_GS_IC.up,'Выгрузить в Google',
-        gs?'Перезапишет таблицу данными листа':'Создаст таблицу в папке проекта','cpGSPush()');
+        gs?'Перезапишет таблицу данными листа':'Создаст таблицу и откроет её здесь','cpGSPush()');
+  if(!gs) h+=row('',CP_GS_IC.frame,'Открыть таблицу здесь','Появится после первой выгрузки','');
   h+=row('',CP_GS_IC.down,'Загрузить из Google',
         gs?'Перезапишет лист данными таблицы':'Сначала нужно выгрузить лист',gs?'cpGSPull()':'');
   if(gs){
@@ -19549,12 +19552,14 @@ async function cpGSPushGo(){
     const { status, data } = await _giFetch('google-sheets',{action:'push'},{ project_id:p.id, sheet:payload });
     if(status===503||(data&&data.error==='not_configured')){ pd2Close(); toast('Google ещё не подключён — раздел «Интеграции»'); return; }
     if(!data||data.ok===false){ pd2Close(); cpGSFail(sh,data,'Не удалось выгрузить лист'); return; }
-    cpGSMark(sh,{ id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' });
-    pd2Close(); cpRerender();
+    cpGSMark(sh,Object.assign({},cpGSLink(sh)||{},
+      { id:data.spreadsheet_id, url:data.url, name:data.name||'', at:new Date().toISOString(), dir:'push' }));
+    pd2Close();
+    /* Выгрузили — сразу показываем результат в окне здесь. Уводить в новую
+       вкладку после того, как окно появилось в самой системе, незачем. */
+    cpGSOn=sh.id; cpRerender();
     toast(data.truncated?('Выгружено (взяли первые '+data.rows+' строк)')
                         :((data.created?'Таблица создана · ':'Таблица обновлена · ')+data.rows+' '+_plural(data.rows,'строка','строки','строк')));
-    let u=data.url; try{ if(typeof _giWithUser==='function') u=_giWithUser(u); }catch(_e){}
-    if(data.created && u) window.open(u,'_blank','noopener');
   }catch(e){ pd2Close(); toast(String(e.message||e)); }
 }
 /* ---- загрузка ---- */
