@@ -19016,8 +19016,13 @@ function cpDocView(id,r,c){
   CPDOC.r=r; CPDOC.c=c;
   const sh=cpSheet(), row=cpRowAt(r);
   const nb=cpDocNeighbours(r,c);
-  const url=(typeof _giWithUser==='function'?_giWithUser('https://docs.google.com/document/d/'+id+'/edit?embedded=true&rm=minimal')
-                                            :'https://docs.google.com/document/d/'+id+'/edit?embedded=true&rm=minimal');
+  /* Два адреса. Внутри окна — встроенный редактор: полноценный Google Docs
+     в чужой странице показывать запрещает сам Google. Кнопка «В Google»
+     ведёт на обычный адрес: там и меню, и вкладки документа, и всё остальное. */
+  const wrap=u=>(typeof _giWithUser==='function'?_giWithUser(u):u);
+  const base='https://docs.google.com/document/d/'+id+'/edit';
+  const url=wrap(base+'?embedded=true');
+  const full=wrap(base);
   const host=document.fullscreenElement||document.webkitFullscreenElement||document.body;
   let ov=document.getElementById('ov-cpdoc');
   if(!ov){ ov=document.createElement('div'); ov.id='ov-cpdoc'; }
@@ -19030,7 +19035,7 @@ function cpDocView(id,r,c){
       +'<div class="cpdoc-nav">'
         +'<button class="cpdoc-b" '+(nb.prev===null?'disabled':'onclick="cpDocGo(-1)"')+' title="Предыдущий сценарий"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>'
         +'<button class="cpdoc-b" '+(nb.next===null?'disabled':'onclick="cpDocGo(1)"')+' title="Следующий сценарий"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>'
-        +'<a class="cpdoc-b wide" href="'+_ddA(url.replace("&embedded=true","").replace("?embedded=true&","?"))+'" target="_blank" rel="noopener" title="Открыть в Google Документах">В Google</a>'
+        +'<a class="cpdoc-b wide" href="'+_ddA(full)+'" target="_blank" rel="noopener" title="Полный редактор Google: меню, вкладки документа, комментарии">Открыть в Google</a>'
         +'<button class="cpdoc-b" onclick="cpDocClose()" title="Закрыть · Esc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>'
       +'</div></div>'
     +'<iframe class="cpdoc-f" src="'+_ddA(url)+'" title="Сценарий"></iframe>'
