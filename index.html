@@ -31064,6 +31064,7 @@ function _pdBoardHTML(p){
         <div class="pd-bdtools">
           <button class="pd-bdic${PD_BD_CLEAN?' on':''}" id="pd-bd-clean" onclick="pdBoardClean()" title="Чистый вид: убрать панели и баннеры Miro — на экране остаётся только сама доска"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
           <button class="pd-bdic" id="pd-bd-fs" onclick="pdBoardFull()" title="Во весь экран · Esc чтобы выйти"><svg id="pd-bd-fs-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+          <button class="pd-bdic" onclick="pdBoardTeam()" title="Позвать команду на доску — по рабочим почтам из профилей">${CP_GS_IC.team}</button>
           <button class="pd-bdic" onclick="pdBoardOpen()" title="Открыть доску в Miro в новой вкладке"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></button>
           ${canEdit?'<button class="pd-bdic pd-bdic-x" onclick="pdBoardUnlink()" title="Отвязать доску от проекта. Сама она останется в Miro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 3.6 8.5M8 12h3M3 3l18 18"/></svg></button>':''}
         </div>
@@ -31083,6 +31084,41 @@ async function pdBoardCreate(){
     toast(data.created?'Доска создана':'Доска уже была');
   }catch(e){ toast(String(e.message||e)); }
   finally{ const x=document.getElementById('pd-board-new'); if(x){ x.disabled=false; x.textContent='Создать доску'; } }
+}
+
+/* Доску заводит аккаунт агентства, и остальные видят вместо неё замок. Зовём
+   команду редакторами — по рабочим почтам Google из профилей. При создании и
+   привязке это делается само; кнопка нужна доскам, заведённым раньше, и тем,
+   у кого почта появилась только что. */
+async function pdBoardTeam(){
+  const p=PROJECTS[pdIdx]; if(!p||!p._miro) return;
+  try{
+    const { status, data } = await _giFetch('miro-board', { action:'team', project:p.id });
+    if(status===503||(data&&data.error==='not_configured')){ toast('Miro ещё не настроен — раздел «Интеграции»'); return; }
+    if(!data||data.ok!==true) throw new Error((data&&data.message)||'Не удалось позвать команду');
+    if(!data.team){ pdBoardTeamNone(); return; }
+    if(data.granted) toast('Приглашения отправлены: '+data.granted+' '+_plural(data.granted,'человек','человека','человек'));
+    else if(!(data.failed&&data.failed.length)) toast('Все, кто указал рабочую почту, уже на доске');
+    if(data.failed&&data.failed.length) pdBoardTeamFail(data.failed,data.message);
+  }catch(e){ toast(String(e.message||e)); }
+}
+function pdBoardTeamNone(){
+  pd2Open('<div class="modal" style="max-width:480px">'
+    +'<div class="modal-h"><h3>Некого звать на доску</h3>'
+    +'<p>Ни у кого в команде не указана рабочая почта Google.</p></div>'
+    +'<div class="modal-b"><div class="cp-gsw q">'+CP_GS_IC.info
+      +'<span>Каждый сотрудник открывает свой профиль и заполняет поле <b>«Рабочая почта Google»</b>. По ней приходит приглашение и в Miro, и в таблицы проектов.</span></div></div>'
+    +'<div class="modal-f"><button class="btn-add" onclick="pd2Close()">Понятно</button></div></div>');
+}
+function pdBoardTeamFail(list,msg){
+  pd2Open('<div class="modal" style="max-width:520px">'
+    +'<div class="modal-h"><h3>Не всех удалось позвать</h3>'
+    +'<p>'+_ddH(msg||'Miro отказал в приглашении.')+'</p></div>'
+    +'<div class="modal-b"><div class="cp-gsw">'+CP_GS_IC.warn
+      +'<span>'+list.map(function(e){ return '<b>'+_ddH(e)+'</b>'; }).join('<br>')+'</span></div>'
+    +'<div class="cp-gsw q" style="margin-top:8px">'+CP_GS_IC.info
+      +'<span>Частая причина — тариф Miro: на бесплатном число участников доски ограничено. Проверьте место в команде Miro и повторите.</span></div></div>'
+    +'<div class="modal-f"><button class="btn-add" onclick="pd2Close()">Понятно</button></div></div>');
 }
 
 /* Бесплатный тариф Miro не даёт создать доску через API. Доску заводят руками
