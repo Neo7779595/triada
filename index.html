@@ -19787,7 +19787,8 @@ const CP_GS_IC={
   off:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 13.5a4.2 4.2 0 0 0 6 0l2.2-2.2a4.2 4.2 0 0 0-6-6L10.6 6.4"/><path d="M14.5 10.5a4.2 4.2 0 0 0-6 0l-2.2 2.2a4.2 4.2 0 0 0 6 6l1.1-1.1"/><path d="m3 3 18 18"/></svg>',
   info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
   warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4.5M12 17.2h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>',
-  frame:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg>'
+  frame:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg>',
+  team:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 17.4V19"/><circle cx="9.5" cy="7.5" r="3.2"/><path d="M21 19v-1.6a3.4 3.4 0 0 0-2.6-3.3"/><path d="M15.5 4.6a3.4 3.4 0 0 1 0 6.1"/></svg>'
 };
 /* Снимок листа для клиента. Один сборщик на все три места, откуда снимок
    уходит: иначе поля расходятся, и клиент видит то месяц, то нет. */
@@ -20087,6 +20088,7 @@ function cpGSFrameHTML(p,bk,sh){
            согласованием и сценариями. Значок скромный, но он обязан быть:
            без него раздел платформы становится недостижим. */
         +ic('','','Вернуться к нашей таблице — листы, согласование, сценарии','cpGSHide()',CP_GS_IC.frame)
+        +ic('','','Открыть таблицу команде на редактирование — по рабочим почтам Google из профилей','cpGSTeam()',CP_GS_IC.team)
         +ic('cp-gs-clean',cpGSClean?'on':'','Чистый вид: убрать шапку и меню Google — на экране остаётся только сетка','cpGSCleanToggle()',eye)
         +(can?ic('','','Загрузить правки из этой таблицы в наш лист','cpGSPull()',CP_GS_IC.down):'')
         +ic('','','Во весь экран · Esc чтобы выйти','cpGSFull()',fsIc)
@@ -20124,6 +20126,44 @@ function cpGSSheetsBar(p,bk,cur){
     return '<button class="cp-gstab'+(on?' on':'')+'" onclick="cpSwitch(\''+s.id+'\')">'
       +'<span class="d" style="background:'+cpColorCss(s.color)+'"></span>'+_ddH(s.name||'Лист')+'</button>';
   }).join('')+'</div>';
+}
+/* Документ создаёт аккаунт агентства, и по умолчанию видит его только он.
+   Сотрудник открывает таблицу своим Google и упирается в «Нет доступа».
+   Кнопка раздаёт право редактировать по рабочим почтам из профилей — тем,
+   что люди указали сами. На выгрузке это делается и без кнопки, но у
+   документа, заведённого давно, повода для выгрузки может и не быть. */
+async function cpGSTeam(){
+  const p=cpP(); if(!p) return;
+  const d=cpData(p), bk=cpBook(d); if(!bk||!cpGSLink(bk)) return;
+  try{
+    const { status, data } = await _giFetch('google-sheets',{action:'team'},{ project_id:p.id, book_id:bk.id });
+    if(status===503||(data&&data.error==='not_configured')){ toast('Google ещё не подключён — раздел «Интеграции»'); return; }
+    if(!data||data.ok===false){ cpGSFail(bk,data,'Не удалось открыть доступ команде'); return; }
+    if(!data.team){ cpGSTeamNone(); return; }
+    if(data.granted) toast('Доступ открыт: +'+data.granted+' '+_plural(data.granted,'сотрудник','сотрудника','сотрудников'));
+    else toast('У всех, кто указал рабочую почту, доступ уже есть');
+    /* Адрес без аккаунта Google Google не пускает даже приглашением —
+       человек должен указать в профиле именно ту почту, которой пользуется. */
+    if(data.failed&&data.failed.length) cpGSTeamFail(data.failed);
+  }catch(e){ toast(String(e.message||e)); }
+}
+function cpGSTeamNone(){
+  pd2Open('<div class="modal" style="max-width:480px">'
+    +'<div class="modal-h"><h3>Некому открывать доступ</h3>'
+    +'<p>Ни у кого в команде не указана рабочая почта Google.</p></div>'
+    +'<div class="modal-b"><div class="cp-gsw q">'+CP_GS_IC.info
+      +'<span>Каждый сотрудник открывает свой профиль и заполняет поле <b>«Рабочая почта Google»</b> — той почтой, которой он на самом деле пользуется. После этого доступ выдаётся сам, при ближайшей выгрузке.</span></div></div>'
+    +'<div class="modal-f"><button class="btn-add" onclick="pd2Close()">Понятно</button></div></div>');
+}
+function cpGSTeamFail(list){
+  pd2Open('<div class="modal" style="max-width:520px">'
+    +'<div class="modal-h"><h3>Не всем удалось открыть доступ</h3>'
+    +'<p>Google не делится файлом с адресом, за которым нет аккаунта Google.</p></div>'
+    +'<div class="modal-b"><div class="cp-gsw">'+CP_GS_IC.warn
+      +'<span>'+list.map(function(e){ return '<b>'+_ddH(e)+'</b>'; }).join('<br>')+'</span></div>'
+    +'<div class="cp-gsw q" style="margin-top:8px">'+CP_GS_IC.info
+      +'<span>Попросите указать в профиле почту, которой человек входит в Google, — обычно это адрес на gmail.com или почта рабочего домена.</span></div></div>'
+    +'<div class="modal-f"><button class="btn-add" onclick="pd2Close()">Понятно</button></div></div>');
 }
 /* Клиенту таблица открывается по ссылке и без аккаунта Google — иначе он её
    просто не увидит. Поэтому решение всегда явное, переключателем, и по
