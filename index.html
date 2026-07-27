@@ -37446,15 +37446,13 @@ window.tLoadBookings = async () => {
       id:b.id, projId:b.project_id||null, projName:(b.project&&b.project.name)||'', title:b.title||'', kind:b.kind||'other', status:b.status||'hold',
       startsAt:new Date(b.starts_at).getTime(), endsAt:new Date(b.ends_at).getTime(), allDay:!!b.all_day,
       location:b.location||'', note:b.note||'', attachments:Array.isArray(b.attachments)?b.attachments:[], createdBy:b.created_by||null, createdAt:b.created_at, members:byB[b.id]||[] }; });
-    /* scope=member → показываем брони проектов из scope, плюс бесплановые (project_id=null) — только если сам участник. */
-    const _visBK = (typeof agVisibleProjectIds==='function') ? agVisibleProjectIds() : null;
-    if (_visBK){
-      const _mid = (window.tMe && window.tMe()) ? String((window.tMe().id)||'') : '';
-      window.BOOKINGS = window.BOOKINGS.filter(function(b){
-        if (b.projId != null) return _visBK.has(b.projId);                                       // бронь проекта — видит только если проект в scope
-        return (b.members||[]).some(function(m){ return String(m.id) === _mid; });               // без проекта — только если сам среди участников
-      });
-    }
+    /* Расписание видит вся команда целиком. Раньше сотруднику показывали
+       только брони его проектов — и он не мог понять, свободен ли коллега,
+       хотя именно за этим в расписание и приходят. Название чужого проекта
+       при этом не раскрывается: его отдаёт связанная таблица по своим
+       правилам, и без доступа в брони остаётся пусто. Менять чужую бронь
+       по-прежнему нельзя — это решает _schCanEdit.
+       Прежний отбор по scope снят и на стороне базы. */
     if(typeof window.onBookingsLoaded==='function') window.onBookingsLoaded();
   }catch(e){ console.warn('[bookings] load ex', e); }
 };
