@@ -15368,14 +15368,18 @@ async function _qtOnProject(idStr){
    лежит в logoUrl, буква — в logo; у сотрудника фото в avatar и свой цвет. */
 function _avProj(p){ if(!p) return null; return { img:p.logoUrl||'', letter:(p.logo||(p.name||'?').trim().charAt(0)), color:'#37E6C8' }; }
 function _avMember(m){ if(!m) return null; return { img:m.avatar||'', letter:(m.name||'?').trim().charAt(0), color:m.color||'#37E6C8' }; }
-/* Список сотрудников для поля «Исполнитель». Не-PM видит только себя —
-   правило прежнее, вынесено в одно место, чтобы не расходилось по модалкам. */
-function _avTeamOpts(){
-  const all=(typeof TEAM!=='undefined'?TEAM:[]).map(m=>[m._id, m.name, _avMember(m)]);
-  if(typeof agIsPM==='function' && agIsPM()) return all;
-  const mid=(typeof agMyId==='function')?agMyId():null;
-  const mine=all.filter(x=>String(x[0])===String(mid));
-  return mine.length?mine:all;
+/* Список сотрудников для поля «Исполнитель» — вся команда, кто бы ни заводил
+   задачу. Раньше не-PM мог назначить только себя, но задачу как раз и заводят,
+   чтобы передать: дизайнер просит правку у монтажёра, копирайтер — съёмку.
+   Право создавать задачи и без того ограничено доступом к правке проектов,
+   урезать поверх этого ещё и список исполнителей смысла нет.
+   Уволенных не показываем. Но если задача числится за таким — оставляем его
+   в списке: иначе сохранение молча переназначило бы её первому попавшемуся. */
+function _avTeamOpts(cur){
+  const keep=String(cur==null?'':cur);
+  return (typeof TEAM!=='undefined'?TEAM:[])
+    .filter(m=>!m.archived_at || String(m._id)===keep)
+    .map(m=>[m._id, m.name, _avMember(m)]);
 }
 function quickTaskCreate(){
   const pid=_v('qt-proj');
@@ -15475,7 +15479,7 @@ async function pdTaskEdit(id){
   window._pdTaskAtt=(Array.isArray(t.attachments)?t.attachments:[]).map(a=>Object.assign({}, a));
   const _stLbl2=s=>s.name+(s.status==='active'?' · в работе':s.status==='done'?' · завершён':' · ожидает');
   let stArr=(p._stages||[]).map(s=>[s.id,_stLbl2(s)]);
-  const teamArr=_avTeamOpts();                                                        // с аватарами: лицо узнаётся быстрее имени
+  const teamArr=_avTeamOpts(t.assignee_id);                                            // с аватарами: лицо узнаётся быстрее имени
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Редактировать задачу</h3><p>${escH(p.name)} · Операционка</p></div>
     <div class="modal-b">
       <div class="fld"><label>Что сделать</label><input id="pd2-ttl" value="${_attr(t.title)}" placeholder="напр. Смонтировать ролик"></div>
@@ -23144,7 +23148,7 @@ function pdEditStage(id){ if(PROJECTS[pdIdx]&&PROJECTS[pdIdx].status==='done'){ 
     <div class="modal-b">
       <div class="fld"><label>Название</label><input id="pd2-name" value="${(s.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="fld"><label>Статус этапа</label><div class="st-seg" id="pd2-stseg">${seg}</div></div>
-      <div class="fld"><label>Ответственный за этап</label>${_nativeSelect('pd2-stasg', [['','— не назначен —']].concat(_avTeamOpts()), s.assignee_id||'')}</div>
+      <div class="fld"><label>Ответственный за этап</label>${_nativeSelect('pd2-stasg', [['','— не назначен —']].concat(_avTeamOpts(s.assignee_id)), s.assignee_id||'')}</div>
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-date', s.due_date||'')}${timeField('pd2-time', s.due_time||'')}</div></div>
       <div class="fld"><label>Ссылка на материал</label><input id="pd2-link" value="${(s.link||'').replace(/"/g,'&quot;')}" placeholder="https://… (Drive, Figma, Notion)"></div>
       <div class="fld"><label>Комментарий</label><textarea id="pd2-note" placeholder="Заметка по этапу…">${escH(s.note||'')}</textarea></div>
