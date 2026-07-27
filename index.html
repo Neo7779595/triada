@@ -4422,7 +4422,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
   border:0;border-radius:8px;background:none;color:var(--txt-3);cursor:pointer;transition:.14s var(--ease)}
 .cp-apri-cm:hover{background:var(--bg-2);color:var(--warn)}
 .cp-apri-cm svg{width:14px;height:14px}
-.cp-gsfr{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#fff}
+/* Приближение таблицы — наше, а не браузерное. Щипок на трекпаде масштабирует
+   всю страницу, и внутри чужой рамки его не перехватить: жест уходит документу
+   Google. Поэтому рамку кладём в окно с обрезкой и растягиваем её саму: рамка
+   становится уже во столько же раз, во сколько мы её увеличиваем, — Google
+   раскладывает таблицу на меньшую ширину, и она читается крупнее. */
+.cp-gsvp{flex:1 1 auto;min-height:0;position:relative;overflow:hidden;background:#fff}
+.cp-gsfr{position:absolute;left:0;top:0;width:100%;height:100%;border:0;display:block;background:#fff;
+  transform-origin:0 0;z-index:1}
+.gz{display:inline-flex;align-items:center;gap:2px;padding:2px;flex:0 0 auto;
+  border:1px solid var(--line-2);border-radius:9px;background:var(--bg-2)}
+.gz button{display:inline-flex;align-items:center;justify-content:center;height:26px;min-width:26px;padding:0 6px;
+  border:0;border-radius:7px;background:none;color:var(--txt-3);font-family:var(--font);font-size:14px;
+  font-weight:600;line-height:1;cursor:pointer;transition:.14s var(--ease)}
+.gz button:hover{background:var(--bg-3);color:var(--txt)}
+.gz .gz-v{min-width:46px;font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;color:var(--txt-2)}
+.gz button:disabled{opacity:.32;cursor:default;background:none;color:var(--txt-3)}
 /* Свой ряд листов — вместо мелкой полосы Google, которая в чистом виде пропадает.
    Стоит там же, внизу, чтобы рука шла привычным путём. */
 .cp-gstabs{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:9px 22px;overflow-x:auto;
@@ -4469,7 +4485,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
   letter-spacing:.08em;text-transform:uppercase}
 @media(prefers-reduced-motion:reduce){.dtld-ti i,.dtld-ti b{animation-duration:1.2s}}
 .cp-gswrap:fullscreen{background:var(--bg)}
-.cp-gswrap:fullscreen .cp-gsfr{position:absolute;inset:0;width:100%;height:100%}
 .cp-gswrap:fullscreen .cp-gsbar{position:absolute;z-index:5;left:50%;bottom:18px;transform:translateX(-50%);
   width:auto;max-width:calc(100vw - 32px);flex-wrap:nowrap;padding:8px 12px;border:1px solid var(--line-2);
   border-radius:999px;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(16px);
@@ -4511,7 +4526,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 #app-cl .clcp-gscard{flex:1 1 auto;min-height:0;display:flex;position:relative;
   border-radius:16px;overflow:hidden;background:#fff;border:1px solid var(--line-2);
   box-shadow:0 28px 64px -28px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.04)}
-#app-cl .clcp-gscard iframe{flex:1 1 auto;width:100%;min-height:0;border:0;display:block;background:#fff}
+#app-cl .clcp-gscard iframe{position:absolute;left:0;top:0;width:100%;height:100%;border:0;display:block;
+  background:#fff;transform-origin:0 0}
 @media(max-width:900px){#app-cl .clcp-gswrap{padding:0 14px 16px}#app-cl .clcp-gscard{border-radius:12px}}
 /* Панель над таблицей: слева кнопки листов, справа решение по открытому листу
    и выход в Google. Названия таблицы и листа здесь нет — оно уже написано на
@@ -20054,6 +20070,7 @@ function cpGSFrameHTML(p,bk,sh){
       +(can?('<div class="pd-bd-sw" onclick="cpGSClient('+(cl?'false':'true')+')" title="Клиент увидит эту таблицу в своём кабинете — только для чтения, по ссылке и без аккаунта Google">'
         +'<span class="tgl'+(cl?' on':'')+'" id="cp-gs-vis"><i></i></span>Показывать клиенту</div>'):'')
       +'<div class="cp-gstools">'
+        +gzHTML('cp-gz-v',cpGSZoom,'cpGSZoomStep')
         /* Единственный путь назад к нашей таблице — со всеми листами,
            согласованием и сценариями. Значок скромный, но он обязан быть:
            без него раздел платформы становится недостижим. */
@@ -20066,11 +20083,22 @@ function cpGSFrameHTML(p,bk,sh){
         +'<button class="cp-gsopen" onclick="cpGSOpen()" title="Открыть таблицу в Google, отдельной вкладкой браузера">'+ext+'В Google</button>'
       +'</div>'
     +'</div>'
-    +'<div class="cp-gsfall"><span>Если таблица не появилась, Google не разрешил открыть её в окне — нажмите «Открыть в Google». Проверьте, что вы вошли в тот аккаунт, которым подключено агентство.</span></div>'
-    +dtLoadHTML('Открываем контент-план',bk.name||'Таблица проекта')
-    +'<iframe class="cp-gsfr" src="'+_ddA(cpGSEmbed(gs,cpGSClean,sh&&sh.gid!=null?sh.gid:null))+'" title="Google Таблица" allowfullscreen onload="dtLoadDone(this)" allow="clipboard-read; clipboard-write; fullscreen"></iframe>'
+    +'<div class="cp-gsvp">'
+      +'<div class="cp-gsfall"><span>Если таблица не появилась, Google не разрешил открыть её в окне — нажмите «Открыть в Google». Проверьте, что вы вошли в тот аккаунт, которым подключено агентство.</span></div>'
+      +dtLoadHTML('Открываем контент-план',bk.name||'Таблица проекта')
+      +'<iframe class="cp-gsfr"'+gzStyle(cpGSZoom)+' src="'+_ddA(cpGSEmbed(gs,cpGSClean,sh&&sh.gid!=null?sh.gid:null))+'" title="Google Таблица" allowfullscreen onload="dtLoadDone(this)" allow="clipboard-read; clipboard-write; fullscreen"></iframe>'
+    +'</div>'
     +cpGSSheetsBar(p,bk,sh)
   +'</div>';
+}
+/* Масштаб держим отдельно от данных плана: это настройка взгляда, а не
+   содержимого, и уезжать в базу ей незачем. */
+let cpGSZoom=1;
+function cpGSZoomFit(){ gzApply(document.querySelector('.cp-gsfr'),cpGSZoom); }
+function cpGSZoomStep(d){
+  cpGSZoom=gzStep(cpGSZoom,d);
+  cpGSZoomFit();
+  const v=document.getElementById('cp-gz-v'); if(v) v.textContent=Math.round(cpGSZoom*100)+'%';
 }
 /* В чистом виде Google убирает свои панели — вместе с полосой листов внизу,
    и переключить месяц становится нечем. Рисуем её сами: тем же местом внизу,
@@ -20887,6 +20915,14 @@ function clCpRender(){
    теперь внутри Google и нашими не являются, отмечать их поштучно негде.
    У каждого листа решение своё, поэтому и панель у каждого листа своя. */
 function clCpGS(sh){ return (sh&&sh.gs&&sh.gs.id)?sh.gs:null; }
+/* Насколько крупно клиент смотрит таблицу — его личная настройка взгляда.
+   Живёт в этой вкладке и никуда не уезжает. */
+let clCpZoom=1;
+function clCpZoomStep(d){
+  clCpZoom=gzStep(clCpZoom,d);
+  gzApply(document.querySelector('#content-cl .clcp-gscard iframe'),clCpZoom);
+  const v=document.getElementById('clcp-gz-v'); if(v) v.textContent=Math.round(clCpZoom*100)+'%';
+}
 function clCpGSRender(sh,tabs,sa){
   const box=document.getElementById('content-cl'); if(!box) return;
   const gs=clCpGS(sh); if(!gs) return;
@@ -20904,6 +20940,7 @@ function clCpGSRender(sh,tabs,sa){
      кнопке и в самой таблице, а строку занимало на всю ширину. */
   const barIn=(tabs||'')
     +'<span class="sp"></span>'
+    +gzHTML('clcp-gz-v',clCpZoom,'clCpZoomStep')
     +'<div class="clcp-gsappr" id="clcp-sheetbar-host">'+clCpSheetCluster(a,null,1)+'</div>';
   /* Раздел перечитывается при каждом возврате во вкладку браузера. Если лист
      тот же — рамку не трогаем: иначе таблица перезагружалась бы с нуля каждый
@@ -20916,7 +20953,7 @@ function clCpGSRender(sh,tabs,sa){
   box.innerHTML='<div class="clcp-gsbar">'+barIn+'</div>'
     +'<div class="clcp-gswrap"><div class="clcp-gscard">'
       +dtLoadHTML('Открываем контент-план',(window.CLP&&window.CLP.name)||'Проект')
-      +'<iframe src="'+_ddA(src)+'" title="Контент-план в Google Таблицах" onload="dtLoadDone(this)" allowfullscreen></iframe>'
+      +'<iframe'+gzStyle(clCpZoom)+' src="'+_ddA(src)+'" title="Контент-план в Google Таблицах" onload="dtLoadDone(this)" allowfullscreen></iframe>'
     +'</div></div>';
   clCpGSTabsFit(box);
 }
@@ -30367,6 +30404,39 @@ function dtLoadHTML(title,sub){
     +(sub?('<p>'+_ddH(sub)+'</p>'):'')
     +'</div></div>';
 }
+/* ─── Приближение чужой рамки ───
+   Щипок на трекпаде и Cmd+колесо — жесты браузера: он масштабирует страницу
+   целиком, и над рамкой Google перехватить их нельзя, событие достаётся чужому
+   документу. Поэтому даём своё приближение кнопками. Работает так: рамку
+   сужаем во столько же раз, во сколько растягиваем, — Google раскладывает
+   таблицу на меньшую ширину, а мы показываем её крупнее. */
+const GZ_STEPS=[0.5,0.67,0.8,0.9,1,1.1,1.25,1.5,1.75,2,2.5,3];
+function gzNext(z,dir){
+  let i=0, best=1e9;
+  GZ_STEPS.forEach(function(v,k){ const d=Math.abs(v-z); if(d<best){best=d;i=k;} });
+  return GZ_STEPS[Math.max(0,Math.min(GZ_STEPS.length-1,i+(dir>0?1:dir<0?-1:0)))];
+}
+function gzApply(fr,z){
+  if(!fr) return;
+  const p=(100/z).toFixed(4)+'%';
+  fr.style.width=p; fr.style.height=p;
+  fr.style.transform=(z===1)?'none':('scale('+z+')');
+}
+/* Масштаб пишем прямо в разметку: раздел перерисовывается целиком, и цеплять
+   к каждой перерисовке отдельный проход только ради двух чисел незачем. */
+function gzStyle(z){
+  const p=(100/z).toFixed(4)+'%';
+  return ' style="width:'+p+';height:'+p+(z===1?'':(';transform:scale('+z+')'))+'"';
+}
+function gzHTML(id,z,fn){
+  const at=function(d){ return ' onclick="'+fn+'('+d+')"'; };
+  return '<div class="gz">'
+    +'<button type="button"'+at(-1)+' title="Отдалить таблицу" aria-label="Отдалить">−</button>'
+    +'<button type="button" class="gz-v" id="'+id+'"'+at(0)+' title="Вернуть 100%">'+Math.round(z*100)+'%</button>'
+    +'<button type="button"'+at(1)+' title="Приблизить таблицу" aria-label="Приблизить">+</button>'
+  +'</div>';
+}
+function gzStep(z,dir){ return dir===0?1:gzNext(z,dir); }
 function dtLoadDone(el){
   try{
     const host=el&&el.parentElement; if(!host) return;
