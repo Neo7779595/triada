@@ -7759,6 +7759,21 @@ button:active{transform:translateY(.5px) scale(.99)}
 .pjh-name:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .pjh-name-t{flex:1;min-width:0;white-space:normal;line-height:1.2;word-break:break-word}
 .pjh-dot{width:8px;height:8px;border-radius:50%;flex:none;margin-left:auto}
+/* Булавка стоит рядом с шестерёнкой, но доступна всем: закрепление — это
+   личный вид списка, а не правка проекта. */
+.pjh-pin{flex:none;width:42px;height:42px;border-radius:var(--r);background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--ease)}
+.pjh-pin svg{width:18px;height:18px;transition:transform .22s var(--spring)}
+.pjh-pin:hover{color:var(--txt);border-color:var(--line-2);background:var(--bg-3)}
+.pjh-pin:hover svg{transform:rotate(-12deg)}
+.pjh-pin:focus-visible{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
+.pjh-pin.on{color:var(--accent);background:var(--accent-dim);border-color:var(--accent-line)}
+.pjh-pin.on svg{fill:color-mix(in srgb,var(--accent) 22%,transparent)}
+/* Закреплённая карточка — тёплая рамка, чтобы взгляд цеплялся за верх списка */
+.pjh.is-pinned{border-color:color-mix(in srgb,var(--accent) 30%,var(--line));box-shadow:inset 0 1px 0 rgba(255,255,255,.03),inset 3px 0 0 -1px color-mix(in srgb,var(--accent) 55%,transparent),0 26px 54px -40px rgba(0,0,0,.85)}
+/* Почему проект наверху — отдельной строкой под названием: в самой строке
+   рядом с булавкой и шестерёнкой длинному названию уже тесно. */
+.pjh-head{flex-wrap:wrap}
+.pjh-why{order:3;flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;letter-spacing:.02em;color:var(--warn);background:var(--warn-dim);border:1px solid color-mix(in srgb,var(--warn) 26%,transparent);padding:5px 10px;border-radius:8px}
 .pjh-set{flex:none;width:42px;height:42px;border-radius:var(--r);background:var(--bg-2);border:1px solid var(--line-2);color:var(--txt-3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
 .pjh-set:hover{color:var(--accent);border-color:var(--accent-line);background:var(--accent-dim)}
 .pjh-set:hover svg{transform:rotate(35deg)}
@@ -10911,7 +10926,7 @@ let PROJECTS = [
   {name:'Тестовый проект',logo:'Т',cat:'Кофейня',svc:'DESIGN',pct:0,stages:'0 / 4',health:'В норме',dyn:'— 0 / 7д',status:'active'},
   {name:'Stella Coffee',logo:'S',cat:'Кофейня',svc:'SMM',pct:100,stages:'8 / 8',health:'Отлично',dyn:'▲ 1 / 7д',status:'done'},
 ];
-let agFilter='active'; let agCat='all',agSvc='all',agSort='active',agQ='',agLead='all',agCplx='all';
+let agFilter='active'; let agCat='all',agSvc='all',agSort='state',agQ='',agLead='all',agCplx='all';   /* по умолчанию наверху то, что горит */
 let PROJECT_TAGS={category:[],service:[],tariff:[],dept:[],rubric:[]};
 const AG_MODULES={projects:'Проекты',deadlines:'Дедлайны',calendar:'Расписание',overview:'Сводка',cycles:'Циклы',finance:'Финансы',team:'Команда',kb:'База знаний',tools:'Инструменты',kpi:'KPI',leaderboard:'Лидерборд',integrations:'Интеграции'};
 
@@ -14090,7 +14105,7 @@ function cycleCardHTML(c,i){
 }
 
 /* ——— project filters (custom dropdowns + live data) ——— */
-const SORT_OPTS=[['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
+const SORT_OPTS=[['state','По состоянию'],['active','По активности'],['progress','Прогресс ↓'],['progress_asc','Прогресс ↑'],['name','По названию']];
 const SORT_LABEL=Object.fromEntries(SORT_OPTS);
 /* Значение подставляется внутрь onclick="…'…'…" — атрибут в двойных кавычках.
    Без экранирования " название категории вида  x" onmouseover="…  разрывало атрибут. */
@@ -14459,7 +14474,47 @@ function setAgSvc(v){agSvc=v;renderProjects();}
 function setAgCplx(v){agCplx=v;renderProjects();}
 function setAgLead(v){agLead=v;renderProjects();}
 function setAgSort(v){agSort=v;renderProjects();}
-function projResetFilters(){agFilter='active';agCat='all';agSvc='all';agLead='all';agCplx='all';agQ='';agSort='active';renderProjects();}
+function projResetFilters(){agFilter='active';agCat='all';agSvc='all';agLead='all';agCplx='all';agQ='';agSort='state';renderProjects();}
+/* ═══ Закреплённые проекты ══════════════════════════════════════════════
+   Закрепление — личная настройка обзора, а не свойство проекта: сотрудник
+   с доступом «только смотреть» тоже должен уметь поднять свой проект
+   наверх, а писать в базу ему нельзя. Поэтому храним в браузере, ключ — на
+   агентство и человека, чтобы на общем компьютере списки не смешивались. */
+function _pinKey(){ const me=(window.tMe&&window.tMe())||{}; return 'triada_pin_'+String(me.agency_id||'ag')+'_'+String(me.id||'me'); }
+function projPinned(){ try{ const a=JSON.parse(localStorage.getItem(_pinKey())||'[]'); return new Set(Array.isArray(a)?a.map(String):[]); }catch(_){ return new Set(); } }
+function projIsPinned(id){ return projPinned().has(String(id)); }
+function projTogglePin(id){
+  const s=projPinned(), k=String(id);
+  if(s.has(k)) s.delete(k); else s.add(k);
+  try{ localStorage.setItem(_pinKey(), JSON.stringify(Array.from(s))); }catch(_){}
+  if(typeof renderProjects==='function') renderProjects();
+  toast(s.has(k)?'Проект закреплён — держим первым в списке':'Проект откреплён');
+}
+window.projTogglePin=projTogglePin; window.projIsPinned=projIsPinned;
+/* ═══ Умный порядок: чем хуже состояние, тем выше ═══════════════════════
+   Считаем «тяжесть» проекта из того, что и так посчитано на карточке:
+   просрочки, застой, близкий дедлайн при низком прогрессе, просевшая
+   маржа, некому вести. Завершённые уходят в самый низ — они не требуют
+   внимания. Возвращаем и причины: по ним подписываем, почему проект сверху. */
+function _projTrouble(p){
+  if(!p || p.status==='done' || (typeof agIsArchivedProject==='function' && agIsArchivedProject(p))) return {s:-1,why:[]};
+  let s=0; const why=[];
+  const ov=p._overdueAll||0;
+  if(ov>0){ s+=40+Math.min(60,10*ov); why.push(ov+' '+((typeof _plural==='function')?_plural(ov,'просрочка','просрочки','просрочек'):'просрочек')); }
+  else if(p._overdue){ s+=40; why.push('просрочка'); }
+  const st=(p._lastActDays==null)?null:p._lastActDays;
+  if(st!=null && st>=14){ s+=30+Math.min(30,st-14); why.push('застой '+st+' дн'); }
+  else if(st!=null && st>=7){ s+=12; why.push('тихо '+st+' дн'); }
+  if(p._nextDue){
+    const t=new Date(); t.setHours(0,0,0,0);
+    const d=new Date(p._nextDue+'T00:00:00'); const df=Math.round((d-t)/86400000);
+    if(df>=0 && df<=3 && (p.pct||0)<80){ s+=25-df*3; why.push(df===0?'дедлайн сегодня':'дедлайн через '+df+' дн'); }
+  }
+  if(p.mrr>0){ const m=Math.round(100*(p.mrr-(p.cost||0))/p.mrr);
+    if(m<0){ s+=30; why.push('минус по марже'); } else if(m<20){ s+=15; why.push('маржа '+m+'%'); } }
+  if(!p.lead_id){ s+=8; why.push('без ответственного'); }
+  return {s,why};
+}
 function projFiltered(){
   const q=(agQ||'').trim().toLowerCase();
   const _vis=(typeof agVisibleProjectIds==='function')?agVisibleProjectIds():null;   // scope='assigned' → Set(pid); иначе null (все)
@@ -14484,6 +14539,17 @@ function projFiltered(){
     const A=(a._lastActDays==null?1e9:a._lastActDays), B=(b._lastActDays==null?1e9:b._lastActDays);
     return A-B || (b._overdueAll||0)-(a._overdueAll||0) || (a.name||'').localeCompare(b.name||'','ru');
   });
+  /* По состоянию: наверх то, что горит. Дальше — по числу просрочек и по
+     давности последнего действия, чтобы порядок не прыгал при равных баллах. */
+  else if(agSort==='state')l=l.slice().sort((a,b)=>{
+    const A=_projTrouble(a).s, B=_projTrouble(b).s;
+    return B-A || (b._overdueAll||0)-(a._overdueAll||0)
+      || ((a._lastActDays==null?1e9:a._lastActDays)-(b._lastActDays==null?1e9:b._lastActDays))
+      || (a.name||'').localeCompare(b.name||'','ru');
+  });
+  /* Закреплённые — всегда первыми, внутри своей группы порядок прежний. */
+  const _pin=projPinned();
+  if(_pin.size){ const A=[],B=[]; l.forEach(p=>{ (_pin.has(String(p.id))?A:B).push(p); }); l=A.concat(B); }
   return l;
 }
 function _kmrr(v){ if(!v) return '—'; if(v>=1e6) return (Math.round(v/1e5)/10)+'M'; if(v>=1e3) return Math.round(v/1e3)+'K'; return ''+v; }
@@ -14726,8 +14792,12 @@ const _projCard=(p)=>{
   const _tkS=_tT>0?(_tkLeft>0?('осталось '+_tkLeft):'<em>готово</em>'):'нет задач';
   const _setSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
   const _smm=_pjhSmm(p);
+  const _pinOn=(typeof projIsPinned==='function')&&projIsPinned(p.id);
+  const _pinSVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
+  const _tr=(typeof _projTrouble==='function')?_projTrouble(p):{s:-1,why:[]};
+  const _whyHTML=(agSort==='state'&&_tr.why.length)?`<span class="pjh-why" title="Почему проект выше в списке">${escH(_tr.why.slice(0,2).join(' · '))}</span>`:'';
   return `
-      <div class="pjh" onclick="openProject(${idx})">
+      <div class="pjh${_pinOn?' is-pinned':''}" onclick="openProject(${idx})">
         <div class="pjh-id">
           <div class="pjh-tile">${logoFill(p.logoUrl,p.logo)}</div>
           <div class="pjh-pills">
@@ -14739,6 +14809,8 @@ const _projCard=(p)=>{
         <div class="pjh-meta">
           <div class="pjh-head">
             <button class="pjh-name" onclick="event.stopPropagation();openProject(${idx})"><span class="pjh-name-t">${escH(p.name)}</span><span class="pjh-dot" style="background:${risk.color};box-shadow:0 0 8px -1px ${risk.color}" title="${risk.label}"></span></button>
+            ${_whyHTML}
+            <button class="pjh-pin${_pinOn?' on':''}" title="${_pinOn?'Открепить — вернётся в общий порядок':'Закрепить наверху списка'}" aria-pressed="${_pinOn?'true':'false'}" onclick="event.stopPropagation();projTogglePin('${String(p.id).replace(/'/g,'')}')">${_pinSVG}</button>
             ${agCanEditProject(p)?`<button class="pjh-set" title="Настройки проекта" onclick="event.stopPropagation();projSettings(${idx})">${_setSVG}</button>`:''}
           </div>
           <div class="pjh-mgrid">
@@ -14936,7 +15008,7 @@ function renderProjects(){
 
     <div class="toolbar tb-proj">
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input placeholder="Поиск проекта…" value="${agQ.replace(/"/g,'&quot;')}" oninput="agQ=this.value;paintProjList()"></div>
-      <button class="tb-fbtn" onclick="window._tbAdvSet&&_tbAdvSet(!window._tbAdvOpen)" title="Фильтры"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 5h18M7 12h10M10 19h4"/></svg>${((agCat!=='all')+(agSvc!=='all')+(agLead!=='all')+(agCplx!=='all')+(agSort!=='active'))?`<i>${(agCat!=='all')+(agSvc!=='all')+(agLead!=='all')+(agCplx!=='all')+(agSort!=='active')}</i>`:''}</button>
+      <button class="tb-fbtn" onclick="window._tbAdvSet&&_tbAdvSet(!window._tbAdvOpen)" title="Фильтры"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 5h18M7 12h10M10 19h4"/></svg>${((agCat!=='all')+(agSvc!=='all')+(agLead!=='all')+(agCplx!=='all')+(agSort!=='state'))?`<i>${(agCat!=='all')+(agSvc!=='all')+(agLead!=='all')+(agCplx!=='all')+(agSort!=='state')}</i>`:''}</button>
       <div class="segm">
         <button class="${on('all')}" onclick="setAgFilter('all')">Все</button>
         <button class="${on('active')}" onclick="setAgFilter('active')">Активные</button>
@@ -14948,8 +15020,8 @@ function renderProjects(){
       <div class="tb-adv-hd"><div class="m-sheet-handle"></div><span>Фильтры</span></div>
       ${_dd('cat','Категория', agCat==='all'?'Все':agCat, [['all','Все категории']].concat(cats.map(c=>[c,c])), agCat, 'setAgCat')}
       ${_dd('svc','Услуга', agSvc==='all'?'Все':agSvc, [['all','Все услуги']].concat(svcs.map(x=>[x,x])), agSvc, 'setAgSvc')}
-      ${_dd('sort','Сортировка', SORT_LABEL[agSort]||'По активности', SORT_OPTS, agSort, 'setAgSort')}
-      ${_dd('lead','Ответственный', leadLbl, leadOpts, agLead, 'setAgLead')}${_dd('cplx','Сложность', agCplx==='all'?'Все':(agCplx==='none'?'Без замеров':agCplx), [['all','Любая сложность'],['Высокая','Высокая'],['Средняя','Средняя'],['Низкая','Низкая'],['none','Без замеров']], agCplx, 'setAgCplx')}${(agFilter!=='active'||agCat!=='all'||agSvc!=='all'||agLead!=='all'||agCplx!=='all'||agQ||agSort!=='active')?`<button class="pk-fclear" onclick="projResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
+      ${_dd('sort','Сортировка', SORT_LABEL[agSort]||'По состоянию', SORT_OPTS, agSort, 'setAgSort')}
+      ${_dd('lead','Ответственный', leadLbl, leadOpts, agLead, 'setAgLead')}${_dd('cplx','Сложность', agCplx==='all'?'Все':(agCplx==='none'?'Без замеров':agCplx), [['all','Любая сложность'],['Высокая','Высокая'],['Средняя','Средняя'],['Низкая','Низкая'],['none','Без замеров']], agCplx, 'setAgCplx')}${(agFilter!=='active'||agCat!=='all'||agSvc!=='all'||agLead!=='all'||agCplx!=='all'||agQ||agSort!=='state')?`<button class="pk-fclear" onclick="projResetFilters()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>Сбросить</button>`:''}
       <button class="tb-adv-apply" onclick="window._tbAdvSet&&_tbAdvSet(false)">Показать: ${list.length} ${_plural(list.length,'проект','проекта','проектов')}</button>
       </div>
     </div>
