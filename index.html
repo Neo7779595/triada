@@ -3808,19 +3808,29 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pkcl-hint2{display:block;font-size:11.5px;color:var(--txt-3);margin-top:5px}
 .pkcl-lbl{display:flex;align-items:baseline;gap:8px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-3);margin:2px 0 7px}
 .pkcl-lbl i{font-style:normal;text-transform:none;letter-spacing:0;font-size:12px;opacity:.8}
-.pkcl-it{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:var(--bg-1);margin-bottom:7px;cursor:pointer;transition:.15s}
+.pkcl-it{display:flex;align-items:center;gap:9px;padding:7px 9px 7px 10px;border:1px solid var(--line);border-radius:11px;background:var(--bg-1);margin-bottom:7px;transition:.15s}
 .pkcl-it:hover{border-color:var(--txt-3)}
 .pkcl-it.on{border-color:var(--accent-line);background:var(--accent-dim)}
-.pkcl-it input{position:absolute;opacity:0;width:0;height:0}
-.pkcl-box{flex:none;width:19px;height:19px;border-radius:6px;border:1px solid var(--line-2);background:var(--bg-2);display:flex;align-items:center;justify-content:center;color:transparent;transition:.15s}
+.pkcl-box{flex:none;width:19px;height:19px;padding:0;border-radius:6px;border:1px solid var(--line-2);background:var(--bg-2);display:flex;align-items:center;justify-content:center;color:transparent;cursor:pointer;transition:.15s}
 .pkcl-box svg{width:12px;height:12px}
+.pkcl-box:focus-visible{outline:none;box-shadow:0 0 0 3px var(--accent-dim)}
 .pkcl-it.on .pkcl-box{background:var(--accent);border-color:var(--accent);color:#0A0B0D}
 .pkcl-ic{flex:none;display:flex;color:var(--txt-3)}
-.pkcl-nm{flex:1;min-width:0;font-size:13.5px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* название материала правится на месте: поле выглядит текстом, пока в него не
+   встали — так видно, что его можно переписать, и список не пестрит рамками */
+.pkcl-nm{flex:1;min-width:0;font-size:13.5px;color:var(--txt);background:transparent;border:1px solid transparent;border-radius:7px;padding:5px 8px;font-family:var(--font);transition:.15s}
+.pkcl-nm:hover{border-color:var(--line-2)}
+.pkcl-nm:focus{outline:none;background:var(--bg-1);border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
+.pkcl-nm::placeholder{color:var(--txt-3)}
 .pkcl-ty{flex:none;font-size:11.5px;color:var(--txt-3);white-space:nowrap}
+.pkcl-x{flex:none;width:24px;height:24px;padding:0;border:0;border-radius:7px;background:none;color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.pkcl-x svg{width:13px;height:13px}
+.pkcl-x:hover{background:var(--neg-dim);color:var(--neg)}
 .pkcl-empty{padding:12px 13px;border:1px dashed var(--line-2);border-radius:11px;color:var(--txt-3);font-size:13px;line-height:1.5;margin-bottom:8px}
-.pkcl-add{display:flex;gap:8px;align-items:center;margin:2px 0 15px}
-.pkcl-add .sch-linkwrap{flex:1;min-width:0}
+.pkcl-add{display:flex;gap:8px;align-items:center;margin:2px 0 15px;flex-wrap:wrap}
+.pkcl-add .sch-linkwrap{flex:2 1 220px;min-width:0}
+.pkcl-addnm{flex:1 1 130px;min-width:110px;background:var(--bg-1);border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;color:var(--txt);font-family:var(--font);font-size:13.5px}
+.pkcl-addnm:focus{outline:none;border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
 .pkcl-f{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 20px;border-top:1px solid var(--line);background:var(--bg-2)}
 .pkcl-hint{font-size:12px;color:var(--txt-3);flex:1 1 220px;min-width:0}
 #pkcl-go[disabled]{opacity:.45;cursor:not-allowed}
@@ -16238,11 +16248,50 @@ window.pkAskReview=pkAskReview; window.pkSendToReview=pkSendToReview;
    согласование уезжает отдельная запись (task_approvals) — название, которое
    пишем мы, этап и ссылки. Она же хранит круги согласования: видно, что
    сценарии уходят клиенту по три раза. */
+/* Голая ссылка в сообщении клиенту читается как мусор: «www.youtube.com/watch
+   ?v=jcoMujWskB4&list=RD…». Поэтому у материала есть имя, и по умолчанию оно
+   человеческое — по тому, куда ведёт ссылка. Переписать его можно всегда. */
+function _niceLinkName(u){
+  const s=String(u||'');
+  if(!s) return 'Материал';
+  if(/docs\.google\.com\/document/i.test(s))     return 'Google Документ';
+  if(/docs\.google\.com\/spreadsheets/i.test(s)) return 'Google Таблица';
+  if(/docs\.google\.com\/presentation/i.test(s)) return 'Google Презентация';
+  if(/docs\.google\.com\/forms/i.test(s))        return 'Google Форма';
+  if(/drive\.google\.com/i.test(s))              return 'Файл на Диске';
+  if(/(youtube\.com|youtu\.be)/i.test(s))        return 'Видео на YouTube';
+  if(/(instagram\.com)/i.test(s))                return 'Публикация в Instagram';
+  if(/(tiktok\.com)/i.test(s))                   return 'Видео в TikTok';
+  if(/figma\.com/i.test(s))                      return 'Макет Figma';
+  if(/miro\.com/i.test(s))                       return 'Доска Miro';
+  if(/notion\.(so|site)/i.test(s))               return 'Notion';
+  if(/t\.me\//i.test(s))                         return 'Пост в Telegram';
+  if(/\.(pdf)(\?|$)/i.test(s))                   return 'PDF-документ';
+  try{ return new URL(/^https?:\/\//i.test(s)?s:('https://'+s)).hostname.replace(/^www\./,''); }
+  catch(_e){ return 'Материал'; }
+}
+/* Имя из адреса — не имя: «docs.google.com/document/d/1x…» показывать клиенту
+   незачем. Такие подставляем человеческими, свои оставляем как есть. */
+function _pkClName(a){
+  const n=String((a&&a.name)||'').trim();
+  const u=String((a&&a.url)||'');
+  if(!n) return (a&&a.type==='file')?'Файл':_niceLinkName(u);
+  if(/^https?:\/\//i.test(n)) return _niceLinkName(n);
+  if(u && (u.replace(/^https?:\/\//i,'').replace(/\/+$/,'')===n.replace(/…$/,'') || u.indexOf(n.replace(/…$/,''))>=0)) return _niceLinkName(u);
+  return n;
+}
+function _pkClUniq(items,name){
+  let n=name, i=2;
+  while(items.some(function(x){ return String(x.name||'')===n; })){ n=name+' '+i; i++; }
+  return n;
+}
 function _pkClAtt(t){
-  return (Array.isArray(t&&t.attachments)?t.attachments:[])
+  const out=[];
+  (Array.isArray(t&&t.attachments)?t.attachments:[])
     .filter(function(a){ return a && (a.url||a.path); })
-    .map(function(a){ return { type:(a.type==='file'?'file':'link'), url:a.url||'', path:a.path||'',
-      name:a.name||a.url||'Материал', size:a.size||0, on:true, _new:false }; });
+    .forEach(function(a){ out.push({ type:(a.type==='file'?'file':'link'), url:a.url||'', path:a.path||'',
+      name:_pkClUniq(out,_pkClName(a)), size:a.size||0, on:true, _new:false }); });
+  return out;
 }
 function _pkClTitle(t,stg){
   const st=(stg&&stg.name)?String(stg.name).trim():'';
@@ -16267,10 +16316,11 @@ function pkAskReviewClient(taskId){
       +'<div class="pkcl-fld"><label>Название для клиента</label>'
       +'<input id="pkcl-t" maxlength="120" value="'+_ddA(_pkClTitle(t,stg))+'" placeholder="Сценарий Reels · сентябрь">'
       +'<span class="pkcl-hint2">Так материал будет называться у клиента и в Telegram</span></div>'
-      +'<div class="pkcl-lbl">Материалы<i>отмеченные уйдут клиенту</i></div>'
+      +'<div class="pkcl-lbl">Материалы<i>отмеченные уйдут клиенту · название можно переписать</i></div>'
       +'<div id="pkcl-list"></div>'
-      +'<div class="pkcl-add"><div class="sch-linkwrap"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007 0l2-2a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-2 2a5 5 0 007 7l1-1"/></svg></span>'
-      +'<input id="pkcl-link" placeholder="Вставьте ссылку — Google Docs, папка, макет…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pkClAddLink();}"></div>'
+      +'<div class="pkcl-add"><input id="pkcl-lname" class="pkcl-addnm" placeholder="Референс 1" maxlength="80" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pkClAddLink();}">'
+      +'<div class="sch-linkwrap"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007 0l2-2a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-2 2a5 5 0 007 7l1-1"/></svg></span>'
+      +'<input id="pkcl-link" placeholder="Вставьте ссылку — Google Docs, видео, макет…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pkClAddLink();}"></div>'
       +'<button type="button" class="sch-attbtn" onclick="pkClAddLink()">Добавить</button></div>'
       +'<div class="pkcl-fld"><label>Короткая просьба <i>необязательно</i></label>'
       +'<textarea id="pkcl-n" rows="2" placeholder="Например: посмотрите сценарий, особенно первые три секунды"></textarea></div>'
@@ -16287,24 +16337,46 @@ function pkClRender(){
   const linkI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007 0l2-2a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-2 2a5 5 0 007 7l1-1"/></svg>';
   const fileI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>';
   el.innerHTML=S.items.map(function(a,i){
-    return '<label class="pkcl-it'+(a.on?' on':'')+'"><input type="checkbox" '+(a.on?'checked':'')+' onchange="pkClToggle('+i+')">'
-      +'<span class="pkcl-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>'
+    return '<div class="pkcl-it'+(a.on?' on':'')+'" data-i="'+i+'">'
+      +'<button type="button" class="pkcl-box" onclick="pkClToggle('+i+')" title="'+(a.on?'Не отправлять':'Отправить клиенту')+'" aria-pressed="'+(a.on?'true':'false')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button>'
       +'<span class="pkcl-ic">'+(a.type==='file'?fileI:linkI)+'</span>'
-      +'<span class="pkcl-nm">'+_ddH(a.name||'Материал')+'</span>'
-      +'<span class="pkcl-ty">'+(a.type==='file'?'файл · ссылка на 30 дней':'ссылка')+'</span></label>';
+      +'<input class="pkcl-nm" value="'+_ddA(a.name||'')+'" maxlength="80" placeholder="Название для клиента" '
+        +'oninput="pkClName('+i+',this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'
+      +'<span class="pkcl-ty" title="'+_ddA(a.url||a.path||'')+'">'+(a.type==='file'?'файл · 30 дней':'ссылка')+'</span>'
+      +'<button type="button" class="pkcl-x" onclick="pkClDel('+i+')" title="Убрать из списка"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>'
+      +'</div>';
   }).join('');
-  const on=S.items.filter(function(a){ return a.on; }).length;
-  const g=document.getElementById('pkcl-go'); if(g) g.disabled=!on;
+  pkClSyncBtn();
 }
-function pkClToggle(i){ const S=window._pkCl; if(!S||!S.items[i]) return; S.items[i].on=!S.items[i].on; pkClRender(); }
+function pkClSyncBtn(){
+  const S=window._pkCl||{items:[]};
+  const g=document.getElementById('pkcl-go'); if(g) g.disabled=!S.items.filter(function(a){ return a.on; }).length;
+}
+/* Переключение не пересобирает список: человек может править названия, и
+   перерисовка вырвала бы курсор из поля. */
+function pkClToggle(i){
+  const S=window._pkCl; if(!S||!S.items[i]) return;
+  S.items[i].on=!S.items[i].on;
+  const row=document.querySelector('#pkcl-list .pkcl-it[data-i="'+i+'"]');
+  if(row){ row.classList.toggle('on',S.items[i].on);
+    const b=row.querySelector('.pkcl-box'); if(b){ b.setAttribute('aria-pressed',S.items[i].on?'true':'false');
+      b.title=S.items[i].on?'Не отправлять':'Отправить клиенту'; } }
+  pkClSyncBtn();
+}
+function pkClName(i,v){ const S=window._pkCl; if(S&&S.items[i]) S.items[i].name=String(v||''); }
+function pkClDel(i){ const S=window._pkCl; if(!S||!S.items[i]) return; S.items.splice(i,1); pkClRender(); }
 function pkClAddLink(){
   const inp=document.getElementById('pkcl-link'); if(!inp) return;
   let u=(inp.value||'').trim(); if(!u) return;
   if(!/^https?:\/\//i.test(u)){ if(/^[\w.-]+\.[a-z]{2,}/i.test(u)) u='https://'+u; else { toast('Введите корректную ссылку'); return; } }
-  let name=u.replace(/^https?:\/\//i,'').replace(/\/+$/,''); if(name.length>52) name=name.slice(0,50)+'…';
   const S=window._pkCl||(window._pkCl={items:[]});
+  const nel=document.getElementById('pkcl-lname');
+  const typed=nel?String(nel.value||'').trim():'';
+  const name=_pkClUniq(S.items, typed||_niceLinkName(u));
   S.items.push({type:'link',url:u,path:'',name:name,size:0,on:true,_new:true});
-  inp.value=''; pkClRender(); inp.focus();
+  inp.value=''; if(nel) nel.value='';
+  pkClRender();
+  if(nel) nel.focus(); else inp.focus();
 }
 async function pkClSend(){
   const S=window._pkCl; if(!S) return;
@@ -16321,12 +16393,15 @@ async function pkClSend(){
      через семь дней выглядит как «вы мне ничего не присылали». */
   const items=[];
   for(const a of sel){
+    /* название пустым не отпускаем: клиенту уйдёт голая ссылка, а её читать
+       невозможно — подставляем человеческое имя по адресу */
+    const nm=String(a.name||'').trim()||_pkClName(a);
     if(a.type==='file' && a.path && window.tTaskSignedUrl){
       const u=await window.tTaskSignedUrl(a.path, 2592000);
-      if(!u){ toast('Файл «'+(a.name||'')+'» не отдал ссылку — уберите его или попробуйте ещё раз');
+      if(!u){ toast('Файл «'+nm+'» не отдал ссылку — уберите его или попробуйте ещё раз');
         if(btn){ btn.disabled=false; btn.textContent='Отправить клиенту'; } return; }
-      items.push({type:'file',name:a.name||'Файл',url:u,path:a.path});
-    } else if(a.url) items.push({type:'link',name:a.name||a.url,url:a.url});
+      items.push({type:'file',name:nm,url:u,path:a.path});
+    } else if(a.url) items.push({type:'link',name:nm,url:a.url});
   }
   const okMove=await (window.tTaskMove?tTaskMove(S.taskId,'review',{review_kind:'client',review_by:''}):Promise.resolve(false));
   if(!okMove){ if(btn){ btn.disabled=false; btn.textContent='Отправить клиенту'; } return; }
@@ -16407,6 +16482,7 @@ function pkApprHistHTML(p,taskId){
 window.pkApprHistHTML=pkApprHistHTML;
 window.pkAskReviewClient=pkAskReviewClient; window.pkClRender=pkClRender; window.pkClToggle=pkClToggle;
 window.pkClAddLink=pkClAddLink; window.pkClSend=pkClSend; window.pkApprList=pkApprList; window.pkApprLast=pkApprLast;
+window.pkClName=pkClName; window.pkClDel=pkClDel; window.pkClSyncBtn=pkClSyncBtn; window._niceLinkName=_niceLinkName;
 function pkReviewWho(t){
   if(!t) return null;
   if(t.review_kind==='client') return {name:'Клиент', client:true};
@@ -16700,7 +16776,7 @@ function _pdTaskAttFldHtml(){
   const linkI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M10 13a5 5 0 007 0l2-2a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-2 2a5 5 0 007 7l1-1"/></svg>';
   const clipI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 11.5l-8.6 8.6a5 5 0 01-7-7L14 4.5a3.3 3.3 0 015 5l-9.2 9.2a1.7 1.7 0 01-2.4-2.4l8.5-8.5"/></svg>';
   return '<div class="fld"><label>Материалы</label>'
-    +'<div class="sch-attadd"><div class="sch-linkwrap"><span class="ic">'+linkI+'</span><input id="pd2-att-link" placeholder="Вставьте ссылку — договор, ТЗ, Google Docs…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_pdTaskAttAddLink();}"></div><button type="button" class="sch-attbtn" onclick="_pdTaskAttAddLink()">Добавить</button></div>'
+    +'<div class="sch-attadd"><input id="pd2-att-name" class="pkcl-addnm" placeholder="Название" maxlength="80" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_pdTaskAttAddLink();}"><div class="sch-linkwrap"><span class="ic">'+linkI+'</span><input id="pd2-att-link" placeholder="Вставьте ссылку — договор, ТЗ, Google Docs…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();_pdTaskAttAddLink();}"></div><button type="button" class="sch-attbtn" onclick="_pdTaskAttAddLink()">Добавить</button></div>'
     +'<div class="sch-attfile"><button type="button" class="sch-filebtn" onclick="document.getElementById(\'pd2-att-file\').click()">'+clipI+'Прикрепить файл</button></div>'
     +'<input type="file" id="pd2-att-file" style="display:none" multiple onchange="_pdTaskAttFile(this)">'
     +'<div class="sch-attlist" id="pd2-att-list"></div>'
@@ -16730,9 +16806,15 @@ function _pdTaskAttAddLink(){
   const inp=document.getElementById('pd2-att-link'); if(!inp) return;
   let u=(inp.value||'').trim(); if(!u) return;
   if(!/^https?:\/\//i.test(u)){ if(/^[\w.-]+\.[a-z]{2,}/i.test(u)) u='https://'+u; else { toast('Введите корректную ссылку'); return; } }
-  let name=u.replace(/^https?:\/\//i,'').replace(/\/+$/,''); if(name.length>52) name=name.slice(0,50)+'…';
-  (window._pdTaskAtt=window._pdTaskAtt||[]).push({ type:'link', url:u, name:name });
-  inp.value=''; _pdTaskAttRender();
+  /* Имя можно написать своё; пустое — подставляем человеческое по адресу.
+     Голая ссылка в списке материалов не читается ни здесь, ни в Telegram. */
+  const nel=document.getElementById('pd2-att-name');
+  const typed=nel?String(nel.value||'').trim():'';
+  const arr=(window._pdTaskAtt=window._pdTaskAtt||[]);
+  const name=(typeof _pkClUniq==='function')?_pkClUniq(arr, typed||_niceLinkName(u)):(typed||_niceLinkName(u));
+  arr.push({ type:'link', url:u, name:name });
+  inp.value=''; if(nel) nel.value=''; _pdTaskAttRender();
+  if(nel) nel.focus();
 }
 async function _pdTaskAttFile(input){
   const files=Array.prototype.slice.call(input.files||[]); input.value=''; if(!files.length) return;
