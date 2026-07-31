@@ -2220,7 +2220,10 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 .wlxq-t{grid-column:1;font-size:14.5px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wlxq-who{grid-column:1;display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--txt-2);margin-top:3px;min-width:0}
 .wlxq-who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wlxq-av{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#0b0f0e;overflow:hidden;flex:none}
+/* position:relative обязателен: фото в аватарке лежит абсолютом внутри рамки
+   (см. logoFill). Без него точкой отсчёта становится сам оверлей — и фото
+   сотрудника растягивается на весь экран поверх окна. */
+.wlxq-av{position:relative;width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#0b0f0e;overflow:hidden;flex:none}
 .wlxq-av img{width:100%;height:100%;object-fit:cover}
 .wlxq-due{grid-column:2;grid-row:1/4;justify-self:end;font-family:var(--mono);font-size:12.5px;padding:5px 10px;border-radius:8px;background:var(--bg-3);color:var(--txt-3);white-space:nowrap}
 .wlxq-due.over{background:var(--neg-dim);color:var(--neg)}
@@ -27784,7 +27787,17 @@ function renderTeam(){
       </tbody></table></div></div>`;
   } else if(teamTab==='workload'){
     const W=TEAM.reduce((s,e)=>s+(e._wait||0),0), I=TEAM.reduce((s,e)=>s+(e._active||0),0), R=TEAM.reduce((s,e)=>s+(e._review||0),0), D=TEAM.reduce((s,e)=>s+(e._done||0),0);
-    const TOT=W+I+R+D, shareOf=v=>TOT?Math.round(100*v/TOT):0;   // «На утверждении» тоже часть нагрузки — иначе проценты не сходятся со строками
+    /* 100% — это текущая нагрузка: ожидание + в работе + на утверждении.
+       Завершённые в базу не входят: закрытых задач со временем становится
+       кратно больше живых, и живая нагрузка тонула в архиве — «В работе 4%»
+       вместо «В работе 40%». Доли считаем по наибольшему остатку, чтобы три
+       числа давали ровно 100, а не 99 и не 101. */
+    const LIVE=W+I+R;
+    const _sh=(()=>{ if(!LIVE) return [0,0,0];
+      const raw=[W,I,R].map(v=>100*v/LIVE), fl=raw.map(Math.floor), out=fl.slice();
+      let rest=100-fl.reduce((s,x)=>s+x,0);
+      raw.map((r,i)=>[r-fl[i],i]).sort((a,b)=>b[0]-a[0]).forEach(([,i])=>{ if(rest>0){ out[i]++; rest--; } });
+      return out; })();
     const sorted=[...TEAM].sort((a,b)=>((b._wait||0)+(b._active||0)+(b._review||0)+(b._done||0))-((a._wait||0)+(a._active||0)+(a._review||0)+(a._done||0)));
     const {t0:_pwT0,t1:_pwT1}=_tWindow();
     const _pWork={}; (window._timeLogs||[]).forEach(l=>{ if(!l||(l.kind&&l.kind!=='work')) return; const ts=l.started_at?new Date(l.started_at).getTime():0; if(ts>=_pwT0&&ts<=_pwT1){ const a=_pWork[l.member_id]||(_pWork[l.member_id]={sec:0,cnt:0}); a.sec+=(l.seconds||0); a.cnt++; } });
@@ -27794,8 +27807,8 @@ function renderTeam(){
     const cell=(v,dim,col)=> v>0?`<span class="wlx-cell" style="background:${dim};color:${col}">${v}</span>`:'<span class="wlx-cell z">—</span>';
     body=`
       <div class="wlx-sum">
-        ${[['wait',W,'var(--warn)','В ожидании'],['active',I,'var(--accent)','В работе'],['review',R,'var(--violet)','На утверждении'],['done',D,'var(--pos)','Завершено']].map(([k,v,c,lbl])=>
-          `<button type="button" class="wlx-s wlx-act" onclick="wlxOpenTasks('${k}')" title="Показать задачи: ${lbl}"><div class="v" style="color:${c}">${v}<small>${shareOf(v)}%</small></div><div class="l"><span class="dt" style="background:${c}"></span>${lbl}</div><span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></button>`).join('')}
+        ${[['wait',W,'var(--warn)','В ожидании',_sh[0]],['active',I,'var(--accent)','В работе',_sh[1]],['review',R,'var(--violet)','На утверждении',_sh[2]],['done',D,'var(--pos)','Завершено',null]].map(([k,v,c,lbl,sh])=>
+          `<button type="button" class="wlx-s wlx-act" onclick="wlxOpenTasks('${k}')" title="${sh==null?'Показать задачи: '+lbl+' · в текущую нагрузку не входят':lbl+' — '+sh+'% текущей нагрузки (ожидание + в работе + на утверждении). Нажмите, чтобы увидеть задачи'}"><div class="v" style="color:${c}">${v}${sh==null?'':`<small>${sh}%</small>`}</div><div class="l"><span class="dt" style="background:${c}"></span>${lbl}</div><span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></button>`).join('')}
         <div class="wlx-s"><div class="v" style="color:var(--accent)">${_totWork>0?_cycDur(_totWork*1000):'—'}</div><div class="l"><span class="dt" style="background:var(--accent)"></span>Время в работе · за ${_periodLbl()}</div></div>
       </div>
       <div class="card">
