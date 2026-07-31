@@ -23644,6 +23644,20 @@ function smmComputeGeneral(){
   const man=N(m.followers_manual);
   m.followers = (man!=null) ? man : (gain>0?gain:null);
 }
+/* ——— итоги аккаунта за период ———
+   «Всего охват» и «Всего просмотров» человек вписывает руками, из них
+   вычитанием получаются сторис. Значит итог = рилсы + сторис + ПОСТЫ.
+   Раньше в отчёте складывались только рилсы и сторис, и он расходился с
+   рейтингом проектов на вклад постов: 895 253 против 897 789 по охвату.
+   Считаем в одном месте, чтобы карточка, презентация и рейтинг сходились. */
+function smmTotalReach(m){ if(!m) return 0;
+  const t=Number(m.total_reach); if(isFinite(t)&&t>0) return t;
+  return (+m.reels_reach||0)+(+m.stories_reach||0)+(+m.posts_reach||0); }
+function smmTotalViews(m){ if(!m) return 0;
+  const t=Number(m.total_views); if(isFinite(t)&&t>0) return t;
+  const sv=(m.stories_views!=null)?(+m.stories_views||0):(+m.stories_reach||0);   // старые отчёты без сторис-просмотров
+  return (+m.reels_views||0)+sv+(+m.posts_views||0); }
+window.smmTotalReach=smmTotalReach; window.smmTotalViews=smmTotalViews;
 function smmGenNum(k,zero){ const m=_smmCur.metrics; return m[k]==null?(zero||'—'):Number(m[k]).toLocaleString('ru-RU'); }
 function smmGenVals(){
   ['reels_count','reels_views','reels_reach','posts_count','posts_views','posts_reach','stories_views','stories_reach','content_total'].forEach(k=>{
@@ -24543,7 +24557,7 @@ function smmConclusionsBlockHTML(){
   }
 
   // 8. Проникновение охвата
-  const totalReach=(m.reels_reach||0)+(m.stories_reach||0);
+  const totalReach=smmTotalReach(m);
   if(totalReach>0&&m.subscribers_current){
     const pen=totalReach/m.subscribers_current;
     C.push({tone:pen>=1?'pos':pen>=0.5?'warn':'neg',
@@ -25190,8 +25204,7 @@ function smmCompareStripHTML(norm){
   /* Подсчёты, которые не хранятся напрямую: охват / просмотры / прирост / подписчики */
   const derive=(m)=>{
     if(!m) return {};
-    const reach=(m.reels_reach||0)+(m.stories_reach||0);
-    const views=(m.reels_views||0)+(m.stories_views!=null?m.stories_views:(m.stories_reach||0));
+    const reach=smmTotalReach(m), views=smmTotalViews(m);
     return {
       subs:  val(m.subscribers_current),
       reach: reach>0?reach:null,
@@ -25253,8 +25266,7 @@ function smmReportCardHTML(x,p){
   const val=v=>(v!=null&&v!==''&&+v!==0)?+v:null;
   const pc=v=>v==null?null:(+v).toFixed(2).replace('.',',')+'%';
   const nf=v=>v==null?null:Number(v).toLocaleString('ru-RU');
-  const reach=(m.reels_reach||0)+(m.stories_reach||0);
-  const views=(m.reels_views||0)+(m.stories_views!=null?m.stories_views:(m.stories_reach||0));
+  const reach=smmTotalReach(m), views=smmTotalViews(m);
   const foll=val(m.followers);
   const subs=val(m.subscribers_current);
   /* Только пять ключевых карточек: охват / просмотры / подписчики / прирост аудитории / ER */
@@ -25277,9 +25289,12 @@ function smmSection01HTML(){
   const m=_smmCur.metrics;
   const f=v=>(v==null||isNaN(v))?'—':Number(v).toLocaleString('ru-RU');
   const ca=(n,dec,pre,suf)=>(n==null||isNaN(n))?'':' data-count="'+n+'"'+(dec?' data-dec="'+dec+'"':'')+(pre?' data-pre="'+pre+'"':'')+(suf?' data-suf="'+suf+'"':'');
-  const totalReach=(m.reels_reach||0)+(m.stories_reach||0);
-  const rv=m.reels_views||0, sv=(m.stories_views!=null?m.stories_views:(m.stories_reach||0)), tv=rv+sv;
-  const reelsP=tv>0?Math.round(rv/tv*100):0, storiesP=tv>0?100-reelsP:0;
+  const totalReach=smmTotalReach(m), tv=smmTotalViews(m);
+  const rv=+m.reels_views||0, sv=(m.stories_views!=null?(+m.stories_views||0):(+m.stories_reach||0)), pv=+m.posts_views||0;
+  const _pt=rv+sv+pv||0;   // доли считаем по слагаемым, итог показываем аккаунтный
+  const reelsP=_pt>0?Math.round(rv/_pt*100):0;
+  const postsP=(_pt>0&&pv>0)?Math.max(1,Math.round(pv/_pt*100)):0;
+  const storiesP=_pt>0?Math.max(0,100-reelsP-postsP):0;
   const erVal=m.er==null?'—':(+m.er).toFixed(2)+'%';
   const fol=m.followers, folStr=fol==null?'—':((fol>0?'+':'')+f(fol));
   const folDelta=(fol!=null&&m.subscribers_current)?((fol>0?'+':'')+(fol/m.subscribers_current*100).toFixed(1)+'% базы за период'):'';
@@ -25300,11 +25315,13 @@ function smmSection01HTML(){
     +'<div style="position:relative;display:flex;height:34px;border-radius:6px;overflow:hidden;background:var(--bg-3)">'
       +`<div class="smm-grow" style="width:${reelsP}%;background:var(--accent);height:100%"></div>`
       +`<div style="width:${storiesP}%;background:rgba(55,230,200,.42);height:100%;border-left:1.5px solid var(--bg)"></div>`
+      +(postsP>0?`<div style="width:${postsP}%;background:rgba(55,230,200,.20);height:100%;border-left:1.5px solid var(--bg)"></div>`:'')
       +`<span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:700;color:var(--accent-ink);letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap">${tv>0?reelsP+'%':'—'}</span>`
     +'</div>'
     +'<div style="display:flex;gap:28px;margin-top:14px;flex-wrap:wrap">'
       +`<div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border-radius:2px;background:var(--accent);flex-shrink:0"></span><span style="font-family:var(--mono);font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-2)">Reels</span><span style="font-size:14px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums">${tv>0?reelsP+'%':'—'}</span><span style="font-family:var(--mono);font-size:12.5px;color:var(--txt-3);font-variant-numeric:tabular-nums">${f(rv)}</span></div>`
       +`<div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(55,230,200,.42);flex-shrink:0"></span><span style="font-family:var(--mono);font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-3)">Сторис</span><span style="font-size:14px;font-weight:700;color:var(--txt-2);font-variant-numeric:tabular-nums">${tv>0?storiesP+'%':'—'}</span><span style="font-family:var(--mono);font-size:12.5px;color:var(--txt-3);font-variant-numeric:tabular-nums">${f(sv)}</span></div>`
+      +(pv>0?`<div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(55,230,200,.20);flex-shrink:0"></span><span style="font-family:var(--mono);font-size:12.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--txt-3)">Посты</span><span style="font-size:14px;font-weight:700;color:var(--txt-2);font-variant-numeric:tabular-nums">${postsP}%</span><span style="font-family:var(--mono);font-size:12.5px;color:var(--txt-3);font-variant-numeric:tabular-nums">${f(pv)}</span></div>`:'')
     +'</div>'
   +'</div>';
   return '<div class="smm-rep01">'+H
@@ -39141,15 +39158,17 @@ window.kpiComputeSmmER = async (scopeKind, scopeId, fromISO, toISO) => {
   return { value: val==null ? null : Math.round(val*100)/100, sample_size: latest.length, confidence: _kpiConfidence('smm_er', latest.length) };
 };
 
-/* ── 2. smm_reach (Reels + Stories, сумма) ── */
+/* ── 2. smm_reach (охват аккаунта за период, сумма по проектам) ── */
 window.kpiComputeSmmReach = async (scopeKind, scopeId, fromISO, toISO) => {
   const raw = await _kpiFetchSmmRaw(fromISO, toISO); if(!raw) return {value:null,sample_size:0,confidence:null};
   const pids = await _kpiSmmScopeProjects(scopeKind, scopeId);
   const latest = _kpiSmmLatestByProject(raw, pids);
-  // Как в UI карточки SMM-отчёта: reels_reach + stories_reach (без posts).
-  // total_reach в БД включает posts_reach, что делает KPI не совпадающим с карточкой.
+  // Тот же итог, что в карточке отчёта и в рейтинге проектов: рилсы + сторис + посты.
+  // Раньше здесь посты отбрасывались, чтобы совпасть с карточкой, — теперь посты
+  // считает и карточка, и расхождение снято в обе стороны.
+  const _tr = window.smmTotalReach || (m => (+m.total_reach||0));
   let sum = 0;
-  latest.forEach(r => { sum += (+r.m.reels_reach||0) + (+r.m.stories_reach||0); });
+  latest.forEach(r => { sum += (+_tr(r.m)||0); });
   return { value: sum, sample_size: latest.length, confidence: _kpiConfidence('smm_reach', latest.length) };
 };
 
