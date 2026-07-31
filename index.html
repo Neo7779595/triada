@@ -5896,17 +5896,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .sched-days{display:flex;gap:5px;margin-bottom:10px}
 .sched-day{flex:1;padding:8px 0;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt-3);border-radius:7px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:.12s}
 .sched-day.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.sched-row{display:flex;gap:7px;align-items:stretch}
+/* Тип отчёта, час и «Добавить» в одну строку не помещались: селект часа
+   сжимался до нитки — в колонке буквально до одного пикселя, — и клик по
+   видимому «18:00» приходился уже мимо него. Отсюда и «время не
+   выбирается». Раскладываем в две строки: переключатель типа занимает
+   свою, час и кнопка — следующую, и обоим есть куда расти. */
+.sched-row{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
 /* Переключатель внутри редактора расписания. Раньше правила были записаны
    на голый .sched-seg и перебивали переключатель вида «Неделя / Месяц /
    Команда»: активной кнопке доставалась своя заливка, и она перекрашивалась
    рывком, пока бегунок ехал — на экране получались две подсветки сразу.
    Ограничиваем правила своей строкой .sched-row. */
-.sched-row .sched-seg{display:flex;flex:1;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;padding:0;height:auto;gap:0}
-.sched-row .sched-seg button{flex:1;padding:8px 6px;border:none;background:var(--bg-2);color:var(--txt-3);font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer;transition:.12s;border-radius:0;height:auto}
-.sched-row .sched-seg button.on{background:var(--accent-dim);color:var(--accent)}
-.sched-hour{padding:8px 8px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);border-radius:8px;font-family:var(--font);font-size:13.5px;cursor:pointer}
-.sched-add-btn{padding:8px 14px;border:none;background:var(--accent);color:var(--accent-ink);border-radius:8px;font-family:var(--font);font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
+/* align-items:center у общего .sched-seg оставлял кнопки высотой по своему
+   тексту: «Загрузка» в одну строку, «Сделано за неделю» в две — заливка
+   активной кнопки заканчивалась выше края, и переключатель выглядел
+   съехавшим. Растягиваем кнопки на всю высоту и не даём тексту переноситься. */
+.sched-row .sched-seg{display:flex;flex:1 1 100%;align-items:stretch;border:1px solid var(--line-2);border-radius:10px;overflow:hidden;padding:0;height:auto;min-height:40px;gap:0}
+.sched-row .sched-seg button{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;padding:9px 10px;border:none;background:var(--bg-2);color:var(--txt-3);font-family:var(--font);font-size:12.5px;font-weight:600;line-height:1.2;white-space:nowrap;cursor:pointer;transition:background .18s var(--ease),color .18s var(--ease);border-radius:0;height:auto}
+.sched-row .sched-seg button+button{border-left:1px solid var(--line-2)}
+.sched-row .sched-seg button:hover:not(.on){background:var(--bg-3);color:var(--txt-2)}
+.sched-row .sched-seg button.on{background:var(--accent-dim);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
+.sched-hour{flex:1 1 130px;min-width:118px;min-height:40px;padding:8px 10px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--txt);border-radius:10px;font-family:var(--font);font-size:13.5px;cursor:pointer;transition:border-color .18s var(--ease),background .18s var(--ease)}
+.sched-hour:hover{border-color:var(--accent-line);background:var(--bg-3)}
+.sched-hour:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.sched-add-btn{flex:0 0 auto;min-height:40px;padding:8px 18px;border:none;background:var(--accent);color:var(--accent-ink);border-radius:10px;font-family:var(--font);font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
 .sched-add-btn:hover{filter:brightness(1.08)}
 .tg-banner-pv{width:100%;border-radius:11px;overflow:hidden;border:1px solid var(--line);background:var(--bg-1);max-height:160px;display:flex;align-items:center;justify-content:center}
 .tg-banner-pv img{width:100%;height:auto;display:block;object-fit:cover;max-height:160px}
@@ -36650,7 +36663,19 @@ document.addEventListener('keydown', function(e){
   if(e.key==='Enter'){ e.preventDefault(); if(_ddxIdx>=0) ddxPick(_ddxIdx); return; }
 }, true);
 window.addEventListener('resize', ddxClose);
-window.addEventListener('scroll', function(){ if(_ddxOpen) ddxClose(); }, true);
+/* Список закрывается, когда страница уехала под ним — но не когда листают
+   его самого. У длинных списков (от 9 пунктов) сверху появляется поиск, и
+   браузер, ставя в него фокус, подкручивает список: этот же скролл прилетал
+   сюда и захлопывал меню в тот же миг, когда оно открылось. Выбор часа
+   (24 пункта) из-за этого не работал вовсе, а колесом длинный список
+   пролистать было нельзя. */
+window.addEventListener('scroll', function(e){
+  if(!_ddxOpen) return;
+  const m=document.getElementById('ddx-menu');
+  const t=e&&e.target;
+  if(m&&t&&t.nodeType===1&&(t===m||m.contains(t))) return;
+  ddxClose();
+}, true);
 
 /* приложение постоянно перерисовывает куски через innerHTML — ловим новые select */
 (function _ddxWatch(){
