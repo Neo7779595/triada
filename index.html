@@ -16285,6 +16285,13 @@ function _pkClUniq(items,name){
   while(items.some(function(x){ return String(x.name||'')===n; })){ n=name+' '+i; i++; }
   return n;
 }
+function _meHasTg(){
+  const me=(window.tMe&&window.tMe())||{};
+  const T=(typeof TEAM!=='undefined'?TEAM:[]);
+  const m=T.find(function(x){ return String(x._id)===String(me.id||''); });
+  return !!(m&&m.tg_user_id);
+}
+window._meHasTg=_meHasTg;
 function _pkClAtt(t){
   const out=[];
   (Array.isArray(t&&t.attachments)?t.attachments:[])
@@ -16305,10 +16312,13 @@ function pkAskReviewClient(taskId){
   const stg=((p._stages)||[]).find(function(s){ return String(s.id)===String(t.stage_id); });
   window._pkCl={ taskId:String(taskId), items:_pkClAtt(t), stage:(stg&&stg.name)||'', pid:p.id };
   const cab=!!p.client_id, tg=!!p.tg_chat_id;
-  const where=(cab&&tg)?'Уйдёт в кабинет клиента и в группу в Telegram'
+  let where=(cab&&tg)?'Уйдёт в кабинет клиента и в группу в Telegram'
     :cab?'Уйдёт в кабинет клиента · группа в Telegram не подключена'
     :tg?'Уйдёт в группу проекта в Telegram · кабинет клиенту не открыт'
     :'Ни кабинет, ни группа не подключены — отправлять некуда';
+  /* Ответ клиента придёт в Telegram тому, кто отправил. Если бот у него не
+     подключён, честнее сказать это сразу, а не когда решение «не пришло». */
+  if(!_meHasTg()) where+=' · ответ клиента придёт в платформу и ведущему проекта: у вас не подключён Telegram';
   pd2Open('<div class="modal pkcl"><button class="pm2-x" onclick="pd2Close()" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>'
     +'<div class="pkcl-h"><div class="pkcl-ttl">Что показать клиенту?</div>'
     +'<div class="pkcl-sub">Клиент видит только материал — задача и её название ему недоступны</div></div>'
@@ -33758,6 +33768,9 @@ async function clApDecide(id,status){
     who.forEach(function(pid){ if(seen[pid]) return; seen[pid]=1;
       tgStaffNotify(pid,'client_decision',{ project_name:P.name||'', project_id:P.id, title:a.title||'Материал',
         stage_name:a.stage_name||'', status:status, comment:comment||'', task_id:a.task_id||'',
+        /* если у адресата нет Telegram — решение уйдёт ведущему проекта, а не
+           пропадёт: ответ клиента слишком дорог, чтобы теряться молча */
+        fallback_project:P.id,
         link:location.origin+'/?p='+encodeURIComponent(P.id)+'&t=kanban'+(a.task_id?('&task='+encodeURIComponent(a.task_id)):'') });
     });
   }
@@ -39257,7 +39270,7 @@ window.tTaskMove = async (id,status,extra) => { if(String(id).indexOf('tmp_')===
         const _sv=((_pv&&_pv._stages)||[]).find(s=>String(s.id)===String(t.stage_id));
         tgStaffNotify(t.assignee_id,'review_verdict',{ status:(status==='done'?'approved':'changes'),
           by:(typeof _tgBy==='function'?_tgBy():''), title:t.title||'Задача', project_name:(_pv&&_pv.name)||'',
-          project_id:_pid, task_id:id, stage_name:(_sv&&_sv.name)||'',
+          project_id:_pid, task_id:id, stage_name:(_sv&&_sv.name)||'', fallback_project:_pid,
           link:location.origin+'/?p='+encodeURIComponent(_pid)+'&t=kanban&task='+encodeURIComponent(id) });
       }
     }
