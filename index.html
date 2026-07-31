@@ -5962,6 +5962,46 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .tgw-note b{color:var(--txt)}
 .tgw-empty{padding:14px 15px;font-size:13.5px;color:var(--txt-3);line-height:1.5}
 .tgw-subwrap{padding:0 22px;margin-bottom:4px}
+/* ═══ Рабочие группы команды — крупное окно настроек ═══
+   Раньше это была одна узкая колонка на два экрана прокрутки: группы,
+   сводки, баннер и расписание шли лентой, и чтобы включить правило, нужно
+   было докрутить до самого низа. Теперь окно шире и разложено на две
+   колонки: слева каналы — куда пишем, справа отправка — что и когда шлём.
+   Ниже 920px колонки схлопываются в одну, порядок чтения сохраняется. */
+#ov-pd2 .modal.tg-modal{max-width:880px}
+.tgw2-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:22px 26px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 5%,transparent),transparent)}
+.tgw2-htx{flex:1;min-width:180px}
+.tgw2-pill{display:inline-flex;align-items:center;gap:9px;padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg-1);font-size:13px;font-weight:600;color:var(--txt-2);white-space:nowrap;transition:.2s var(--ease)}
+.tgw2-pill .tg-dot{width:8px;height:8px;border-radius:50%;background:var(--txt-3);flex:none}
+.tgw2-pill.on{color:var(--txt);border-color:color-mix(in srgb,var(--pos) 30%,var(--line));background:color-mix(in srgb,var(--pos) 8%,var(--bg-1))}
+.tgw2-pill.on .tg-dot{background:var(--pos);box-shadow:0 0 0 3px color-mix(in srgb,var(--pos) 20%,transparent)}
+.tgw2-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 26px;padding:20px 26px 6px;align-items:start}
+.tgw2-col{min-width:0}
+.tgw2-body .tg-bh{padding:0 2px;margin:0 0 10px}
+.tgw2-body .tg-bh::after{content:"";flex:1;height:1px;background:var(--line);align-self:center}
+.tgw2-body .tgw-group{margin:0 0 20px;border-radius:16px;transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
+.tgw2-body .tgw-group:hover{border-color:var(--line-2);box-shadow:0 10px 30px -22px rgba(0,0,0,.9)}
+.tgw2-body .tgw-actres{padding:0 2px;margin:-14px 0 18px}
+.tgw2-body .tgw-subwrap{padding:0;margin:0 0 18px}
+/* Тонкая акцентная полоска у строки под курсором — подсказывает, что строка
+   кликабельна, не перекрашивая её целиком. */
+.tgw2-body .tgw-act{position:relative;overflow:hidden}
+.tgw2-body .tgw-act::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent);transform:scaleY(0);transition:transform .24s var(--spring)}
+.tgw2-body .tgw-act:hover::before,.tgw2-body .tgw-act:focus-visible::before{transform:scaleY(1)}
+/* В колонке карточка баннера уже, чем во всю ширину: даём кнопкам уйти на
+   вторую строку вместо того, чтобы обрезать подпись многоточием. */
+.tgw2-body .tgw-banner{flex-wrap:wrap;row-gap:10px}
+.tgw2-body .tgw-banner .tgw-tx{flex:1 1 140px}
+.tgw2-body .tgw-banner .tgw-tx b,.tgw2-body .tgw-banner .tgw-tx i{white-space:normal;overflow:visible}
+.tgw2-body .tgw-banner-ctl{flex:0 0 auto;margin-left:auto}
+.tgw2-foot{padding:8px 26px 22px;font-size:13px;color:var(--txt-3);line-height:1.55;border-top:1px solid var(--line);margin-top:6px}
+.tgw2-empty{max-width:520px;margin:0 auto;padding:0 4px}
+@media(max-width:920px){
+  #ov-pd2 .modal.tg-modal{max-width:560px}
+  .tgw2-body{grid-template-columns:minmax(0,1fr);gap:0;padding:18px 20px 4px}
+  .tgw2-head{padding:18px 20px 14px}
+  .tgw2-foot{padding:8px 20px 18px}
+}
 #ov-npteam{z-index:70}
 #ov-npteam .modal{max-width:480px}
 .pt-team{display:flex;align-items:center;margin-top:9px}
@@ -15056,63 +15096,75 @@ async function tgTeamModal(){
   }).join('');
   const clashN=groups.filter(g=>clash[String(g.chat_id)]).length;
   const clashNote=clashN?`<div class="tgw-note"><b>Один чат — одна роль.</b> В рабочие группы уходят внутренние сводки: нагрузка сотрудников, закрытые задачи, сроки. Если в том же чате сидит клиент проекта, он всё это видит. «Убрать проект» — чат останется рабочим, клиентские уведомления по проекту прекратятся. «Убрать сводки» — чат останется клиентским.</div>`:'';
+  /* Статус переехал в шапку пилюлей: раньше он занимал отдельную строку во
+     всю ширину ради одной фразы. */
+  const statusPill=`<span class="tgw2-pill ${linked?'on':''}"><span class="tg-dot"></span>${linked?(groups.length+' '+_plG(groups.length)+' '+_plP(groups.length)):'Группы не подключены'}</span>`;
   pd2Open(`<div class="modal tg-modal">
-    <div class="tg-head">
+    <div class="tgw2-head">
       <div class="tg-hic">${ICON}</div>
-      <div style="flex:1;min-width:0"><div class="tg-title">Рабочие группы команды</div><div class="tg-sub">${_ddH(me.agencyName||'Агентство')}</div></div>
-      <button class="tg-x" onclick="pd2Close()">✕</button>
+      <div class="tgw2-htx"><div class="tg-title">Рабочие группы команды</div><div class="tg-sub">${_ddH(me.agencyName||'Агентство')}</div></div>
+      ${statusPill}
+      <button class="tg-x" onclick="pd2Close()" aria-label="Закрыть">✕</button>
     </div>
-    <div class="tg-status ${linked?'on':''}"><span class="tg-dot"></span><b>${linked?(groups.length+' '+_plG(groups.length)+' '+_plP(groups.length)):'Группы не подключены'}</b></div>
     ${linked?`
-      <div class="tg-bh" style="margin-top:2px">Подключённые группы</div>
-      <div class="tgw-group">
-        ${rows}
-        <a class="tgw-act" href="${grpLink}" target="_blank" rel="noopener" onclick="tgGroupIntent('team',null)"><span class="tgw-ic accent">${IC_PLUS}</span><span class="tgw-tx"><b>Добавить группу</b><i>команда, директора или инвесторы</i></span><span class="tgw-go">${GO}</span></a>
-        ${clashNote}
-      </div>
-
-      <div class="tg-bh">Командные сводки</div>
-      <div class="tgw-group">
-        <button class="tgw-act" onclick="tgTeamSummary()"><span class="tgw-ic accent">${IC_LOAD}</span><span class="tgw-tx"><b>Загрузка команды</b><i>сводка по нагрузке — отправить сейчас</i></span><span class="tgw-go">${GO}</span></button>
-        <button class="tgw-act" onclick="tgTeamDone()"><span class="tgw-ic accent">${IC_DONE}</span><span class="tgw-tx"><b>Сделано за неделю</b><i>итоги недели — отправить сейчас</i></span><span class="tgw-go">${GO}</span></button>
-        <button class="tgw-act" onclick="tgTeamTest()"><span class="tgw-ic muted">${IC_TEST}</span><span class="tgw-tx"><b>Тест во все группы</b><i>проверка связи</i></span><span class="tgw-go">${GO}</span></button>
-      </div>
-      <div class="tgw-actres"><div class="tg-res2" id="tgt-sum-res"></div><div class="tg-res2" id="tgt-done-res"></div><div class="tg-res2" id="tgt-test-res"></div></div>
-
-      <div class="tg-bh">Баннер клиентских уведомлений</div>
-      <input type="file" accept="image/*" id="tg-banner-file" style="display:none" onchange="if(this.files&&this.files[0])tgBannerUpload(this.files[0])">
-      <div class="tgw-group">
-        ${me.tg_banner_url?`
-          <div class="tgw-banner"><div class="tgw-banner-thumb"><img src="${_ddH(me.tg_banner_url)}" alt=""></div><span class="tgw-tx"><b>Баннер подключён</b><i>в письмах клиентам: этапы, отчёты, завершение</i></span><div class="tgw-banner-ctl"><button type="button" class="tg-unlink" onclick="document.getElementById('tg-banner-file').click()">Заменить</button><button type="button" class="tg-unlink tgw-danger" onclick="tgBannerRemove()">Убрать</button></div></div>
-        `:`
-          <button type="button" class="tgw-act" onclick="document.getElementById('tg-banner-file').click()"><span class="tgw-ic muted">${IC_BAN}</span><span class="tgw-tx"><b>Загрузить баннер</b><i>прикрепится к клиентским уведомлениям</i></span><span class="tgw-go">${GO}</span></button>
-        `}
-      </div>
-
-      <div class="tg-bh">Автоотправка по расписанию</div>
-      <div class="tgw-group">
-        ${schedRows||'<div class="tgw-empty">Правил пока нет — добавьте шаблон или настройте своё правило ниже.</div>'}
-      </div>
-      <div class="tgw-subwrap">
-        <div class="sched-presets">
-          <button type="button" class="sched-preset" onclick="tgSchedPreset('load',[1,2,3,4,5,6],18)"><b>Пн–Сб · 18:00</b><span>загрузка</span></button>
-          <button type="button" class="sched-preset" onclick="tgSchedPreset('done',[6],18)"><b>Суббота · 18:00</b><span>отчёт за неделю</span></button>
+    <div class="tgw2-body">
+      <div class="tgw2-col">
+        <div class="tg-bh">Подключённые группы</div>
+        <div class="tgw-group">
+          ${rows}
+          <a class="tgw-act" href="${grpLink}" target="_blank" rel="noopener" onclick="tgGroupIntent('team',null)"><span class="tgw-ic accent">${IC_PLUS}</span><span class="tgw-tx"><b>Добавить группу</b><i>команда, директора или инвесторы</i></span><span class="tgw-go">${GO}</span></a>
+          ${clashNote}
         </div>
-        <div class="sched-manual">
-          <div class="sched-manual-t">Своё правило</div>
-          <div id="sched-form-body"></div>
+
+        <div class="tg-bh">Командные сводки</div>
+        <div class="tgw-group">
+          <button class="tgw-act" onclick="tgTeamSummary()"><span class="tgw-ic accent">${IC_LOAD}</span><span class="tgw-tx"><b>Загрузка команды</b><i>сводка по нагрузке — отправить сейчас</i></span><span class="tgw-go">${GO}</span></button>
+          <button class="tgw-act" onclick="tgTeamDone()"><span class="tgw-ic accent">${IC_DONE}</span><span class="tgw-tx"><b>Сделано за неделю</b><i>итоги недели — отправить сейчас</i></span><span class="tgw-go">${GO}</span></button>
+          <button class="tgw-act" onclick="tgTeamTest()"><span class="tgw-ic muted">${IC_TEST}</span><span class="tgw-tx"><b>Тест во все группы</b><i>проверка связи</i></span><span class="tgw-go">${GO}</span></button>
         </div>
+        <div class="tgw-actres"><div class="tg-res2" id="tgt-sum-res"></div><div class="tg-res2" id="tgt-done-res"></div><div class="tg-res2" id="tgt-test-res"></div></div>
       </div>
 
-      <div class="tg-hint" style="padding:6px 22px 20px">Сводки и авто-отправка работают по всем подключённым группам. Время — по Ташкенту.</div>
+      <div class="tgw2-col">
+        <div class="tg-bh">Баннер клиентских уведомлений</div>
+        <input type="file" accept="image/*" id="tg-banner-file" style="display:none" onchange="if(this.files&&this.files[0])tgBannerUpload(this.files[0])">
+        <div class="tgw-group">
+          ${me.tg_banner_url?`
+            <div class="tgw-banner"><div class="tgw-banner-thumb"><img src="${_ddH(me.tg_banner_url)}" alt=""></div><span class="tgw-tx"><b>Баннер подключён</b><i>в письмах клиентам: этапы, отчёты, завершение</i></span><div class="tgw-banner-ctl"><button type="button" class="tg-unlink" onclick="document.getElementById('tg-banner-file').click()">Заменить</button><button type="button" class="tg-unlink tgw-danger" onclick="tgBannerRemove()">Убрать</button></div></div>
+          `:`
+            <button type="button" class="tgw-act" onclick="document.getElementById('tg-banner-file').click()"><span class="tgw-ic muted">${IC_BAN}</span><span class="tgw-tx"><b>Загрузить баннер</b><i>прикрепится к клиентским уведомлениям</i></span><span class="tgw-go">${GO}</span></button>
+          `}
+        </div>
+
+        <div class="tg-bh">Автоотправка по расписанию</div>
+        <div class="tgw-group">
+          ${schedRows||'<div class="tgw-empty">Правил пока нет — включите шаблон ниже или задайте своё правило.</div>'}
+        </div>
+        <div class="tgw-subwrap">
+          <div class="sched-presets">
+            <button type="button" class="sched-preset" onclick="tgSchedPreset('load',[1,2,3,4,5,6],18)"><b>Пн–Сб · 18:00</b><span>загрузка</span></button>
+            <button type="button" class="sched-preset" onclick="tgSchedPreset('done',[6],18)"><b>Суббота · 18:00</b><span>отчёт за неделю</span></button>
+          </div>
+          <div class="sched-manual">
+            <div class="sched-manual-t">Своё правило</div>
+            <div id="sched-form-body"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tgw2-foot">Сводки и авто-отправка работают по всем подключённым группам. Время — по Ташкенту.</div>
     `:`
-      <div class="tg-steps">
-        <div class="tg-step"><span class="tg-sn">1</span><span>Создайте рабочую группу (команда, директора или инвесторы)</span></div>
-        <div class="tg-step"><span class="tg-sn">2</span><span>Нажмите кнопку и выберите группу — бот привяжется сам. Так можно добавить несколько групп.</span></div>
+    <div class="tgw2-body" style="grid-template-columns:minmax(0,1fr)">
+      <div class="tgw2-col tgw2-empty">
+        <div class="tg-steps">
+          <div class="tg-step"><span class="tg-sn">1</span><span>Создайте рабочую группу (команда, директора или инвесторы)</span></div>
+          <div class="tg-step"><span class="tg-sn">2</span><span>Нажмите кнопку и выберите группу — бот привяжется сам. Так можно добавить несколько групп.</span></div>
+        </div>
+        <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener" onclick="tgGroupIntent('team',null)">${ICON}Добавить бота в группу</a>
+        <div class="tg-wait" id="tg-wait"><span class="tg-wait-dot"></span>Ждём, когда бот попадёт в группу — окно обновится само</div>
+        <div class="tg-hint" style="padding:0">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
       </div>
-      <a class="tg-add" href="${grpLink}" target="_blank" rel="noopener" onclick="tgGroupIntent('team',null)">${ICON}Добавить бота в группу</a>
-      <div class="tg-wait" id="tg-wait"><span class="tg-wait-dot"></span>Ждём, когда бот попадёт в группу — окно обновится само</div>
-      <div class="tg-hint">Код привязки: <code>${_ddH(code||'—')}</code> — нужен, только если добавляете бота вручную.</div>
+    </div>
     `}
   </div>`);
   if(linked && typeof tgSchedRenderForm==='function') setTimeout(tgSchedRenderForm,0);
