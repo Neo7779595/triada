@@ -28197,6 +28197,7 @@ function openEmpInTeam(dept){
 
 /* ════════════════ НАСТРОЙКИ ШАБЛОНОВ (категории · услуги+этапы · тарифы+цены) ════════════════ */
 let _stplTab='category', _stplSvc=null, _stplTariff='', _stplStages=[], _stplTariffEdit=null;
+let _stplCopyOpen=false, _stplCopySel=[];
 function _stplUsedCat(name){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>(p.cat||'')===name).length; }
 function _stplUsedSvc(name){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>(p.svc||'')===name).length; }
 function _stplUsedTariff(name){ return (typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>(p.tariff||'')===name).length; }
@@ -28235,6 +28236,30 @@ function openTemplatesSettings(){
 .stpl-sw-custom svg{width:12px;height:12px;color:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.55));pointer-events:none}
 .stpl-sw-custom input{position:absolute;inset:-6px;opacity:0;cursor:pointer;padding:0;border:0}
 .stpl-gdot{width:9px;height:9px;border-radius:3px;display:inline-block;flex:none}
+/* три кнопки вместо двух: в узкой колонке переносим строку целиком,
+   а не рвём подписи внутри кнопок */
+.stpl-stage-acts{flex-wrap:wrap}
+.stpl-stage-acts>button,.stpl-acts-r>button{white-space:nowrap}
+.stpl-acts-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.stpl-acts-r .btn-ghost.on{border-color:var(--accent-line);color:var(--accent);background:var(--accent-dim)}
+.stpl-cp{margin-top:14px;border:1px solid var(--accent-line);border-radius:14px;background:var(--bg-2);padding:14px 16px 13px;animation:cycRow .26s var(--ease-out) both}
+.stpl-cp-h{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-3);font-weight:600;margin-bottom:11px}
+.stpl-cp-list{display:flex;flex-direction:column;gap:7px}
+.stpl-cp-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--bg-1);font:inherit;color:var(--txt-2);cursor:pointer;transition:.14s}
+.stpl-cp-row:hover{border-color:var(--line-2);background:var(--bg-3)}
+.stpl-cp-row.on{border-color:var(--accent-line);background:var(--accent-dim)}
+.stpl-cp-row:focus-visible{outline:none;box-shadow:0 0 0 3px var(--accent-dim)}
+.stpl-cp-box{flex:none;width:19px;height:19px;border-radius:6px;border:1.5px solid var(--line-2);display:flex;align-items:center;justify-content:center;color:var(--accent-ink);background:var(--bg-2)}
+.stpl-cp-row.on .stpl-cp-box{background:var(--accent);border-color:var(--accent)}
+.stpl-cp-box svg{width:12px;height:12px}
+.stpl-cp-nm{font-size:14px;color:var(--txt);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.stpl-cp-note{margin-left:auto;font-size:12px;color:var(--txt-3);white-space:nowrap;flex:none}
+.stpl-cp-note.warn{color:var(--warn)}
+.stpl-cp-f{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.stpl-cp-fr{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.stpl-cp-warn{font-size:12px;color:var(--txt-3)}
+.stpl-cp-f .btn-add[disabled]{opacity:.45;pointer-events:none}
+@media(max-width:760px){.stpl-cp-note{margin-left:0;white-space:normal;flex:1 1 100%;padding-left:30px}.stpl-cp-row{flex-wrap:wrap}}
     </style>
     <div class="modal-h"><h3>Настройки шаблонов</h3><p>Категории, услуги с тарифами и этапами — всё, что доступно при создании проекта</p></div>
     <div class="stpl-tabs">
@@ -28383,13 +28408,75 @@ function _stplSvcBody(){
       ${_stplSvc?`${_stplColorBar(_stplSvc)}<div class="stpl-col-rtop">${tfChips}<div class="stpl-stages-h">${_title}</div></div>
         <div class="stpl-hint" style="margin:-2px 0 8px">${_hint}</div>
         <div class="stpl-stages" id="stpl-stages">${stages.map((st,i)=>`<div class="stpl-stage"><span class="stpl-stnum">${i+1}</span><input value="${_attr(st)}" oninput="_stplStages[${i}]=this.value" onkeydown="stplStageKey(event,${i})" placeholder="Название этапа"><button class="stpl-del" onclick="stplStageDel(${i})" title="Удалить этап"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>`).join('')||('<div class="tc-empty">Этапов нет — добавьте'+(_stplTariff?' (или оставьте пусто — будут базовые)':'')+'</div>')}</div>
-        <div class="stpl-stage-acts"><button class="btn-ghost sm" onclick="stplStageAdd()">+ Добавить этап</button><button class="btn-add sm2" onclick="stplStagesSave()">Сохранить этапы</button></div>`
+        <div class="stpl-stage-acts"><button class="btn-ghost sm" onclick="stplStageAdd()">+ Добавить этап</button>
+          <div class="stpl-acts-r">${_stplCopyTargets().length?`<button class="btn-ghost sm${_stplCopyOpen?' on':''}" onclick="stplCopyToggle()" title="Перенести этот список этапов в другие тарифы услуги">${_stplCopyOpen?'Скрыть':'Копировать'}</button>`:''}<button class="btn-add sm2" onclick="stplStagesSave()">Сохранить этапы</button></div></div>
+        ${_stplCopyBody()}`
       :'<div class="tc-empty" style="margin-top:34px">Выберите услугу слева,<br>чтобы настроить её этапы и тарифы</div>'}
     </div>
   </div>`;
 }
-function stplPickSvc(s){ _stplSvc=s; _stplTariff=''; _stplStages=(stageSetFor(s,'')||[]).slice(); _stplRefresh(); }
-function stplPickTariff(t){ _stplTariff=t||''; _stplStages=_stplTariff?stageTplRaw(_stplSvc,_stplTariff):(stageSetFor(_stplSvc,'')||[]).slice(); _stplRefresh(); }
+/* ── перенос этапов между тарифами ──
+   Тарифы одной услуги обычно отличаются двумя-тремя этапами, а не всем
+   списком. Набивать каждый заново — самая частая ручная работа в шаблонах,
+   поэтому список можно перенести целиком в любые другие тарифы услуги. */
+function _stplCopyTargets(){
+  if(!_stplSvc) return [];
+  const tfs=(typeof tariffsForSvc==='function')?tariffsForSvc(_stplSvc):[];
+  return [{k:'',label:'Базовые этапы'}].concat(tfs.map(t=>({k:String(t.name||''),label:String(t.name||'')})))
+    .filter(x=>String(x.k)!==String(_stplTariff||''));
+}
+function _stplCopyBody(){
+  if(!_stplCopyOpen) return '';
+  const tg=_stplCopyTargets(); if(!tg.length) return '';
+  const n=_stplStages.map(x=>(x||'').trim()).filter(Boolean).length;
+  const rows=tg.map((t,i)=>{
+    const own=stageTplRaw(_stplSvc,t.k)||[];
+    const note=own.length?('свои этапы: '+own.length+' → заменим'):(t.k===''?'своих нет · подставляется стандартный набор':'своих нет · сейчас берёт базовые');
+    const on=_stplCopySel.indexOf(t.k)>=0;
+    return '<button type="button" class="stpl-cp-row'+(on?' on':'')+'" onclick="stplCopyPick('+i+')" aria-pressed="'+(on?'true':'false')+'">'
+      +'<span class="stpl-cp-box">'+(on?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>':'')+'</span>'
+      +'<span class="stpl-cp-nm">'+_ddH(t.label)+'</span>'
+      +'<span class="stpl-cp-note'+(own.length?' warn':'')+'">'+_ddH(note)+'</span></button>';
+  }).join('');
+  const sel=_stplCopySel.length;
+  return '<div class="stpl-cp">'
+    +'<div class="stpl-cp-h">Перенести этот список ('+n+' '+_plural(n,'этап','этапа','этапов')+') в:</div>'
+    +'<div class="stpl-cp-list">'+rows+'</div>'
+    +'<div class="stpl-cp-f"><button type="button" class="btn-ghost sm" onclick="stplCopyAll()">'+(sel===tg.length?'Снять все':'Выбрать все')+'</button>'
+    +'<div class="stpl-cp-fr"><span class="stpl-cp-warn">'+(sel?'Отмеченное будет перезаписано, отменить нельзя':'Отметьте, куда перенести')+'</span>'
+    +'<button type="button" class="btn-add sm2"'+(sel?'':' disabled')+' onclick="stplCopyRun()">Перенести'+(sel?' в '+sel:'')+'</button></div></div>'
+  +'</div>';
+}
+function stplCopyToggle(){ _stplCopyOpen=!_stplCopyOpen; if(!_stplCopyOpen)_stplCopySel=[]; _stplRefresh(); }
+function stplCopyPick(i){ const t=_stplCopyTargets()[i]; if(!t) return; const k=t.k;
+  const at=_stplCopySel.indexOf(k); if(at>=0)_stplCopySel.splice(at,1); else _stplCopySel.push(k); _stplRefresh(); }
+function stplCopyAll(){ const tg=_stplCopyTargets(); _stplCopySel=(_stplCopySel.length===tg.length)?[]:tg.map(t=>t.k); _stplRefresh(); }
+async function stplCopyRun(){
+  const clean=_stplStages.map(x=>(x||'').trim()).filter(Boolean);
+  if(!clean.length){ toast('Сначала добавьте хотя бы один этап'); return; }
+  const targets=_stplCopySel.slice(); if(!targets.length){ toast('Отметьте, куда перенести'); return; }
+  const svc=_stplSvc;
+  /* исходную вкладку записываем тем же махом: иначе на экране один список,
+     а в перенесённых — другой, если правки ещё не сохраняли */
+  const all=[...new Set(targets.concat([_stplTariff||'']))];
+  if(window.LIVE && window.SB){
+    const me=(window.tMe&&window.tMe())||null;
+    if(!me||!me.agency_id){ toast('Профиль не загружен'); return; }
+    const rows=all.map(tf=>({agency_id:me.agency_id, service:svc, tariff:tf, stages:clean, updated_at:new Date().toISOString()}));
+    const {error}=await SB.from('stage_templates').upsert(rows,{onConflict:'agency_id,service,tariff'});
+    if(error){ toast('Не перенеслось: '+(error.message||error)); return; }
+  }
+  window.STAGE_TPL=window.STAGE_TPL||{};
+  const bag=(window.STAGE_TPL[svc]=window.STAGE_TPL[svc]||{});
+  all.forEach(tf=>{ bag[tf]=clean.slice(); });        // копия на каждый тариф: общий массив правился бы разом везде
+  _stplStages=clean; _stplCopyOpen=false; _stplCopySel=[];
+  _stplRefresh(); if(typeof tplRenderSvcs==='function') tplRenderSvcs();
+  const nm=targets.map(k=>k===''?'базовые':k);
+  toast('Этапы перенесены: '+(nm.length>3?(nm.slice(0,3).join(', ')+' и ещё '+(nm.length-3)):nm.join(', ')));
+}
+window.stplCopyToggle=stplCopyToggle; window.stplCopyPick=stplCopyPick; window.stplCopyAll=stplCopyAll; window.stplCopyRun=stplCopyRun;
+function stplPickSvc(s){ _stplSvc=s; _stplTariff=''; _stplStages=(stageSetFor(s,'')||[]).slice(); _stplCopyOpen=false; _stplCopySel=[]; _stplRefresh(); }
+function stplPickTariff(t){ _stplTariff=t||''; _stplStages=_stplTariff?stageTplRaw(_stplSvc,_stplTariff):(stageSetFor(_stplSvc,'')||[]).slice(); _stplCopyOpen=false; _stplCopySel=[]; _stplRefresh(); }
 function stplSvcAdd(){ const v=(document.getElementById('stpl-svc-new').value||'').trim(); if(!v){toast('Введите название');return;}
   const _n=(typeof PROJECT_TAGS!=='undefined'&&PROJECT_TAGS.service)?PROJECT_TAGS.service.length:0;
   const _autoC=STPL_PALETTE[_n%STPL_PALETTE.length];
