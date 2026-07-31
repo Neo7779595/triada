@@ -22204,7 +22204,9 @@ function dlApplyPending(){
     el.classList.add('dl-hl'); p._el=el;
   }
   const enough = p.found && (now - p.found > 2600);
-  if(enough || now > p.until){ if(!p.found && typeof toast==='function'){ const _k=(p.tab==='kanban'?'.pk-card':'.pd-st'); toast('Не нашёл. '+_k+' на странице: '+document.querySelectorAll(_k).length+', вкладка '+(typeof pdTabCur!=='undefined'?pdTabCur:'?')); } window._dlPending=null; if(p._el){ const e=p._el; setTimeout(function(){ e.classList.remove('dl-hl'); }, 50); } return; }
+  /* не нашли за 8 секунд — говорим по-человечески: раньше сюда падало
+     отладочное «.pk-card на странице: 3, вкладка kanban» */
+  if(enough || now > p.until){ if(!p.found && typeof toast==='function'){ toast(p.tab==='kanban'?'Задача на доске не нашлась — её могли удалить или перенести':'Этап не нашёлся — его могли удалить'); } window._dlPending=null; if(p._el){ const e=p._el; setTimeout(function(){ e.classList.remove('dl-hl'); }, 50); } return; }
   setTimeout(dlApplyPending, 90);
 }
 /* ===================== ШАБЛОНЫ КОНТЕНТ-ПЛАНОВ (структура листа целиком: колонки + типы + опции + стартовые строки) ===================== */
@@ -28691,24 +28693,18 @@ function wlxOpenTasks(st){
     +'<div class="wlxq-list">'+cards+more+'</div></div>');
 }
 /* Карточка ведёт в проект на «Операционку». Задачи проекта грузятся отдельным
-   запросом, поэтому саму карточку открываем, как только она появилась, —
-   ждём до трёх секунд и молча сдаёмся, чтобы не зависнуть на пустом ожидании. */
+   запросом, поэтому ждём появления карточки — этим занимается dlGoto, тот же
+   переход, что из дедлайнов и общего поиска: доска, подсветка, без модалки.
+   Открывать настройки задачи не нужно — человек шёл посмотреть, где она
+   стоит и что рядом, а не править её. */
 function wlxGoTask(pid,tid){
   pd2Close();
+  if(tid && typeof dlGoto==='function'){ dlGoto(pid,'task',tid); return; }
   const arr=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
   const i=arr.findIndex(p=>String(p.id)===String(pid));
   if(i<0){ toast('Проект недоступен'); return; }
   openProject(i);
   try{ if(typeof pdTab==='function') pdTab('kanban'); }catch(_){}
-  if(!tid) return;
-  let n=0; const tm=setInterval(function(){
-    n++;
-    const p=arr[i];
-    if(p&&p._tasks&&p._tasks.some(function(t){ return String(t.id)===String(tid); })){
-      clearInterval(tm);
-      try{ if(typeof pdTaskEdit==='function') pdTaskEdit(tid); }catch(_){}
-    } else if(n>30) clearInterval(tm);
-  },100);
 }
 window.wlxOpenTasks=wlxOpenTasks; window.wlxGoTask=wlxGoTask;
 function openEmpStats(id){
