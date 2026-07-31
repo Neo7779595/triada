@@ -32884,7 +32884,17 @@ function _schOpenForm(b, presetTs, presetMembers){
   _schT1=b?_schFmtT(b.startsAt):'10:00'; _schT2=b?_schFmtT(b.endsAt):'11:00';
   _schAllDay=b?!!b.allDay:false;
   const kind=b?b.kind:'meeting', status=b?b.status:'hold';
-  const projOpts='<option value="">— без проекта —</option>'+(typeof PROJECTS!=='undefined'?PROJECTS:[]).map(function(p){ return '<option value="'+_kbEscAttr(p.id)+'"'+((b&&String(b.projId)===String(p.id))?' selected':'')+'>'+escH(p.name)+'</option>'; }).join('');
+  /* В списке — только живые проекты и только те, что человеку видны: бронировать
+     завершённый проект незачем, а список от них разрастался. Проект уже
+     сохранённой брони оставляем даже завершённым — иначе сохранение молча
+     сбросило бы привязку, и бронь потеряла бы проект при любой правке. */
+  const _pCur=b?String(b.projId||''):'';
+  const _pList=((typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(function(p){ return !AG_ARCHIVED_ST[String(p.status||'')]; })).filter(function(p){ return p&&p.id!=null; });
+  if(_pCur && !_pList.some(function(p){ return String(p.id)===_pCur; })){
+    const _old=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(function(p){ return String(p.id)===_pCur; });
+    if(_old) _pList.unshift(_old);
+  }
+  const projOpts='<option value="">— без проекта —</option>'+_pList.map(function(p){ const _ar=(typeof agIsArchivedProject==='function')&&agIsArchivedProject(p); return '<option value="'+_kbEscAttr(p.id)+'"'+((b&&String(b.projId)===String(p.id))?' selected':'')+'>'+escH(p.name)+(_ar?' · завершён':'')+'</option>'; }).join('');
   const kindChips=SCH_KINDS.map(function(x){ return '<button type="button" class="sch-kind'+(x[0]===kind?' on':'')+'" data-k="'+x[0]+'" style="--cc:'+x[2]+'" onclick="schPickKind(this)">'+x[1]+'</button>'; }).join('');
   const statusSeg=SCH_STATUS.map(function(x){ return '<button type="button" class="'+(x[0]===status?'on':'')+'" data-s="'+x[0]+'" onclick="schPickStatus(this)">'+x[1]+'</button>'; }).join('');
   const clk='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
