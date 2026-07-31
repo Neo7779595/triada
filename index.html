@@ -2649,6 +2649,9 @@ button.sched-att{font-family:var(--font);font-size:12.5px;cursor:pointer}
 .clap-done.ok{color:var(--pos)}
 .clap-done.fix{color:var(--warn)}
 .clap-done.wait{color:var(--txt-3)}
+.clap-hl{animation:clapHl 2.4s ease}
+@keyframes clapHl{0%{box-shadow:0 0 0 0 var(--accent-dim);background:transparent}18%{box-shadow:0 0 0 3px var(--accent-line);background:var(--accent-dim)}100%{box-shadow:0 0 0 0 transparent;background:transparent}}
+@media (prefers-reduced-motion:reduce){.clap-hl{animation:none;box-shadow:0 0 0 2px var(--accent-line)}}
 .cl-cur{position:relative;overflow:hidden;display:flex;align-items:center;gap:14px;background:linear-gradient(180deg,rgba(55,230,200,.04),transparent 60%),var(--bg-1);border:1px solid var(--line-2);border-radius:var(--r);padding:17px 18px;margin-top:16px}
 .cl-cur::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent 85%)}
 .cl-cur .ic{width:38px;height:38px;border-radius:10px;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-family:var(--mono);font-size:13.5px;font-weight:700}
@@ -3821,6 +3824,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .pkcl-f{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 20px;border-top:1px solid var(--line);background:var(--bg-2)}
 .pkcl-hint{font-size:12px;color:var(--txt-3);flex:1 1 220px;min-width:0}
 #pkcl-go[disabled]{opacity:.45;cursor:not-allowed}
+/* история согласований в карточке задачи */
+.apph{display:flex;flex-direction:column;gap:8px}
+.apph-row{padding:10px 12px;border:1px solid var(--line);border-left-width:3px;border-radius:10px;background:var(--bg-1)}
+.apph-row.wait{border-left-color:var(--txt-3)}
+.apph-row.ok{border-left-color:var(--pos)}
+.apph-row.fix{border-left-color:var(--neg)}
+.apph-row.mut{border-left-color:var(--line-2);opacity:.72}
+.apph-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.apph-rd{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-3);background:var(--bg-3);border-radius:20px;padding:2px 8px;flex:none}
+.apph-t{font-size:14px;font-weight:600;color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.apph-st{margin-left:auto;font-size:12px;font-weight:600;color:var(--txt-2);white-space:nowrap}
+.apph-row.ok .apph-st{color:var(--pos)}
+.apph-row.fix .apph-st{color:var(--neg)}
+.apph-meta{font-size:12px;color:var(--txt-3);margin-top:4px;font-family:var(--mono)}
+.apph-cm{font-size:13px;color:var(--txt-2);line-height:1.45;margin-top:6px;padding-left:9px;border-left:2px solid var(--line-2)}
 /* решение клиента на карточке задачи */
 .pk-appr{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg-2)}
 .pk-appr .l{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.02em}
@@ -15841,6 +15859,7 @@ function tgOpenModal(){
         ${ev('stage_start','Начало этапа','когда этап стартует')}
         ${ev('stage_done','Завершение этапа','закрытие этапа + прогресс проекта')}
         ${ev('project_done','Завершение проекта','когда все этапы готовы')}
+        ${ev('task_review','Материал на согласование','сценарии, анализы и макеты, которые ждут ответа клиента')}
         ${ev('report_published','Новый отчёт','при публикации Facebook Ads / SMM')}
         ${ev('brief_ready','Бриф готов','когда бриф отправлен клиенту')}
         ${ev('content_ready','Контент-план готов','когда лист плана отправлен клиенту')}
@@ -16333,7 +16352,11 @@ async function pkClSend(){
   }
   p._appr=(p._appr||[]).concat([saved||Object.assign({id:'tmp_'+Date.now()},row)]);
   pd2Close();
-  if(typeof tgNotify==='function') tgNotify(p.id,'task_review',{ title:title, stage_name:S.stage||'', note:note||'',
+  /* Кнопка в сообщении ведёт к самому материалу в кабинете. Даём её, только
+     если кабинет клиенту открыт: кнопка, ведущая на форму входа, хуже, чем
+     её отсутствие. */
+  const cab=(p.client_id && saved && saved.id) ? (location.origin+'/?ap='+encodeURIComponent(saved.id)) : '';
+  if(typeof tgNotify==='function') tgNotify(p.id,'task_review',{ title:title, stage_name:S.stage||'', note:note||'', cab:cab,
     items:items.map(function(x){ return {name:x.name,url:x.url}; }) });
   toast(p.tg_chat_id?('На согласование клиенту · '+items.length+(items.length===1?' материал':' материала')):'На согласование клиенту · группа в Telegram не подключена');
   if(typeof renderPd==='function') renderPd();
@@ -16361,6 +16384,26 @@ function _pkApprHtml(a,c){
   return '';
 }
 window._pkApprHtml=_pkApprHtml;
+/* История согласований в самой задаче: что отправляли, когда и что ответили.
+   Круг, который прошли неделю назад, иначе живёт только в чужой памяти. */
+function pkApprHistHTML(p,taskId){
+  const L=pkApprList(p,taskId); if(!L.length) return '';
+  const ST={pending:['ждём ответа','wait'],approved:['согласовано','ok'],changes:['правки','fix'],withdrawn:['отозвано','mut']};
+  const when=function(v){ if(!v) return ''; try{ return (typeof _dDateFull==='function')?_dDateFull(v):String(v).slice(0,10); }catch(_e){ return ''; } };
+  const rows=L.map(function(a){
+    const s=ST[a.status]||['—','mut'];
+    const items=(Array.isArray(a.items)?a.items:[]).filter(function(x){ return x&&x.url; });
+    return '<div class="apph-row '+s[1]+'">'
+      +'<div class="apph-top"><span class="apph-rd">круг '+(a.round||1)+'</span><span class="apph-t">'+_ddH(a.title||'Материал')+'</span>'
+      +'<span class="apph-st">'+s[0]+'</span></div>'
+      +'<div class="apph-meta">отправлено '+_ddH(when(a.sent_at))+(a.decided_at?(' · ответ '+_ddH(when(a.decided_at))):'')+' · материалов '+items.length+'</div>'
+      +(a.comment?'<div class="apph-cm">'+_ddH(a.comment)+'</div>':'')
+    +'</div>';
+  }).join('');
+  return '<div class="fld"><label>Согласование с клиентом <i style="font-style:normal;text-transform:none;letter-spacing:0;opacity:.7">'+L.length+' '
+    +((typeof _plural==='function')?_plural(L.length,'круг','круга','кругов'):'кругов')+'</i></label><div class="apph">'+rows+'</div></div>';
+}
+window.pkApprHistHTML=pkApprHistHTML;
 window.pkAskReviewClient=pkAskReviewClient; window.pkClRender=pkClRender; window.pkClToggle=pkClToggle;
 window.pkClAddLink=pkClAddLink; window.pkClSend=pkClSend; window.pkApprList=pkApprList; window.pkApprLast=pkApprLast;
 function pkReviewWho(t){
@@ -16636,6 +16679,7 @@ async function pdTaskEdit(id){
       <div class="fld"><label>Срок (дедлайн)</label><div class="dl-dt">${dateField('pd2-tdate', t.due_date||'')}${timeField('pd2-ttime', t.due_time||'')}</div></div>
       ${_subFldHtml()}
       ${_pdTaskAttFldHtml()}
+      ${pkApprHistHTML(p,id)}
     </div>
     <div class="modal-f"><button class="btn-ghost" onclick="pd2Close()">Отмена</button><button class="btn-add" onclick="pdSaveTask('${id}')">Сохранить</button></div></div>`);
   pdSubRender();
@@ -27276,7 +27320,35 @@ function renderOverview(){
 }
 
 /* ——— CYCLES module ——— */
-let CYCLES = { _loaded:false, _at:0, projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[], reviewTasks:[], reviewStages:[], reviewByWho:[], reviewNow:0, reviewCount:0, reviewTotalSec:0, reviewAvgSec:0, workCount:0, workTotalSec:0, workMedianSec:0, workMeanSec:0, workP90Sec:0, workDoneCount:0, workDoneAvgSec:0, workStages:[], workTopTasks:[], workByAsg:[], workParetoPct:0 };
+let CYCLES = { _loaded:false, _at:0, projMedianMs:null, projCount:0, bottleneck:null, coverageDone:0, coverageTotal:0, coveragePct:0, stuckNow:0, agingRows:[], stages:[], chartStages:[], trend:{vals:[],labels:[]}, clients:[], reviewTasks:[], reviewStages:[], reviewByWho:[], reviewNow:0, reviewCount:0, reviewTotalSec:0, reviewAvgSec:0, apr:null, workCount:0, workTotalSec:0, workMedianSec:0, workMeanSec:0, workP90Sec:0, workDoneCount:0, workDoneAvgSec:0, workStages:[], workTopTasks:[], workByAsg:[], workParetoPct:0 };
+/* ——— согласование с клиентом ———
+   «Время на утверждении» говорит, сколько работа ждёт. Этот блок — про то, что
+   с ней происходит у клиента: сколько кругов уходит до «да», как быстро он
+   отвечает и в каких проектах круги копятся. Три круга по сценариям — это
+   разговор о процессе, а не ощущение. */
+function _cycApprHTML(A){
+  if(!A||!A.sent) return '';
+  const dur=(ms)=>(typeof _cycDur==='function')?_cycDur(ms):Math.round(ms/3600000)+' ч';
+  const pl=(n,a,b,c)=>(typeof _plural==='function')?_plural(n,a,b,c):c;
+  const firstPct=A.closed?Math.round(100*A.firstOk/A.closed):null;
+  const avgR=A.avgRounds?A.avgRounds.toFixed(A.avgRounds>=10?0:1).replace('.',','):'—';
+  const rows=(A.byProject||[]).filter(x=>x.rounds>0);
+  const mx=Math.max(1,...rows.map(x=>x.rounds));
+  return `<div class="cyc-appr">
+    <div class="eyebrow" style="margin:18px 0 10px">Согласование с клиентом <span class="cyc-cnt">${A.materials}</span></div>
+    <div class="px-ov cyc-hero-strip" style="margin-bottom:14px">
+      <div class="px-ov-cell"><div class="px-ov-l">Кругов на материал</div><div class="px-ov-v">${avgR}</div><div class="px-ov-ctx">${A.sent} ${pl(A.sent,'отправка','отправки','отправок')} · ${A.materials} ${pl(A.materials,'материал','материала','материалов')}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">С первого раза</div><div class="px-ov-v" style="color:${firstPct==null?'var(--txt-3)':(firstPct>=60?'var(--pos)':firstPct>=35?'var(--warn)':'var(--neg)')}">${firstPct==null?'—':firstPct+'%'}</div><div class="px-ov-ctx">${A.closed?(A.firstOk+' из '+A.closed+' согласовано без правок'):'согласованных пока нет'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Клиент отвечает</div><div class="px-ov-v">${A.replyAvgMs?dur(A.replyAvgMs):'—'}</div><div class="px-ov-ctx">${A.replyMaxMs?('дольше всего — '+dur(A.replyMaxMs)):'ответов пока нет'}</div></div>
+      <div class="px-ov-cell"><div class="px-ov-l">Ждут ответа</div><div class="px-ov-v" style="color:${A.pending?'var(--warn)':'var(--txt-3)'}">${A.pending}</div><div class="px-ov-ctx">${A.pending?('самый долгий — '+dur(A.pendOldestMs)):'ничего не висит у клиента'}</div></div>
+    </div>
+    ${rows.length?`<div class="cyc-rvgrid">${rows.map((x,i)=>`<div class="cyc-row2" style="animation-delay:${Math.min(i,12)*30}ms">
+      ${_cycRankPill(i,'violet')}
+      <div class="cyc-body"><div class="cyc-nm">${_ddH(x.client)}</div><div class="cyc-meta">${x.materials} ${pl(x.materials,'материал','материала','материалов')}<span class="sep"> · </span>${x.avg.toFixed(1).replace('.',',')} ${pl(2,'круг','круга','кругов')} на материал${x.fixes?('<span class="sep"> · </span><span class="cyc-rv now">'+x.fixes+' с правками</span>'):''}</div><div class="cyc-bar violet"><i style="width:${(x.rounds/mx*100).toFixed(1)}%"></i></div></div>
+      <div class="cyc-right"><div class="cyc-val violet">${x.rounds}</div><div class="cyc-sub">${pl(x.rounds,'круг','круга','кругов')}</div></div>
+    </div>`).join('')}</div>`:''}
+  </div>`;
+}
 /* Строка аналитики ведёт туда, где сущность живёт: задача — на доску проекта,
    этап — в этапы. Переход тот же, что из дедлайнов: с прокруткой и подсветкой. */
 function _cycGo(pid,kind,id,what){
@@ -27693,6 +27765,7 @@ function renderCycles(){
               <div class="cyc-body"><div class="cyc-nm">${_ddH(x.name)}</div><div class="cyc-meta">${x.count} ${_plural(x.count,'задача','задачи','задач')}<span class="sep"> · </span>среднее ${_cycDur(x.avg*1000)}${x.now?('<span class="sep"> · </span><span class="cyc-rv now">сейчас у него '+x.now+'</span>'):''}</div><div class="cyc-bar violet"><i style="width:${(x.total/mx*100).toFixed(1)}%"></i></div></div>
               <div class="cyc-right"><div class="cyc-val violet">${_cycDur(x.total*1000)}</div><div class="cyc-sub">${x.share}%</div></div>
             </div>`).join('')}</div></div>`; })()}
+        ${_cycApprHTML(C.apr)}
       `:`<div style="padding:34px 0;text-align:center;color:var(--txt-3);font-size:14px;line-height:1.6">Пока нет задач, проходивших через утверждение.<br>Данные появятся, когда задачи начнут двигаться через колонку «На утверждении».</div>`}
       </div>
     </div>
@@ -33289,7 +33362,27 @@ function enterClient(){
   document.getElementById('app-cl').classList.add('on');
   clNav('overview');
   requestAnimationFrame(()=>animateCounters(document.querySelector('#app-cl .side')));
+  _clApDeepLink();
 }
+/* Ссылка «Согласовать» из Telegram ведёт не «в кабинет», а к самому материалу:
+   иначе клиент открывает кабинет и ищет, о чём вообще была речь. */
+function _clApDeepLink(){
+  try{
+    const u=new URL(location.href); const ap=u.searchParams.get('ap'); if(!ap) return;
+    history.replaceState(null,'',location.pathname);
+    if(typeof clNav==='function') clNav('overview');
+    setTimeout(function(){
+      const el=document.getElementById('clap-'+ap);
+      if(el){ try{ el.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_e){}
+        el.classList.add('clap-hl'); setTimeout(function(){ el.classList.remove('clap-hl'); },2600); }
+      else if(typeof toast==='function'){
+        const known=((window.CLP&&window.CLP.approvals)||[]).find(function(x){ return String(x.id)===String(ap); });
+        toast(known?'Этот материал уже закрыт — решение принято':'Материал не найден — возможно, его отозвали');
+      }
+    },260);
+  }catch(_e){}
+}
+window._clApDeepLink=_clApDeepLink;
 function pjToggleClVis(el){ var on=el.classList.toggle('on'); var ic=el.querySelector('.cvt-ic svg'); if(ic){ ic.innerHTML=on?'<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>':'<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/><path d="M2 2l20 20"/>'; } }
 function _clApplyVisibility(){
   var P=window.CLP; var hidden=(P&&P.cl_hidden)||(P&&P.settings&&P.settings.cl_hidden)||[];
@@ -39049,6 +39142,14 @@ window.tTaskMove = async (id,status,extra) => { if(String(id).indexOf('tmp_')===
       throw new Error(rc.error.message || 'Не удалось изменить задачу');
     }
     if(_wlog) _logWork(_wlog);
+    /* Задачу увели с утверждения руками — материал у клиента больше не ждёт
+       ответа (в базе это делает триггер). Гасим и локально, чтобы карточка не
+       обещала «у клиента» до ближайшей перезагрузки. */
+    if(status!=='review' && t){
+      const _pa=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===t.project_id);
+      if(_pa&&Array.isArray(_pa._appr)) _pa._appr.forEach(function(a){
+        if(String(a.task_id||'')===String(id)&&a.status==='pending') a.status='withdrawn'; });
+    }
     if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); }   // запись подтверждена — держим локальное состояние; реалтайм-эхо не перезагружаем (без гонки)
     return true;
   } catch(e){ toast('Ошибка: '+(e.message||e)); if(t) t._mvTs=0; await _pwReload(curProjId()); return false; } };
@@ -39593,12 +39694,15 @@ window.tLoadCycles = async () => {
   if (!SB) return;
   const now = Date.now();
   const _pageAll = window._sbPageAll;
-  const [histAll, sr, tasksAll, pmr, pjr] = await Promise.all([
+  const [histAll, sr, tasksAll, pmr, pjr, apAll] = await Promise.all([
     _pageAll(() => SB.from('stage_history').select('stage_id,project_id,stage_name,old_status,new_status,created_at').order('created_at',{ascending:true})),
     _pageAll(() => SB.from('project_stages').select('id,name,project_id').order('id')),
     _pageAll(() => SB.from('project_tasks').select('id,title,status,stage_id,project_id,time_spent,timer_started,review_spent,review_started,review_by,review_kind,assignee_id,created_at,completed_at').order('created_at',{ascending:true})),
     _pageAll(() => SB.from('project_members').select('project_id,member_id').order('project_id')),
-    _pageAll(() => SB.from('projects').select('id,status').order('id'))
+    _pageAll(() => SB.from('projects').select('id,status').order('id')),
+    /* согласования с клиентом: круги и скорость ответа — часть того же вопроса
+       «сколько работа ждёт утверждения», только по ту сторону */
+    _pageAll(() => SB.from('task_approvals').select('id,project_id,task_id,title,status,round,sent_at,decided_at').order('sent_at',{ascending:true})).catch(()=>[])
   ]);
   /* завершённые проекты в аналитику циклов не идут — метрики должны описывать живой портфель */
   const _archCy = new Set(); (pjr||[]).forEach(r => { if(AG_ARCHIVED_ST[String(r.status||'')]) _archCy.add(r.id); });
@@ -39781,6 +39885,38 @@ window.tLoadCycles = async () => {
   const reviewCount=_rtasks.filter(t=>_revEl(t)>0).length;
   const reviewTotalSec=_rtasks.reduce((a,t)=>a+_revEl(t),0);
   const reviewAvgSec=reviewCount?Math.round(reviewTotalSec/reviewCount):0;
+  /* ——— согласование с клиентом ———
+     «Время на утверждении» отвечает, сколько работа ждёт. Здесь — что с ней
+     происходит у клиента: сколько кругов до «да», как быстро он отвечает и
+     где эти круги копятся. Круг — это отдельная отправка, поэтому считаем по
+     задачам, а не по записям. */
+  const _apRows=(apAll||[]).filter(a=>a&&_okCy(a.project_id));
+  const _apByTask={}; _apRows.forEach(a=>{ const k=String(a.task_id||a.id); (_apByTask[k]||(_apByTask[k]=[])).push(a); });
+  const _apTasks=Object.values(_apByTask);
+  const _apLive=_apTasks.filter(x=>x.some(a=>a.status!=='withdrawn'));
+  const _apReply=_apRows.filter(a=>a.decided_at&&a.sent_at&&(a.status==='approved'||a.status==='changes'))
+    .map(a=>new Date(a.decided_at).getTime()-new Date(a.sent_at).getTime()).filter(v=>v>=0);
+  const _apPend=_apRows.filter(a=>a.status==='pending');
+  const _apProj={};
+  _apRows.forEach(a=>{ if(a.status==='withdrawn') return;
+    const e=_apProj[a.project_id]||(_apProj[a.project_id]={pid:a.project_id,rounds:0,fixes:0,tasks:{}});
+    e.rounds++; if(a.status==='changes') e.fixes++; e.tasks[String(a.task_id||a.id)]=1; });
+  const apr={
+    sent:_apRows.filter(a=>a.status!=='withdrawn').length,
+    materials:_apLive.length,
+    /* «с первого раза» считаем только по закрытым: материал, который ещё висит
+       у клиента, пока не согласован ни с первого раза, ни с третьего */
+    closed:_apTasks.filter(x=>x.some(a=>a.status==='approved')).length,
+    firstOk:_apTasks.filter(x=>{ const live=x.filter(a=>a.status!=='withdrawn'); return live.length===1&&live[0].status==='approved'; }).length,
+    avgRounds:_apLive.length?(_apLive.reduce((s,x)=>s+x.filter(a=>a.status!=='withdrawn').length,0)/_apLive.length):0,
+    replyAvgMs:_apReply.length?Math.round(_apReply.reduce((a,b)=>a+b,0)/_apReply.length):0,
+    replyMaxMs:_apReply.length?Math.max(..._apReply):0,
+    pending:_apPend.length,
+    pendOldestMs:_apPend.length?Math.max(..._apPend.map(a=>now-new Date(a.sent_at).getTime())):0,
+    byProject:Object.values(_apProj).map(e=>({pid:e.pid,client:nameById[e.pid]||'—',rounds:e.rounds,fixes:e.fixes,
+      materials:Object.keys(e.tasks).length,avg:e.rounds/Math.max(1,Object.keys(e.tasks).length)}))
+      .sort((a,b)=>b.avg-a.avg||b.rounds-a.rounds).slice(0,8)
+  };
   // ——— трудозатраты по задачам (рабочее время из «В работе») ———
   const _workEl=(t)=>{ let v=t.time_spent||0; if(t.timer_started && t.status==='active') v+=Math.max(0,Math.round((now-new Date(t.timer_started).getTime())/1000)); return v; };
   const _wsecs=_rtasks.map(_workEl).filter(v=>v>0).sort((a,b)=>a-b);
@@ -39803,7 +39939,7 @@ window.tLoadCycles = async () => {
   let _cum=0,_p80=0; const _desc=[..._wsecs].sort((a,b)=>b-a); const _tgt=workTotalSec*0.8;
   for(const v of _desc){ _cum+=v; _p80++; if(_cum>=_tgt)break; }
   const workParetoPct=workCount?Math.round(100*_p80/workCount):0;
-  CYCLES={_loaded:true,_at:now,projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients,reviewTasks,reviewStages,reviewByWho,reviewNow,reviewCount,reviewTotalSec,reviewAvgSec,workCount,workTotalSec,workMedianSec,workMeanSec,workP90Sec,workDoneCount,workDoneAvgSec,workStages,workTopTasks,workByAsg,workParetoPct};
+  CYCLES={_loaded:true,_at:now,projMedianMs,projCount,bottleneck,coverageDone:measurableUnique,coverageTotal:completedUnique,coveragePct,stuckNow:agingRows.length,agingRows,stages:stageRows,chartStages,trend,clients,reviewTasks,reviewStages,reviewByWho,reviewNow,reviewCount,reviewTotalSec,reviewAvgSec,apr,workCount,workTotalSec,workMedianSec,workMeanSec,workP90Sec,workDoneCount,workDoneAvgSec,workStages,workTopTasks,workByAsg,workParetoPct};
 };
 
 /* ===== TEAM · live aggregation (workload & activity per member) ===== */
