@@ -6612,7 +6612,11 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .bfc-help{font-size:13.5px;color:var(--txt-3);margin-bottom:9px;line-height:1.45}
 .bfc-in{width:100%;box-sizing:border-box;background:var(--bg-2);border:1px solid var(--line-2);border-radius:11px;color:var(--txt);font-size:16px;padding:13px 16px;outline:none;font-family:var(--font);margin-top:6px;transition:border-color .16s,box-shadow .16s}
 .bfc-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
-.bfc-area{resize:vertical;min-height:78px;line-height:1.5}
+.bfc-area{resize:none;min-height:78px;line-height:1.5}
+/* поля ответа тянутся сами — скроллбар внутри окошка появляется только
+   после 480px, чтобы длинный ответ не рос на весь экран */
+textarea.bfc-in{resize:none;overflow-y:auto;max-height:480px;line-height:1.5}
+.bfc-line{min-height:0}
 .bfc-sel{cursor:pointer}
 /* клиентский кастомный выпадающий список */
 .bfc-csel{position:relative;margin-top:6px}
@@ -6687,7 +6691,7 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .bpass-cell{background:var(--bg-1);padding:15px 18px}
 .bpass-cell.wide{grid-column:1 / -1}
 .bpass-lbl{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--txt-3);font-weight:600;margin-bottom:7px}
-.bpass-val{font-size:15px;color:var(--txt);font-weight:550;line-height:1.4}
+.bpass-val{font-size:15px;color:var(--txt);font-weight:550;line-height:1.4;white-space:pre-wrap}
 .bpass-long{font-size:14.5px;color:var(--txt);line-height:1.6;white-space:pre-wrap}
 .bpass-link{font-size:15px;color:var(--accent);text-decoration:none;font-weight:600;word-break:break-all}
 .bpass-link:hover{text-decoration:underline}
@@ -6743,7 +6747,7 @@ body.bf-dragging-body{cursor:grabbing!important;user-select:none;-webkit-user-se
 .bpass-cell-icn svg{width:14px;height:14px}
 .bpass-cell:hover .bpass-cell-icn{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,var(--line-2));background:var(--accent-dim)}
 .bpass-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--txt-3);font-weight:700;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bpass-val{font-size:15.5px;color:var(--txt);font-weight:600;line-height:1.35;letter-spacing:-.005em}
+.bpass-val{font-size:15.5px;color:var(--txt);font-weight:600;line-height:1.35;letter-spacing:-.005em;white-space:pre-wrap}
 .bpass-long{font-size:14.5px;color:var(--txt);line-height:1.6;white-space:pre-wrap;font-weight:500}
 .bpass-link{font-size:15px;color:var(--accent);text-decoration:none;font-weight:650;word-break:break-all}
 .bpass-link:hover{text-decoration:underline}
@@ -20794,6 +20798,15 @@ const BRIEF_TYPES=[
   {t:'file',n:'Загрузка файла'}
 ];
 const _BMON=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+/* ——— поля ответа растут вместе с текстом ———
+   В коротком ответе стоял <input>: Enter в нём не переводит строку, и абзац
+   было не набрать — ответ шёл одной строкой. Теперь это textarea в одну
+   строку, которая растёт по мере набора. «Абзац» тоже растёт, а не прячет
+   написанное в окошко на три строки. */
+function _bfRows(v,min){ var n=String(v==null?'':v).split('\n').length; return Math.max(min||1, Math.min(n, 14)); }
+function bfcGrow(el){ if(!el||el.tagName!=='TEXTAREA') return; el.style.height='auto'; el.style.height=Math.min(el.scrollHeight+2, 480)+'px'; }
+function bfcGrowAll(root){ try{ (root||document).querySelectorAll('textarea.bfc-in').forEach(bfcGrow); }catch(_e){} }
+window.bfcGrow=bfcGrow; window.bfcGrowAll=bfcGrowAll;
 function _briefUid(){ return 'f'+Math.random().toString(36).slice(2,9); }
 window._BRIEFDOC = window._BRIEFDOC || {};
 function _briefBid(){ return 'b'+Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-4); }
@@ -20980,11 +20993,11 @@ function briefClientFieldHTML(f,val){
   if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
   val=(val==null)?'':val; const fid=_ddA(f.id);
   let inp='';
-  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="'+_bfRows(val,3)+'" data-fid="'+fid+'" placeholder="Ваш ответ" oninput="bfcGrow(this)">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
   else if(f.type==='select') inp='<select class="bfc-in bfc-sel" data-fid="'+fid+'"><option value="">— выберите —</option>'+(f.options||[]).map(function(o){return '<option'+(o===val?' selected':'')+'>'+_ddH(o)+'</option>';}).join('')+'</select>';
   else if(f.type==='radio') inp='<div class="bfc-choices">'+(f.options||[]).map(function(o){return '<label class="bfc-choice"><input type="radio" name="bfr_'+fid+'" value="'+_ddA(o)+'"'+(o===val?' checked':'')+'><span class="bfc-mk r"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')+'</div>';
   else if(f.type==='checks'){ const arr=Array.isArray(val)?val:[]; inp='<div class="bfc-choices">'+(f.options||[]).map(function(o){return '<label class="bfc-choice"><input type="checkbox" data-grp="'+fid+'" value="'+_ddA(o)+'"'+(arr.indexOf(o)>=0?' checked':'')+'><span class="bfc-mk c"></span><span class="bfc-ot">'+_ddH(o)+'</span></label>';}).join('')+'</div>'; }
-  else { const it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; const ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; }
+  else { const it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; const ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; inp=(it==='text')?('<textarea class="bfc-in bfc-line" rows="'+_bfRows(val,1)+'" data-fid="'+fid+'" placeholder="'+ph+'" oninput="bfcGrow(this)">'+_ddH(String(val))+'</textarea>'):('<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'); }
   return '<div class="bfc-field"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+'</div>';
 }
 function briefClientFormHTML(pid,preview){
@@ -22471,7 +22484,7 @@ function briefClientFieldHTML(f,val){
   if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
   val=(val==null)?'':val; var fid=_ddA(f.id);
   var inp='';
-  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="'+_bfRows(val,3)+'" data-fid="'+fid+'" placeholder="Ваш ответ" oninput="bfcGrow(this)">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
   else if(f.type==='select') inp='<div class="bfc-csel"><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'"><button type="button" class="bfc-csel-btn" onclick="briefCselOpen(this)"><span class="bfc-csel-lbl'+(val?'':' ph')+'">'+(val?_ddH(val):'— выберите —')+'</span><svg class="bfc-csel-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="bfc-csel-pop">'+briefOptsList(f).map(function(o){return '<div class="bfc-csel-opt'+(o===val?' on':'')+'" data-v="'+_ddA(o)+'" onclick="briefCselPick(this)">'+_ddH(o)+'</div>';}).join('')+'</div></div>';
   else if(f.type==='radio'){
     var inO=(f.options||[]).indexOf(val)>=0; var oSel=(f.hasOther&&!inO&&String(val).trim()!=='');
@@ -22486,7 +22499,7 @@ function briefClientFieldHTML(f,val){
   else if(f.type==='scale') inp=briefScaleClient(f,val);
   else if(f.type==='grid') inp=briefGridClient(f,val,false);
   else if(f.type==='checkgrid') inp=briefGridClient(f,val,true);
-  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
+  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else if(it==='text'){ inp='<textarea class="bfc-in bfc-line" rows="'+_bfRows(val,1)+'" data-fid="'+fid+'" placeholder="'+ph+'" oninput="bfcGrow(this)">'+_ddH(String(val))+'</textarea>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
   return '<div class="bfc-field"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+'</div>';
 }
 
@@ -22619,6 +22632,9 @@ function briefStepBack(pid){ var b=briefGet(pid); var secs=briefSections(b.field
 /* ---- переопределение: клиентская форма (превью = плоская, заполнение = пошаговое) ---- */
 function briefClientFormHTML(pid,preview){
   var b=briefGet(pid); var F=b.fields||[];
+  /* разметка вставляется вызывающим синхронно — к этому моменту поля уже в DOM
+     и их можно подогнать под уже написанный текст */
+  setTimeout(bfcGrowAll,0);
   if(!F.length) return '<div class="bfc-prev-empty">Бриф ещё не настроен.'+(preview?' Добавьте вопросы слева — они появятся здесь.':'')+'</div>';
   if(b.font&&typeof briefLoadFont==='function')briefLoadFont(b.font); var _bfst=(typeof briefFontStack==='function'&&briefFontStack(b.font))?(' style="font-family:'+briefFontStack(b.font)+'"'):''; var _bban=(typeof briefBannerHTML==='function')?briefBannerHTML(b):'';
   var head=_bban+'<div class="bfc-formhead"><span class="bfc-formhead-bar"></span><div class="bfc-formtitle">'+_ddH(b.title||'Бриф проекта')+'</div>'+(b.description?'<div class="bfc-formdesc">'+_ddH(b.description)+'</div>':'')+'</div>';
@@ -22772,7 +22788,7 @@ function briefClientFieldHTML(f,val){
   if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
   val=(val==null)?'':val; var fid=_ddA(f.id);
   var inp='';
-  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="'+_bfRows(val,3)+'" data-fid="'+fid+'" placeholder="Ваш ответ" oninput="bfcGrow(this)">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
   else if(f.type==='select') inp='<div class="bfc-csel"><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'"><button type="button" class="bfc-csel-btn" onclick="briefCselOpen(this)"><span class="bfc-csel-lbl'+(val?'':' ph')+'">'+(val?_ddH(val):'— выберите —')+'</span><svg class="bfc-csel-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="bfc-csel-pop">'+briefOptsList(f).map(function(o){return '<div class="bfc-csel-opt'+(o===val?' on':'')+'" data-v="'+_ddA(o)+'" onclick="briefCselPick(this)">'+_ddH(o)+'</div>';}).join('')+'</div></div>';
   else if(f.type==='radio'){
     var inO=(f.options||[]).indexOf(val)>=0; var oSel=(f.hasOther&&!inO&&String(val).trim()!=='');
@@ -22787,7 +22803,7 @@ function briefClientFieldHTML(f,val){
   else if(f.type==='scale') inp=briefScaleClient(f,val);
   else if(f.type==='grid') inp=briefGridClient(f,val,false);
   else if(f.type==='checkgrid') inp=briefGridClient(f,val,true);
-  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
+  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else if(it==='text'){ inp='<textarea class="bfc-in bfc-line" rows="'+_bfRows(val,1)+'" data-fid="'+fid+'" placeholder="'+ph+'" oninput="bfcGrow(this)">'+_ddH(String(val))+'</textarea>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
   var bad=(val!=null && typeof val!=='object' && String(val).trim()!=='' && typeof briefValCheck==='function' && !briefValCheck(f,val));
   var err=bad?'<div class="bfc-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+_ddH((typeof briefValMsg==='function')?briefValMsg(f):'Проверьте значение')+'</div>':'';
   return '<div class="bfc-field'+(bad?' bfc-invalid':'')+'"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+err+'</div>';
@@ -22913,7 +22929,7 @@ function briefClientFieldHTML(f,val){
   if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
   val=(val==null)?'':val; var fid=_ddA(f.id);
   var inp='';
-  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="'+_bfRows(val,3)+'" data-fid="'+fid+'" placeholder="Ваш ответ" oninput="bfcGrow(this)">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
   else if(f.type==='select') inp='<div class="bfc-csel"><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'"><button type="button" class="bfc-csel-btn" onclick="briefCselOpen(this)"><span class="bfc-csel-lbl'+(val?'':' ph')+'">'+(val?_ddH(val):'— выберите —')+'</span><svg class="bfc-csel-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button><div class="bfc-csel-pop">'+briefOptsList(f).map(function(o){return '<div class="bfc-csel-opt'+(o===val?' on':'')+'" data-v="'+_ddA(o)+'" onclick="briefCselPick(this)">'+_ddH(o)+'</div>';}).join('')+'</div></div>';
   else if(f.type==='radio'){
     var inO=(f.options||[]).indexOf(val)>=0; var oSel=(f.hasOther&&!inO&&String(val).trim()!=='');
@@ -22929,7 +22945,7 @@ function briefClientFieldHTML(f,val){
   else if(f.type==='grid') inp=briefGridClient(f,val,false);
   else if(f.type==='checkgrid') inp=briefGridClient(f,val,true);
   else if(f.type==='file') inp=briefFileClient(f,val,fid);
-  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
+  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else if(it==='text'){ inp='<textarea class="bfc-in bfc-line" rows="'+_bfRows(val,1)+'" data-fid="'+fid+'" placeholder="'+ph+'" oninput="bfcGrow(this)">'+_ddH(String(val))+'</textarea>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
   var bad=(val!=null && typeof val!=='object' && String(val).trim()!=='' && typeof briefValCheck==='function' && !briefValCheck(f,val));
   var err=bad?'<div class="bfc-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+_ddH((typeof briefValMsg==='function')?briefValMsg(f):'Проверьте значение')+'</div>':'';
   return '<div class="bfc-field'+(bad?' bfc-invalid':'')+'"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+err+'</div>';
@@ -23069,7 +23085,7 @@ function briefClientFieldHTML(f,val){
   if(f.type==='section') return '<div class="bfc-sec"><span class="bfc-sec-bar"></span>'+_ddH(f.label||'Раздел')+'</div>';
   val=(val==null)?'':val; var fid=_ddA(f.id);
   var inp='';
-  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="3" data-fid="'+fid+'" placeholder="Ваш ответ">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
+  if(f.type==='long') inp='<textarea class="bfc-in bfc-area" rows="'+_bfRows(val,3)+'" data-fid="'+fid+'" placeholder="Ваш ответ" oninput="bfcGrow(this)">'+_ddH(typeof val==='string'?val:'')+'</textarea>';
   else if(f.type==='select'){ var _bopts=briefOptsList(f); inp='<div class="bxfield bxsel" data-forfid="'+fid+'" data-opts="'+_ddA(JSON.stringify(_bopts))+'" onclick="bxSelOpen(this,\'field\')"><span class="bxfield-val'+(val?'':' ph')+'">'+(val?_ddH(String(val)):'— выберите —')+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'">'; }
   else if(f.type==='radio'){
     var inO=(f.options||[]).indexOf(val)>=0; var oSel=(f.hasOther&&!inO&&String(val).trim()!=='');
@@ -23087,7 +23103,7 @@ function briefClientFieldHTML(f,val){
   else if(f.type==='date'){ inp='<div class="bxfield" data-forfid="'+fid+'" onclick="bxDateOpen(this)"><span class="bxfield-val'+(val?'':' ph')+'">'+(val?bxDateFmt(String(val)):'дд.мм.гггг')+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></div><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'">'; }
   else if(f.type==='time'){ inp='<div class="bxfield" data-forfid="'+fid+'" onclick="bxTimeOpen(this)"><span class="bxfield-val'+(val?'':' ph')+'">'+(val?_ddH(String(val)):'--:--')+'</span><svg class="bxfield-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></div><input type="hidden" data-fid="'+fid+'" value="'+_ddA(val)+'">'; }
   else if(f.type==='file') inp=briefFileClient(f,val,fid);
-  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
+  else { var it=f.type==='number'?'number':f.type==='date'?'date':f.type==='time'?'time':f.type==='email'?'email':f.type==='url'?'url':f.type==='phone'?'tel':'text'; var ph=f.type==='url'?'https://…':f.type==='email'?'you@example.com':f.type==='phone'?'+998 …':'Ваш ответ'; if(f.type==='date'||f.type==='time'){ var _dic=f.type==='date'?'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>':'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; inp='<div class="bfc-dt" onclick="briefDtOpen(this)"><input class="bfc-in bfc-dt-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'"><span class="bfc-dt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_dic+'</svg></span></div>'; } else if(it==='text'){ inp='<textarea class="bfc-in bfc-line" rows="'+_bfRows(val,1)+'" data-fid="'+fid+'" placeholder="'+ph+'" oninput="bfcGrow(this)">'+_ddH(String(val))+'</textarea>'; } else { inp='<input class="bfc-in" type="'+it+'" data-fid="'+fid+'" value="'+_ddA(val)+'" placeholder="'+ph+'">'; } }
   var bad=(val!=null && typeof val!=='object' && String(val).trim()!=='' && typeof briefValCheck==='function' && !briefValCheck(f,val));
   var err=bad?'<div class="bfc-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+_ddH((typeof briefValMsg==='function')?briefValMsg(f):'Проверьте значение')+'</div>':'';
   return '<div class="bfc-field'+(bad?' bfc-invalid':'')+'"><div class="bfc-q">'+_ddH(f.label||'Вопрос')+(f.required?'<span class="bfc-req">*</span>':'')+'</div>'+(f.help?'<div class="bfc-help">'+_ddH(f.help)+'</div>':'')+inp+err+'</div>';
