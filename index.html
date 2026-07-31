@@ -3846,7 +3846,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .tskm-ttl{width:calc(100% + 24px);margin:11px 0 0 -12px;background:transparent;border:1px solid transparent;border-radius:12px;padding:9px 12px;color:var(--txt);font-family:var(--font);font-size:24px;font-weight:750;letter-spacing:-.022em;line-height:1.25;transition:.15s}
 .tskm-ttl::placeholder{color:var(--txt-3);font-weight:650}
 .tskm-ttl:hover{background:rgba(255,255,255,.03)}
-.tskm-ttl:focus{outline:none;background:var(--bg-1);border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-dim)}
+/* Никакого свечения: место ввода показывает курсор — он крупный по размеру
+   шрифта и акцентного цвета, поэтому сразу видно, что писать нужно здесь. */
+#ov-pd2 .modal.tskm input.tskm-ttl{caret-color:var(--accent)}
+#ov-pd2 .modal.tskm input.tskm-ttl:focus{outline:none !important;background:rgba(255,255,255,.035);border-color:var(--line-2) !important;box-shadow:none !important}
 .tskm-cols{display:flex;align-items:stretch;flex:1 1 auto;min-height:0}
 .tskm-main{flex:1 1 auto;min-width:0;padding:20px 24px 24px 30px;overflow-y:auto}
 .tskm-side{flex:0 0 322px;min-width:0;border-left:1px solid var(--line);background:var(--bg-2);padding:20px 24px 24px;overflow-y:auto;display:flex;flex-direction:column;gap:18px}
@@ -17543,6 +17546,7 @@ function dpOpen(id){
    раскрываем вверх, а если тесно с обеих сторон — подтягиваем прокрутку. */
 function _popFit(wrap, pop){
   try{
+    if(_popEscape(wrap,pop)) return;                     // всплывашку вынесли из обрезающего блока — координаты уже посчитаны
     const t=wrap.getBoundingClientRect();
     const h=pop.offsetHeight||320;
     const vh=window.innerHeight||document.documentElement.clientHeight;
@@ -17553,6 +17557,40 @@ function _popFit(wrap, pop){
       pop.scrollIntoView({ block:'nearest', behavior:'smooth' });
     }
   }catch(_){ /* не критично: календарь всё равно открыт */ }
+}
+/* Календарь и часы висят абсолютом внутри поля. Если поле лежит в блоке с
+   прокруткой — в боковой колонке формы задачи, в узком окне, — предок режет
+   всплывашку по своему краю: видна половина, и кажется, что выбор сломан.
+   В таком случае переводим её в координаты экрана: обрезать нечему. */
+function _popEscape(wrap, pop){
+  let el=wrap.parentElement, clip=false;
+  while(el && el!==document.body && el!==document.documentElement){
+    const o=getComputedStyle(el);
+    if(/(auto|hidden|scroll)/.test(o.overflowY)||/(auto|hidden|scroll)/.test(o.overflowX)){ clip=true; break; }
+    el=el.parentElement;
+  }
+  if(!clip) return false;
+  const t=wrap.getBoundingClientRect();
+  const vw=window.innerWidth||document.documentElement.clientWidth;
+  const vh=window.innerHeight||document.documentElement.clientHeight;
+  pop.style.position='fixed'; pop.style.margin='0'; pop.style.bottom='auto'; pop.style.right='auto';
+  pop.style.left='0px'; pop.style.top='0px';
+  /* Точку отсчёта у fixed забирает любой предок с transform — а модалки
+     появляются именно с ним. Поэтому не вычисляем координаты, а калибруем:
+     ставим в ноль, смотрим, где оказались, и сдвигаем на разницу. */
+  const z=pop.getBoundingClientRect();
+  const w=z.width||280, h=z.height||320;
+  let L=Math.max(8,Math.min(t.left, vw-w-8));
+  let T=t.bottom+8;
+  if(T+h>vh-8) T=Math.max(8, t.top-h-8);
+  pop.style.left=Math.round(L-z.left)+'px';
+  pop.style.top=Math.round(T-z.top)+'px';
+  /* Вынесенная всплывашка больше не едет вместе с содержимым: если под ней
+     прокрутили список, она повиснет над чужим полем. Проще закрыть. */
+  const onScroll=function(){ try{ if(typeof _closePops==='function') _closePops(); }catch(_e){}
+    window.removeEventListener('scroll',onScroll,true); };
+  window.addEventListener('scroll',onScroll,true);
+  return true;
 }
 function _dpGrid(id){
   const st=_dpState[id], y=st.y, m=st.m, iso=dpVal(id), now=new Date();
