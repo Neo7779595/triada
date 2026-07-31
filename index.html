@@ -16343,7 +16343,8 @@ async function pkClSend(){
   const me=(window.tMe&&window.tMe())||{};
   const round=(pkApprList(p,S.taskId).length)+1;
   const row={ project_id:p.id, task_id:S.taskId, stage_name:S.stage||'', title:title, note:note||null,
-    items:items, status:'pending', round:round, sent_by:me.id||null, sent_at:new Date().toISOString() };
+    items:items, status:'pending', round:round, sent_by:me.id||null, sent_at:new Date().toISOString(),
+    task_assignee:t.assignee_id||null };
   let saved=null;
   if(window.SB){
     try{ const r=await window.SB.from('task_approvals').insert(row).select().maybeSingle();
@@ -33649,8 +33650,12 @@ async function clApDecide(id,status){
   a.status=status; a.comment=comment||null; a.decided_at=new Date().toISOString();
   if(window.SB){
     try{
-      const r=await window.SB.from('task_approvals').update({status:status,comment:comment||null}).eq('id',id);
+      /* Ответ читаем обратно: исполнителя проставляет база в момент решения —
+         клиент задач не видит и знать его не может, а сказать ему надо. */
+      const r=await window.SB.from('task_approvals').update({status:status,comment:comment||null}).eq('id',id)
+        .select('sent_by,task_assignee').maybeSingle();
       if(r&&r.error) throw r.error;
+      if(r&&r.data){ a.sent_by=r.data.sent_by||a.sent_by; a.task_assignee=r.data.task_assignee||a.task_assignee; }
     }catch(e){
       console.error('task_approvals decide',e);
       a.status='pending'; a.comment=null; a.decided_at=null;
@@ -33662,12 +33667,17 @@ async function clApDecide(id,status){
     ? '<div class="clap-done ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Согласовано — спасибо, команда продолжает</div>'
     : '<div class="clap-done fix">Правки отправлены — команда уже видит их</div>';
   toast(status==='approved'?'Согласовано':'Правки отправлены');
-  /* Команде — адресно тому, кто отправлял: ждать, пока кто-нибудь заглянет в
-     платформу, для правок клиента слишком дорого. */
-  if(a.sent_by && typeof tgStaffNotify==='function'){
-    tgStaffNotify(a.sent_by,'client_decision',{ project_name:P.name||'', project_id:P.id, title:a.title||'Материал',
-      stage_name:a.stage_name||'', status:status, comment:comment||'', task_id:a.task_id||'',
-      link:location.origin+'/?p='+encodeURIComponent(P.id)+'&t=kanban'+(a.task_id?('&task='+encodeURIComponent(a.task_id)):'') });
+  /* Команде — адресно: тому, кто отправлял, и тому, кто за задачу отвечает.
+     Это часто разные люди: отправляет менеджер, а переделывать исполнителю.
+     Ждать, пока кто-нибудь заглянет в платформу, для правок слишком дорого. */
+  if(typeof tgStaffNotify==='function'){
+    const who=[a.sent_by,a.task_assignee].filter(Boolean).map(String);
+    const seen={};
+    who.forEach(function(pid){ if(seen[pid]) return; seen[pid]=1;
+      tgStaffNotify(pid,'client_decision',{ project_name:P.name||'', project_id:P.id, title:a.title||'Материал',
+        stage_name:a.stage_name||'', status:status, comment:comment||'', task_id:a.task_id||'',
+        link:location.origin+'/?p='+encodeURIComponent(P.id)+'&t=kanban'+(a.task_id?('&task='+encodeURIComponent(a.task_id)):'') });
+    });
   }
 }
 window.clApprBlock=clApprBlock; window.clApFix=clApFix; window.clApCancel=clApCancel; window.clApDecide=clApDecide;
@@ -39116,6 +39126,7 @@ window.tTaskAdd = async (projectId,row) => {
 let _pkRaf=0;
 function _pkRerender(){ if(_pkRaf) return; _pkRaf=requestAnimationFrame(()=>{ _pkRaf=0; try{ const el=document.getElementById('ov-proj'); if(typeof renderPd==='function' && el && el.classList.contains('on')) renderPd(); }catch(_){} }); }
 window.tTaskMove = async (id,status,extra) => { if(String(id).indexOf('tmp_')===0){ toast('Секунду — задача ещё сохраняется'); return; } const t=_findTask(id); const _pp=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===(t&&t.project_id)); if(_pp&&_pp.status==='done'){ toast('Проект завершён — изменения запрещены'); return; } try {
+    const _prevSt=t?t.status:null;                                  // с чего ушли — нужно для вердикта проверяющего
     const patch={status}; const now=new Date().toISOString(); let _wlog=null;
     /* кто проверяет — приходит вместе со сменой статуса, одной записью:
        иначе между «ушло на проверку» и «назначен проверяющий» был бы зазор,
@@ -39149,6 +39160,24 @@ window.tTaskMove = async (id,status,extra) => { if(String(id).indexOf('tmp_')===
       const _pa=(typeof PROJECTS!=='undefined'?PROJECTS:[]).find(x=>x.id===t.project_id);
       if(_pa&&Array.isArray(_pa._appr)) _pa._appr.forEach(function(a){
         if(String(a.task_id||'')===String(id)&&a.status==='pending') a.status='withdrawn'; });
+    }
+    /* Вердикт проверяющего — исполнителю в Telegram. Задача ушла с утверждения:
+       её либо приняли, либо вернули в работу, и в обоих случаях следующий шаг
+       за исполнителем. Сам себе не пишем: тот, кто нажал, и так знает. */
+    if(t && _prevSt==='review' && (status==='done'||status==='active') && t.assignee_id && typeof tgStaffNotify==='function'){
+      const _meV=(window.tMe&&window.tMe())||{};
+      if(String(t.assignee_id)!==String(_meV.id||'')){
+        /* проект ищем и по ссылке на объект: у задачи, созданной оптимистично,
+           project_id ещё не проставлен, а письмо без проекта бесполезно */
+        const _PR=(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+        const _pv=_PR.find(x=>x.id===t.project_id)||_PR.find(x=>((x._tasks||[]).indexOf(t)>=0))||null;
+        const _pid=(_pv&&_pv.id)||t.project_id||'';
+        const _sv=((_pv&&_pv._stages)||[]).find(s=>String(s.id)===String(t.stage_id));
+        tgStaffNotify(t.assignee_id,'review_verdict',{ status:(status==='done'?'approved':'changes'),
+          by:(typeof _tgBy==='function'?_tgBy():''), title:t.title||'Задача', project_name:(_pv&&_pv.name)||'',
+          project_id:_pid, task_id:id, stage_name:(_sv&&_sv.name)||'',
+          link:location.origin+'/?p='+encodeURIComponent(_pid)+'&t=kanban&task='+encodeURIComponent(id) });
+      }
     }
     if(t){ t._mvTs=Date.now(); window._localTaskWriteTs=Date.now(); }   // запись подтверждена — держим локальное состояние; реалтайм-эхо не перезагружаем (без гонки)
     return true;
