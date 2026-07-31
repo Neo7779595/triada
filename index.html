@@ -15984,8 +15984,8 @@ function openProject(i){
     if(document.getElementById('ov-proj').classList.contains('on')&&PROJECTS[pdIdx]&&PROJECTS[pdIdx].id===p.id&&pdTabCur==='kanban') renderPd(); }).catch(function(){});
   if(typeof pkZenRestore==='function') pkZenRestore();
 }
-function closeProject(){ if(typeof _closePops==='function')_closePops(); document.getElementById('ov-proj').classList.remove('on'); }
-function pdTab(t){if(typeof _closePops==='function')_closePops();pdTabCur=t;document.querySelectorAll('#pd-tabbar [data-k]').forEach(b=>b.classList.toggle('on',b.dataset.k===t));var _hr=document.getElementById('pd-hdr-rep');if(_hr)_hr.style.display=(t==='smm'||t==='reports')?'':'none';renderPd();if(t==='content'){const _p=PROJECTS[pdIdx];if(_p&&window.LIVE&&window.SB){ if(!_p._cpLoad){_p._cpLoad=1;cpLoadServer(_p);} else if(typeof cpRefreshAppr==='function')cpRefreshAppr(_p); }}}
+function closeProject(){ if(typeof _closePops==='function')_closePops(); document.getElementById('ov-proj').classList.remove('on'); if(typeof pkZenSync==='function') pkZenSync(); }
+function pdTab(t){if(typeof _closePops==='function')_closePops();pdTabCur=t;document.querySelectorAll('#pd-tabbar [data-k]').forEach(b=>b.classList.toggle('on',b.dataset.k===t));var _hr=document.getElementById('pd-hdr-rep');if(_hr)_hr.style.display=(t==='smm'||t==='reports')?'':'none';if(typeof pkZenSync==='function')pkZenSync();renderPd();if(t==='content'){const _p=PROJECTS[pdIdx];if(_p&&window.LIVE&&window.SB){ if(!_p._cpLoad){_p._cpLoad=1;cpLoadServer(_p);} else if(typeof cpRefreshAppr==='function')cpRefreshAppr(_p); }}}
 /* ═══════════ Канбан: полный экран и WIP-лимиты ═══════════
    Настройки доски — командные, поэтому лежат в проекте (projects.kanban),
    а не в браузере: WIP-лимит это договорённость команды, а не личный вкус.
@@ -16023,17 +16023,28 @@ function pkDense(){ const p=_pkProj(); if(!p) return; const c=pkCfg(p); c.dense=
 /* Полный экран доски — это режим работы, а не настройка проекта: он у каждого
    свой и на своём устройстве, поэтому живёт в браузере. */
 let PK_ZEN=false;
+/* Полный экран — это режим доски, а не проекта. Класс вешается только пока
+   открыта «Операционка»: на других вкладках доски нет, а шапка и вкладки в
+   этом режиме скрыты — проект открывался без единой кнопки, и выйти было
+   нечем. Поэтому состояние помним, а применяем по месту. */
+function pkZenSync(){
+  const ov=document.getElementById('ov-proj');
+  const on=!!PK_ZEN && !!ov && ov.classList.contains('on')
+        && typeof pdTabCur!=='undefined' && pdTabCur==='kanban';
+  const m=ov?ov.querySelector('.modal'):null; if(m) m.classList.toggle('pk-zen',on);
+  document.body.classList.toggle('pk-zen-on',on);
+  return on;
+}
 function pkZen(on){
   PK_ZEN=(on===undefined)?!PK_ZEN:!!on;
   try{ localStorage.setItem('triada_pkzen', PK_ZEN?'1':'0'); }catch(_e){}
-  const m=document.querySelector('#ov-proj .modal'); if(m) m.classList.toggle('pk-zen',PK_ZEN);
-  document.body.classList.toggle('pk-zen-on',PK_ZEN);
+  const shown=pkZenSync();
   if(typeof renderPd==='function') renderPd();
-  if(PK_ZEN) toast('Доска на весь экран · Esc — выйти');
+  if(shown) toast('Доска на весь экран · Esc — выйти');
 }
 function pkZenRestore(){ try{ PK_ZEN=(localStorage.getItem('triada_pkzen')==='1'); }catch(_e){ PK_ZEN=false; }
-  const m=document.querySelector('#ov-proj .modal'); if(m) m.classList.toggle('pk-zen',PK_ZEN);
-  document.body.classList.toggle('pk-zen-on',PK_ZEN); }
+  pkZenSync(); }
+window.pkZenSync=pkZenSync;
 let PK_SET_OPEN=false;
 function pkSetOpen(v){ PK_SET_OPEN=(v===undefined)?!PK_SET_OPEN:!!v;
   const el=document.getElementById('pk-setpanel'); if(el) el.classList.toggle('on',PK_SET_OPEN);
