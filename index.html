@@ -16041,14 +16041,22 @@ async function pkSendToReview(taskId,kind,byId){
   const stg=((p._stages)||[]).find(function(s){ return String(s.id)===String(t.stage_id); });
   const link=location.origin+'/?p='+encodeURIComponent(p.id)+'&t=kanban&task='+encodeURIComponent(taskId);
   if(kind==='pm' && byId){
-    const me=(window.tMe&&window.tMe())||{};
-    if(String(byId)!==String(me.id||'') && typeof tgStaffNotify==='function'){
-      tgStaffNotify(byId,'review_request',{ by:(typeof _tgBy==='function'?_tgBy():''), title:t.title||'Задача',
-        project_name:p.name||'', project_id:p.id, task_id:taskId, stage_name:(stg&&stg.name)||'',
-        due:t.due_date||'', due_time:t.due_time||'', link:link });
-    }
     const who=(pkReviewPeople(p).find(function(x){ return String(x.id)===String(byId); })||{}).name||'проверяющему';
     toast('На проверку · '+who);
+    /* Пишем и самому себе, если проверяющим выбрали себя: карточка в Telegram
+       со ссылкой — это ещё и напоминание, а не только сигнал другому. */
+    if(typeof tgStaffNotify==='function'){
+      const r=await tgStaffNotify(byId,'review_request',{ by:(typeof _tgBy==='function'?_tgBy():''), title:t.title||'Задача',
+        project_name:p.name||'', project_id:p.id, task_id:taskId, stage_name:(stg&&stg.name)||'',
+        due:t.due_date||'', due_time:t.due_time||'', link:link });
+      /* Молчаливый «skipped» выглядел бы как успешная отправка — говорим прямо. */
+      if(r && r.ok===false){
+        const why=String(r.skipped||r.error||'');
+        toast(/Telegram/i.test(why) ? (who+' не подключил Telegram — уведомление только в платформе')
+             : /архивирован/i.test(why) ? (who+' в архиве — сообщение не отправлено')
+             : ('Уведомление в Telegram не ушло: '+(why||'ошибка отправки')));
+      }
+    }
   } else if(kind==='client'){
     if(typeof tgNotify==='function') tgNotify(p.id,'task_review',{ title:t.title||'Задача', stage_name:(stg&&stg.name)||'', link:location.origin });
     toast(p.tg_chat_id?'На проверку клиенту · сообщение ушло в группу':'На проверку клиенту · группа не подключена');
@@ -37911,13 +37919,17 @@ async function tgUnlink(){
 }
 window.tgUnlink=tgUnlink;
 /* ===== Внутренний контур: персональные уведомления сотрудникам ===== */
+/* Возвращаем ответ функции: вызывающий должен знать, ушло сообщение или нет.
+   Раньше ответ молча выбрасывался, и «не подключён Telegram» выглядело так же,
+   как успешная отправка. */
 async function tgStaffNotify(profileId, eventType, data){
-  if(!profileId || !SB) return;
+  if(!profileId || !SB) return null;
   try{
-    await fetch(TG_FN+'/tg-staff', { method:'POST',
+    const r=await fetch(TG_FN+'/tg-staff', { method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
       body:JSON.stringify({profile_id:profileId, event_type:eventType, data:data||{}}) });
-  }catch(e){ console.warn('[tg-staff]', e); }
+    try{ return await r.json(); }catch(_e){ return null; }
+  }catch(e){ console.warn('[tg-staff]', e); return null; }
 }
 window.tgStaffNotify=tgStaffNotify;
 async function tgStaffTest(){
