@@ -3582,6 +3582,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,.nav-i:focus-visib
 .lb-oprow:not(.lb-ophead):hover{background:color-mix(in oklab,var(--accent) 5%,transparent)}
 .lb-ophead{background:color-mix(in oklab,var(--bg-2) 55%,transparent);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-3);font-weight:700;padding:12px 20px;border-bottom:1px solid color-mix(in oklab,var(--line-2) 70%,transparent)}
 .lb-ophead .c{text-align:center}
+/* Строка SMM-рейтинга открывает отчёт. Отдельной колонки со стрелкой нет
+   намеренно: в сетке ровно шесть ячеек, седьмая сдвинула бы все цифры —
+   поэтому подсказка наведением: полоска слева и название акцентом. */
+.lb-oprow.lb-opgo{cursor:pointer}
+.lb-oprow.lb-opgo::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity .18s cubic-bezier(.4,0,.2,1)}
+.lb-oprow.lb-opgo:hover::before,.lb-oprow.lb-opgo:focus-visible::before{opacity:1}
+.lb-oprow.lb-opgo:hover .lb-opnm,.lb-oprow.lb-opgo:focus-visible .lb-opnm{color:var(--accent)}
+.lb-oprow.lb-opgo:focus-visible{outline:none;background:color-mix(in oklab,var(--accent) 8%,transparent)}
 .lb-rk{font-family:var(--mono);font-size:15px;color:var(--txt-3);text-align:center;font-weight:600}
 /* Медали топ-3: премиум-градиент + свечение + внутренняя рамка */
 .lb-medal{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:800;font-size:14.5px;margin:0 auto;position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(0,0,0,.15)}
@@ -23648,6 +23656,7 @@ function smmLoadPrev(report){
     let pool=[];
     if(typeof PROJECTS!=='undefined' && typeof pdIdx!=='undefined' && pdIdx!=null && PROJECTS[pdIdx] && Array.isArray(PROJECTS[pdIdx]._reports)) pool=pool.concat(PROJECTS[pdIdx]._reports);
     if(window.CLP && Array.isArray(window.CLP.reports)) pool=pool.concat(window.CLP.reports);
+    if(Array.isArray(window._smmLbPool)) pool=pool.concat(window._smmLbPool);   // заход из лидерборда: проект не открыт, соседние отчёты пришли с ним
     const pid=report.project_id||(_smmMeta&&_smmMeta.projectId), curId=report.id, curAt=String(report.published_at||'');
     const cand=pool.filter(r=>r && r.kind==='SMM' && String(r.id)!==String(curId) && (!pid||String(r.project_id)===String(pid)) && (!curAt || String(r.published_at||'')<curAt));
     cand.sort((a,b)=>{ const x=String(a.published_at||''),y=String(b.published_at||''); return x<y?1:x>y?-1:0; });
@@ -23674,7 +23683,11 @@ async function smmClose(){
   smmWzStop(); _smmStep=0; _smmT0=0; _smmDone=false;
   document.getElementById('ov-smm').classList.remove('on');
   _smmCur=null; _smmMeta=null; _smmDirty=false; _smmRO=false;
+  window._smmLbPool=null;
   if(typeof renderPd==='function' && document.getElementById('ov-proj').classList.contains('on')) renderPd();   // карточки отчётов сразу с свежими цифрами
+  /* Вернулись в лидерборд: openSMM сбрасывает кеш рейтинга (в отчёте могли
+     поправить цифры), и без перерисовки список остался бы на «Загрузка…». */
+  if(typeof _agCurModule==='function' && _agCurModule()==='leaderboard' && typeof renderLeaderboard==='function') renderLeaderboard();
 }
 async function smmTab(t){
   if(t==='lb')_smmLbAnim=true; if(t==='data')_smmDone=false; _smmTab=t; smmRender();
@@ -24685,9 +24698,26 @@ function smmSetLbMetric(k){ _smmLbMetric=k; _smmLbAnim=true; if(typeof _closePop
 function smmToggleLbMenu(e){ if(e&&e.stopPropagation)e.stopPropagation(); _smmLbMenuOpen=!_smmLbMenuOpen; _smmLbAnim=false; lbRender(); }
 function smmToggleLbSort(){ _smmLbSortDir=(_smmLbSortDir==='asc'?'desc':'asc'); _smmLbAnim=true; lbPaint(); }
 function smmLbFilter(v){ const q=(v||'').trim().toLowerCase(); document.querySelectorAll('#ov-lb [data-lbpn]').forEach(el=>{ el.style.display=(!q||el.getAttribute('data-lbpn').indexOf(q)>=0)?'':'none'; }); }
+/* Открыть отчёт, стоящий за строкой рейтинга. Тянем не одну строку, а все
+   SMM-отчёты этого проекта: внутри отчёта показываются стрелки «к прошлому
+   периоду», а соседние отчёты берутся из кеша открытого проекта — при заходе
+   из лидерборда проект не открыт, и без этого сравнивать было бы не с чем. */
 async function smmOpenFromLb(reportId){
-  if(!window.SB) return;
-  try{ const {data}=await SB.from('reports').select('*').eq('id',reportId).single(); if(data){ const lo=document.getElementById('ov-lb'); if(lo)lo.classList.remove('on'); openSMM(data); } }catch(e){ toast('Не удалось открыть отчёт'); }
+  if(!window.SB){ toast('Нет связи с базой'); return; }
+  const ent=(_smmLbAll||[]).find(r=>String(r.reportId)===String(reportId));
+  const pid=ent?ent.proj.id:null;
+  try{
+    let pool=null, rep=null;
+    if(pid!=null){
+      const {data}=await SB.from('reports').select('*').eq('project_id',pid).eq('kind','SMM').order('published_at',{ascending:false,nullsFirst:false});
+      pool=data||[]; rep=pool.find(r=>String(r.id)===String(reportId))||null;
+    }
+    if(!rep){ const r1=await SB.from('reports').select('*').eq('id',reportId).single(); rep=r1.data||null; }
+    if(!rep){ toast('Отчёт не найден или закрыт доступом'); return; }
+    window._smmLbPool=pool||[];
+    const lo=document.getElementById('ov-lb'); if(lo) lo.classList.remove('on');
+    openSMM(rep);
+  }catch(e){ console.warn('smmOpenFromLb', e); toast('Не удалось открыть отчёт'); }
 }
 function lbPaint(){
   const ov=document.getElementById('ov-lb');
@@ -24789,7 +24819,7 @@ function renderSmmLbSimple(){
   if(_smmLbData===null) return shell('<div class="lb-load">Загрузка рейтинга…</div>');
   if(!_all.length && _smmLbErr) return headBar+'<div class="lb-load">Не удалось загрузить рейтинг<br><span style="opacity:.6">'+esc(_smmLbErr)+'</span><br><button class="pk-fclear" style="margin-top:12px" onclick="smmLbReset();renderLeaderboard()">Повторить</button></div>';
   if(!_all.length) return headBar+'<div class="lb-load">SMM-отчётов в агентстве пока нет<br><span style="opacity:.6">создайте отчёты в проектах — они появятся здесь</span></div>';
-  const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m)})).filter(r=>r.val!=null&&isFinite(r.val));
+  const rows=_smmLbData.map(d=>({proj:d.proj,m:d.m,val:cfg.get(d.m),reportId:d.reportId,period:d.period})).filter(r=>r.val!=null&&isFinite(r.val));
   if(!_smmLbData.length) return shell('<div class="lb-load">За период «'+esc(curName)+'» отчётов нет<br><span style="opacity:.6">выберите другой период выше</span></div>');
   if(!rows.length) return shell('<div class="lb-load">Нет данных по метрике «'+esc(NAMES[cfg.k])+'» за «'+esc(curName)+'»<br><span style="opacity:.6">попробуйте другую метрику или период</span></div>');
   rows.sort((a,b)=>(b.val||0)-(a.val||0)); rows.forEach((r,i)=>r.rank=i+1);
@@ -24818,7 +24848,15 @@ function renderSmmLbSimple(){
     const col=r.proj.color||'#37E6C8'; const init=esc(((r.proj.name||'?').trim()[0]||'?').toUpperCase());
     const ic='<span class="lb-opic" style="background:'+col+'22;color:'+col+'">'+logoFill(r.proj.logoUrl,init)+'</span>';
     const secCols=secM.map(mc=>'<span class="lb-opc">'+fmtCell(mc.get(r.m),mc)+'</span>').join('');
-    return '<div class="lb-oprow">'
+    /* Строка ведёт в сам отчёт, из которого взяты эти цифры: увидел просадку —
+       открыл и разобрался, не разыскивая проект и его вкладку отчётов. */
+    const rid=String(r.reportId==null?'':r.reportId).replace(/['"\\]/g,'');
+    const opn=rid?(' class="lb-oprow lb-opgo" role="button" tabindex="0"'
+      +' title="Открыть '+(r.period?('отчёт «'+escH(r.period)+'»'):'последний отчёт')+' · '+escH(r.proj.name)+'"'
+      +' onclick="smmOpenFromLb(\''+rid+'\')"'
+      +' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();smmOpenFromLb(\''+rid+'\')}"')
+      :' class="lb-oprow"';
+    return '<div'+opn+'>'
       +rk
       +'<span class="lb-opproj">'+ic+'<span class="lb-opnm">'+esc(r.proj.name)+'</span></span>'
       +'<span class="lb-opmetric"><span class="lb-opvrow"><b style="color:'+hcol+'">'+fmtV(r.val).replace('%','<small>%</small>')+'</b>'+dChip+'</span><span class="lb-opbar"><i style="width:'+bw+'%;background:'+hcol+'"></i></span></span>'
