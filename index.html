@@ -27407,9 +27407,22 @@ function renderFinance(){
         <div class="fg"><div class="l">MRR агентства</div><div class="gv">${money(F.totalMrr)}</div><div class="gs">${F.paying} ${_plural(F.paying,'клиент','клиента','клиентов')} · /мес</div></div>
         <div class="fg"><div class="l">Расходы</div><div class="gv neg">${money(F.totalCost)}</div><div class="gs">${F.costPct}% от выручки</div></div>
         <div class="fg"><div class="l">Время</div><div class="gv acc">${fmtHours(F.totalHours)}</div><div class="gs">часов по таймеру</div></div>
-        <div class="fg"><div class="l">Концентрация прибыли</div><div class="gv">${F.profConcPct?F.profConcPct+'%':'—'}</div><div class="gs">${F.profConcTop&&F.profConcTop!=='—'?'с проекта '+F.profConcTop:(F.profit>0?'—':'прибыли пока нет')}</div></div>
+        ${(()=>{
+          /* Метрика с этим названием есть и в сводке — там она считалась от
+             выручки. Здесь стояла доля прибыли, и два экрана показывали
+             «концентрацию» разными числами (45% против 48%). Название и
+             число теперь одни и те же, а доля прибыли — подписью рядом:
+             это другая база, а не другая цифра того же самого. */
+          const cTop=F.concentrationTop&&F.concentrationTop!=='—'?F.concentrationTop:'';
+          const pTop=F.profConcTop&&F.profConcTop!=='—'?F.profConcTop:'';
+          const sub = F.totalMrr<=0 ? 'бюджеты не заданы'
+            : !pTop ? (cTop||'—')
+            : (String(pTop)===String(cTop) ? (cTop+' · и '+F.profConcPct+'% прибыли')
+                                           : (cTop+' · по прибыли — '+pTop+' '+F.profConcPct+'%'));
+          return `<div class="fg"><div class="l">Концентрация выручки</div><div class="gv">${F.totalMrr>0?F.concentrationPct+'%':'—'}</div><div class="gs">${escH(sub)}</div></div>`;
+        })()}
         <div class="fg"><div class="l">Прибыль / час</div><div class="gv ${F.profitPerHour>0?'pos':F.profitPerHour<0?'neg':''}">${F.profitPerHour?((F.profitPerHour>0?'+':'')+money(F.profitPerHour)):'—'}</div><div class="gs">${F.profitPerHour?'чистыми за час':'логируйте часы'}</div></div>
-        <div class="fg"><div class="l">Средний чек</div><div class="gv">${F.avgMrr?money(F.avgMrr):'—'}</div><div class="gs">конц. ${F.concentrationPct}% · ${F.concentrationTop}</div></div>
+        <div class="fg"><div class="l">Средний чек</div><div class="gv">${F.avgMrr?money(F.avgMrr):'—'}</div><div class="gs">${F.paying?('на платящий проект · '+F.paying+' из '+F.total):'платящих проектов нет'}</div></div>
       </div>
     </div>
 
