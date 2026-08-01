@@ -301,12 +301,28 @@ const setup = () => {
   await page.waitForTimeout(150);
   ok('заполненная — спрашивает', await page.evaluate(() => document.getElementById('ov-npclose').classList.contains('on')));
   ok('и окно ещё открыто', await page.evaluate(() => !!document.querySelector('#ov-pd2 .modal.npw')));
+  /* у .ov по умолчанию z-index 50, у #ov-pd2 — 60: вопрос открывался ПОД окном
+     проекта, и крестик выглядел сломанным */
+  ok('вопрос виден поверх окна проекта', await page.evaluate(() => {
+    const r = document.querySelector('#ov-npclose .modal').getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !!(el && el.closest('#ov-npclose'));
+  }), await page.evaluate(() => {
+    const r = document.querySelector('#ov-npclose .modal').getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return el ? el.tagName + '.' + String(el.className).slice(0, 24) : null;
+  }));
   await page.evaluate(() => npwCloseAsk(0));
   ok('«Вернуться» возвращает', await page.evaluate(() =>
     !document.getElementById('ov-npclose').classList.contains('on') && !!document.querySelector('#ov-pd2 .modal.npw')));
-  await page.evaluate(() => npwCloseAsk(1));
-  await page.waitForTimeout(150);
+  /* настоящий клик мышью, а не вызов функции: так ловятся перекрытия */
+  await page.click('#ov-pd2 .npw-x');
+  await page.waitForTimeout(200);
+  ok('крестик снова открывает вопрос', await page.evaluate(() => document.getElementById('ov-npclose').classList.contains('on')));
+  await page.click('#ov-npclose .btn-add');
+  await page.waitForTimeout(200);
   ok('«Закрыть» закрывает', await page.evaluate(() => !document.querySelector('#ov-pd2 .modal.npw')));
+  ok('и вопрос убрался', await page.evaluate(() => !document.getElementById('ov-npclose').classList.contains('on')));
 
   /* ——— O. адаптив ——— */
   console.log('\n[O] раскладка на разных экранах');

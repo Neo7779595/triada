@@ -234,6 +234,11 @@ const setup = () => {
   await page.waitForTimeout(80);
   ok('спрашивает про несохранённое', await page.evaluate(() => document.getElementById('ov-empclose').classList.contains('on')));
   ok('и окно ещё открыто', await page.evaluate(() => document.getElementById('ov-emp').classList.contains('on')));
+  ok('вопрос виден поверх карточки', await page.evaluate(() => {
+    const r = document.querySelector('#ov-empclose .modal').getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !!(el && el.closest('#ov-empclose'));
+  }));
   await page.evaluate(() => empwCloseAsk(0));
   ok('«Вернуться» возвращает', await page.evaluate(() => !document.getElementById('ov-empclose').classList.contains('on') && document.getElementById('ov-emp').classList.contains('on')));
   await page.evaluate(() => empwCloseAsk(1));
