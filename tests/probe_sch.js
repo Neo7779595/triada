@@ -221,7 +221,18 @@ const setup = () => {
   ok('бронь на ленте — та же нейтральная карточка', tm.bg === BG2, tm.bg);
   ok('с кантом вида работ', /rgb\(/.test(tm.left || ''), tm.left);
   ok('без наружных теней', outerShadow(tm.shadow).length === 0, tm.shadow);
+  /* Линия «сейчас» рисуется, только когда текущий час попадает в окно дня
+     (SCH_W0..SCH_W1 = 7..23). Ночью её нет по замыслу, поэтому саму отрисовку
+     проверяем по условию, а оформление — по правилу в таблице стилей: оно от
+     времени суток не зависит. */
+  const nowRule = await page.evaluate(() => {
+    for (const sh of document.styleSheets) { let rs; try { rs = sh.cssRules; } catch (e) { continue; }
+      for (const r of rs) if (r.selectorText === '.sav-track-now') return { w: r.style.width, shadow: r.style.boxShadow }; }
+    return null;
+  });
   ok('линия «сейчас» — ровные два пикселя без размытия',
+    !!nowRule && nowRule.w === '2px' && !(nowRule.shadow || '').trim(), nowRule);
+  if (tm.nowW != null) ok('и на ленте она такой и отрисована',
     tm.nowW === '2px' && outerShadow(tm.nowShadow).length === 0, tm);
 
   console.log('\n[H] список дня: вид работ — метка, а не цветная плашка');
