@@ -155,9 +155,26 @@ const setup = () => {
 
   /* ——— I. доступ клиента ——— */
   console.log('\n[I] доступ клиента');
+  /* логин собирается из названия сам — руками его набирать не нужно */
+  ok('логин уже подставлен из названия', await page.evaluate(() => document.getElementById('np-clogin').value) === 'stella',
+    await page.evaluate(() => document.getElementById('np-clogin').value));
+  await page.evaluate(() => { document.getElementById('np-name').value = 'Ресто Групп'; npwLoginTouched = false; npwLoginSync(); });
+  await page.waitForTimeout(120);
+  ok('кириллица переводится в латиницу', await page.evaluate(() => document.getElementById('np-clogin').value) === 'resto',
+    await page.evaluate(() => document.getElementById('np-clogin').value));
+  const vars = await page.evaluate(() => npwLoginVariants());
+  ok('вариантов логина несколько', vars.length >= 3, vars);
+  ok('все варианты годятся для адреса', vars.every(v => /^[a-z][a-z0-9]{2,23}$/.test(v)), vars);
+  await page.click('#ov-pd2 .npw-gen .npw-pbtn');
+  await page.waitForTimeout(120);
+  ok('кнопка даёт следующий вариант', await page.evaluate(() => document.getElementById('np-clogin').value) === vars[1], vars);
   await page.fill('#np-clogin', 'stella');
   await page.waitForTimeout(120);
   ok('почта клиента собирается на лету', await page.evaluate(() => document.getElementById('np-cemail').textContent) === 'stella@detroyd.triada.app');
+  await page.evaluate(() => { document.getElementById('np-name').value = 'Совсем другое'; npwLoginSync(); });
+  await page.waitForTimeout(120);
+  ok('набранный руками логин название не перебивает', await page.evaluate(() => document.getElementById('np-clogin').value) === 'stella');
+  await page.evaluate(() => { document.getElementById('np-name').value = 'Stella Coffee'; npwPreview(); npwCounts(); });
   ok('пароль скрыт по умолчанию', await page.evaluate(() => document.getElementById('np-cpass').type) === 'password');
   await page.evaluate(() => npwPassGen());
   await page.waitForTimeout(120);
