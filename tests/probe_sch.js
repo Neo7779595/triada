@@ -15,6 +15,13 @@ const MEET = 'rgb(138, 143, 255)';    /* встреча #8A8FFF */
 const outerShadow = s => String(s || 'none').split(/,(?![^(]*\))/)
   .map(x => x.trim()).filter(x => x && x !== 'none' && !/inset/.test(x));
 
+/* Нейтральный — это когда красный, зелёный и синий почти равны: любой
+   «цвет вида работ» в тексте сразу разводит каналы. */
+const neutral = c => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(String(c || '')); if (!m) return false;
+  const v = [+m[1], +m[2], +m[3]]; return Math.max.apply(null, v) - Math.min.apply(null, v) <= 24; };
+/* запас 24 берёт холодную серую палитру (#7A828D — разброс 19) и отсекает
+   любой цвет вида работ (#37E6C8 — 175, #8A8FFF — 117, #E3B567 — 124) */
+
 const setup = () => {
   window.toast = () => {}; window.LIVE = false; window.tLoadBookings = null;
   window.tMe = () => ({ id: 'u1', full_name: 'DTR', role: 'agency_owner', agency_id: 'AG' });
@@ -43,6 +50,8 @@ const setup = () => {
     /* лента команды показывает СЕГОДНЯ — нужна бронь именно на сегодня,
        иначе в какой день недели ни запусти, лента окажется пустой */
     B({ id: 'b7', title: 'Смена на объекте', startsAt: TODAY + 9 * 3600000, endsAt: TODAY + 13 * 3600000, members: M.slice(0, 2) }),
+    /* идёт прямо сейчас — карточка должна сама об этом сказать */
+    B({ id: 'b8', title: 'Съёмка в студии', startsAt: Date.now() - 30 * 60000, endsAt: Date.now() + 30 * 60000, members: M.slice(0, 2) }),
   ];
   document.querySelectorAll('.app').forEach(a => a.classList.remove('on'));
   document.getElementById('app-ag').classList.add('on');
@@ -62,18 +71,20 @@ const setup = () => {
   await page.waitForTimeout(500);
 
   console.log('\n[A] карточка брони: поверхность нейтральная, цвет — только кант');
-  const card = await page.evaluate((C) => {
+  const card = await page.evaluate(() => {
     const el = document.querySelector('.sched-chip');
-    const s = getComputedStyle(el);
-    return { bg: s.backgroundColor, left: s.borderLeftColor, leftW: s.borderLeftWidth,
-      top: s.borderTopColor, topW: s.borderTopWidth, shadow: s.boxShadow, radius: s.borderRadius,
-      hasBefore: getComputedStyle(el, '::before').content };
-  }, {});
+    const s = getComputedStyle(el), r = getComputedStyle(el, '::before');
+    return { bg: s.backgroundColor, top: s.borderTopColor, left: s.borderLeftColor, topW: s.borderTopWidth,
+      shadow: s.boxShadow, radius: s.borderTopLeftRadius,
+      railBg: r.backgroundColor, railW: r.width, railTop: r.top, railH: r.height, cardH: el.clientHeight };
+  });
   ok('фон карточки — обычная поверхность, а не заливка цветом вида работ', card.bg === BG2, card.bg);
-  ok('слева кант цвета вида работ', card.left === SHOOT && card.leftW === '2px', card);
-  ok('остальные грани — обычная линия интерфейса', card.top === 'rgba(255, 255, 255, 0.07)' && card.topW === '1px', card);
+  ok('цвет вида работ вынесен в капсулу слева', card.railBg === SHOOT && card.railW === '3px', card);
+  ok('капсула не доходит до углов — цвет не размазан по скруглению',
+    parseFloat(card.railTop) >= 6 && parseFloat(card.railH) < card.cardH, card);
+  ok('все четыре грани — обычная линия интерфейса',
+    card.top === 'rgba(255, 255, 255, 0.07)' && card.left === 'rgba(255, 255, 255, 0.07)' && card.topW === '1px', card);
   ok('карточка не светится: наружных теней нет', outerShadow(card.shadow).length === 0, card.shadow);
-  ok('градиентная плёнка сверху убрана', card.hasBefore === 'none', card.hasBefore);
 
   const hov = await page.evaluate(async () => {
     const el = document.querySelector('.sched-chip');
@@ -87,7 +98,8 @@ const setup = () => {
     return rule ? { bg: rule.backgroundColor || rule.background, shadow: rule.boxShadow, transform: rule.transform } : null;
   });
   ok('под курсором карточка просто светлеет', hov && /var\(--bg-3\)/.test(hov.bg || ''), hov);
-  ok('и не подпрыгивает', hov && !hov.transform, hov);
+  ok('подъём под курсором — ровно один пиксель, без прыжка',
+    hov && /translateY\(-1px\)/.test(hov.transform || ''), hov && hov.transform);
   ok('тень под курсором чёрная, а не цветная', hov && !/230|143|255,/.test(String(hov.shadow).replace(/rgba?\(255, 255, 255[^)]*\)/g, '')), hov && hov.shadow);
 
   console.log('\n[B] порядок чтения: время → название → место → вид и люди');
@@ -102,8 +114,9 @@ const setup = () => {
       durAlign: getComputedStyle(el.querySelector('.sched-chip-dur')).textAlign };
   });
   ok('название крупнее времени', hier.ttSize > hier.tmSize, hier);
-  ok('время набрано спокойным серым, а не цветом вида работ', hier.tmColor === 'rgb(154, 161, 172)', hier.tmColor);
-  ok('вид работ — тоже серый, цвет за него отвечает кант', hier.kindColor === 'rgb(122, 130, 141)', hier.kindColor);
+  ok('время — самый заметный текст после названия', neutral(hier.tmColor) && hier.tmColor === 'rgb(234, 236, 239)', hier.tmColor);
+  ok('вид работ приглушён и тоже нейтрален — цвет за него отвечает кант',
+    neutral(hier.kindColor) && hier.kindColor === 'rgb(122, 130, 141)', hier.kindColor);
   ok('низ карточки отделён волосяной линией', hier.sep === '1px', hier.sep);
   ok('подпись вида работ не обрезается даже при четырёх участниках', hier.kindFits, hier);
 
@@ -115,20 +128,51 @@ const setup = () => {
     return { cancelStrike: c ? getComputedStyle(c.querySelector('.sched-chip-tt')).textDecorationLine : null,
       cancelWhole: c ? getComputedStyle(c).textDecorationLine : null,
       cancelOp: c ? getComputedStyle(c).opacity : null,
-      holdDash: h ? getComputedStyle(h).borderLeftStyle : null,
+      holdDash: h ? getComputedStyle(h, '::before').backgroundImage : null,
       adBg: ad ? getComputedStyle(ad).backgroundColor : null,
-      adLeft: ad ? getComputedStyle(ad).borderLeftColor : null,
+      adLeft: ad ? getComputedStyle(ad, '::before').backgroundColor : null,
       adCase: ad ? getComputedStyle(ad.querySelector('.sched-chip-tm')).textTransform : null };
   });
   ok('у отменённой перечёркнуто название, а не вся карточка целиком',
     st.cancelStrike === 'line-through' && st.cancelWhole === 'none', st);
   ok('отменённая приглушена', parseFloat(st.cancelOp) < .7, st.cancelOp);
-  ok('резерв помечен пунктирным кантом', st.holdDash === 'dashed', st.holdDash);
+  ok('резерв помечен пунктирным кантом', /repeating-linear-gradient/.test(st.holdDash || ''), st.holdDash);
   ok('«весь день» — та же карточка, без градиента во всю ширину', st.adBg === BG2, st.adBg);
   ok('и со своим кантом', st.adLeft === MEET, st.adLeft);
   ok('«весь день» набрано меткой', st.adCase === 'uppercase', st.adCase);
 
-  console.log('\n[D] сегодняшняя колонка отмечена кантом, а не ореолом');
+  console.log('\n[D] идёт сейчас — карточка говорит об этом сама');
+  const live = await page.evaluate(() => {
+    const el = document.querySelector('.sched-chip.live');
+    if (!el) return { none: true };
+    const chip = el.querySelector('.sched-chip-now');
+    const others = [...document.querySelectorAll('.sched-chip')].filter(x => !x.classList.contains('live'));
+    return { txt: chip ? chip.textContent.trim() : null, title: el.querySelector('.sched-chip-tt').textContent,
+      border: getComputedStyle(el).borderTopColor, anim: chip ? getComputedStyle(chip).animationName : null,
+      shadow: chip ? getComputedStyle(chip).boxShadow : null,
+      othersMarked: others.filter(x => x.querySelector('.sched-chip-now')).length };
+  });
+  ok('у идущей сейчас брони стоит метка «сейчас»', live.txt === 'сейчас', live);
+  ok('и это именно та бронь, которая идёт', /Съёмка в студии/.test(live.title || ''), live.title);
+  ok('метка не мигает', live.anim === 'none', live.anim);
+  ok('и не светится — только кант', outerShadow(live.shadow).length === 0, live.shadow);
+  ok('остальные брони меткой не помечены', live.othersMarked === 0, live.othersMarked);
+  ok('рамка живой карточки чуть подсвечена акцентом', live.border !== 'rgba(255, 255, 255, 0.07)', live.border);
+
+  console.log('\n[D2] шапка колонки показывает загрузку дня');
+  const load = await page.evaluate(() => {
+    const cols = [...document.querySelectorAll('.sched-col')];
+    const bars = cols.map(c => { const b = c.querySelector('.sched-col-load'); const i = b ? b.querySelector('i') : null;
+      return { has: !!b, w: i ? i.style.width : null, empty: b ? b.classList.contains('is-empty') : null,
+        title: b ? b.getAttribute('title') : null }; });
+    return { bars, filled: bars.filter(b => b.w).length, peak: bars.filter(b => b.w === '100%').length };
+  });
+  ok('полоска загрузки есть у каждого дня', load.bars.every(b => b.has), load.bars);
+  ok('у пустых дней она пустая', load.bars.some(b => b.empty && !b.w), load.bars);
+  ok('самый занятый день недели заполнен целиком', load.peak === 1, load.bars);
+  ok('подсказка объясняет, что показывает полоска', /от самого занятого дня/.test((load.bars.find(b => b.title) || {}).title || ''), load.bars);
+
+  console.log('\n[E] сегодняшняя колонка отмечена кантом, а не ореолом');
   const today = await page.evaluate(() => {
     const col = document.querySelector('.sched-col.today');
     const lb = col ? col.querySelector('.today-lb') : null;
@@ -142,7 +186,7 @@ const setup = () => {
   ok('метка «сегодня» не пульсирует', today.lbAnim === 'none', today.lbAnim);
   ok('и не светится', outerShadow(today.lbShadow).length === 0, today.lbShadow);
 
-  console.log('\n[E] месяц: строка события не заливается и не вылезает из клетки');
+  console.log('\n[F] месяц: строка события не заливается и не вылезает из клетки');
   await page.evaluate(() => schView('month'));
   await page.waitForTimeout(500);
   const mo = await page.evaluate(() => {
@@ -162,7 +206,7 @@ const setup = () => {
   ok('длинное название не вылезает за клетку', mo.inside, mo);
   ok('и обрывается многоточием, а не на полуслове', mo.ellipsis === 'ellipsis' && mo.clipped === true, mo);
 
-  console.log('\n[F] лента команды: те же правила');
+  console.log('\n[G] лента команды: те же правила');
   await page.evaluate(() => { schView('team'); });
   await page.waitForTimeout(600);
   const tm = await page.evaluate(() => {
@@ -180,7 +224,7 @@ const setup = () => {
   ok('линия «сейчас» — ровные два пикселя без размытия',
     tm.nowW === '2px' && outerShadow(tm.nowShadow).length === 0, tm);
 
-  console.log('\n[G] список дня: вид работ — метка, а не цветная плашка');
+  console.log('\n[H] список дня: вид работ — метка, а не цветная плашка');
   const day = await page.evaluate(() => {
     const mon = (function () { const x = new Date(); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); x.setHours(0, 0, 0, 0); return x.getTime(); })();
     schDay(mon + 3 * 86400000);
