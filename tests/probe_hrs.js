@@ -178,6 +178,70 @@ const setup = (D) => {
   });
   ok('2,5 ч таймера + 12,5 ч журнала = 15 ч', agg.hours === 15, agg.hours);
 
+  console.log('\n[H] разбор времени: данные не слипаются, окно прокручивается');
+  /* Экран пользователя: 1300×845. Записей больше, чем влезает, — как в жизни. */
+  await page.setViewportSize({ width: 1300, height: 845 });
+  const LONG = []; const KIND = ['Съёмка', 'Проезд', 'Переговоры', 'Кастинг', 'Монтаж'];
+  for (let i = 0; i < 9; i++) LONG.push({ id: 'L' + i, label: KIND[i % 5], h: 1 + (i % 4), date: '2026-07-' + (10 + i), note: i % 2 ? 'комментарий ' + i : '' });
+  await page.evaluate(setup, { HLOG: LONG });
+  await page.evaluate(() => {
+    PROJECTS[0]._tasks = Array.from({ length: 6 }, (_, i) => ({ id: 'x' + i, title: 'Задача номер ' + (i + 1),
+      status: ['done', 'active', 'review'][i % 3], assignee_id: 'm1', time_spent: 1800 * (i + 1),
+      review_spent: i % 3 === 2 ? 600 : 0, subtasks: [], attachments: [] }));
+    pd2Close(); openProject(0); pdTimeOpen();
+  });
+  await page.waitForTimeout(400);
+  const fit = await page.evaluate(() => {
+    const mb = document.querySelector('.pdt-modal .modal-b');
+    const rows = [...document.querySelectorAll('.pdt-tbl:not(.pdt-tbl-tasks) .pdt-tr:not(.pdt-th)')];
+    return { scrolls: mb.scrollHeight - mb.clientHeight > 2, bodyH: mb.clientHeight, bodyS: mb.scrollHeight,
+      squashed: [...mb.children].filter(c => c.scrollHeight - c.clientHeight > 2).map(c => String(c.className).slice(0, 24)),
+      rows: rows.length, minRow: Math.min.apply(null, rows.map(r => Math.round(r.getBoundingClientRect().height))),
+      overlap: rows.slice(1).filter((r, i) => r.getBoundingClientRect().top < rows[i].getBoundingClientRect().bottom - 1).length,
+      ring: getComputedStyle(mb).outlineStyle };
+  });
+  ok('окно прокручивается, когда записей больше, чем влезает', fit.scrolls, fit);
+  ok('ни один блок не сдавлен — данные видно целиком', fit.squashed.length === 0, fit.squashed);
+  ok('все девять записей на месте', fit.rows === 9, fit.rows);
+  ok('строка не схлопывается в полоску', fit.minRow >= 36, fit.minRow);
+  ok('строки не налезают друг на друга', fit.overlap === 0, fit.overlap);
+  ok('тело окна не обведено рамкой фокуса', fit.ring === 'none', fit.ring);
+
+  const stick = await page.evaluate(() => {
+    const mb = document.querySelector('.pdt-modal .modal-b');
+    mb.scrollTop = 560;
+    const th = document.querySelector('.pdt-tbl:not(.pdt-tbl-tasks) .pdt-th');
+    const tb = document.querySelector('.pdt-tbl:not(.pdt-tbl-tasks)');
+    return { pos: getComputedStyle(th).position, gap: Math.round(th.getBoundingClientRect().top - mb.getBoundingClientRect().top),
+      scrolledPast: tb.getBoundingClientRect().top < mb.getBoundingClientRect().top,
+      head: th.textContent.replace(/\s+/g, ' ').trim() };
+  });
+  ok('шапка таблицы прилипает к верху при прокрутке', stick.pos === 'sticky' && stick.scrolledPast, stick);
+  ok('и стоит вплотную — в щель не подглядывает уехавшая строка', Math.abs(stick.gap) <= 1, stick.gap);
+  ok('видно, что за колонки перед глазами', /ВИД РАБОТ|Вид работ/i.test(stick.head), stick.head);
+
+  console.log('\n[I] на телефоне окно поверх карточки проекта, а не под ней');
+  await page.setViewportSize({ width: 390, height: 780 });
+  await page.evaluate(() => { pd2Close(); pdTimeOpen(); });
+  await page.waitForTimeout(400);
+  const mob = await page.evaluate(() => {
+    const m = document.querySelector('.pdt-modal');
+    const mb = m.querySelector('.modal-b');
+    const zi = el => Number(getComputedStyle(el).zIndex) || 0;
+    const at = document.elementFromPoint(195, 420);
+    return { over: zi(document.getElementById('ov-pd2')) > zi(document.getElementById('ov-proj')),
+      hit: !!(at && m.contains(at)), inner: mb.scrollHeight - mb.clientHeight > 2,
+      btnRow: (function(){ const b = m.querySelector('.pf-cat-btn'), h = m.querySelector('.modal-h h3');
+        return b && h ? Math.round(b.getBoundingClientRect().top - h.getBoundingClientRect().bottom) : null; })(),
+      titleLines: (function(){ const h = m.querySelector('.modal-h h3');
+        return h ? Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).fontSize) / 1.25) : null; })() };
+  });
+  ok('шторка лежит поверх карточки проекта', mob.over, mob);
+  ok('и принимает нажатия, а не проваливает их вниз', mob.hit, mob);
+  ok('внутри шторки нет второго скролла — тянется вся целиком', !mob.inner, mob);
+  ok('заголовок помещается в одну строку', mob.titleLines === 1, mob.titleLines);
+  ok('кнопка «Добавить часы» ушла на свою строку', mob.btnRow !== null && mob.btnRow > 0, mob.btnRow);
+
   ok('страница без ошибок', errs.length === 0, errs.slice(0, 2));
   console.log('\n──────── ' + pass + ' ok · ' + fail + ' fail ────────');
   await b.close();
