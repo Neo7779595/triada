@@ -91,6 +91,16 @@ const setup = () => {
   });
   ok('лист тёмный, как весь кабинет', sheet.lum < 60, sheet);
   ok('текст на нём светлый', sheet.colLum > 150, sheet);
+  /* лист занимает окно, а не лежит островком посреди тёмного поля */
+  const box = await page.evaluate(() => {
+    const body = document.getElementById('dsr-body').getBoundingClientRect();
+    const sh = document.querySelector('.dsr-sheet').getBoundingClientRect();
+    return { left: Math.round(sh.left - body.left), right: Math.round(body.right - sh.right),
+      top: Math.round(sh.top - body.top), fill: Math.round((sh.width / body.width) * 100) };
+  });
+  ok('поля слева и справа одинаковые', Math.abs(box.left - box.right) <= 1, box);
+  ok('сверху такое же поле', Math.abs(box.top - box.left) <= 1, box);
+  ok('лист занимает почти всю ширину окна', box.fill >= 90, box);
 
   /* ——— C. пустое досье ——— */
   console.log('\n[C] пустое досье');
