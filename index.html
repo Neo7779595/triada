@@ -11724,7 +11724,7 @@ function agPlanLimit(){
 function agProjUsed(){
   const me=(window.tMe&&window.tMe())||{};
   if(typeof me.agencyActiveProjects==='number' && isFinite(me.agencyActiveProjects)) return me.agencyActiveProjects;
-  return (typeof PROJECTS!=='undefined')?PROJECTS.filter(p=>p&&p.status!=='done').length:0;
+  return (typeof PROJECTS!=='undefined')?PROJECTS.filter(p=>p&&!agIsArchivedProject(p)).length:0;
 }
 /* Обновить me.agencyActiveProjects через RPC. Вызывается после создания/удаления проекта
    и после подтверждения оплаты. Не роняет UI, если RPC недоступна. */
@@ -17490,7 +17490,8 @@ async function quickTaskOpen(){
   if(typeof PROJECTS==='undefined' || !PROJECTS.length){ toast('Сначала создайте проект'); return; }
   if(typeof agCanView==='function' && !agCanView('projects')){ toast('Нет доступа к проектам'); return; }
   window._qtSub=[];
-  const projArr=PROJECTS.filter(p=>p.status!=='done').map(p=>[String(p.id), p.name, _avProj(p)]);
+  const projArr=((typeof agActiveProjects==='function')?agActiveProjects():PROJECTS.filter(p=>!agIsArchivedProject(p)))
+    .map(p=>[String(p.id), p.name, _avProj(p)]);
   pd2Open(`<div class="modal"><div class="modal-h"><h3>Добавить задачу</h3><p>Быстрое создание · выберите проект и этап</p></div>
     <div class="modal-b">
       <div class="fld"><label>Проект <span style="color:var(--neg)">*</span></label>${selField('qt-proj', projArr, '')}</div>
@@ -26794,7 +26795,7 @@ let _smmLbData=null, _smmLbMetric='er', _smmLbLoading=false, _smmLbSortDir='desc
    window._smmProjLoaded, из-за которого пустой кеш залипал до перезагрузки страницы. */
 let _smmLbSig='', _smmLbErrAt=0, _smmLbErr='', _smmLbMixed=false;
 const _SMM_LB_ERR_TTL=15000;
-function _smmIds(){ const _src=(typeof agActiveProjects==='function')?agActiveProjects():((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]).filter(p=>p.status!=='done'); return _src.map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }   // scope сотрудника + без архива: лидерборд ранжирует живые проекты
+function _smmIds(){ const _src=(typeof agActiveProjects==='function')?agActiveProjects():((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS:[]).filter(p=>!agIsArchivedProject(p)); return _src.map(p=>p.id).filter(x=>x!=null).map(String).sort().join(','); }   // scope сотрудника + без архива: лидерборд ранжирует живые проекты
 function _smmLbStale(){ const s=_smmIds(); return !!s && s!==_smmLbSig && !(_smmLbErrAt && Date.now()-_smmLbErrAt<_SMM_LB_ERR_TTL); }
 function smmLbReset(){ _smmLbAll=null; _smmLbData=null; _smmLbPeriods=[]; _smmLbSig=''; _smmLbErrAt=0; _smmLbLoading=false; }
 /* total_* — то, что реально ввели в отчёте. Раньше охват считался как
@@ -28080,7 +28081,7 @@ function renderDeadlines(){
   const onF=f=>agDlFilter===f?'on':'', onV=v=>agDlView===v?'on':'', onG=g=>agDlGroup===g?'on':'';
   /* значение опции — id проекта: по имени два проекта-тёзки было не различить,
      а переименование на сервере оставляло фильтр указывать в пустоту */
-  const _dlPrj=(typeof agVisibleProjects==='function')?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]);
+  const _dlPrj=(typeof agActiveProjects==='function')?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>!agIsArchivedProject(p));
   const projOptsArr=[['all','Все проекты']].concat(_dlPrj.map(p=>[String(p.id),p.name]));
   const _team=(typeof TEAM!=='undefined'?TEAM:[]);
   const _teamArc=(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]);
@@ -28259,8 +28260,8 @@ function renderOverview(){
   const _ready = !!O._loaded;                                     // данные ещё не пришли → показываем «—», а не ложные 100%
 
   /* —— scalars derived from the projects themselves (always match the table) —— */
-  const active = P.filter(p => p.status !== 'done');
-  const doneN  = P.filter(p => p.status === 'done').length;
+  const active = P.filter(p => !agIsArchivedProject(p));
+  const doneN  = P.length - active.length;
   const STALE = 14;
   const _isStale = p => p._lastActDays != null && p._lastActDays >= STALE;
   const onTrack = active.filter(p => !p._overdue && !_isStale(p)).length;
@@ -28307,7 +28308,7 @@ function renderOverview(){
   const IC_REDO = '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/>';
 
   /* —— portfolio rows (respect the active filter tab) —— */
-  const rows = P.filter(p => ovFilter==='all' ? true : ovFilter==='active' ? p.status!=='done' : ovFilter==='overdue' ? (!!p._overdue && p.status!=='done') : p.status==='done');
+  const rows = P.filter(p => ovFilter==='all' ? true : ovFilter==='active' ? !agIsArchivedProject(p) : ovFilter==='overdue' ? (!!p._overdue && !agIsArchivedProject(p)) : agIsArchivedProject(p));
   const seg = (k,lbl,dot) => `<button class="${ovFilter===k?'on':''}" onclick="setOvFilter('${k}')">${dot||''}${lbl}</button>`;
 
   /* —— deadline radar: overdue → today → week —— */
@@ -28711,7 +28712,9 @@ const _cycLbl=(o,v)=>{const fo=o.find(x=>String(x[0])===String(v));return fo?fo[
 function _cycFilterBar(pfx,period,sort,q,asg,setP,setS,setQ,setA,reset,proj,setPr){
   const _tmAll=[].concat((typeof TEAM!=='undefined'?TEAM:[]),(typeof TEAM_ARCHIVED!=='undefined'?TEAM_ARCHIVED:[]));   // архивных тоже надо фильтровать
   const asgOpts=[['all','Все исполнители'],['__none','Не назначен']].concat(_tmAll.map(m=>[m._id,m.name]));
-  const _prList=(typeof agVisibleProjects==='function'?agVisibleProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]))
+  /* Только живые проекты: аналитика считает по ним, и предлагать в фильтре
+     завершённый проект — обещать разрез, которого в цифрах нет. */
+  const _prList=(typeof agActiveProjects==='function'?agActiveProjects():(typeof PROJECTS!=='undefined'?PROJECTS:[]).filter(p=>!agIsArchivedProject(p)))
     .filter(p=>p&&p.id).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
   const projOpts=[['all','Все проекты']].concat(_prList.map(p=>[p.id,p.name||'—']));
   const _active=(sort!=='desc')||!!q||(period!=='all')||(asg!=='all')||(proj&&proj!=='all');
@@ -38010,7 +38013,7 @@ function _sideRefreshBadges(){
       const P=(typeof agVisibleProjects==='function')?agVisibleProjects()
         :((typeof PROJECTS!=='undefined'&&PROJECTS)||[]);
       if(O && O._loaded && Array.isArray(P)){
-        const active=P.filter(p=>p && p.status!=='done');
+        const active=P.filter(p=>p && !agIsArchivedProject(p));
         const onTrack=active.filter(p=>!p._overdue && !(p._lastActDays!=null && p._lastActDays>=14)).length;
         if(active.length) healthPct=Math.round(100*onTrack/active.length);
       }
