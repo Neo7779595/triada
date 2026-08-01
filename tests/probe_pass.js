@@ -80,7 +80,7 @@ const geom = () => {
   ok('внутри документа нет горизонтальной прокрутки', g.docOver === 0, g.docOver);
   ok('ни один элемент не вылезает за края документа', g.outside.length === 0, g.outside);
   ok('страница не едет вбок', g.pageOver === 0, g.pageOver);
-  ok('на 1720px таблица раздела в 3 колонки', g.gridCols === 3, g.gridCols);
+  ok('на 1720px таблица раздела в 2 колонки — как на листе PDF', g.gridCols === 2, g.gridCols);
   ok('каждый раздел — отдельный блок', g.secs === 2, g.secs);
 
   console.log('\n[B] короткий ответ — ячейка, развёрнутый — строка целиком');
@@ -155,12 +155,56 @@ const geom = () => {
     const gg = await page.evaluate(geom);
     ok(W + 'px · ничего не вылезает за документ', gg.outside.length === 0 && gg.docOver === 0, gg);
     ok(W + 'px · страница не едет вбок', gg.pageOver === 0, gg.pageOver);
-    if (W === 2200) ok('2200px · таблица в 3 колонки — шире не дробим, читаемость важнее плотности', gg.gridCols === 3, gg.gridCols);
+    if (W === 2200) ok('2200px · только на сверхширокой третья колонка', gg.gridCols === 3, gg.gridCols);
     if (W === 1280) ok('1280px · таблица в 2 колонки', gg.gridCols === 2, gg.gridCols);
     if (W === 1024) ok('1024px · узкий раздел — одна колонка', gg.gridCols === 1, gg.gridCols);
     if (W === 900) ok('900px · одна колонка', gg.gridCols === 1, gg.gridCols);
     if (W === 430) ok('430px · всё в одну колонку', gg.gridCols === 1, gg);
   }
+
+  console.log('\n[G] композиция повторяет PDF: обложка, содержание, выровненные подписи');
+  await page.setViewportSize({ width: 1720, height: 1000 });
+  await page.waitForTimeout(250);
+  const pdfLike = await page.evaluate(() => {
+    const q = s => document.querySelector(s);
+    const toc = [...document.querySelectorAll('.bpass-toc-i')];
+    /* подписи в паре плиток обязаны стоять на одной высоте, значения — тоже */
+    const rows = [];
+    document.querySelectorAll('.bpass-tbl').forEach(t => {
+      const cs = [...t.querySelectorAll(':scope>.bpass-c')];
+      for (let i = 0; i + 1 < cs.length; i += 2) {
+        const a = cs[i].querySelector('.bpass-lbl'), b = cs[i + 1].querySelector('.bpass-lbl');
+        if (!a || !b) continue;
+        const va = cs[i].children[1], vb = cs[i + 1].children[1];
+        rows.push({
+          lbl: Math.abs(a.getBoundingClientRect().height - b.getBoundingClientRect().height),
+          val: (va && vb) ? Math.abs(va.getBoundingClientRect().top - vb.getBoundingClientRect().top) : 0,
+          h: Math.abs(cs[i].getBoundingClientRect().height - cs[i + 1].getBoundingClientRect().height),
+        });
+      }
+    });
+    return {
+      rule: !!q('.bpass-rule'), bar: !!q('.bpass-prog2-bar'), ring: !!q('.bpass-ring'),
+      tocN: toc.length, tocHref: toc[0] && toc[0].getAttribute('href'),
+      secFramed: q('.bpass-sec') ? getComputedStyle(q('.bpass-sec')).borderTopWidth : null,
+      cardBorder: q('.bpass-c') ? getComputedStyle(q('.bpass-c')).borderTopWidth : null,
+      narrSep: (() => { const l = q('.bpass-narr .bpass-lbl'); return l ? getComputedStyle(l).borderBottomWidth : null; })(),
+      nofill: !!q('.bpass-nofill'),
+      badLbl: rows.filter(r => r.lbl > 1).length,
+      badVal: rows.filter(r => r.val > 1).length,
+      badH: rows.filter(r => r.h > 1).length,
+      rows: rows.length,
+    };
+  });
+  ok('на титуле акцентная черта, как в PDF', pdfLike.rule, pdfLike);
+  ok('заполнение показано полосой, а не кольцом', pdfLike.bar && !pdfLike.ring, pdfLike);
+  ok('содержание собрано и ведёт к разделам', pdfLike.tocN === 2 && /#bpsec-/.test(pdfLike.tocHref || ''), pdfLike);
+  ok('раздел без рамки — вес держат карточки', pdfLike.secFramed === '0px' && pdfLike.cardBorder === '1px', pdfLike);
+  ok('в развёрнутом ответе вопрос отбит линейкой', pdfLike.narrSep === '1px', pdfLike.narrSep);
+  ok('незаполненные вопросы одной строкой', pdfLike.nofill, pdfLike);
+  ok('в паре плиток подписи одной высоты', pdfLike.rows > 0 && pdfLike.badLbl === 0, pdfLike);
+  ok('значения в паре плиток на одной линии', pdfLike.badVal === 0, pdfLike);
+  ok('плитки ряда одной высоты', pdfLike.badH === 0, pdfLike);
 
   ok('страница без ошибок', errs.length === 0, errs.slice(0, 2));
   console.log('\n──────── ' + pass + ' ok · ' + fail + ' fail ────────');
