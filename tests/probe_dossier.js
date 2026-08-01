@@ -39,28 +39,37 @@ const setup = () => {
   console.log('\n[A] кнопка в карточке');
   const btns = await page.evaluate(() => {
     const o = {};
-    document.querySelectorAll('.pjh-mgrid .dsr-open').forEach(b => { o[b.id] = { on: b.classList.contains('on'), dot: !!b.querySelector('.dot') }; });
+    document.querySelectorAll('.pjh-mgrid .dsr-tile').forEach(b => { o[b.id] = { on: b.classList.contains('on'), dot: !!b.querySelector('.dot') }; });
     return o;
   });
   ok('кнопка есть у каждого проекта', Object.keys(btns).length === 2, btns);
-  ok('стоит внутри блока «Ответственный»', await page.evaluate(() => {
-    const b = document.querySelector('.dsr-open');
-    const blk = b && b.closest('.pjh-mblk');
-    return !!blk && /Ответственный/.test(blk.querySelector('.mk').textContent);
+  ok('досье — отдельный блок, а не пассажир в чужом', await page.evaluate(() => {
+    const b = document.getElementById('dsr-b-p1');
+    const lead = b.parentNode.querySelector('.pjh-lead');
+    return !!lead && b.parentNode.classList.contains('pjh-mrow')
+      && !lead.contains(b) && /Ответственный/.test(lead.querySelector('.mk').textContent);
   }));
   ok('пустое досье — приглушённая иконка', btns['dsr-b-p1'].on === false && btns['dsr-b-p1'].dot === false, btns['dsr-b-p1']);
   ok('заполненное — акцентная с точкой', btns['dsr-b-p2'].on === true && btns['dsr-b-p2'].dot === true, btns['dsr-b-p2']);
-  ok('у кнопки есть внятная подпись для чтения с экрана', await page.evaluate(() =>
-    /Досье проекта/.test(document.querySelector('.dsr-open').getAttribute('aria-label') || '')));
+  ok('у плитки есть внятная подпись для чтения с экрана', await page.evaluate(() =>
+    /Досье проекта/.test(document.getElementById('dsr-b-p1').getAttribute('aria-label') || '')));
+  ok('и видимая подпись «Досье»', await page.evaluate(() =>
+    (document.querySelector('#dsr-b-p1 .dsr-tile-k') || {}).textContent) === 'Досье');
+  ok('строчки на иконке готовы дописываться', await page.evaluate(() =>
+    document.querySelectorAll('#dsr-b-p1 svg .ln').length) === 3);
   const fit = await page.evaluate(() => {
-    const b = document.getElementById('dsr-b-p1').getBoundingClientRect();
-    const blk = document.getElementById('dsr-b-p1').closest('.pjh-mblk').getBoundingClientRect();
-    const person = document.getElementById('dsr-b-p1').closest('.pjh-leadrow').querySelector('.pjh-person').getBoundingClientRect();
-    return { over: Math.round(Math.max(0, b.bottom - blk.bottom, blk.top - b.top)),
-      right: Math.round(blk.right - b.right), sameRow: Math.abs((b.top + b.height / 2) - (person.top + person.height / 2)) < 3 };
+    const tile = document.getElementById('dsr-b-p1');
+    const row = tile.parentNode, lead = row.querySelector('.pjh-lead');
+    const t = tile.getBoundingClientRect(), l = lead.getBoundingClientRect(), r = row.getBoundingClientRect();
+    return { gap: Math.round(t.left - l.right), sameH: Math.abs(t.height - l.height) <= 2,
+      tileW: Math.round(t.width), rightEdge: Math.round(r.right - t.right),
+      leadCut: Math.round(r.width - l.width) };
   });
-  ok('кнопка помещается в блок и не растягивает его', fit.over === 0, fit);
-  ok('стоит справа, в одну строку с ответственным', fit.right >= 10 && fit.right <= 20 && fit.sameRow, fit);
+  ok('плитка стоит справа от «Ответственного»', fit.gap >= 6 && fit.gap <= 16, fit);
+  ok('оба блока одной высоты', fit.sameH, fit);
+  ok('«Ответственный» ужат ровно на ширину плитки', fit.leadCut >= fit.tileW && fit.leadCut <= fit.tileW + 16, fit);
+  ok('плитка узкая и не съедает карточку', fit.tileW >= 60 && fit.tileW <= 100, fit);
+  ok('плитка прижата к правому краю', fit.rightEdge <= 1, fit);
 
   /* ——— B. открытие ——— */
   console.log('\n[B] открытие');
@@ -74,6 +83,14 @@ const setup = () => {
     return /SMM/.test(t) && /Gold/.test(t) && /DTR HUNTER/.test(t) && /01\.06\.2026/.test(t) && /01\.12\.2026/.test(t);
   }), await page.evaluate(() => document.querySelector('.dsr-sh-m').textContent.replace(/\s+/g, ' ')));
   ok('в подвале сказано, что документ внутренний', /не для передачи клиенту/.test(await page.evaluate(() => document.querySelector('.dsr-sh-f').textContent)));
+  /* лист в фирменной тёмной теме, а не белая бумага посреди тёмной панели */
+  const sheet = await page.evaluate(() => {
+    const c = getComputedStyle(document.querySelector('.dsr-sheet'));
+    const lum = s => { const m = String(s).match(/\d+/g) || [0, 0, 0]; return (+m[0] * .299 + +m[1] * .587 + +m[2] * .114); };
+    return { bg: c.backgroundColor, bgImg: c.backgroundImage.slice(0, 30), lum: Math.round(lum(c.backgroundColor)), color: c.color, colLum: Math.round(lum(c.color)) };
+  });
+  ok('лист тёмный, как весь кабинет', sheet.lum < 60, sheet);
+  ok('текст на нём светлый', sheet.colLum > 150, sheet);
 
   /* ——— C. пустое досье ——— */
   console.log('\n[C] пустое досье');
