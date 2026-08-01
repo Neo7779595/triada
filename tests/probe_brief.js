@@ -73,15 +73,20 @@ const setup = () => {
   const view = await page.evaluate(() => {
     const host = document.getElementById('probe-host');
     host.innerHTML = briefPassportHTML('p1');
-    const vals = [...host.querySelectorAll('.bpass-val,.bpass-long')].map(e => ({
-      cls: e.className, ws: getComputedStyle(e).whiteSpace, txt: e.textContent, h: Math.round(e.getBoundingClientRect().height) }));
+    /* Многострочный ответ паспорт разбирает на абзацы (.bpass-rich),
+       односложный оставляет плиткой (.bpass-val). Проверяем не механику,
+       а то, что переносы дожили до экрана в любом из этих видов. */
+    const vals = [...host.querySelectorAll('.bpass-val,.bpass-long,.bpass-rich')].map(e => ({
+      cls: e.className, ws: getComputedStyle(e).whiteSpace, txt: e.textContent,
+      breaks: e.querySelectorAll('br').length + Math.max(0, e.querySelectorAll(':scope>p,:scope>ol,:scope>ul').length - 1),
+      h: Math.round(e.getBoundingClientRect().height) }));
     return vals;
   });
-  console.log('    ' + JSON.stringify(view));
+  console.log('    ' + JSON.stringify(view.map(v => ({ cls: v.cls, breaks: v.breaks, h: v.h }))));
   const shortCell = view.find(v => /Первая строка/.test(v.txt));
-  ok('короткий ответ показан целиком', !!shortCell, view.map(v => v.txt));
-  ok('и переносы не схлопнулись', shortCell && shortCell.ws === 'pre-wrap', shortCell);
-  ok('три строки занимают три строки', shortCell && shortCell.h > 40, shortCell);
+  ok('короткий ответ показан целиком', !!shortCell && /Вторая строка/.test(shortCell.txt) && /Третья/.test(shortCell.txt), view.map(v => v.txt));
+  ok('и переносы не схлопнулись', shortCell && (shortCell.ws === 'pre-wrap' || shortCell.breaks >= 2), shortCell && { cls: shortCell.cls, ws: shortCell.ws, breaks: shortCell.breaks });
+  ok('три строки занимают три строки', shortCell && shortCell.h > 40, shortCell && shortCell.h);
 
   console.log('\n[E] уже написанный текст открывается развёрнутым');
   const reopened = await page.evaluate(() => {
