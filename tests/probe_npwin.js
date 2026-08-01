@@ -178,9 +178,26 @@ const setup = () => {
     return Math.abs(s.getBoundingClientRect().top - b.getBoundingClientRect().top - 8) < 24;
   }));
   ok('активный пункт — «Команда»', await page.evaluate(() => document.querySelector('#npw-nav .npw-nav-i.on').dataset.sec) === 'team');
-  ok('подложка навигации переехала', await page.evaluate(() => {
-    const p = document.getElementById('npw-pill'), a = document.querySelector('#npw-nav .npw-nav-i.on');
-    return p.style.opacity === '1' && p.style.transform === 'translateY(' + a.offsetTop + 'px)';
+  await page.waitForTimeout(700);   /* подложка переезжает 0.2s — даём ей доехать */
+  ok('подложка легла ровно на активную кнопку', await page.evaluate(() => {
+    const p = document.getElementById('npw-pill').getBoundingClientRect();
+    const a = document.querySelector('#npw-nav .npw-nav-i.on').getBoundingClientRect();
+    return Math.abs(p.top - a.top) <= 1.5 && Math.abs(p.bottom - a.bottom) <= 1.5
+        && Math.abs(p.left - a.left) <= 1 && Math.abs(p.right - a.right) <= 1;
+  }), await page.evaluate(() => {
+    const p = document.getElementById('npw-pill').getBoundingClientRect();
+    const a = document.querySelector('#npw-nav .npw-nav-i.on').getBoundingClientRect();
+    return { dTop: +(p.top - a.top).toFixed(2), dBot: +(p.bottom - a.bottom).toFixed(2), dL: +(p.left - a.left).toFixed(2), dR: +(p.right - a.right).toFixed(2) };
+  }));
+  ok('подсветка не сбегает на «Основное» по дороге', await page.evaluate(() =>
+    document.querySelector('#npw-nav .npw-nav-i.on').dataset.sec) === 'team');
+  ok('кнопки навигации одной ширины и на одной вертикали', await page.evaluate(() => {
+    const r = [...document.querySelectorAll('#npw-nav .npw-nav-i')].map(e => e.getBoundingClientRect());
+    return r.every(x => Math.abs(x.left - r[0].left) < .5 && Math.abs(x.width - r[0].width) < .5 && Math.abs(x.height - r[0].height) < .5);
+  }));
+  ok('счётчики прижаты к одному краю', await page.evaluate(() => {
+    const c = [...document.querySelectorAll('#npw-nav .npw-nav-c')].filter(e => e.textContent.trim());
+    return c.length > 1 && c.every(x => Math.abs(x.getBoundingClientRect().right - c[0].getBoundingClientRect().right) < .5);
   }));
   await page.evaluate(() => { document.getElementById('npw-body').scrollTop = 0; });
   await page.waitForTimeout(250);
