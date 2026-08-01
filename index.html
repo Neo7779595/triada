@@ -12372,6 +12372,12 @@ function _agShowTariffsPage(opts){
         </div>
       </div>
 
+      ${(!isPublic && dLeft!=null && dLeft>0) ? `
+      <div class="tf-reset-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+        <span>При переходе на другой тариф срок текущего закрывается — новый считается с сегодня, оставшиеся <b>${dLeft} ${_plural(dLeft,'день','дня','дней')}</b> не переносятся. Продление того же тарифа прибавляется к сроку.</span>
+      </div>` : ''}
+
       ${upgradeList.length ? `
         <section class="tf-sec">
           <header class="tf-sec-h">
@@ -12558,6 +12564,16 @@ function _agShowUpgradeModal(cur, tgt, intent, ctx){
   /* Бонус-строка для квартала: считаем стоимость одного месяца из quarterly_price/3 vs из price — экономия */
   const bonusHtml = (isQuarter && tgt && tgt.price!=null && tgt.quarterly_price!=null)
     ? `<div class="ag-up-save-row">+1 месяц бонусом · экономия ${_agFmtMoney(Number(tgt.price)*3 - Number(tgt.quarterly_price))} сум за квартал</div>` : '';
+  /* Честное предупреждение о сбросе срока. Сервер (billing_apply_payment) при смене
+     тарифа начинает отсчёт с сегодня — остаток старого тарифа не переносится.
+     Клиент должен узнать об этом ДО оплаты, а не из сообщения бота после. */
+  const _meUp=(window.tMe&&window.tMe())||{};
+  const dLeftUp=_agDaysLeft(_meUp.agencyPaidUntil);
+  const resetHtml = (dLeftUp!=null && dLeftUp>0)
+    ? `<div class="ag-up-reset">
+         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+         <span>Срок текущего тарифа закрывается: оставшиеся <b>${dLeftUp} ${_plural(dLeftUp,'день','дня','дней')}</b> не переносятся — новый тариф считается с сегодня.</span>
+       </div>` : '';
   const isDowngrade = (ctx.reason==='downgrade');
   const title = (ctx.reason==='limit' && ctx.limit)
     ? `Достигнут лимит · ${used}/${ctx.limit.limit}`
@@ -12588,6 +12604,7 @@ function _agShowUpgradeModal(cur, tgt, intent, ctx){
         </div>
       </div>
       ${bonusHtml}
+      ${resetHtml}
       ${feats?'<ul class="ag-up-feats">'+feats+'</ul>':''}
       <div class="ag-up-note">Оплата через бот <b>@DeTroyd_system_bot</b>. Реквизиты, чек и подтверждение — там. Тариф активируется автоматически после подтверждения.</div>
     </div>
@@ -12822,6 +12839,9 @@ function _agReadOnlyPeek(){
     +'.ag-up-feats{margin:12px 0 4px;padding-left:20px;color:var(--txt-2);font-size:13px;line-height:1.75}'
     +'.ag-up-feats li{margin:2px 0}'
     +'.ag-up-note{background:color-mix(in oklab, var(--panel-3) 60%, transparent);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;color:var(--txt-3);line-height:1.55;margin-top:12px}'
+    +'.ag-up-reset{display:flex;align-items:flex-start;gap:9px;margin-top:12px;padding:10px 12px;border:1px dashed color-mix(in oklab, #F5C542 34%, transparent);background:color-mix(in oklab, #F5C542 7%, transparent);border-radius:10px;font-size:12.5px;line-height:1.55;color:var(--txt-2)}'
+    +'.ag-up-reset svg{width:15px;height:15px;flex:0 0 15px;margin-top:1px;color:#F5C542}'
+    +'.ag-up-reset b{color:var(--txt-1);font-weight:700}'
     +'.ag-up-note code{background:color-mix(in oklab, var(--accent) 15%, transparent);padding:1px 6px;border-radius:6px;color:var(--txt-2);font-size:11.5px}'
     /* ═══ plan-picker · премиальная модалка «Изменить тариф» ═══ */
     /* Оверлей — сильный blur+scrim, чтобы фон-кабинет не отвлекал */
@@ -12975,6 +12995,10 @@ function _agReadOnlyPeek(){
     +'.tf-tog button:hover{color:var(--txt-2)}'
     +'.tf-tog button.on{background:linear-gradient(180deg, color-mix(in oklab, var(--accent) 20%, var(--bg-2)) 0%, color-mix(in oklab, var(--accent) 14%, var(--bg-2)) 100%);color:var(--txt);box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--line-2))}'
     +'.tf-tog-bonus{font-size:9.5px;font-weight:800;color:#F5C542;background:color-mix(in oklab, #F5C542 14%, transparent);padding:2.5px 6px;border-radius:5px;letter-spacing:.03em;border:1px solid color-mix(in oklab, #F5C542 24%, transparent);line-height:1.15}'
+    /* Честное предупреждение: при смене тарифа остаток срока не переносится */
+    +'.tf-reset-note{display:flex;align-items:flex-start;gap:9px;margin:-4px 0 20px;padding:11px 14px;border:1px dashed color-mix(in oklab, #F5C542 34%, transparent);background:color-mix(in oklab, #F5C542 7%, transparent);border-radius:12px;font-size:12.5px;line-height:1.55;color:var(--txt-2)}'
+    +'.tf-reset-note svg{width:15px;height:15px;flex:0 0 15px;margin-top:1px;color:#F5C542}'
+    +'.tf-reset-note b{color:var(--txt-1);font-weight:700}'
     /* ─── Section header ─── */
     +'.tf-sec{margin-bottom:24px}'
     +'.tf-sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px;padding:0 4px}'
