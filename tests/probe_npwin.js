@@ -156,21 +156,22 @@ const setup = () => {
   /* ——— I. доступ клиента ——— */
   console.log('\n[I] доступ клиента');
   /* логин собирается из названия сам — руками его набирать не нужно */
-  ok('логин уже подставлен из названия', await page.evaluate(() => document.getElementById('np-clogin').value) === 'stella',
+  ok('в поле сразу полный адрес входа', await page.evaluate(() => document.getElementById('np-clogin').value) === 'stella@detroyd.triada.app',
     await page.evaluate(() => document.getElementById('np-clogin').value));
+  ok('подпись объясняет, а не повторяет адрес', await page.evaluate(() => document.getElementById('np-cemail').textContent) === 'Этот адрес клиент вводит при входе');
   await page.evaluate(() => { document.getElementById('np-name').value = 'Ресто Групп'; npwLoginTouched = false; npwLoginSync(); });
   await page.waitForTimeout(120);
-  ok('кириллица переводится в латиницу', await page.evaluate(() => document.getElementById('np-clogin').value) === 'resto',
+  ok('кириллица переводится в латиницу', await page.evaluate(() => document.getElementById('np-clogin').value) === 'resto@detroyd.triada.app',
     await page.evaluate(() => document.getElementById('np-clogin').value));
   const vars = await page.evaluate(() => npwLoginVariants());
   ok('вариантов логина несколько', vars.length >= 3, vars);
   ok('все варианты годятся для адреса', vars.every(v => /^[a-z][a-z0-9]{2,23}$/.test(v)), vars);
   await page.click('#ov-pd2 .npw-gen .npw-pbtn');
   await page.waitForTimeout(120);
-  ok('кнопка даёт следующий вариант', await page.evaluate(() => document.getElementById('np-clogin').value) === vars[1], vars);
+  ok('кнопка даёт следующий вариант', await page.evaluate(() => document.getElementById('np-clogin').value) === vars[1] + '@detroyd.triada.app', vars);
   await page.fill('#np-clogin', 'stella');
   await page.waitForTimeout(120);
-  ok('почта клиента собирается на лету', await page.evaluate(() => document.getElementById('np-cemail').textContent) === 'stella@detroyd.triada.app');
+  ok('набрали одно имя — подпись показывает готовый адрес', await page.evaluate(() => document.getElementById('np-cemail').textContent) === 'Адрес входа: stella@detroyd.triada.app');
   await page.evaluate(() => { document.getElementById('np-name').value = 'Совсем другое'; npwLoginSync(); });
   await page.waitForTimeout(120);
   ok('набранный руками логин название не перебивает', await page.evaluate(() => document.getElementById('np-clogin').value) === 'stella');
@@ -267,8 +268,19 @@ const setup = () => {
   await page.waitForTimeout(400);
   ok('без логина клиента не сохраняет', await page.evaluate(() => window.__toasts[0]) === 'Задай логин и пароль клиента');
   ok('увело к разделу «Доступ клиента»', await page.evaluate(() => document.querySelector('#npw-nav .npw-nav-i.on').dataset.sec) === 'client');
+  /* чужой домен молча не обрезаем */
   await page.evaluate(() => {
-    document.getElementById('np-clogin').value = 'stella';
+    document.getElementById('np-clogin').value = 'stella@gmail.com';
+    document.getElementById('np-cpass').value = 'Qwerty2345xz';
+    window.__toasts = []; window.__prov = null; npSaveProject();
+  });
+  await page.waitForTimeout(300);
+  ok('чужой домен не проходит', await page.evaluate(() => window.__prov) === null &&
+    /должен заканчиваться на @detroyd\.triada\.app/.test(await page.evaluate(() => window.__toasts[0] || '')),
+    await page.evaluate(() => window.__toasts[0]));
+  await page.evaluate(() => {
+    /* в поле полный адрес — наружу должно уйти только имя до собаки */
+    document.getElementById('np-clogin').value = 'stella@detroyd.triada.app';
     document.getElementById('np-cpass').value = 'Qwerty2345xz';
     window.NP_TEAM = new Set(['m1']); npRenderTeam();
     window.__prov = null; npSaveProject();
@@ -276,7 +288,7 @@ const setup = () => {
   await page.waitForTimeout(300);
   const prov = await page.evaluate(() => window.__prov);
   ok('провижининг вызван', !!prov);
-  ok('логин и имя проекта переданы', prov && prov.login === 'stella' && prov.full_name === 'Stella Coffee', prov && { l: prov.login, n: prov.full_name });
+  ok('наружу уходит имя до собаки, а не весь адрес', prov && prov.login === 'stella' && prov.full_name === 'Stella Coffee', prov && { l: prov.login, n: prov.full_name });
   ok('услуги переданы целиком', prov && prov.project && prov.project.services.length === 1 && prov.project.services[0].mrr === 9000000, prov && prov.project && prov.project.services);
   ok('доход проекта = сумме услуг', prov && prov.project.mrr === 9000000, prov && prov.project && prov.project.mrr);
   ok('основная услуга SMM', prov && prov.project.service === 'SMM');
