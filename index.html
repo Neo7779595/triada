@@ -10913,11 +10913,31 @@ function finCatLoad(){
   FIN_CAT_CACHE=d; return d;
 }
 function finCatSave(d){ FIN_CAT_CACHE=d; try{ localStorage.setItem(_finCatKey(),JSON.stringify(d)); }catch(e){} }
-// сотрудники по роли (для привязки строки к конкретному человеку)
-function finStaffByRole(roleName){
+/* Сотрудники для строк финансов. Опция — [id, подпись, аватар]: лицо ищется
+   в списке быстрее, чем строка текста, и так же выглядят все остальные
+   выпадающие списки с людьми. Уволенных не показываем, но если строка уже
+   записана на такого — оставляем, иначе сохранение молча переписало бы её
+   на другого человека (это делает _avTeamOpts). */
+function _finStaffOpts(cur){ return (typeof _avTeamOpts==='function')?_avTeamOpts(cur):[]; }
+function _finRoleOf(id){
   const T=(typeof TEAM!=='undefined'?TEAM:[]);
+  const m=T.find(x=>String(x._id)===String(id));
+  return (m&&m.role)?m.role:'';
+}
+// гонорар: только те, кто числится в выбранной роли
+function finStaffByRole(roleName, cur){
   const rn=(roleName||'').toLowerCase();
-  return T.filter(e=>((e.role||'').toLowerCase()===rn)).map(e=>[e._id, e.name]);
+  const keep=String(cur==null?'':cur);
+  return _finStaffOpts(cur).filter(o => _finRoleOf(o[0]).toLowerCase()===rn || (keep && String(o[0])===keep));
+}
+/* Расход: вся команда. Гонорар подбирается под роль, а расход бывает на кого
+   угодно — такси водителю, подписка дизайнеру, техника оператору. Должность
+   идёт подписью: иначе двух Азизов в списке не различить. */
+function finStaffAll(cur){
+  return _finStaffOpts(cur).map(function(o){
+    const r=_finRoleOf(o[0]);
+    return [o[0], o[1]+(r?(' · '+r):''), o[2]];
+  });
 }
 
 let TARIFFS=[
@@ -14707,12 +14727,13 @@ function _ddSel(id, opts, cur, cb, ph){
   const ck='<svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
   return `<div class="dd seldd ddsel" id="seldd-${id}">`
     +`<input type="hidden" id="${id}" value="${_attr(cur==null?'':cur)}">`
-    +`<button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${co?'':'color:var(--txt-3);font-weight:500'}">${_ddH(lbl)}</span>${caret}</button>`
-    +`<div class="dd-menu">`+O.map(o=>`<button type="button" class="dd-opt ${String(o[0])===String(cur)?'on':''}" data-v="${_attr(o[0])}" data-l="${_attr(o[1])}" onclick="_ddSelPick('${id}',this.dataset.v,this.dataset.l)">${_ddH(o[1])}${ck}</button>`).join('')+`</div></div>`;
+    +`<button type="button" class="dd-btn" style="width:100%;justify-content:space-between" onclick="event.stopPropagation();selToggle('${id}')"><span class="dd-v" id="${id}-lbl" style="${co?'':'color:var(--txt-3);font-weight:500'}">${co?window._selAv(co[2]):''}${_ddH(lbl)}</span>${caret}</button>`
+    +`<div class="dd-menu">`+O.map(o=>`<button type="button" class="dd-opt ${String(o[0])===String(cur)?'on':''}" data-v="${_attr(o[0])}" data-l="${_attr(o[1])}"${window._selAvAttrs(o[2])} onclick="_ddSelPick('${id}',this.dataset.v,this.dataset.l,this)">${window._selAv(o[2])}${_ddH(o[1])}${ck}</button>`).join('')+`</div></div>`;
 }
-function _ddSelPick(id,v,l){
+function _ddSelPick(id,v,l,srcBtn){
   const h=document.getElementById(id); if(h)h.value=v;
-  const lbl=document.getElementById(id+'-lbl'); if(lbl){ lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; }
+  const lbl=document.getElementById(id+'-lbl');
+  if(lbl){ const av=(window._selAvFrom?window._selAvFrom(srcBtn):''); if(av) lbl.innerHTML=av+_ddH(l); else lbl.textContent=l; lbl.style.color=''; lbl.style.fontWeight=''; }
   if(typeof _closePops==='function'){ _closePops(); setTimeout(_closePops,0); }
   const cb=window._DDSEL_CB[id]; if(typeof cb==='function'){ try{ cb(v); }catch(e){} }
 }
@@ -28409,7 +28430,11 @@ function pfPickCat(list,i,val){
   const item = pool.find(x=>x.name===val);
   if(item){ r.name=item.name; r.role=item.name; let u=item.unit||'month';
     if(!isSalary && !['month','piece','hour'].includes(u)) u='month';   // категории расходов не бывают за Reels/Stories/пост
-    r.unit=u; if(item.rate!=null&&!r.manual)r.rate=item.rate; r.staffId=null; }
+    r.unit=u; if(item.rate!=null&&!r.manual)r.rate=item.rate;
+    /* Гонорар: список людей зависит от роли — при смене роли выбранный человек
+       больше не подходит, сбрасываем (вместе с именем, иначе в P&L оставалась
+       подпись от прежнего сотрудника). У расходов список общий — не трогаем. */
+    if(isSalary){ r.staffId=null; r.staffName=null; } }
   else { r.name=val; r.role=''; }
   r.amount=pfRowAmount(r);
   pfRender();
@@ -28454,11 +28479,13 @@ function pfSection(list,title,sub,ph){
   const isSalary = list==='salaries';
   const catLabel = isSalary?'роль':'категория';
   const unitOpts = isSalary ? FIN_UNITS.map(u=>[u[0],u[1]]) : FIN_UNITS.filter(u=>['month','piece','hour'].includes(u[0])).map(u=>[u[0],u[1]]);
+  /* Гонорар привязывается к человеку с этой ролью, расход — к любому в команде. */
+  const staffPh = isSalary ? 'кто именно (необяз.)' : 'сотрудник (необяз.)';
   const rowHtml=(r,i)=>{
     const amt=pfRowAmount(r);
     const isMonth = r.unit==='month' || !r.unit;
     const advanced = !isMonth || !!r._adv;
-    const staff = isSalary && r.role ? finStaffByRole(r.role) : [];
+    const staff = isSalary ? (r.role ? finStaffByRole(r.role, r.staffId) : []) : finStaffAll(r.staffId);
     const catOpts=[['','— '+catLabel+' —']].concat(pool.map(x=>[x.name,x.name]));
     if(!advanced){
       // ПРОСТОЙ РЕЖИМ — одна строка: категория + сумма/мес + кнопка "..." + удалить
@@ -28469,7 +28496,7 @@ function pfSection(list,title,sub,ph){
         +  '<button class="pf-mini" onclick="pfToggleAdv(\''+list+'\','+i+')" title="Расширенно · qty × rate">···</button>'
         +  '<button class="pf-del" onclick="pfDel(\''+list+'\','+i+')" title="Удалить">✕</button>'
         +'</div>'
-        +(staff.length?'<div class="pf-staff">'+_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',function(v){return pfSetStaff(list,i,v);},'сотрудник')+'</div>':'')
+        +(staff.length?'<div class="pf-staff">'+_pfSel('pfs-'+list+'-'+i,[['',staffPh]].concat(staff),r.staffId||'',function(v){return pfSetStaff(list,i,v);},'сотрудник')+'</div>':'')
         +'</div>';
     }
     // ПРОДВИНУТЫЙ РЕЖИМ — как раньше, но с кнопкой свернуть
@@ -28485,7 +28512,7 @@ function pfSection(list,title,sub,ph){
       +'<button class="pf-mini" onclick="pfToggleAdv(\''+list+'\','+i+')" title="Свернуть">↑</button>'
       +'<button class="pf-del" onclick="pfDel(\''+list+'\','+i+')" title="Удалить">✕</button>'
       +'</div>'
-      +(staff.length?'<div class="pf-staff">'+_pfSel('pfs-'+list+'-'+i,[['','кто именно (необяз.)']].concat(staff),r.staffId||'',function(v){return pfSetStaff(list,i,v);},'сотрудник')+'</div>':'')
+      +(staff.length?'<div class="pf-staff">'+_pfSel('pfs-'+list+'-'+i,[['',staffPh]].concat(staff),r.staffId||'',function(v){return pfSetStaff(list,i,v);},'сотрудник')+'</div>':'')
       +'</div>';
   };
   return '<div class="fld pf-sec" style="margin-top:6px">'
