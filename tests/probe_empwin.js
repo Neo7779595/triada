@@ -204,6 +204,23 @@ const setup = () => {
     const l = document.querySelector('#e-prj-list-host .prj-scope-list');
     return !l || l.clientHeight <= 250;
   }));
+  /* Три липкие полосы (заголовок раздела + шапка таблицы + заголовок группы)
+     складывались стопкой, и строки пролезали между ними наполовину. */
+  const sticky = await page.evaluate(() => [...document.querySelectorAll('#empw-body *')]
+    .filter(el => getComputedStyle(el).position === 'sticky')
+    .map(el => String(el.className)));
+  ok('в прокручиваемой области липкая только шапка таблицы', sticky.length === 1 && /perm-head/.test(sticky[0]), sticky);
+  ok('заголовок раздела едет вместе с содержимым', await page.evaluate(() =>
+    getComputedStyle(document.querySelector('#empw-s-perm .empw-sec-h')).position) === 'static');
+  await page.evaluate(() => { const b = document.getElementById('empw-body'), g = [...document.querySelectorAll('#e-perms .perm-gh')].pop();
+    b.scrollTop = b.scrollTop + (g.getBoundingClientRect().top - b.getBoundingClientRect().top) - 70; });
+  await page.waitForTimeout(200);
+  ok('под шапкой таблицы ничего не копится', await page.evaluate(() => {
+    const h = document.querySelector('#e-perms .perm-head').getBoundingClientRect();
+    const g = [...document.querySelectorAll('#e-perms .perm-gh')].pop().getBoundingClientRect();
+    /* заголовок группы отъехал от шапки и виден целиком, а не выглядывает из-под неё */
+    return g.top >= h.bottom - 1 && g.height > 20;
+  }));
   ok('шапка и подвал на месте при любом скролле', await page.evaluate(() => {
     const m = document.querySelector('#ov-emp .modal.empw').getBoundingClientRect();
     const t = document.querySelector('#ov-emp .empw-top').getBoundingClientRect();
