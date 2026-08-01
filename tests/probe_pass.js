@@ -1,5 +1,6 @@
-/* probe_pass — паспорт проекта у клиента: макет во всю ширину, ничего не обрезано,
-   текст разобран на абзацы и списки, данные отделены от текста. */
+/* probe_pass — паспорт проекта у клиента: макет во всю ширину, разделы —
+   блоки с таблицей внутри, ничего не обрезано, текст разобран на абзацы
+   и списки, развёрнутый ответ занимает строку целиком. */
 const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n + (x !== undefined ? '  → ' + JSON.stringify(x) : '')); } };
@@ -47,17 +48,17 @@ const DATA = { LIST: A_LIST, MIX: A_MIX, BUL: A_BUL, SHORT: A_SHORT, NOSPACE: A_
 const geom = () => {
   const doc = document.querySelector('.bpass-doc');
   const cont = document.getElementById('content-cl');
-  const grid = document.querySelector('.bpass-grid');
-  const narr = document.querySelector('.bpass-narr');
+  const grid = document.querySelector('.bpass-tbl');
   const dr = doc.getBoundingClientRect(), cr = cont.getBoundingClientRect();
   let outside = [];
   doc.querySelectorAll('*').forEach(el => { const r = el.getBoundingClientRect();
-    if (r.width && (r.right > dr.right + 0.5 || r.left < dr.left - 0.5)) outside.push(el.className.toString().slice(0, 30)); });
+    /* таблица намеренно уходит на 1px под рамку блока: иначе линия ячейки удваивает рамку */
+    if (r.width && (r.right > dr.right + 1.5 || r.left < dr.left - 0.5)) outside.push(el.className.toString().slice(0, 30)); });
   const cols = s => s ? getComputedStyle(s).gridTemplateColumns.trim().split(/\s+/).length : 0;
   return {
     docW: Math.round(dr.width), contW: Math.round(cr.width),
     docOver: doc.scrollWidth - doc.clientWidth,
-    gridCols: cols(grid), narrCols: cols(narr),
+    gridCols: cols(grid), secs: document.querySelectorAll('.bpass-sec').length,
     outside: [...new Set(outside)],
     pageOver: document.body.scrollWidth - document.documentElement.clientWidth,
   };
@@ -79,29 +80,32 @@ const geom = () => {
   ok('внутри документа нет горизонтальной прокрутки', g.docOver === 0, g.docOver);
   ok('ни один элемент не вылезает за края документа', g.outside.length === 0, g.outside);
   ok('страница не едет вбок', g.pageOver === 0, g.pageOver);
-  ok('на 1720px данные лежат в 3 колонки', g.gridCols === 3, g.gridCols);
-  ok('на 1720px тексты лежат в 2 колонки', g.narrCols === 2, g.narrCols);
+  ok('на 1720px таблица раздела в 3 колонки', g.gridCols === 3, g.gridCols);
+  ok('каждый раздел — отдельный блок', g.secs === 2, g.secs);
 
-  console.log('\n[B] данные и текст разведены по разным блокам');
+  console.log('\n[B] короткий ответ — ячейка, развёрнутый — строка целиком');
   const split = await page.evaluate(() => {
     const lbl = e => (e.querySelector('.bpass-lbl') || {}).textContent || '';
     return {
-      facts: [...document.querySelectorAll('.bpass-grid>.bpass-cell')].map(lbl),
-      narr: [...document.querySelectorAll('.bpass-narr>.bpass-cell')].map(lbl),
-      narrHasRich: [...document.querySelectorAll('.bpass-narr>.bpass-cell')].every(c => c.querySelector('.bpass-rich')),
-      factsHaveRich: [...document.querySelectorAll('.bpass-grid>.bpass-cell .bpass-rich')].length,
+      facts: [...document.querySelectorAll('.bpass-c:not(.full)')].map(lbl),
+      narr: [...document.querySelectorAll('.bpass-c.full')].map(lbl),
+      narrHasRich: [...document.querySelectorAll('.bpass-c.full')].every(c => c.querySelector('.bpass-rich')),
+      factsHaveRich: [...document.querySelectorAll('.bpass-c:not(.full) .bpass-rich')].length,
+      /* развёрнутый ответ обязан занимать всю ширину таблицы */
+      fullWide: [...document.querySelectorAll('.bpass-c.full')].every(c =>
+        Math.abs(c.getBoundingClientRect().width - c.parentElement.getBoundingClientRect().width) < 3),
     };
   });
-  ok('развёрнутый ответ ушёл в блок текста', split.narr.some(t => /Почему человек/.test(t)), split.narr);
+  ok('развёрнутый ответ занимает строку целиком', split.narr.some(t => /Почему человек/.test(t)) && split.fullWide, split);
   ok('однострочный ответ остался плиткой данных', split.facts.some(t => /главным преимуществом/.test(t)), split.facts);
   ok('короткий ответ в поле «абзац» тоже плитка, а не полупустая карточка', split.facts.some(t => /Опишите вашу аудиторию/.test(t)), split.facts);
-  ok('незаполненный вопрос не попадает в блок текста', !split.narr.some(t => /Не отвеченный/.test(t)), split.narr);
-  ok('в блоке текста каждая карточка с разобранным текстом', split.narrHasRich, split.narr);
-  ok('в плитках данных разобранного текста нет', split.factsHaveRich === 0, split.factsHaveRich);
+  ok('незаполненный вопрос строку целиком не занимает', !split.narr.some(t => /Не отвеченный/.test(t)), split.narr);
+  ok('в каждой такой строке — разобранный текст', split.narrHasRich, split.narr);
+  ok('в обычных ячейках разобранного текста нет', split.factsHaveRich === 0, split.factsHaveRich);
 
   console.log('\n[C] текст разобран на абзацы и списки, а не склеен в простыню');
   const rich = await page.evaluate(() => {
-    const find = re => [...document.querySelectorAll('.bpass-cell')].find(c => re.test((c.querySelector('.bpass-lbl') || {}).textContent || ''));
+    const find = re => [...document.querySelectorAll('.bpass-c')].find(c => re.test((c.querySelector('.bpass-lbl') || {}).textContent || ''));
     const dump = c => { const r = c.querySelector('.bpass-rich'); if (!r) return null;
       return { html: r.innerHTML, p: [...r.querySelectorAll(':scope>p')].map(x => x.textContent),
         ol: [...r.querySelectorAll(':scope>ol>li')].map(x => ({ n: (x.querySelector('.bpass-n') || {}).textContent, t: (x.querySelector('span') || {}).textContent })),
@@ -124,7 +128,7 @@ const geom = () => {
 
   console.log('\n[D] длинное слово без пробелов не ломает сетку');
   const nb = await page.evaluate(() => {
-    const c = [...document.querySelectorAll('.bpass-cell')].find(x => /Тег без пробелов/.test((x.querySelector('.bpass-lbl') || {}).textContent || ''));
+    const c = [...document.querySelectorAll('.bpass-c')].find(x => /Тег без пробелов/.test((x.querySelector('.bpass-lbl') || {}).textContent || ''));
     const grid = c.parentElement;
     const cs = [...grid.children].map(x => Math.round(x.getBoundingClientRect().width));
     return { w: Math.round(c.getBoundingClientRect().width), gridW: Math.round(grid.getBoundingClientRect().width), cs, over: c.scrollWidth - c.clientWidth };
@@ -135,7 +139,7 @@ const geom = () => {
 
   console.log('\n[E] вопрос читается целиком, а не обрезается многоточием');
   const lbl = await page.evaluate(() => {
-    const c = [...document.querySelectorAll('.bpass-cell')].find(x => /Почему человек/.test((x.querySelector('.bpass-lbl') || {}).textContent || ''));
+    const c = [...document.querySelectorAll('.bpass-c')].find(x => /Почему человек/.test((x.querySelector('.bpass-lbl') || {}).textContent || ''));
     const l = c.querySelector('.bpass-lbl'); const cs = getComputedStyle(l);
     return { ws: cs.whiteSpace, clipped: l.scrollWidth - l.clientWidth, text: l.textContent };
   });
@@ -151,9 +155,11 @@ const geom = () => {
     const gg = await page.evaluate(geom);
     ok(W + 'px · ничего не вылезает за документ', gg.outside.length === 0 && gg.docOver === 0, gg);
     ok(W + 'px · страница не едет вбок', gg.pageOver === 0, gg.pageOver);
-    if (W === 2200) ok('2200px · данные в 4 колонки', gg.gridCols === 4, gg.gridCols);
-    if (W === 1024) ok('1024px · данные в 2 колонки', gg.gridCols === 2, gg.gridCols);
-    if (W === 430) ok('430px · всё в одну колонку', gg.gridCols === 1 && gg.narrCols === 1, gg);
+    if (W === 2200) ok('2200px · таблица в 3 колонки — шире не дробим, читаемость важнее плотности', gg.gridCols === 3, gg.gridCols);
+    if (W === 1280) ok('1280px · таблица в 2 колонки', gg.gridCols === 2, gg.gridCols);
+    if (W === 1024) ok('1024px · узкий раздел — одна колонка', gg.gridCols === 1, gg.gridCols);
+    if (W === 900) ok('900px · одна колонка', gg.gridCols === 1, gg.gridCols);
+    if (W === 430) ok('430px · всё в одну колонку', gg.gridCols === 1, gg);
   }
 
   ok('страница без ошибок', errs.length === 0, errs.slice(0, 2));
