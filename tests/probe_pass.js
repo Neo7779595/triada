@@ -190,6 +190,19 @@ const geom = () => {
       cardBorder: q('.bpass-c') ? getComputedStyle(q('.bpass-c')).borderTopWidth : null,
       narrSep: (() => { const l = q('.bpass-narr .bpass-lbl'); return l ? getComputedStyle(l).borderBottomWidth : null; })(),
       nofill: !!q('.bpass-nofill'),
+      lblMark: (() => { const l = q('.bpass-c .bpass-lbl'); if (!l) return false;
+        const cs = getComputedStyle(l, '::before'); return cs.content !== 'none' && parseFloat(cs.width) >= 2; })(),
+      lblSep: (() => { const l = q('.bpass-c .bpass-lbl'); return l ? getComputedStyle(l).borderBottomWidth : null; })(),
+      badSep: (() => { let bad = 0;
+        document.querySelectorAll('.bpass-tbl').forEach(t => { const cs = [...t.querySelectorAll(':scope>.bpass-c')];
+          for (let i = 0; i + 1 < cs.length; i += 2) { const a = cs[i].querySelector('.bpass-lbl'), b = cs[i + 1].querySelector('.bpass-lbl');
+            if (a && b && Math.abs(a.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom) > 1) bad++; } });
+        return bad; })(),
+      facts: document.querySelectorAll('.bpass-fact').length,
+      factsWide: (() => { const f = q('.bpass-facts'), d = q('.bpass-doc');
+        return !!f && !!d && Math.abs(f.getBoundingClientRect().width - d.getBoundingClientRect().width) < 3; })(),
+      progFull: (() => { const b2 = q('.bpass-prog2-bar'), d = q('.bpass-doc');
+        return !!b2 && !!d && Math.abs(b2.getBoundingClientRect().width - d.getBoundingClientRect().width) < 3; })(),
       badLbl: rows.filter(r => r.lbl > 1).length,
       badVal: rows.filter(r => r.val > 1).length,
       badH: rows.filter(r => r.h > 1).length,
@@ -201,6 +214,10 @@ const geom = () => {
   ok('содержание собрано и ведёт к разделам', pdfLike.tocN === 2 && /#bpsec-/.test(pdfLike.tocHref || ''), pdfLike);
   ok('раздел без рамки — вес держат карточки', pdfLike.secFramed === '0px' && pdfLike.cardBorder === '1px', pdfLike);
   ok('в развёрнутом ответе вопрос отбит линейкой', pdfLike.narrSep === '1px', pdfLike.narrSep);
+  ok('у каждого вопроса акцентная метка и линейка', pdfLike.lblMark && pdfLike.lblSep === '1px', pdfLike);
+  ok('линейки под подписями пары совпадают', pdfLike.badSep === 0, pdfLike);
+  ok('полоса фактов — четыре ячейки во всю ширину', pdfLike.facts === 4 && pdfLike.factsWide, pdfLike);
+  ok('готовность — линия по нижней кромке шапки', pdfLike.progFull, pdfLike);
   ok('незаполненные вопросы одной строкой', pdfLike.nofill, pdfLike);
   ok('в паре плиток подписи одной высоты', pdfLike.rows > 0 && pdfLike.badLbl === 0, pdfLike);
   ok('значения в паре плиток на одной линии', pdfLike.badVal === 0, pdfLike);
