@@ -61,6 +61,21 @@ const TINTED = sh => (String(sh).match(/rgba?\([^)]*\)|color\([^)]*\)/g) || [])
   ok('кнопка не подпрыгивает', b1.transform === 'none' || b1.transform === 'matrix(1, 0, 0, 1, 0, 0)', b1.transform);
   ok('наведение всё же читается — тень глубже', b1.shadow !== b0.shadow, { покой: b0.shadow, навёл: b1.shadow });
 
+  console.log('\n[B2] надпись заливается, а не просто меняет цвет');
+  const rv = await page.evaluate(() => {
+    const sp = document.querySelector('.side-new-proj .rv'); if (!sp) return null;
+    const s = getComputedStyle(sp), a = getComputedStyle(sp, '::after');
+    return { stroke: s.webkitTextStrokeWidth, fill: s.color, afterW: a.width, spanW: sp.getBoundingClientRect().width,
+      text: sp.getAttribute('data-text'), up: s.textTransform };
+  });
+  ok('оба слоя текста на месте', !!rv && rv.text === 'Новый проект', rv);
+  ok('в покое буквы только контуром', rv.stroke !== '0px' && /rgba\(0, 0, 0, 0\)|transparent/.test(rv.fill), rv);
+  ok('надпись набрана капителью', rv.up === 'uppercase', rv.up);
+  ok('при наведении заливка раскрыта на всю ширину', parseFloat(rv.afterW) >= rv.spanW - 2, rv);
+  await page.hover('.clockw'); await page.waitForTimeout(700);
+  const rv0 = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.side-new-proj .rv'), '::after').width));
+  ok('без наведения заливка свёрнута', rv0 <= 1, rv0);
+
   console.log('\n[C] нигде не осталось мятного ореола');
   const left = await page.evaluate(() => {
     const out = [];
