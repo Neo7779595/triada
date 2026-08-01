@@ -61,20 +61,33 @@ const TINTED = sh => (String(sh).match(/rgba?\([^)]*\)|color\([^)]*\)/g) || [])
   ok('кнопка не подпрыгивает', b1.transform === 'none' || b1.transform === 'matrix(1, 0, 0, 1, 0, 0)', b1.transform);
   ok('наведение всё же читается — тень глубже', b1.shadow !== b0.shadow, { покой: b0.shadow, навёл: b1.shadow });
 
-  console.log('\n[B2] надпись заливается, а не просто меняет цвет');
-  const rv = await page.evaluate(() => {
-    const sp = document.querySelector('.side-new-proj .rv'); if (!sp) return null;
-    const s = getComputedStyle(sp), a = getComputedStyle(sp, '::after');
-    return { stroke: s.webkitTextStrokeWidth, fill: s.color, afterW: a.width, spanW: sp.getBoundingClientRect().width,
-      text: sp.getAttribute('data-text'), up: s.textTransform };
+  console.log('\n[B2] цвет въезжает слева');
+  const parts = await page.evaluate(() => {
+    const b = document.querySelector('.side-new-proj');
+    const d = b.querySelector('.sw-decor'), i = b.querySelector('.sw-ic'), t = b.querySelector('.sw-tx');
+    if (!d || !i || !t) return null;
+    const cd = getComputedStyle(d), ci = getComputedStyle(i), ct = getComputedStyle(t);
+    return { decor: cd.transform, icBg: ci.backgroundColor, txColor: ct.color, txt: t.textContent.trim(),
+      w: b.getBoundingClientRect().width };
   });
-  ok('оба слоя текста на месте', !!rv && rv.text === 'Новый проект', rv);
-  ok('в покое буквы только контуром', rv.stroke !== '0px' && /rgba\(0, 0, 0, 0\)|transparent/.test(rv.fill), rv);
-  ok('надпись набрана капителью', rv.up === 'uppercase', rv.up);
-  ok('при наведении заливка раскрыта на всю ширину', parseFloat(rv.afterW) >= rv.spanW - 2, rv);
-  await page.hover('.clockw'); await page.waitForTimeout(700);
-  const rv0 = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.side-new-proj .rv'), '::after').width));
-  ok('без наведения заливка свёрнута', rv0 <= 1, rv0);
+  ok('все три части на месте', !!parts && parts.txt === 'Новый проект', parts);
+  const accent = await page.evaluate(() => {
+    const p = document.createElement('i'); p.style.color = 'var(--accent)'; document.body.appendChild(p);
+    const c = getComputedStyle(p).color; p.remove(); return c;
+  });
+  ok('квадрат с плюсом — акцентный', parts.icBg === accent, { квадрат: parts.icBg, акцент: accent });
+  ok('при наведении заливка встала на место', /matrix\(1, 0, 0, 1, 0, 0\)|none/.test(parts.decor), parts.decor);
+  ok('подпись перевернулась в тёмную', parts.txColor !== (await page.evaluate(() => {
+    const p = document.createElement('i'); p.style.color = 'var(--txt)'; document.body.appendChild(p);
+    const c = getComputedStyle(p).color; p.remove(); return c;
+  })), parts.txColor);
+  await page.hover('.clockw'); await page.waitForTimeout(600);
+  const off = await page.evaluate(() => {
+    const b = document.querySelector('.side-new-proj');
+    return { decor: getComputedStyle(b.querySelector('.sw-decor')).transform, w: b.getBoundingClientRect().width };
+  });
+  const dx = parseFloat((String(off.decor).match(/matrix\([^)]*?,\s*([-\d.]+),\s*[-\d.]+\)$/) || [])[1] || '0');
+  ok('без наведения заливка убрана за левый край', dx <= -(off.w - 2), { сдвиг: dx, ширина: off.w });
 
   console.log('\n[C] нигде не осталось мятного ореола');
   const left = await page.evaluate(() => {
