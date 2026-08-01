@@ -49,9 +49,17 @@ const setup = () => {
     return { before, after, hasSum: !!document.querySelector('#content-ag .wlx-sum') };
   });
   console.log('    TEAM до/после renderTeam: ' + JSON.stringify(dbg));
-  /* числа в счётчиках 850 мс «накручиваются» с нуля (animateCounters) —
-     читать их раньше бессмысленно: увидим промежуточный кадр */
-  await page.waitForTimeout(1100);
+  /* числа в счётчиках «накручиваются» с нуля (animateCounters) — читать их
+     раньше бессмысленно: увидим промежуточный кадр. Ждём не по секундомеру
+     (под нагрузкой всей сборки 1100 мс не хватало, и доли ловились как
+     33/33/33 вместо 34/33/33), а пока картинка не перестанет меняться. */
+  await page.waitForFunction(() => {
+    const txt = [...document.querySelectorAll('#content-ag .wlx-sum .wlx-s')].map(s => s.textContent).join('|');
+    const prev = window.__wlxPrev; window.__wlxPrev = txt;
+    if (prev !== txt) { window.__wlxSame = 0; return false; }
+    window.__wlxSame = (window.__wlxSame || 0) + 1;
+    return window.__wlxSame >= 2;
+  }, { timeout: 8000, polling: 150 });
 
   console.log('\n[A] полоса счётчиков');
   const sum = await page.evaluate(() => {
