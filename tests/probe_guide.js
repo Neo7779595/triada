@@ -356,6 +356,31 @@ const stripMinus = s => norm(s).replace(/^-\s*/, '');
   ok('и калькулятор после неё считает', Math.abs(P2.net + 14375000) < 1, P2.net);
   ok('пользователь получает подтверждение', /подставлен/i.test(P2.toast), P2.toast);
 
+  console.log('\n[I2] раскладка занимает ширину и не рассыпается на любом экране');
+  for (const w of [1920, 1600, 1440, 1280, 1024, 900]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await page.evaluate(() => renderCalc());
+    await frames(3);
+    const R = await page.evaluate(() => {
+      const body = document.getElementById('mkg-body'), s0 = document.querySelector('.mkg-s');
+      const over = [...document.querySelectorAll('.mkg-s')].filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.id);
+      const clip = [...document.querySelectorAll('.mkg-res dd, .mkg-t td, .mkg-fn-v, .mkg-wf-v, .mkg-note span, .mkg-fm-n')]
+        .filter(x => x.scrollWidth > x.clientWidth + 1).length;
+      /* Свободного места по краям — только внутренние поля: если больше,
+         значит колонка не занимает экран и справа снова дыра. */
+      const slack = body.clientWidth - s0.clientWidth;
+      const rows = [...document.querySelectorAll('.mkg-res')].map(r =>
+        [...new Set([...r.querySelectorAll('dd')].map(d => getComputedStyle(d).fontSize))].length);
+      return { over, clip, slack, mixed: rows.filter(n => n > 1).length };
+    });
+    ok('на ' + w + ' px ничего не вылезает и не обрезано', R.over.length === 0 && R.clip === 0, R);
+    ok('на ' + w + ' px раздел занимает всю доступную ширину', R.slack <= 90 || w > 1800, R.slack);
+    ok('на ' + w + ' px числа в ряду набраны одним кеглем', R.mixed === 0, R.mixed);
+  }
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.evaluate(() => renderCalc());
+  await frames(3);
+
   console.log('\n[J] узкий экран');
   await page.setViewportSize({ width: 900, height: 900 });
   await page.evaluate(() => renderCalc());
