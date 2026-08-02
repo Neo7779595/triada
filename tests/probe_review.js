@@ -196,9 +196,9 @@ const setup = () => {
     const c = document.getElementById('content-ag'); document.body.appendChild(c);
     c.style.cssText = 'position:fixed;left:0;top:0;width:1460px;height:900px;overflow:auto;background:#0a0d0c;z-index:1;display:block;padding:20px';
     const chips = [...document.querySelectorAll('#content-ag .cyc-rv')].map(e => e.textContent.trim());
-    const who = [...document.querySelectorAll('#content-ag .cyc-rvgrid .cyc-row2')].map(r => ({
-      nm: r.querySelector('.cyc-nm').textContent, meta: r.querySelector('.cyc-meta').textContent.replace(/\s+/g, ' ').trim(),
-      val: r.querySelector('.cyc-val').textContent }));
+    const who = [...document.querySelectorAll('#content-ag .cyc-rvgrid .cyc-r')].map(r => ({
+      nm: r.querySelector('.cyc-r-t').textContent, meta: r.querySelector('.cyc-r-m').textContent.replace(/\s+/g, ' ').trim(),
+      val: r.querySelector('.cyc-r-val').textContent }));
     return { chips, who };
   });
   console.log('    ' + JSON.stringify(cyc, null, 1).slice(0, 800));

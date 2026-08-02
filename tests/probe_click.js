@@ -115,8 +115,8 @@ const show = () => { const c = document.getElementById('content-ag'); if (!c) re
   await page.evaluate(show);
   await page.waitForTimeout(300);
   const cyc = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('#content-ag .cyc-row2')].map(r => ({
-      nm: (r.querySelector('.cyc-nm') || {}).textContent, go: r.classList.contains('cyc-go'),
+    const rows = [...document.querySelectorAll('#content-ag .cyc-r')].map(r => ({
+      nm: (r.querySelector('.cyc-r-t') || {}).textContent, go: r.classList.contains('cyc-go'),
       onclick: r.getAttribute('onclick'), cur: getComputedStyle(r).cursor }));
     const stuck = [...document.querySelectorAll('#content-ag .cyc-stuck')].map(r => ({
       go: r.classList.contains('cyc-go'), onclick: r.getAttribute('onclick'), cur: getComputedStyle(r).cursor }));
@@ -133,7 +133,7 @@ const show = () => { const c = document.getElementById('content-ag'); if (!c) re
 
   console.log('\n[D] клик по этапу ведёт в этап, а не фильтрует');
   await page.evaluate(() => { window.__go = null;
-    [...document.querySelectorAll('#content-ag .cyc-row2')].find(r => (r.dataset || {}).st === 'ПРОЕКТЫ').click(); });
+    [...document.querySelectorAll('#content-ag .cyc-r')].find(r => (r.dataset || {}).st === 'ПРОЕКТЫ').click(); });
   await page.waitForTimeout(200);
   const one = await page.evaluate(() => ({ go: window.__go, q: WORK_Q, modal: !!document.querySelector('#ov-pd2 .modal.wlxq') }));
   console.log('    ' + JSON.stringify(one));
@@ -142,7 +142,7 @@ const show = () => { const c = document.getElementById('content-ag'); if (!c) re
   ok('лишнего окна не появилось', !one.modal, one);
 
   await page.evaluate(() => { window.__go = null;
-    [...document.querySelectorAll('#content-ag .cyc-row2')].find(r => (r.dataset || {}).st === 'SMM ОТЧЕТ').click(); });
+    [...document.querySelectorAll('#content-ag .cyc-r')].find(r => (r.dataset || {}).st === 'SMM ОТЧЕТ').click(); });
   await page.waitForTimeout(220);
   const many = await page.evaluate(() => {
     const m = document.querySelector('#ov-pd2 .modal.wlxq');
@@ -200,7 +200,7 @@ const show = () => { const c = document.getElementById('content-ag'); if (!c) re
   const done2 = await page.evaluate(() => {
     const el = document.getElementById('work-q');
     return { v: el ? el.value : null, focused: document.activeElement === el, caret: el ? el.selectionStart : null,
-      rows: [...document.querySelectorAll('#content-ag .cyc-row2')].map(r => (r.querySelector('.cyc-nm') || {}).textContent), q: WORK_Q };
+      rows: [...document.querySelectorAll('#content-ag .cyc-r')].map(r => (r.querySelector('.cyc-r-t') || {}).textContent), q: WORK_Q };
   });
   console.log('    ' + JSON.stringify(done2));
   ok('после паузы список отфильтровался', done2.q === 'дизайнеру' && done2.rows.includes('Дать ТЗ дизайнеру') && !done2.rows.includes('Снять рилс'), done2);
