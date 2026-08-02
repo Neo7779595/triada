@@ -106,8 +106,11 @@ const CFG = {
     near(D.m.cac, 280000) && near(D.m.cpo, 250000), D.m);
   ok('безубыточный ROAS 2,857× — от маржи после переменных, а не от валовой',
     near(D.m.beRoas, 1 / 0.35, 1e-9), D.m.beRoas);
-  ok('порог с покрытием постоянных 3,43× · предельный CAC 175 000 и 125 000',
-    near(D.m.beRoasFull, 30e6 / 0.35 / 25e6, 1e-9) && near(D.m.maxCac, 175000) && near(D.m.maxCacFull, 125000), D.m);
+  /* 155 000, а не 125 000: расходы на продажи уже сидят внутри CAC, и вычесть
+     их ещё и из числителя значит посчитать дважды. Проверка ниже, в [J],
+     показывает это не формулой, а смыслом: при таком CAC EBITDA равна нулю. */
+  ok('порог с покрытием постоянных 3,43× · предельный CAC 175 000 и 155 000',
+    near(D.m.beRoasFull, 30e6 / 0.35 / 25e6, 1e-9) && near(D.m.maxCac, 175000) && near(D.m.maxCacFull, 155000), D.m);
   ok('предельная цена лида 35 000, а платим 50 000', near(D.m.beCpl, 35000) && near(D.m.cpl, 50000, 1e-9), D.m);
   ok('вердикт «в минус» — и чистая прибыль правда отрицательная', D.m.verdictRoas.level === 'bad' && D.net < 0, D.m.verdictRoas);
   ok('самая узкая конверсия — переход в клики', D.narrow === 'click', D.narrow);
@@ -207,6 +210,134 @@ const CFG = {
     near(G.total.budget, 16e6) && near(G.total.revenue, 62.5e6) && near(G.total.roas, 62.5 / 16) && near(G.total.cpo, 128000), G.total);
   ok('сводный ROAS выше порога, но один канал в минусе — потому и показываем разбивку',
     G.total.roas > G.total.beRoas && G.rows[1].profit < 0, { roas: G.total.roas, be: G.total.beRoas });
+
+  /* ── Пороги и экран: не «формула совпала», а «утверждение на экране правда» ── */
+  console.log('\n[J] пороги проверяются смыслом, а не повтором формулы');
+  const J1 = await page.evaluate((cfg) => {
+    const c = { ...cfg, adVatPct: 12, agencyPct: 10, agencyFix: 400000, prodCost: 200000 };
+    const base = MKC.funnel(c);
+    /* Объём держим тот же, двигаем цену клика, пока фактический CAC не упрётся
+       в потолок. Если потолок честный, EBITDA обязана стать ровно нулём. */
+    const upK = 1 + c.adVatPct / 100 + c.agencyPct / 100;
+    const clicks = base.stages[1].n;
+    const media = (base.m.maxCacFull * base.newCust - c.salesCost - c.agencyFix - c.prodCost) / upK;
+    const at = MKC.funnel({ ...c, price: media / clicks });
+    /* И предельная цена лида: при ней маркетинг обязан ровно съесть
+       маржинальный доход — в обоих режимах, они считаются по-разному. */
+    const g = MKC.funnel({ ...c, buy: 'lead' });
+    const gAt = MKC.funnel({ ...c, buy: 'lead', price: g.m.beCpl });
+    const bcfg = { ...c, buy: 'lead', mode: 'budget', budget: 20000000 };
+    const bb = MKC.funnel(bcfg);
+    const bAt = MKC.funnel({ ...bcfg, price: bb.m.beCpl });
+    return { cacAt: at.m.cac, ceil: base.m.maxCacFull, ebitdaAt: at.ebitda,
+      goalGap: gAt.contribution - gAt.marketing, budGap: bAt.contribution - bAt.marketing,
+      goalCpl: g.m.beCpl, budCpl: bb.m.beCpl };
+  }, CFG);
+  ok('при CAC, равном потолку с постоянными, EBITDA ровно ноль',
+    Math.abs(J1.ebitdaAt) < 1 && near(J1.cacAt, J1.ceil, 1e-6), J1);
+  ok('предельная цена лида честна в режиме «от цели»: маркетинг = маржинальному доходу',
+    Math.abs(J1.goalGap) < 1, { gap: J1.goalGap, cpl: J1.goalCpl });
+  ok('и в режиме «от бюджета» — там лиды зависят от цены, и формула другая',
+    Math.abs(J1.budGap) < 1, { gap: J1.budGap, cpl: J1.budCpl });
+
+  console.log('\n[K] окупаемость: «нет данных» и «не окупается» — разные ответы');
+  const K = await page.evaluate(() => {
+    const read = () => {
+      const t = [...document.querySelectorAll('.mk-tile')].find(x => /^Окупаемость$/.test(x.querySelector('.mk-tile-l').textContent));
+      return t ? { v: t.querySelector('.mk-tile-v').textContent.trim(), s: t.querySelector('.mk-tile-s').textContent.trim() } : null;
+    };
+    window.__me = { id: 'u1', full_name: 'd', role: 'agency_owner', agency_id: 'AG' };
+    window.tMe = () => window.__me; window.toast = () => { }; window.LIVE = false;
+    document.querySelectorAll('.app').forEach(a => a.classList.remove('on'));
+    document.getElementById('app-ag').classList.add('on');
+    MK.tab = 'unit'; MK.cur = 'uzs';
+    MK.u = { aov: 500000, purchases: 3, marginPct: null, churnPct: 20, cac: 250000, arpu: 500000 };
+    renderCalc(); const empty = read();
+    MK.u = { aov: 500000, purchases: 3, marginPct: 40, churnPct: 20, cac: 5000000, arpu: 500000 };
+    mkPaint(); const never = read();
+    MK.u = { aov: 500000, purchases: 3, marginPct: 40, churnPct: 20, cac: 250000, arpu: 500000 };
+    mkPaint(); const good = read();
+    return { empty, never, good, why: [MKC.paybackWhy(250000, 500000, null, 20), MKC.paybackWhy(5000000, 500000, 40, 20), MKC.paybackWhy(250000, 500000, 40, 20)] };
+  });
+  ok('маржинальность не заполнена — прочерк и подсказка, а не приговор «не окупается»',
+    K.empty && K.empty.v === '—' && /нужны/.test(K.empty.s), K.empty);
+  ok('CAC больше LTV — вот тогда «не окупается»',
+    K.never && K.never.v === 'не окупается' && /CAC больше LTV/.test(K.never.s), K.never);
+  ok('всё сходится — печатается срок в периодах', K.good && /период/.test(K.good.v), K.good);
+  ok('три разных случая различаются в ядре, а не только на экране',
+    JSON.stringify(K.why) === JSON.stringify(['nodata', 'never', 'ok']), K.why);
+
+  console.log('\n[L] состояние может прийти неполным — экран обязан выжить');
+  const L = await page.evaluate(() => {
+    const old = { f: { mode: 'goal', goal: 100, price: 5000, aov: 500000 }, m: { aov: 500000 }, u: { cac: 1 } };
+    MK.tab = 'funnel';
+    MK.f = JSON.parse(JSON.stringify(old.f)); MK.m = JSON.parse(JSON.stringify(old.m)); MK.u = JSON.parse(JSON.stringify(old.u));
+    let err = null;
+    try { renderCalc(); } catch (e) { err = String(e); }
+    const filled = { fact: !!MK.f.fact, stages: (MK.f.stages || []).length, rows: (MK.m.rows || []).length, goal: MK.f.goal };
+    MK.f = { mode: 'goal', goal: 100, price: 5000, aov: 500000 };     // снова без «факта»
+    let setErr = null;
+    try { mkSet('f.fact.days', '12'); } catch (e) { setErr = String(e); }
+    return { err, filled, setErr, days: MK.f.fact && MK.f.fact.days };
+  });
+  ok('расчёт, сохранённый до появления новых полей, открывается без падения', L.err === null, L.err);
+  ok('недостающие блоки достроены по умолчанию, введённое сохранено',
+    L.filled.fact && L.filled.stages >= 2 && L.filled.rows >= 1 && L.filled.goal === 100, L.filled);
+  ok('ввод в поле, которого не было в сохранённом расчёте, не роняет экран',
+    L.setErr === null && L.days === '12', L);
+
+  console.log('\n[M] валюта переключает все деньги, а не половину');
+  const M = await page.evaluate(() => {
+    MK.tab = 'funnel'; MK.cur = 'uzs'; MK.rate = 12800;
+    renderCalc();
+    Object.assign(MK.f, { agencyFix: 500000, prodCost: 300000, fixed: 4000000, aov: 500000, salesCost: 700000 });
+    MK.f.fact.spent = 1000000;
+    MK.u.cac = 250000; MK.u.arpu = 500000;
+    MK.m.rows = [{ name: 'X', buy: 'lead', budget: 20000000, price: 50000, cr1: 25 }]; MK.m.aov = 500000;
+    const snap = () => JSON.stringify([MK.f.agencyFix, MK.f.prodCost, MK.f.fixed, MK.f.aov, MK.f.salesCost,
+    MK.f.fact.spent, MK.u.cac, MK.u.arpu, MK.m.rows[0].budget, MK.m.rows[0].price, MK.m.aov]);
+    const before = snap();
+    mkCur('usd');
+    const usd = { agencyFix: MK.f.agencyFix, prodCost: MK.f.prodCost, spent: MK.f.fact.spent, cac: MK.u.cac };
+    mkCur('uzs');
+    return { same: before === snap(), before, after: snap(), usd };
+  });
+  ok('фикс агентства, продакшн, «потрачено» и CAC пересчитаны, а не только подпись',
+    M.usd.agencyFix < 100 && M.usd.prodCost < 100 && M.usd.spent < 200 && M.usd.cac < 100, M.usd);
+  ok('туда и обратно возвращает ровно те же суммы', M.same, { before: M.before, after: M.after });
+
+  console.log('\n[N] экран не врёт обрезанными цифрами и не выдаёт каналы за воронку');
+  const N = await page.evaluate(() => {
+    MK.tab = 'funnel'; MK.cur = 'uzs';
+    MK.f = { ...MK.f, mode: 'goal', goal: 1000, buy: 'lead', price: 250000, aov: 500000,
+      cogsMode: 'unit', unitCost: 300000, varPct: 5, fixed: 0, salesCost: 0,
+      vatPct: 12, vatIncluded: true, adVatPct: 12, agencyPct: 0, agencyFix: 0, prodCost: 0,
+      taxMode: 'none', spread: 20, stages: [{ key: 'lead', name: 'Лиды' }, { key: 'sale', name: 'Продажи', cr: 25 }] };
+    renderCalc();
+    const tiles = [...document.querySelectorAll('.mk-tile')].map(t => {
+      const v = t.querySelector('.mk-tile-v'), s = t.querySelector('.mk-tile-s');
+      return { l: t.querySelector('.mk-tile-l').textContent, txt: v.textContent.trim(),
+        over: Math.round(v.scrollWidth - v.clientWidth), subOver: s ? Math.round(s.scrollHeight - s.clientHeight) : 0 };
+    });
+    MK.tab = 'media';
+    MK.m = { aov: 500000, marginPct: 40, varPct: 5, rows: [{ name: 'X', buy: 'lead', budget: 20000000, price: 50000, cr1: 25 }] };
+    renderCalc();
+    const txt = document.getElementById('mk-out').textContent;
+    const chan = MKC.media(MK.m.rows, MK.m);
+    const fun = MKC.funnel({ mode: 'budget', budget: 20000000, buy: 'lead', price: 50000,
+      stages: [{ key: 'lead' }, { key: 'sale', cr: 25 }], aov: 500000, cogsMode: 'margin',
+      marginPct: 40, varPct: 5, vatPct: 12, vatIncluded: true, adVatPct: 0, agencyPct: 0 });
+    return { tiles, note: /упрощённая модель/i.test(txt) && /НДС/.test(txt) && /воронк/i.test(txt),
+      beLabel: /1 ÷ \(маржинальность − переменные\)/.test(txt),
+      chanRev: chan.total.revenue, funRev: fun.revenue };
+  });
+  ok('миллиардные суммы в плитках печатаются целиком, а не «−963 675…»',
+    N.tiles.every(t => t.over <= 1), N.tiles.filter(t => t.over > 1));
+  ok('подписи под цифрами не обрезаются', N.tiles.every(t => t.subOver <= 1), N.tiles.filter(t => t.subOver > 1));
+  ok('каналы честно сообщают, что модель упрощённая и прибыль считается в воронке', N.note, N.note);
+  ok('подпись безубыточного ROAS на каналах отражает настоящую формулу', N.beLabel, N.beLabel);
+  ok('расхождение каналов с воронкой реально — потому о нём и написано',
+    N.chanRev > N.funRev, { chan: Math.round(N.chanRev), fun: Math.round(N.funRev) });
 
   console.log('\n[H] сверка со слепком: оформление не сдвинуло ни одной цифры');
   const live = await page.evaluate((g) => {

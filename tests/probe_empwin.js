@@ -169,7 +169,12 @@ const setup = () => {
   /* Плавность проверяем глазами, а не секундомером: на время замеров геометрии
      выключаем анимацию, иначе тест меряет длину анимации, а не точку прокрутки. */
   await page.addStyleTag({ content: '#ov-emp .empw-body{scroll-behavior:auto!important}' });
-  const settle = async () => { await page.waitForTimeout(150); };
+  /* Подсветка пункта пересчитывается в requestAnimationFrame, а безголовый
+     Chromium рисует кадры только по требованию: без принудительной прокачки
+     обработчик иногда не успевал сработать, и тест падал через раз не из-за
+     продукта, а из-за отсутствия кадра. */
+  const frames = async (n = 4) => { for (let i = 0; i < n; i++) await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))); };
+  const settle = async () => { await page.waitForTimeout(150); await frames(); };
   await page.evaluate(() => { document.getElementById('empw-body').scrollTop = 0; empwGo('prj'); });
   await settle();
   ok('клик по пункту ставит раздел под шапку', await page.evaluate(() => {
@@ -189,6 +194,7 @@ const setup = () => {
   ok('и пункт «Вход» загорелся', await page.evaluate(() => document.querySelector('#empw-nav .empw-nav-i.on').dataset.sec) === 'login');
   await page.evaluate(() => { document.getElementById('empw-body').scrollTo({ top: 0, behavior: 'auto' }); });
   await page.waitForTimeout(400);
+  await frames(6);
   ok('прокрутка наверх возвращает подсветку на «Профиль»', await page.evaluate(() => document.querySelector('#empw-nav .empw-nav-i.on').dataset.sec) === 'prof');
   /* Единственная прокрутка в потоке — тело окна. Список проектов ограничен
      по высоте намеренно: это замкнутый блок, а не второй поток страницы. */
