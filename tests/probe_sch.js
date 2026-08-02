@@ -37,6 +37,9 @@ const setup = () => {
   const mon = (function () { const x = new Date(); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); x.setHours(0, 0, 0, 0); return x.getTime(); })();
   const at = (d, h, m) => mon + d * 86400000 + h * 3600000 + (m || 0) * 60000;
   const TODAY = (function () { const x = new Date(); x.setHours(0, 0, 0, 0); return x.getTime(); })();
+  /* Утренний слот, если сейчас день, и дневной, если сейчас утро: смена
+     обязана быть сегодня, но не «прямо сейчас». */
+  const B7_H = (function () { const h = (Date.now() - TODAY) / 3600000; return (h >= 8.5 && h < 13.5) ? 14 : 9; })();
   const B = (o) => Object.assign({ projId: 'p1', projName: 'Qushbegi', kind: 'shoot', status: 'planned',
     allDay: false, location: '', note: '', attachments: [], members: [] }, o);
   window.BOOKINGS = [
@@ -48,8 +51,12 @@ const setup = () => {
     B({ id: 'b5', title: 'Резерв под досъём', status: 'hold', startsAt: at(3, 12, 0), endsAt: at(3, 15, 30), members: M.slice(0, 3) }),
     B({ id: 'b6', title: 'Очень длинное название брони, которое не влезает в клетку месяца', kind: 'task', startsAt: at(4, 9, 0), endsAt: at(4, 13, 0), members: M.slice(0, 2) }),
     /* лента команды показывает СЕГОДНЯ — нужна бронь именно на сегодня,
-       иначе в какой день недели ни запусти, лента окажется пустой */
-    B({ id: 'b7', title: 'Смена на объекте', startsAt: TODAY + 9 * 3600000, endsAt: TODAY + 13 * 3600000, members: M.slice(0, 2) }),
+       иначе в какой день недели ни запусти, лента окажется пустой.
+       Час выбирается так, чтобы смена не накрыла текущий момент: иначе
+       «идущих сейчас» броней оказывалось две, и проверка ниже брала первую
+       по разметке. Тест падал не всегда, а только если запустить его
+       с девяти утра до часу дня. */
+    B({ id: 'b7', title: 'Смена на объекте', startsAt: TODAY + B7_H * 3600000, endsAt: TODAY + (B7_H + 4) * 3600000, members: M.slice(0, 2) }),
     /* идёт прямо сейчас — карточка должна сама об этом сказать */
     B({ id: 'b8', title: 'Съёмка в студии', startsAt: Date.now() - 30 * 60000, endsAt: Date.now() + 30 * 60000, members: M.slice(0, 2) }),
   ];
