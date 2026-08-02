@@ -45,6 +45,52 @@ const bar = () => ({
   ok('кнопки шапки на месте', d.top.join(',') === 'cal,drive,time', d.top);
   ok('раскладка не выдумана — в проекте по-прежнему null', await page.evaluate(() => PROJECTS[0].ui === null));
 
+  console.log('\n[A2] панель вкладок — один ряд в одном стиле');
+  const st = await page.evaluate(() => {
+    const pick = x => { const c = getComputedStyle(x), r = x.getBoundingClientRect();
+      return { k: x.dataset.k || 'gear', fs: c.fontSize, fw: c.fontWeight, ls: c.letterSpacing,
+        tt: c.textTransform, col: c.color, bg: c.backgroundColor,
+        bt: c.borderTopWidth, bl: c.borderLeftWidth, br: c.borderRadius,
+        top: Math.round(r.top), h: Math.round(r.height) }; };
+    const tabs = [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(pick);
+    const acts = [...document.querySelectorAll('#pd-tabbar .pd-tabact > *')].map(pick);
+    const sep = getComputedStyle(document.querySelector('#pd-tabbar .pd-tabact'), '::before');
+    const docsLbl = getComputedStyle(document.querySelector('#pd-tabbar .pd-chip-docs .lbl')).display;
+    return { tabs, acts, sepW: sep.width, sepC: sep.backgroundColor, docsLbl };
+  });
+  const same = (a, b, f) => a.every(x => f(x) === f(b[0]));
+  ok('вкладки и кнопки — одного кегля, начертания и разрядки',
+    same(st.acts, st.tabs, x => x.fs) && same(st.acts, st.tabs, x => x.fw) && same(st.acts, st.tabs, x => x.ls)
+    && same(st.acts, st.tabs, x => x.tt), { tab: st.tabs[1], act: st.acts[0] });
+  ok('все стоят в одну строку и одной высоты',
+    [...st.tabs, ...st.acts].every(x => x.top === st.tabs[0].top && x.h === st.tabs[0].h),
+    [...st.tabs, ...st.acts].map(x => [x.k, x.top, x.h]));
+  ok('у кнопок нет ни плашки, ни рамки, ни скругления',
+    st.acts.every(x => /rgba\(0, 0, 0, 0\)|transparent/.test(x.bg) && x.bl === '0px' && x.bt === '0px' && x.br === '0px'),
+    st.acts.map(x => [x.k, x.bg, x.bl, x.br]));
+  ok('спокойный цвет у всех один', same(st.acts, [st.tabs[1]], x => x.col), { tab: st.tabs[1].col, acts: st.acts.map(x => x.col) });
+  ok('группы разделены волосяной линией, а не пустотой',
+    st.sepW === '1px' && !/rgba\(0, 0, 0, 0\)/.test(st.sepC), { w: st.sepW, c: st.sepC });
+  ok('подпись «Документы» не прячется — иначе кнопка выглядит пропавшей', st.docsLbl !== 'none', st.docsLbl);
+
+  const onSt = await page.evaluate(() => {
+    /* Панель пересобираем перед замером: у только что вставленного узла нет
+       перехода, и видно состояние покоя, а не первый кадр анимации цвета. */
+    const paint = () => { document.getElementById('pd-tabbar').innerHTML = pdTabbar(PROJECTS[0]); };
+    paint();
+    const tab = document.querySelector('#pd-tabbar .pd-tab.on');
+    const tabCol = getComputedStyle(tab).color, tabBb = getComputedStyle(tab).borderBottomColor;
+    pdTabCur = 'brief'; paint();
+    const el = document.querySelector('#pd-tabbar .pd-chip[data-k="brief"]');
+    const c = getComputedStyle(el);
+    return { col: c.color, bb: c.borderBottomWidth, bbc: c.borderBottomColor, tabCol, tabBb,
+      noTabOn: !document.querySelector('#pd-tabbar .pd-tab.on') };
+  });
+  ok('выбранная кнопка подчёркивается так же, как вкладка',
+    onSt.bb === '2px' && onSt.bbc === onSt.tabBb && onSt.col === onSt.tabCol, onSt);
+  ok('пока открыт «Бриф», ни одна вкладка не подсвечена', onSt.noTabOn === true, onSt);
+  await page.evaluate(() => { pdTabCur = 'stages'; pdTab('stages'); });
+
   console.log('\n[B] конструктор открывается');
   await page.evaluate(() => pdUiOpen());
   await page.waitForTimeout(200);
