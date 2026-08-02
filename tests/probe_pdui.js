@@ -40,7 +40,7 @@ const bar = () => ({
   console.log('\n[A] по умолчанию — как было');
   const d = await page.evaluate(bar);
   console.log('    ' + JSON.stringify(d));
-  ok('вкладки в исходном порядке', d.tabs.join(',') === 'stages,kanban,deadlines,board,content,smm,history', d.tabs);
+  ok('вкладки в исходном порядке', d.tabs.join(',') === 'stages,kanban,deadlines,board,content,ads,smm,history', d.tabs);
   ok('кнопки панели на месте', d.acts.join(',') === 'brief,docs,contacts,telegram,gear', d.acts);
   ok('кнопки шапки на месте', d.top.join(',') === 'cal,drive,time', d.top);
   ok('раскладка не выдумана — в проекте по-прежнему null', await page.evaluate(() => PROJECTS[0].ui === null));
@@ -56,7 +56,7 @@ const bar = () => ({
   console.log('    ' + JSON.stringify(panel));
   ok('панель открылась', !!panel);
   ok('три группы', panel.groups.length === 3, panel.groups.map(g => g.g));
-  ok('вкладки, кнопки панели и кнопки шапки — все', panel.groups.map(g => g.rows.length).join(',') === '7,4,3', panel.groups);
+  ok('вкладки, кнопки панели и кнопки шапки — все', panel.groups.map(g => g.rows.length).join(',') === '8,4,3', panel.groups);
   ok('в заголовке — имя проекта', /APOLO COFFEE/.test(panel.sub), panel.sub);
 
   console.log('\n[C] скрыть вкладку');
@@ -64,9 +64,9 @@ const bar = () => ({
   await page.waitForTimeout(150);
   const hid = await page.evaluate(() => ({ bar: [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(t => t.dataset.k), ui: PROJECTS[0].ui }));
   console.log('    ' + JSON.stringify(hid));
-  ok('вкладка исчезла из панели', hid.bar.indexOf('board') < 0 && hid.bar.length === 6, hid.bar);
+  ok('вкладка исчезла из панели', hid.bar.indexOf('board') < 0 && hid.bar.length === 7, hid.bar);
   ok('и записана в скрытые', (hid.ui.hidden || []).join(',') === 'board', hid.ui);
-  ok('порядок сохранён целиком', (hid.ui.order || []).length === 14, hid.ui.order);
+  ok('порядок сохранён целиком', (hid.ui.order || []).length === 15, hid.ui.order);
 
   console.log('\n[D] скрыли ту вкладку, на которой стоим');
   await page.evaluate(() => { pdTab('kanban'); pduiToggle('kanban'); });
@@ -78,7 +78,7 @@ const bar = () => ({
 
   console.log('\n[E] последнюю вкладку скрыть нельзя');
   const last = await page.evaluate(() => {
-    ['deadlines', 'content', 'smm', 'history'].forEach(k => pduiToggle(k));
+    ['deadlines', 'content', 'ads', 'smm', 'history'].forEach(k => pduiToggle(k));
     const before = [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(t => t.dataset.k);
     window.__toast = '';
     pduiToggle('stages');
@@ -93,16 +93,18 @@ const bar = () => ({
   await page.evaluate(() => pduiReset());
   await page.waitForTimeout(200);
   const reset = await page.evaluate(() => ({ ui: PROJECTS[0].ui, bar: [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(t => t.dataset.k) }));
-  ok('раскладка снова по умолчанию', reset.ui === null && reset.bar.length === 7, reset);
+  ok('раскладка снова по умолчанию', reset.ui === null && reset.bar.length === 8, reset);
 
   console.log('\n[G] порядок стрелками');
-  await page.evaluate(() => { pduiMove('tab', 6, 0); });
+  /* Индекс последней вкладки: их стало восемь, «История» теперь седьмая
+     по счёту от нуля. */
+  await page.evaluate(() => { pduiMove('tab', 7, 0); });
   await page.waitForTimeout(150);
-  const ord = await page.evaluate(() => ({ bar: [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(t => t.dataset.k), order: PROJECTS[0].ui.order.slice(0, 7) }));
+  const ord = await page.evaluate(() => ({ bar: [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(t => t.dataset.k), order: PROJECTS[0].ui.order.slice(0, 8) }));
   console.log('    ' + JSON.stringify(ord));
-  ok('история встала первой', ord.bar[0] === 'history' && ord.bar.length === 7, ord.bar);
+  ok('история встала первой', ord.bar[0] === 'history' && ord.bar.length === 8, ord.bar);
   ok('порядок записан', ord.order[0] === 'history', ord.order);
-  ok('группы не перемешались', await page.evaluate(() => { const o = PROJECTS[0].ui.order; return o.slice(0, 7).every(k => ['stages', 'kanban', 'deadlines', 'board', 'content', 'smm', 'history'].indexOf(k) >= 0); }));
+  ok('группы не перемешались', await page.evaluate(() => { const o = PROJECTS[0].ui.order; return o.slice(0, 8).every(k => ['stages', 'kanban', 'deadlines', 'board', 'content', 'ads', 'smm', 'history'].indexOf(k) >= 0); }));
 
   console.log('\n[H] перетаскивание мышью');
   await page.evaluate(() => { pduiReset(); pdUiOpen(); });
@@ -123,7 +125,7 @@ const bar = () => ({
   console.log('    ' + JSON.stringify(drag));
   ok('перетащенная вкладка встала на третье место', drag.bar[2] === 'stages', drag.bar);
   ok('в панели тот же порядок, что в конструкторе', drag.bar.join(',') === drag.rows.join(','), drag);
-  ok('ни одна вкладка не потерялась', drag.bar.length === 7 && new Set(drag.bar).size === 7, drag.bar);
+  ok('ни одна вкладка не потерялась', drag.bar.length === 8 && new Set(drag.bar).size === 8, drag.bar);
 
   console.log('\n[I] кнопки шапки и панели');
   await page.evaluate(() => { pduiToggle('drive'); pduiToggle('telegram'); });
@@ -155,7 +157,7 @@ const bar = () => ({
       acts: [...document.querySelectorAll('#pd-tabbar .pd-tabact .pd-chip')].map(t => t.dataset.k || 'gear') };
   });
   console.log('    ' + JSON.stringify(fut));
-  ok('незнакомые ключи не ломают панель', fut.bar.length === 7 && fut.acts.length === 5, fut);
+  ok('незнакомые ключи не ломают панель', fut.bar.length === 8 && fut.acts.length === 5, fut);
   ok('сохранённый порядок соблюдён', fut.bar[0] === 'history' && fut.bar[1] === 'stages', fut.bar);
   ok('остальные вкладки не пропали', ['kanban', 'deadlines', 'board', 'content', 'smm'].every(k => fut.bar.indexOf(k) >= 0), fut.bar);
 
@@ -180,7 +182,7 @@ const bar = () => ({
   });
   console.log('    ' + JSON.stringify(rej));
   ok('раскладка не осталась применённой', rej.ui === null, rej.ui);
-  ok('вкладка вернулась в панель', rej.bar.indexOf('smm') >= 0 && rej.bar.length === 7, rej.bar);
+  ok('вкладка вернулась в панель', rej.bar.indexOf('smm') >= 0 && rej.bar.length === 8, rej.bar);
   ok('о сбое сказали', /не сохранилась/.test(rej.toast), rej.toast);
 
   console.log('\n[N] ошибки');

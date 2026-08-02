@@ -226,15 +226,15 @@ const mkProj = () => {
 
   /* ——— G. видимость для клиента ——— */
   console.log('\n[G] видимость для клиента');
-  ok('шесть разделов', await page.evaluate(() => document.querySelectorAll('#pj-clvis .cl-vis-tog').length) === 6);
+  ok('семь разделов', await page.evaluate(() => document.querySelectorAll('#pj-clvis .cl-vis-tog').length) === 7);
   ok('сводки в списке нет — её скрыть нельзя', await page.evaluate(() =>
     [...document.querySelectorAll('#pj-clvis .cl-vis-tog')].every(x => x.dataset.mk !== 'overview')));
-  ok('счётчик показывает 5 из 6', await page.evaluate(() => document.getElementById('pj-clvis-cnt').textContent) === 'Клиенту открыто 5 из 6');
-  ok('и он же стоит в навигации', await page.evaluate(() => document.getElementById('npw-c-client').textContent) === '5/6');
+  ok('счётчик показывает 6 из 7', await page.evaluate(() => document.getElementById('pj-clvis-cnt').textContent) === 'Клиенту открыто 6 из 7');
+  ok('и он же стоит в навигации', await page.evaluate(() => document.getElementById('npw-c-client').textContent) === '6/7');
   await page.click('#pj-clvis .cl-vis-tog[data-mk="content"]');
   await page.waitForTimeout(150);
   ok('переключатель гасит раздел', await page.evaluate(() => pjClHidden().sort().join(',')) === 'board,content');
-  ok('счётчик пересчитался', await page.evaluate(() => document.getElementById('pj-clvis-cnt').textContent) === 'Клиенту открыто 4 из 6');
+  ok('счётчик пересчитался', await page.evaluate(() => document.getElementById('pj-clvis-cnt').textContent) === 'Клиенту открыто 5 из 7');
   await page.click('.npw-vis-h button:nth-of-type(2)');
   await page.waitForTimeout(200);
   ok('«Только отчёты» оставляет один раздел', await page.evaluate(() => pjClVisOpen()) === 1);
@@ -242,7 +242,7 @@ const mkProj = () => {
     document.querySelector('#pj-clvis .cl-vis-tog.on').dataset.mk) === 'reports');
   await page.click('.npw-vis-h button:nth-of-type(1)');
   await page.waitForTimeout(200);
-  ok('«Открыть всё» включает все шесть', await page.evaluate(() => pjClVisOpen()) === 6);
+  ok('«Открыть всё» включает все семь', await page.evaluate(() => pjClVisOpen()) === 7);
   ok('и скрытых не остаётся', await page.evaluate(() => pjClHidden().length) === 0);
   await page.click('#pj-clvis .cl-vis-tog[data-mk="board"]');
   await page.waitForTimeout(150);
