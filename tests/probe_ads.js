@@ -152,8 +152,8 @@ const HEADS = {
   ok('деления на ноль дают прочерк, а не бесконечность',
     G.empty.cpm === null && G.empty.cpc === null && G.empty.cpr === null && G.empty.roas === null, G.empty);
 
-  console.log('\n[H] экран');
-  const H = await page.evaluate(async () => {
+  console.log('\n[H] пока модуль не доделан — вкладки нет');
+  const OFF = await page.evaluate(() => {
     window.toast = t => { window.__t = String(t) }; window.LIVE = false;
     window.tMe = () => ({ id: 'u1', full_name: 'DTR', role: 'agency_owner', agency_id: 'AG' });
     window.ME = window.tMe(); window.TEAM = [];
@@ -162,6 +162,27 @@ const HEADS = {
     window.tLoadProjectWork = null; window.tLoadProjectToday = null;
     PROJECTS = [{ id: 'p1', name: 'Qushbegi', status: 'active', _stages: [], _tasks: [], _appr: [], _reports: [] }];
     window.PROJECTS = PROJECTS; openProject(0);
+    const tabs = [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(x => x.dataset.k);
+    /* Попасть в обход панели тоже нельзя — ни ссылкой, ни старым состоянием. */
+    pdTab('ads');
+    return { flag: window.ADS_ON, tabs, cur: pdTabCur,
+      screen: !!document.querySelector('.ads-tiles, .ads-empty'),
+      layout: pduiAll().map(x => x.k), vis: pjVisList().map(v => v[0]),
+      code: typeof adsTabHTML === 'function' && typeof adsBuild === 'function' };
+  });
+  ok('вкладки «Реклама» в панели нет', OFF.tabs.indexOf('ads') < 0 && OFF.tabs.length === 7, OFF.tabs);
+  ok('её нет и в редакторе раскладки', OFF.layout.indexOf('ads') < 0, OFF.layout);
+  ok('её нет в списке того, что открывают клиенту', OFF.vis.indexOf('ads') < 0 && OFF.vis.length === 6, OFF.vis);
+  ok('прямой переход на скрытый модуль возвращает на «Этапы»',
+    OFF.cur === 'stages' && OFF.screen === false, OFF);
+  ok('код модуля цел — спрятана вкладка, а не вырезан разбор', OFF.code === true, OFF.code);
+
+  console.log('\n[I] экран');
+  const H = await page.evaluate(async () => {
+    /* Включаем модуль и проверяем, что он рабочий: рубильник скрывает
+       вкладку, а не ломает то, что за ней. */
+    window.ADS_ON = true;
+    openProject(0);
     let err = null;
     try { pdTab('ads'); } catch (e) { err = String(e); }
     const empty = !!document.querySelector('.ads-empty');
@@ -197,7 +218,7 @@ const HEADS = {
   ok('в таблице шапка, две кампании и итог', H.rowsN === 4, H.rowsN);
   ok('в графике по столбцу на каждый день', H.chart === 3, H.chart);
 
-  console.log('\n[I] окно загрузки');
+  console.log('\n[J] окно загрузки');
   const I = await page.evaluate(async () => {
     adsImportOpen();
     const t = await (await fetch('/tests/fixtures/meta_ru.csv')).text();
@@ -230,7 +251,7 @@ const HEADS = {
   ok('предпросмотр называет период и расход',
     /01\.07\.2026/.test(I.txt) && /5\s?390\s?001/.test(I.txt), I.txt.slice(0, 200));
 
-  console.log('\n[J] что принесли на самом деле — решают байты, а не имя файла');
+  console.log('\n[K] что принесли на самом деле — решают байты, а не имя файла');
   const J = await page.evaluate(async () => {
     /* Проверяем настоящий путь загрузки: собираем File и отдаём его в
        adsFile — так же, как это делает перетаскивание в окно. */
@@ -291,7 +312,7 @@ const HEADS = {
   ok('CSV в UTF-16 от Google Ads читается, а не отбраковывается как двоичный',
     J.u16Head === 'Дата' && J.u16.maps === 8, { h: J.u16Head, m: J.u16.maps });
 
-  console.log('\n[K] пропущенные строки: когда это норма, а когда беда');
+  console.log('\n[L] пропущенные строки: когда это норма, а когда беда');
   const K = await page.evaluate(async () => {
     const load = async text => {
       adsImportOpen();
@@ -325,7 +346,7 @@ const HEADS = {
     { nodate: K.nodate.top, half: K.half.top, tail: K.tail.top });
 
   const bad = errs.filter(x => /SyntaxError|is not defined|Cannot read|Cannot set/.test(x));
-  console.log('\n[L] ошибки страницы');
+  console.log('\n[M] ошибки страницы');
   ok('нет ошибок исполнения', bad.length === 0, bad.slice(0, 3));
 
   console.log('\n──────── ' + pass + ' ok · ' + fail + ' fail ────────');
