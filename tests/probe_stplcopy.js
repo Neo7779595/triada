@@ -28,30 +28,30 @@ const setup = () => {
   await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
   await page.evaluate(setup);
-  await page.evaluate(() => { openTemplatesSettings(); stplTab('service'); stplPickSvc('PROD'); });
+  await page.evaluate(() => { openTemplatesSettings(); stplGo('tsvc'); stplPickSvc('PROD'); });
   await page.waitForTimeout(300);
 
   console.log('\n[A] кнопка переноса');
   const btn = await page.evaluate(() => {
-    const bs = [...document.querySelectorAll('#stpl-body .stpl-stage-acts button')].map(x => x.textContent.trim());
+    const bs = [...document.querySelectorAll('#tplw-body .stpl-stage-acts button')].map(x => x.textContent.trim());
     return { btns: bs, tab: _stplTariff, stages: _stplStages.slice() };
   });
   console.log('    ' + JSON.stringify(btn));
   ok('на базовых этапах кнопка есть', btn.btns.some(t => /^Копировать$/.test(t)), btn.btns);
   ok('открыты базовые этапы услуги', btn.tab === '' && btn.stages.join('|') === 'Предпродакшн|Продакшн|Постпродакшн', btn);
-  const noTf = await page.evaluate(() => { stplPickSvc('SMM'); const r = [...document.querySelectorAll('#stpl-body .stpl-stage-acts button')].map(x => x.textContent.trim()); stplPickSvc('PROD'); return r; });
+  const noTf = await page.evaluate(() => { stplPickSvc('SMM'); const r = [...document.querySelectorAll('#tplw-body .stpl-stage-acts button')].map(x => x.textContent.trim()); stplPickSvc('PROD'); return r; });
   ok('у услуги без тарифов кнопки нет', !noTf.some(t => /^Копировать$/.test(t)), noTf);
 
   console.log('\n[B] список назначений');
   await page.evaluate(() => stplCopyToggle());
   await page.waitForTimeout(150);
   const list = await page.evaluate(() => ({
-    h: (document.querySelector('#stpl-body .stpl-cp-h') || {}).textContent,
-    rows: [...document.querySelectorAll('#stpl-body .stpl-cp-row')].map(r => ({
+    h: (document.querySelector('#tplw-body .stpl-cp-h') || {}).textContent,
+    rows: [...document.querySelectorAll('#tplw-body .stpl-cp-row')].map(r => ({
       nm: r.querySelector('.stpl-cp-nm').textContent, note: r.querySelector('.stpl-cp-note').textContent,
       warn: r.querySelector('.stpl-cp-note').classList.contains('warn'), on: r.classList.contains('on') })),
-    apply: (document.querySelector('#stpl-body .stpl-cp-f .btn-add') || {}).textContent,
-    disabled: !!(document.querySelector('#stpl-body .stpl-cp-f .btn-add') || {}).disabled,
+    apply: (document.querySelector('#tplw-body .stpl-cp-f .btn-add') || {}).textContent,
+    disabled: !!(document.querySelector('#tplw-body .stpl-cp-f .btn-add') || {}).disabled,
   }));
   console.log('    ' + JSON.stringify(list, null, 1));
   ok('назначения — только другие тарифы', list.rows.map(r => r.nm).join('|') === 'GOLD|PLATINUM', list.rows.map(r => r.nm));
@@ -64,10 +64,10 @@ const setup = () => {
   await page.evaluate(() => stplCopyAll());
   await page.waitForTimeout(120);
   const sel = await page.evaluate(() => ({
-    on: [...document.querySelectorAll('#stpl-body .stpl-cp-row')].map(r => r.classList.contains('on')),
-    apply: (document.querySelector('#stpl-body .stpl-cp-f .btn-add') || {}).textContent,
-    disabled: !!(document.querySelector('#stpl-body .stpl-cp-f .btn-add') || {}).disabled,
-    warn: (document.querySelector('#stpl-body .stpl-cp-warn') || {}).textContent,
+    on: [...document.querySelectorAll('#tplw-body .stpl-cp-row')].map(r => r.classList.contains('on')),
+    apply: (document.querySelector('#tplw-body .stpl-cp-f .btn-add') || {}).textContent,
+    disabled: !!(document.querySelector('#tplw-body .stpl-cp-f .btn-add') || {}).disabled,
+    warn: (document.querySelector('#tplw-body .stpl-cp-warn') || {}).textContent,
   }));
   console.log('    ' + JSON.stringify(sel));
   ok('«Выбрать все» отметил оба', sel.on.every(Boolean), sel.on);
@@ -77,7 +77,7 @@ const setup = () => {
   await page.waitForTimeout(250);
   const res = await page.evaluate(() => ({
     tpl: JSON.parse(JSON.stringify(window.STAGE_TPL.PROD)),
-    toast: window.__toast, open: !!document.querySelector('#stpl-body .stpl-cp'),
+    toast: window.__toast, open: !!document.querySelector('#tplw-body .stpl-cp'),
   }));
   console.log('    ' + JSON.stringify(res));
   ok('GOLD получил список', (res.tpl.GOLD || []).join('|') === 'Предпродакшн|Продакшн|Постпродакшн', res.tpl.GOLD);
@@ -91,7 +91,7 @@ const setup = () => {
   console.log('\n[D] перенос из тарифа обратно');
   await page.evaluate(() => { STAGE_TPL.PROD.GOLD = ['Только GOLD-1', 'Только GOLD-2']; stplPickSvc('PROD'); stplPickTariff('GOLD'); });
   await page.waitForTimeout(150);
-  const t2 = await page.evaluate(() => { stplCopyToggle(); return [...document.querySelectorAll('#stpl-body .stpl-cp-row')].map(r => r.querySelector('.stpl-cp-nm').textContent); });
+  const t2 = await page.evaluate(() => { stplCopyToggle(); return [...document.querySelectorAll('#tplw-body .stpl-cp-row')].map(r => r.querySelector('.stpl-cp-nm').textContent); });
   ok('текущий тариф в назначениях не предлагается', t2.join('|') === 'Базовые этапы|PLATINUM', t2);
   await page.evaluate(async () => { stplCopyPick(1); await stplCopyRun(); });
   await page.waitForTimeout(200);
@@ -113,7 +113,7 @@ const setup = () => {
   console.log('\n[F] смена услуги закрывает панель');
   await page.evaluate(() => { stplPickSvc('SMM'); });
   await page.waitForTimeout(120);
-  ok('панель переноса не осталась открытой', await page.evaluate(() => !_stplCopyOpen && !document.querySelector('#stpl-body .stpl-cp')));
+  ok('панель переноса не осталась открытой', await page.evaluate(() => !_stplCopyOpen && !document.querySelector('#tplw-body .stpl-cp')));
 
   const bad = errs.filter(e => /SyntaxError|is not defined|Cannot read/.test(e));
   console.log('\n[G] ошибки');

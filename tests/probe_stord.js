@@ -175,8 +175,8 @@ const dragTo = (A) => {
     window.tplServices = () => ['SMM'];
     window.tariffsForSvc = () => [];
     window.stageSetFor = () => ['БРИФ', 'СЦЕНАРИИ', 'СЪЁМКА', 'МОНТАЖ'];
-    document.body.insertAdjacentHTML('beforeend', '<div id="stpl-body"></div>');
-    _stplTab = 'service'; _stplSvc = null; _stplStages = [];
+    document.body.insertAdjacentHTML('beforeend', '<div id="tplw-body"></div>');
+    _stplTab = 'tsvc'; _stplSvc = null; _stplStages = [];
     _stplRefresh();
     const vals = () => [...document.querySelectorAll('#stpl-stages .stpl-stage input')].map(e => e.value);
     const rows = () => [...document.querySelectorAll('#stpl-stages .stpl-stage')];
