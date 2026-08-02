@@ -33,14 +33,14 @@ const setup = () => {
 
   console.log('\n[A] кнопка переноса');
   const btn = await page.evaluate(() => {
-    const bs = [...document.querySelectorAll('#tplw-body .stpl-stage-acts button')].map(x => x.textContent.trim());
+    const bs = [...document.querySelectorAll('#tplw-body .tpl-stacts button')].map(x => x.textContent.trim());
     return { btns: bs, tab: _stplTariff, stages: _stplStages.slice() };
   });
   console.log('    ' + JSON.stringify(btn));
-  ok('на базовых этапах кнопка есть', btn.btns.some(t => /^Копировать$/.test(t)), btn.btns);
+  ok('на базовых этапах кнопка есть', btn.btns.some(t => /^Копировать в…$/.test(t)), btn.btns);
   ok('открыты базовые этапы услуги', btn.tab === '' && btn.stages.join('|') === 'Предпродакшн|Продакшн|Постпродакшн', btn);
-  const noTf = await page.evaluate(() => { stplPickSvc('SMM'); const r = [...document.querySelectorAll('#tplw-body .stpl-stage-acts button')].map(x => x.textContent.trim()); stplPickSvc('PROD'); return r; });
-  ok('у услуги без тарифов кнопки нет', !noTf.some(t => /^Копировать$/.test(t)), noTf);
+  const noTf = await page.evaluate(() => { stplPickSvc('SMM'); const r = [...document.querySelectorAll('#tplw-body .tpl-stacts button')].map(x => x.textContent.trim()); stplPickSvc('PROD'); return r; });
+  ok('у услуги без тарифов кнопки нет', !noTf.some(t => /^Копировать в…$/.test(t)), noTf);
 
   console.log('\n[B] список назначений');
   await page.evaluate(() => stplCopyToggle());

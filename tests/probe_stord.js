@@ -178,18 +178,18 @@ const dragTo = (A) => {
     document.body.insertAdjacentHTML('beforeend', '<div id="tplw-body"></div>');
     _stplTab = 'tsvc'; _stplSvc = null; _stplStages = [];
     _stplRefresh();
-    const vals = () => [...document.querySelectorAll('#stpl-stages .stpl-stage input')].map(e => e.value);
-    const rows = () => [...document.querySelectorAll('#stpl-stages .stpl-stage')];
-    const out = { grips: document.querySelectorAll('#stpl-stages .stpl-grip').length, before: vals() };
+    const vals = () => [...document.querySelectorAll('#stpl-stages .stpl-stage:not(.tpl-newst) input')].map(e => e.value);
+    const rows = () => [...document.querySelectorAll('#stpl-stages .stpl-stage:not(.tpl-newst)')];
+    const out = { grips: document.querySelectorAll('#stpl-stages .stpl-grip:not(.empty)').length, before: vals() };
 
     /* стрелка вниз на первом */
-    document.querySelectorAll('#stpl-stages .stpl-grip')[0]
+    document.querySelectorAll('#stpl-stages .stpl-grip:not(.empty)')[0]
       .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
     out.afterKey = vals();
-    out.focusIdx = [...document.querySelectorAll('#stpl-stages .stpl-grip')].indexOf(document.activeElement);
+    out.focusIdx = [...document.querySelectorAll('#stpl-stages .stpl-grip:not(.empty)')].indexOf(document.activeElement);
 
     /* правка текста, затем перетаскивание последнего наверх: текст обязан уехать вместе со строкой */
-    const inps = () => [...document.querySelectorAll('#stpl-stages .stpl-stage input')];
+    const inps = () => [...document.querySelectorAll('#stpl-stages .stpl-stage:not(.tpl-newst) input')];
     inps()[3].value = 'МОНТАЖ 4K'; inps()[3].dispatchEvent(new Event('input', { bubbles: true }));
     const last = rows()[3];
     last.querySelector('.stpl-grip').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
@@ -200,12 +200,12 @@ const dragTo = (A) => {
       Object.assign(new Event('dragover', { bubbles: true, cancelable: true }), { dataTransfer: dt, clientY: t.top + 2 }));
     last.dispatchEvent(new Event('dragend', { bubbles: true }));
     out.afterDrag = vals(); out.arr = _stplStages.slice();
-    out.nums = [...document.querySelectorAll('#stpl-stages .stpl-stnum')].map(e => e.textContent);
+    out.nums = [...document.querySelectorAll('#stpl-stages .stpl-stnum:not(.plus)')].map(e => e.textContent);
     out.draggable = rows().map(e => e.getAttribute('draggable'));
 
     /* один этап — переставлять не с чем */
     _stplStages = ['ЕДИНСТВЕННЫЙ']; _stplRefresh();
-    out.oneGrip = document.querySelectorAll('#stpl-stages .stpl-grip').length;
+    out.oneGrip = document.querySelectorAll('#stpl-stages .stpl-grip:not(.empty)').length;
     return out;
   });
   ok('ручка у каждой строки шаблона', tpl.grips === 4, tpl.grips);

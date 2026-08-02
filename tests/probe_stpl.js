@@ -176,46 +176,85 @@ const seed = () => {
   await open();
   await page.evaluate(() => stplGo('tsvc'));
   await page.waitForTimeout(250);
+  const stg = () => page.evaluate(() => [...document.querySelectorAll('#stpl-stages .stpl-stage:not(.tpl-newst) input')].map(x => x.value));
   const svc = await page.evaluate(() => ({
     rows: [...document.querySelectorAll('.stpl-svc-row')].map(x => x.dataset.k),
     sel: (document.querySelector('.stpl-svc-row.on') || {}).dataset.k,
-    chips: [...document.querySelectorAll('.stpl-tf-tab')].map(x => x.textContent.trim()),
-    stages: [...document.querySelectorAll('#stpl-stages input')].map(x => x.value),
-    tars: [...document.querySelectorAll('.tpl-col-r .stpl-item.tar .stpl-nm')].map(x => x.textContent),
+    tfs: [...document.querySelectorAll('.tplw-row')].map(x => x.dataset.tf),
+    open: [...document.querySelectorAll('.tplw-row.on')].map(x => x.dataset.tf),
+    st: [...document.querySelectorAll('.tplw-rst')].map(x => x.textContent),
+    pr: [...document.querySelectorAll('.tplw-rpr')].map(x => x.textContent.replace(/\s| | /g, '')),
     swatch: getComputedStyle(document.querySelector('.stpl-svc-row.on .stpl-svc-swatch')).backgroundColor,
   }));
   ok('услуги в списке', svc.rows.join(',') === 'PROD,SMM,DESIGN', svc.rows);
   ok('первая выбрана сама', svc.sel === 'PROD', svc.sel);
-  ok('чипы — базовые плюс тарифы услуги', svc.chips.join(',') === 'Базовые этапы,GOLD,SILVER', svc.chips);
-  ok('видны базовые этапы услуги', svc.stages.join(',') === 'Предпродакшн,Продакшн,Постпродакшн', svc.stages);
-  ok('тарифы услуги здесь же, без перехода на другую вкладку', svc.tars.join(',') === 'GOLD,SILVER', svc.tars);
+  ok('одна строка на базовые этапы и по строке на тариф', svc.tfs.join(',') === ',GOLD,SILVER', svc.tfs);
+  ok('базовые этапы раскрыты сразу — без единого клика', svc.open.join(',') === '', svc.open);
+  ok('видны базовые этапы услуги', (await stg()).join(',') === 'Предпродакшн,Продакшн,Постпродакшн', await stg());
+  ok('в строке тарифа видна цена', svc.pr.join(',') === '12000000,6000000', svc.pr);
+  ok('и сразу видно, свои у него этапы или базовые', svc.st.join(',') === '3 этапа,свои: 4,базовые', svc.st);
   ok('цвет услуги на метке', svc.swatch === 'rgb(138, 143, 255)', svc.swatch);
   await page.evaluate(() => stplPickTariff('GOLD'));
   await page.waitForTimeout(250);
-  ok('у тарифа свои этапы', await page.evaluate(() =>
-    [...document.querySelectorAll('#stpl-stages input')].map(x => x.value).join(',')) === 'Бриф,Съёмка,Монтаж,Сдача');
+  ok('клик по тарифу раскрывает его этапы', (await stg()).join(',') === 'Бриф,Съёмка,Монтаж,Сдача', await stg());
+  ok('раскрыт ровно один тариф', await page.evaluate(() => document.querySelectorAll('.tplw-row.on').length) === 1);
+  await page.evaluate(() => stplPickTariff('GOLD'));
+  await page.waitForTimeout(200);
+  ok('повторный клик сворачивает', await page.evaluate(() => document.querySelectorAll('.tplw-row.on').length) === 0);
+  await page.evaluate(() => stplPickTariff('SILVER'));
+  await page.waitForTimeout(250);
+  const inh = await page.evaluate(() => ({
+    ghost: [...document.querySelectorAll('.tpl-ghost-r')].map(x => x.textContent.replace(/^\d+/, '')),
+    btn: (document.querySelector('.tpl-stacts .btn-add') || {}).textContent,
+    edit: document.querySelectorAll('#stpl-stages').length,
+  }));
+  ok('у тарифа без своих этапов показаны базовые', inh.ghost.join(',') === 'Предпродакшн,Продакшн,Постпродакшн', inh.ghost);
+  ok('и они не редактируются, пока не сделаешь своими', inh.edit === 0, inh.edit);
+  ok('одна кнопка вместо объяснений', inh.btn === 'Задать свои этапы', inh.btn);
+  await page.evaluate(() => stplStOwn());
+  await page.waitForTimeout(250);
+  ok('«Задать свои» копирует базовые и делает их своими', await page.evaluate(() =>
+    (window.STAGE_TPL.PROD.SILVER || []).join(',')) === 'Предпродакшн,Продакшн,Постпродакшн');
+  ok('строка сразу говорит «свои»', await page.evaluate(() =>
+    document.querySelector('.tplw-row.on .tplw-rst').textContent) === 'свои: 3');
+  await page.evaluate(() => stplStBase());
+  await page.waitForTimeout(250);
+  ok('«Вернуть базовые» убирает свои', await page.evaluate(() =>
+    (window.STAGE_TPL.PROD.SILVER || []).length) === 0);
+  ok('и строка снова говорит «базовые»', await page.evaluate(() =>
+    document.querySelector('.tplw-row.on .tplw-rst').textContent) === 'базовые');
+  await page.evaluate(() => stplPickTariff('GOLD'));
+  await page.waitForTimeout(250);
 
   /* ——— G. этапы не теряются ——— */
-  console.log('\n[G] несохранённые этапы');
-  await page.evaluate(() => { const i = document.querySelectorAll('#stpl-stages input')[0]; i.value = 'Бриф с клиентом'; i.dispatchEvent(new Event('input', { bubbles: true })); });
-  await page.waitForTimeout(150);
-  ok('окно честно говорит «не сохранено»', await page.evaluate(() => !!document.querySelector('.tpl-unsaved')));
-  await page.evaluate(() => stplPickTariff(''));
-  await page.waitForTimeout(250);
-  ok('уход на другой тариф не теряет правку', await page.evaluate(() =>
+  console.log('\n[G] список пишется сам');
+  ok('кнопки «Сохранить этапы» в окне нет', await page.evaluate(() =>
+    ![...document.querySelectorAll('#tplw-body button')].some(b => /Сохранить/.test(b.textContent))));
+  await page.evaluate(() => { const i = document.querySelectorAll('#stpl-stages .stpl-stage:not(.tpl-newst) input')[0]; i.value = 'Бриф с клиентом'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(800);
+  ok('правка текста сохраняется сама', await page.evaluate(() =>
     (window.STAGE_TPL.PROD.GOLD || []).join(',')) === 'Бриф с клиентом,Съёмка,Монтаж,Сдача',
     await page.evaluate(() => (window.STAGE_TPL.PROD.GOLD || []).join(',')));
-  ok('и метка «не сохранено» погасла', await page.evaluate(() => !document.querySelector('.tpl-unsaved')));
-  await page.evaluate(() => { const i = document.querySelectorAll('#stpl-stages input')[0]; i.value = 'Смета'; i.dispatchEvent(new Event('input', { bubbles: true })); stplGo('ttar'); });
+  ok('и коротко сообщает об этом', await page.evaluate(() => {
+    const e = document.getElementById('tpl-sv'); return !!e && e.classList.contains('on') && e.textContent === 'сохранено';
+  }));
+  await page.evaluate(() => { const n = document.getElementById('stpl-st-new'); n.value = 'Правки'; n.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); });
   await page.waitForTimeout(250);
-  ok('уход в другой раздел тоже дописывает', await page.evaluate(() =>
-    (window.STAGE_TPL.PROD[''] || []).join(',')) === 'Смета,Продакшн,Постпродакшн',
-    await page.evaluate(() => (window.STAGE_TPL.PROD[''] || []).join(',')));
-  await page.evaluate(() => { stplGo('tsvc'); const i = document.querySelectorAll('#stpl-stages input')[1]; i.value = 'Съёмочный день'; i.dispatchEvent(new Event('input', { bubbles: true })); npwTryClose(); });
+  ok('новый этап заводится прямо в конце списка по Enter', await page.evaluate(() =>
+    (window.STAGE_TPL.PROD.GOLD || []).join(',')) === 'Бриф с клиентом,Съёмка,Монтаж,Сдача,Правки',
+    await page.evaluate(() => (window.STAGE_TPL.PROD.GOLD || []).join(',')));
+  ok('и курсор остаётся в поле — можно диктовать подряд', await page.evaluate(() =>
+    document.activeElement && document.activeElement.id) === 'stpl-st-new');
+  await page.evaluate(() => stplStageDel(4));
   await page.waitForTimeout(250);
-  ok('закрытие окна тоже дописывает', await page.evaluate(() =>
-    (window.STAGE_TPL.PROD[''] || []).join(',')) === 'Смета,Съёмочный день,Постпродакшн',
-    await page.evaluate(() => (window.STAGE_TPL.PROD[''] || []).join(',')));
+  ok('удаление тоже пишется сразу', await page.evaluate(() =>
+    (window.STAGE_TPL.PROD.GOLD || []).join(',')) === 'Бриф с клиентом,Съёмка,Монтаж,Сдача');
+  /* набрал и тут же закрыл окно — таймер не успел бы */
+  await page.evaluate(() => { const n = document.getElementById('stpl-st-new'); n.value = 'Архив'; npwTryClose(); });
+  await page.waitForTimeout(250);
+  ok('набранное на выходе не теряется', await page.evaluate(() =>
+    (window.STAGE_TPL.PROD.GOLD || []).join(',')) === 'Бриф с клиентом,Съёмка,Монтаж,Сдача,Архив',
+    await page.evaluate(() => (window.STAGE_TPL.PROD.GOLD || []).join(',')));
   ok('и окно закрылось', await page.evaluate(() => !document.querySelector('#ov-pd2 .modal.npw')));
 
   /* ——— H. порядок этапов ——— */
@@ -224,13 +263,11 @@ const seed = () => {
   await page.evaluate(() => { stplGo('tsvc'); stplPickSvc('PROD'); });
   await page.waitForTimeout(250);
   await page.evaluate(() => stplStageMove(2, -1));
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(250);
   ok('стрелка меняет соседние этапы местами', await page.evaluate(() =>
-    [...document.querySelectorAll('#stpl-stages input')].map(x => x.value).join(',')) === 'Предпродакшн,Постпродакшн,Продакшн');
+    [...document.querySelectorAll('#stpl-stages .stpl-stage:not(.tpl-newst) input')].map(x => x.value).join(',')) === 'Предпродакшн,Постпродакшн,Продакшн');
   ok('номера пересчитались', await page.evaluate(() =>
-    [...document.querySelectorAll('#stpl-stages .stpl-stnum')].map(x => x.textContent).join(',')) === '1,2,3');
-  await page.evaluate(() => { window.__save = []; stplStagesSave(); });
-  await page.waitForTimeout(200);
+    [...document.querySelectorAll('#stpl-stages .stpl-stnum:not(.plus)')].map(x => x.textContent).join(',')) === '1,2,3');
   ok('в базу уходит тот же порядок, что на экране', await page.evaluate(() =>
     (window.STAGE_TPL.PROD[''] || []).join(',')) === 'Предпродакшн,Постпродакшн,Продакшн');
 
@@ -285,8 +322,8 @@ const seed = () => {
   const jump = await page.evaluate(() => ({
     sec: document.querySelector('#npw-nav .npw-nav-i.on').dataset.sec,
     svc: (document.querySelector('.stpl-svc-row.on') || {}).dataset.k,
-    tf: (document.querySelector('.stpl-tf-tab.on') || {}).textContent.trim(),
-    stages: [...document.querySelectorAll('#stpl-stages input')].map(x => x.value),
+    tf: (document.querySelector('.tplw-row.on') || {}).dataset.tf,
+    stages: [...document.querySelectorAll('#stpl-stages .stpl-stage:not(.tpl-newst) input')].map(x => x.value),
   }));
   ok('из прайса попадаем в этапы этого тарифа', jump.sec === 'tsvc' && jump.svc === 'PROD' && jump.tf === 'GOLD', jump);
   ok('и видим именно его этапы', jump.stages.join(',') === 'Бриф,Съёмка,Монтаж,Сдача', jump.stages);
