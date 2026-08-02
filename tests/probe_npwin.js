@@ -22,6 +22,10 @@ const setup = () => {
   const b = await chromium.launch();
   const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
+  /* В headless кадры рисуются только по запросу: без этого CSS-переход подложки
+     стоит на месте, а requestAnimationFrame внутри страницы не срабатывает.
+     Прокачиваем кадры перед замерами движения — это про стенд, не про продукт. */
+  const frames = async (n = 4) => { for (let i = 0; i < n; i++) await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))); };
   await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1300);
   await page.evaluate(setup);
@@ -197,6 +201,7 @@ const setup = () => {
   }));
   ok('активный пункт — «Команда»', await page.evaluate(() => document.querySelector('#npw-nav .npw-nav-i.on').dataset.sec) === 'team');
   await page.waitForTimeout(700);   /* подложка переезжает 0.2s — даём ей доехать */
+  await frames();
   ok('подложка легла ровно на активную кнопку', await page.evaluate(() => {
     const p = document.getElementById('npw-pill').getBoundingClientRect();
     const a = document.querySelector('#npw-nav .npw-nav-i.on').getBoundingClientRect();
@@ -219,6 +224,7 @@ const setup = () => {
   }));
   await page.evaluate(() => { document.getElementById('npw-body').scrollTop = 0; });
   await page.waitForTimeout(250);
+  await frames();
   ok('прокрутка наверх возвращает «Основное»', await page.evaluate(() => document.querySelector('#npw-nav .npw-nav-i.on').dataset.sec) === 'main');
   const sticky = await page.evaluate(() => [...document.querySelectorAll('#npw-body *')]
     .filter(el => getComputedStyle(el).position === 'sticky').map(el => String(el.className)));

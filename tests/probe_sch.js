@@ -168,7 +168,22 @@ const setup = () => {
     return { bars, filled: bars.filter(b => b.w).length, peak: bars.filter(b => b.w === '100%').length };
   });
   ok('полоска загрузки есть у каждого дня', load.bars.every(b => b.has), load.bars);
-  ok('у пустых дней она пустая', load.bars.some(b => b.empty && !b.w), load.bars);
+  /* «Пустой день» нельзя брать из недельной раскладки: живая бронь идёт от
+     текущей минуты, и сразу после полуночи её хвост подкрашивает вчерашний
+     столбец — проверка падала ночью независимо от кода. Спрашиваем прямо:
+     неделя без броней — все семь полосок пустые. */
+  const emptyWeek = await page.evaluate(() => {
+    const keep = window.BOOKINGS;
+    window.BOOKINGS = []; renderSchedule();
+    const out = [...document.querySelectorAll('.sched-col')].map(c => {
+      const b = c.querySelector('.sched-col-load'), i = b && b.querySelector('i');
+      return { empty: b ? b.classList.contains('is-empty') : null, w: i ? i.style.width : null };
+    });
+    window.BOOKINGS = keep; renderSchedule();
+    return out;
+  });
+  ok('у дней без броней полоска пустая', emptyWeek.length === 7 && emptyWeek.every(b => b.empty && !b.w), emptyWeek);
+  ok('пустая полоска и нулевая ширина — всегда вместе', load.bars.every(b => b.empty === !b.w), load.bars);
   ok('самый занятый день недели заполнен целиком', load.peak === 1, load.bars);
   ok('подсказка объясняет, что показывает полоска', /от самого занятого дня/.test((load.bars.find(b => b.title) || {}).title || ''), load.bars);
 
