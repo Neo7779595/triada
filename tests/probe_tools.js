@@ -12,7 +12,7 @@ const setup = () => {
   window.ME = window.tMe(); window.agIsOwner = () => true; window.agCanView = () => true; window.agCanEdit = () => true;
   TOOLS_DATA.length = 0;
   TOOLS_DATA.push({ cat: 'Аналитика', color: '#37E6C8', items: [
-    { name: 'Анализ эффективности', url: 'https://dtr-analytics.vercel.app/dashboard', ty: 'Sheets' },
+    { name: 'Анализ эффективности', url: 'https://dtr-analytics.vercel.app/dashboard', ty: 'Sheets', created_at: '2026-04-12T10:00:00Z' },
     { name: '324', url: '', ty: 'Miro' },
     { name: 'Доска без схемы', url: 'miro.com/app/board/z', ty: 'Miro' } ] });
   TOOLS_DATA.push({ cat: 'Рабочие доски', color: '#8A8FFF', items: [
@@ -51,52 +51,67 @@ const setup = () => {
   const card = await page.evaluate(() => {
     const c = document.querySelector('.tool-card');
     const g = q => c.querySelector(q);
-    const cs = getComputedStyle(c), bs = getComputedStyle(c, '::before');
+    const cs = getComputedStyle(c);
+    const art = g('.tc-art');
     return { cls: c.className, tab: c.getAttribute('tabindex'), role: c.getAttribute('role'),
-      stripe: bs.backgroundColor, stripeH: bs.height,
-      ic: (g('.tc-ic') || {}).textContent, icColor: g('.tc-ic') ? getComputedStyle(g('.tc-ic')).color : null,
+      icSvg: !!g('.tc-ic svg'), icColor: g('.tc-ic') ? getComputedStyle(g('.tc-ic')).color : null,
+      markColor: g('.tc-mark') ? getComputedStyle(g('.tc-mark')).color : null,
       badge: (g('.tc-badge') || {}).textContent, name: (g('.tc-name') || {}).textContent,
-      url: (g('.tc-url span') || {}).textContent, open: (g('.tc-open') || {}).textContent.trim(),
+      url: (g('.tc-url span') || {}).textContent,
+      open: (g('.tc-open') || {}).getAttribute('title'),
       acts: c.querySelectorAll('.tc-act').length,
       order: [...c.children].map(x => x.className),
+      bar: !!g('.tc-bar'), ratio: art ? +(art.getBoundingClientRect().width / art.getBoundingClientRect().height).toFixed(2) : null,
       overflow: cs.overflow, nameColor: g('.tc-name') ? getComputedStyle(g('.tc-name')).color : null,
       topBorder: g('.tc-top') ? getComputedStyle(g('.tc-top')).borderBottomWidth : null };
   });
-  ok('карточка собрана из трёх частей по порядку',
-    card.order.join(' → ') === 'tc-top → tc-body → tc-foot', card.order);
-  ok('цвет типа стоит в плитке', card.icColor === 'rgb(67, 216, 140)', card.icColor);
-  ok('и в нити над карточкой', card.stripe === 'rgb(67, 216, 140)' && card.stripeH === '2px', card);
+  ok('карточка собрана из двух частей: окно и подпись',
+    card.order.join(' → ') === 'tc-shot → tc-foot', card.order);
+  ok('у окна есть адресная строка', card.bar === true);
+  ok('обложка держит 16:9 — под тот же размер, что просим при загрузке', Math.abs(card.ratio - 16 / 9) < 0.03, card.ratio);
+  ok('знак сервиса нарисован, а не набран буквами', card.icSvg === true);
+  ok('цвет типа стоит на знаке', card.icColor === 'rgb(67, 216, 140)', card.icColor);
+  /* Браузер отдаёт color-mix как color(srgb …) — сравниваем каналами, а не строкой */
+  ok('и на подложке вместо обложки', (function(){
+    const m = String(card.markColor || '').match(/([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/);
+    if (!m) return false;
+    const ch = [+m[1], +m[2], +m[3]].map(v => v <= 1 ? Math.round(v * 255) : Math.round(v));
+    return ch.join(',') === '67,216,140';
+  })(), card.markColor);
   ok('название набрано нейтральным, а не цветом типа', card.nameColor === 'rgb(234, 236, 239)', card.nameColor);
   ok('в карточке видно тип, имя и адрес',
-    card.badge === 'Sheets' && /Анализ эффективности/.test(card.name) && /dtr-analytics\.vercel\.app/.test(card.url), card);
-  ok('в подвале сказано, что будет по клику', /Открыть/i.test(card.open), card.open);
+    /^Sheets/.test(card.badge) && /Анализ эффективности/.test(card.name) && /dtr-analytics\.vercel\.app/.test(card.url), card);
+  ok('и когда добавили', /\d/.test(card.badge.split('·')[1] || ''), card.badge);
+  ok('стрелка объясняет, что будет по клику', /Открыть/i.test(card.open || ''), card.open);
   ok('три действия: копировать, править, удалить', card.acts === 3, card.acts);
   ok('карточку видно с клавиатуры', card.tab === '0' && card.role === 'button', card);
-  ok('чужая шапка карточки сотрудника сюда не прилетает', card.topBorder === '0px', card.topBorder);
+  ok('чужая шапка карточки сотрудника сюда не прилетает', card.topBorder === null, card.topBorder);
 
   console.log('\n[C] действия никого не перекрывают');
   const geo = await page.evaluate(() => {
     const c = document.querySelector('.tool-card');
     const r = e => { const b = e.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom }; };
     return { badge: r(c.querySelector('.tc-badge')), acts: r(c.querySelector('.tc-acts')),
-      name: r(c.querySelector('.tc-name')), foot: r(c.querySelector('.tc-foot')), card: r(c) };
+      name: r(c.querySelector('.tc-name')), foot: r(c.querySelector('.tc-foot')),
+      shot: r(c.querySelector('.tc-shot')), bar: r(c.querySelector('.tc-bar')), card: r(c) };
   });
   ok('кнопки не наезжают на метку типа', !overlap(geo.acts, geo.badge), geo);
   ok('и не закрывают название', !overlap(geo.acts, geo.name), geo);
-  ok('действия внутри подвала', geo.acts.top >= geo.foot.top - 1 && geo.acts.bottom <= geo.foot.bottom + 1, geo);
-  ok('подвал прижат к низу карточки', Math.abs(geo.foot.bottom - geo.card.bottom) <= 2, geo);
+  ok('действия живут поверх обложки, а не в подписи', geo.acts.top >= geo.shot.top - 1 && geo.acts.bottom <= geo.shot.bottom + 1, geo);
+  ok('и не закрывают адресную строку', !overlap(geo.acts, geo.bar), geo);
+  ok('подпись прижата к низу карточки', Math.abs(geo.foot.bottom - geo.card.bottom) <= 2, geo);
 
   console.log('\n[D] карточка без ссылки честно об этом говорит');
   const nolink = await page.evaluate(() => {
     const c = [...document.querySelectorAll('.tool-card')].find(x => x.dataset.nm === '324');
     return { cls: c.className, url: c.querySelector('.tc-url span').textContent,
       dim: c.querySelector('.tc-url').classList.contains('is-none'),
-      open: c.querySelector('.tc-open').textContent.trim(), acts: c.querySelectorAll('.tc-act').length,
+      open: c.querySelector('.tc-open').getAttribute('title'), acts: c.querySelectorAll('.tc-act').length,
       cursor: getComputedStyle(c).cursor };
   });
   ok('карточка помечена как «без ссылки»', /is-nolink/.test(nolink.cls), nolink.cls);
   ok('вместо прочерка — понятная строка', /ссылка не указана/.test(nolink.url) && nolink.dim, nolink);
-  ok('в подвале не обещают открыть', /Нет ссылки/i.test(nolink.open), nolink.open);
+  ok('стрелка не обещает открыть', /Нет ссылки/i.test(nolink.open), nolink.open);
   ok('копировать нечего — кнопки нет', nolink.acts === 2, nolink.acts);
   ok('и курсор не изображает ссылку', nolink.cursor === 'default', nolink.cursor);
 
