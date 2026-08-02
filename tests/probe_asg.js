@@ -69,27 +69,70 @@ const setup = () => {
   const form = await page.evaluate(() => {
     const w = document.getElementById('cdd-pd2-asg');
     return { multi: w.classList.contains('cdd-multi'), val: document.getElementById('pd2-asg').value,
-      chips: w.querySelectorAll('.cdd-lbl .asg-chip').length, more: (w.querySelector('.cdd-lbl .asg-more') || {}).textContent,
+      chips: w.querySelectorAll('.cdd-lbl .asg-chip').length,
+      faces: w.querySelectorAll('.cdd-lbl .asg-face').length,
+      titles: [...w.querySelectorAll('.cdd-lbl .asg-face')].map(x => x.getAttribute('title')),
       on: w.querySelectorAll('.cdd-opt.on').length, clear: !!w.querySelector('.asg-clear'),
+      done: !!w.querySelector('.asg-done'), cnt: (w.querySelector('.asg-cnt') || {}).textContent,
       lbl: [...document.querySelectorAll('.tskm-pl')].map(x => x.textContent.trim())[1] };
   });
   console.log('    ' + JSON.stringify(form));
   ok('поле стало множественным', form.multi && form.val === 'm1,m2,m3,m4', form);
-  ok('в поле — чипы, лишние свёрнуты', form.chips === 3 && form.more === '+1', form);
+  ok('когда исполнителей несколько — в поле только лица', form.faces === 4 && form.chips === 0, form);
+  ok('имя каждого — в подсказке к лицу', form.titles.join(',') === 'Худойберди,Шахзод,Азиза,Рустам', form.titles);
   ok('в списке отмечены все выбранные', form.on === 4, form.on);
+  ok('внизу списка сказано, сколько выбрано', form.cnt === 'выбрано 4', form.cnt);
+  ok('и есть кнопка «Готово»', form.done === true, form);
   ok('подпись поля во множественном числе', /Исполнител/.test(form.lbl || ''), form.lbl);
+
+  /* Главное неудобство было в том, что за двумя людьми приходилось открывать
+     список дважды: он закрывался на каждом выборе. */
+  const stay = await page.evaluate(() => {
+    const w = document.getElementById('cdd-pd2-asg');
+    asgClear('pd2-asg');
+    _cddToggle('pd2-asg');
+    const opened = w.classList.contains('open');
+    w.querySelector('.cdd-opt[data-v="m1"]').click();
+    const after1 = w.classList.contains('open');
+    w.querySelector('.cdd-opt[data-v="m2"]').click();
+    const after2 = w.classList.contains('open');
+    const val = document.getElementById('pd2-asg').value;
+    w.querySelector('.asg-done').click();
+    return { opened, after1, after2, val, closed: !w.classList.contains('open') };
+  });
+  ok('список открывается', stay.opened === true, stay);
+  ok('и не захлопывается после первого выбора', stay.after1 === true, stay);
+  ok('и после второго тоже', stay.after2 === true, stay);
+  ok('двоих выбрали за один заход', stay.val === 'm1,m2', stay.val);
+  ok('«Готово» закрывает список и возвращает к карточке', stay.closed === true, stay);
+
+  const one = await page.evaluate(() => {
+    asgClear('pd2-asg'); asgPick('pd2-asg', 'm1');
+    const w = document.getElementById('cdd-pd2-asg');
+    const chip = w.querySelector('.cdd-lbl .asg-chip');
+    return { chips: w.querySelectorAll('.cdd-lbl .asg-chip').length,
+      faces: w.querySelectorAll('.cdd-lbl .asg-face').length,
+      name: chip ? chip.querySelector('.asg-nm').textContent : null, x: !!(chip && chip.querySelector('.asg-x')) };
+  });
+  ok('когда исполнитель один — видно имя', one.chips === 1 && one.faces === 0 && one.name === 'Худойберди', one);
+  ok('и его можно снять прямо из поля, не открывая список', one.x === true, one);
+  await page.evaluate(() => {
+    const x = document.querySelector('#cdd-pd2-asg .cdd-lbl .asg-x'); if (x) x.click();
+  });
+  ok('крестик в поле снимает исполнителя', await page.evaluate(() => document.getElementById('pd2-asg').value) === '');
+  await page.evaluate(() => { document.getElementById('pd2-asg').value = 'm1,m2,m3,m4'; asgSync('pd2-asg'); });
   const pick = await page.evaluate(() => {
     asgPick('pd2-asg', 'm2');                       // снять
     const afterOff = document.getElementById('pd2-asg').value;
     asgPick('pd2-asg', 'm2');                       // вернуть
     const afterOn = document.getElementById('pd2-asg').value;
     const w = document.getElementById('cdd-pd2-asg');
-    return { afterOff, afterOn, chips: w.querySelectorAll('.cdd-lbl .asg-chip').length, on: w.querySelectorAll('.cdd-opt.on').length };
+    return { afterOff, afterOn, faces: w.querySelectorAll('.cdd-lbl .asg-face').length, on: w.querySelectorAll('.cdd-opt.on').length };
   });
   console.log('    ' + JSON.stringify(pick));
   ok('повторный клик снимает исполнителя', pick.afterOff === 'm1,m3,m4', pick.afterOff);
   ok('и добавляет обратно в конец', pick.afterOn === 'm1,m3,m4,m2', pick.afterOn);
-  ok('поле перерисовалось', pick.chips === 3 && pick.on === 4, pick);
+  ok('поле перерисовалось', pick.faces === 4 && pick.on === 4, pick);
   const saved = await page.evaluate(async () => { pdSaveTask('t1'); await new Promise(r => setTimeout(r, 150)); return window.__upd[0]; });
   console.log('    ' + JSON.stringify(saved.patch.assignees) + ' / main ' + saved.patch.assignee_id);
   ok('сохраняется весь состав', Array.isArray(saved.patch.assignees) && saved.patch.assignees.length === 4, saved.patch.assignees);
@@ -119,12 +162,19 @@ const setup = () => {
   const st = await page.evaluate(async () => {
     const w = document.getElementById('cdd-pd2-stasg');
     const start = document.getElementById('pd2-stasg').value;
-    asgPick('pd2-stasg', 'm3');
+    _cddToggle('pd2-stasg');
+    w.querySelector('.cdd-opt[data-v="m3"]').click();
+    const same = { faces: w.querySelectorAll('.cdd-lbl .asg-face').length,
+      openAfterPick: w.classList.contains('open'), done: !!w.querySelector('.asg-done') };
+    w.querySelector('.asg-done').click();
+    same.closed = !w.classList.contains('open');
+    same.ok = same.faces === 3 && same.openAfterPick && same.done && same.closed;
     pdSaveStage('s1'); await new Promise(r => setTimeout(r, 150));
-    return { multi: !!w && w.classList.contains('cdd-multi'), start, patch: (window.__st[0] || {}).patch };
+    return { multi: !!w && w.classList.contains('cdd-multi'), start, same, patch: (window.__st[0] || {}).patch };
   });
   console.log('    ' + JSON.stringify(st));
   ok('у этапа тоже несколько ответственных', st.multi && st.start === 'm1,m2', st);
+  ok('и выбор там устроен так же: лица, «Готово», список не захлопывается', st.same && st.same.ok, st.same);
   ok('состав этапа сохраняется', st.patch.assignees.join(',') === 'm1,m2,m3' && st.patch.assignee_id === 'm1', st.patch);
 
   console.log('\n[F] фильтр по исполнителю');
