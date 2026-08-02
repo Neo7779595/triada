@@ -63,6 +63,18 @@ const dragTo = (A) => {
   await page.evaluate(setup);
   await page.waitForTimeout(400);
 
+  /* Перестановка уходит в базу и возвращается перерисовкой — ждём именно
+     её, а не фиксированную паузу. Под нагрузкой всей пачки проверок 400 мс
+     не хватало, и падала не перестановка, а секундомер. Ожидание с
+     таймаутом: если порядок так и не пришёл — падает утверждение ниже
+     и показывает, что на экране на самом деле. */
+  const settle = async want => {
+    try {
+      await page.waitForFunction(w => [...document.querySelectorAll('.pd-stages .pd-st .pd-st-nm')]
+        .map(e => e.textContent.trim()).join(',') === w, want, { timeout: 5000 });
+    } catch (e) { /* пусть говорит утверждение, а не исключение */ }
+  };
+
   console.log('\n[A] ручка есть у каждого этапа и объясняет себя');
   const grips = await page.evaluate(() => {
     const g = [...document.querySelectorAll('.pd-stages .pd-grip')];
@@ -80,7 +92,7 @@ const dragTo = (A) => {
   const before = await page.evaluate(names);
   ok('исходный порядок', before.join(',') === 'БРИФ,СЦЕНАРИИ,СЪЁМКА,МОНТАЖ', before);
   await page.evaluate(dragTo, { fromId: 's4', toIdx: 1 });
-  await page.waitForTimeout(250);
+  await settle('БРИФ,МОНТАЖ,СЦЕНАРИИ,СЪЁМКА');
   const after = await page.evaluate(() => ({
     names: [...document.querySelectorAll('.pd-stages .pd-st .pd-st-nm')].map(e => e.textContent.trim()),
     idx: PROJECTS[0]._stages.map(s => s.name + '#' + s.idx),
@@ -110,7 +122,7 @@ const dragTo = (A) => {
     const g = document.querySelector('.pd-st[data-stid="s2"] .pd-grip'); g.focus();
     g.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }));
   });
-  await page.waitForTimeout(400);
+  await settle('БРИФ,СЦЕНАРИИ,МОНТАЖ,СЪЁМКА');
   const kb = await page.evaluate(() => ({
     names: [...document.querySelectorAll('.pd-st .pd-st-nm')].map(e => e.textContent.trim()),
     rpc: window.__rpc, focus: document.activeElement && document.activeElement.closest('.pd-st') && document.activeElement.closest('.pd-st').getAttribute('data-stid'),

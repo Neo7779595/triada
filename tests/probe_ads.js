@@ -230,8 +230,102 @@ const HEADS = {
   ok('предпросмотр называет период и расход',
     /01\.07\.2026/.test(I.txt) && /5\s?390\s?001/.test(I.txt), I.txt.slice(0, 200));
 
+  console.log('\n[J] что принесли на самом деле — решают байты, а не имя файла');
+  const J = await page.evaluate(async () => {
+    /* Проверяем настоящий путь загрузки: собираем File и отдаём его в
+       adsFile — так же, как это делает перетаскивание в окно. */
+    const put = async (bytes, name) => {
+      adsImportOpen();
+      await adsFile(new File([bytes], name));
+      const box = document.getElementById('ads-imp-b');
+      return { txt: box.textContent.trim(), maps: document.querySelectorAll('.ads-map-r').length,
+        drop: !!document.querySelector('.ads-drop'), rows: ADS_IMP ? ADS_IMP.rows.length : 0 };
+    };
+    const bin = a => new Uint8Array(a);
+    const utf8 = s => new TextEncoder().encode(s);
+    /* windows-1251: так CSV сохраняет Excel в русской локали. */
+    const cp1251 = s => new Uint8Array([...s].map(c => {
+      const k = c.charCodeAt(0);
+      if (k < 128) return k;
+      if (k === 0x401) return 0xA8; if (k === 0x451) return 0xB8;
+      if (k >= 0x410 && k <= 0x44F) return k - 0x410 + 0xC0;
+      return 63;
+    }));
+    const utf16le = s => { const o = [0xFF, 0xFE];
+      for (const c of s) { const k = c.charCodeAt(0); o.push(k & 255, k >> 8); } return new Uint8Array(o); };
+
+    const pdf = await put(bin([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A, 0x25, 0xE2, 0xE3, 0xCF, 0xD3]), 'отчёт.pdf');
+    const png = await put(bin([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]), 'screenshot.png');
+    const xls = await put(bin([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0]), 'старый.xls');
+    const junk = await put(bin([1, 2, 3, 0, 7, 9, 200, 0, 55, 4, 0, 8]), 'что-то.csv');
+    const empty = await put(bin([]), 'пусто.csv');
+    const only = await put(utf8('Дата;Кампания;Расход\n'), 'только-шапка.csv');
+
+    /* xlsx, названный csv: имя врёт, подпись zip — нет. */
+    const buf = await (await fetch('/tests/fixtures/google_en.xlsx')).arrayBuffer();
+    const zip = await put(new Uint8Array(buf), 'выгрузка.csv');
+
+    const win = await put(cp1251('Дата;Кампания;Расход\n01.07.2026;Лето;1000\n'), 'excel-ru.csv');
+    const winHead = ADS_IMP ? String(ADS_IMP.rows[0][0]) : null;
+    const winMap = ADS_IMP ? ADS_IMP.map : null;
+
+    const u16 = await put(utf16le('Дата\tКампания\tРасход\n01.07.2026\tЛето\t1000\n'), 'google.csv');
+    const u16Head = ADS_IMP ? String(ADS_IMP.rows[0][0]) : null;
+
+    return { pdf, png, xls, junk, empty, only, zip, win, winHead, winMap, u16, u16Head };
+  });
+  ok('PDF не притворяется таблицей: разбор остановлен и сказано, где взять выгрузку',
+    /PDF/.test(J.pdf.txt) && /CSV/.test(J.pdf.txt) && J.pdf.maps === 0 && J.pdf.drop === true, J.pdf);
+  ok('со снимка экрана цифры не берутся — об этом написано прямо',
+    /картинк/i.test(J.png.txt) && J.png.maps === 0, J.png);
+  ok('старый .xls назван старым .xls, а не «не удалось прочитать»',
+    /старый формат Excel/i.test(J.xls.txt) && J.xls.maps === 0, J.xls);
+  ok('двоичный мусор с расширением .csv отклонён', /не похож/i.test(J.junk.txt) && J.junk.maps === 0, J.junk);
+  ok('пустой файл назван пустым', /пуст/i.test(J.empty.txt), J.empty);
+  ok('файл из одной шапки: сказано, что строк с данными нет',
+    /только заголовок/i.test(J.only.txt) && J.only.maps === 0, J.only);
+  ok('xlsx, переименованный в .csv, всё равно читается как xlsx',
+    J.zip.maps === 8 && J.zip.rows === 5, J.zip);
+  ok('CSV из русского Excel в windows-1251 читается без кракозябр',
+    J.winHead === 'Дата' && J.winMap && J.winMap.date === 0 && J.winMap.spend === 2, { h: J.winHead, m: J.winMap });
+  ok('CSV в UTF-16 от Google Ads читается, а не отбраковывается как двоичный',
+    J.u16Head === 'Дата' && J.u16.maps === 8, { h: J.u16Head, m: J.u16.maps });
+
+  console.log('\n[K] пропущенные строки: когда это норма, а когда беда');
+  const K = await page.evaluate(async () => {
+    const load = async text => {
+      adsImportOpen();
+      await adsFile(new File([new TextEncoder().encode(text)], 'x.csv'));
+      const n = document.querySelector('.ads-note');
+      const btn = document.querySelector('#ads-imp-f .btn-add');
+      return { note: n ? n.textContent.trim() : null, bad: n ? n.classList.contains('is-bad') : null,
+        off: btn ? btn.disabled : null,
+        /* наверху окна или в предпросмотре внизу */
+        top: !!document.querySelector('#ads-imp-b > .ads-note') };
+    };
+    const head = 'Дата;Кампания;Расход\n';
+    const good = 'Дата;Кампания;Расход\n01.07.2026;A;100\n02.07.2026;A;200\n03.07.2026;A;300\n04.07.2026;A;400\n05.07.2026;A;500\n';
+    return {
+      none:  await load(good),
+      tail:  await load(good + 'Итого;;1500\n'),
+      half:  await load(head + '01.07.2026;A;100\n02.07.2026;A;200\nИтого;;300\nВсего за период;;300\n'),
+      nodate: await load(head + 'Итого;A;100\nВсего;A;200\n'),
+    };
+  });
+  ok('когда пропущенных нет — оговорки нет', K.none.note === null, K.none);
+  ok('одна итоговая строка внизу отчёта — это норма, и так и написано',
+    /итоговая строка/i.test(K.tail.note || '') && K.tail.bad === false && K.tail.off === false, K.tail);
+  ok('пропущена половина файла — это уже повод проверить колонки',
+    K.half.bad === true && /колонк/i.test(K.half.note || ''), K.half);
+  ok('не разобралась ни одна строка — сказано про дату, а не «так и должно быть»',
+    K.nodate.bad === true && /не нашлось даты/i.test(K.nodate.note || '')
+    && !/так и должно быть/.test(K.nodate.note || '') && K.nodate.off === true, K.nodate);
+  ok('когда грузить нечего — причина наверху окна, а не под прокруткой',
+    K.nodate.top === true && K.half.top === false && K.tail.top === false,
+    { nodate: K.nodate.top, half: K.half.top, tail: K.tail.top });
+
   const bad = errs.filter(x => /SyntaxError|is not defined|Cannot read|Cannot set/.test(x));
-  console.log('\n[J] ошибки страницы');
+  console.log('\n[L] ошибки страницы');
   ok('нет ошибок исполнения', bad.length === 0, bad.slice(0, 3));
 
   console.log('\n──────── ' + pass + ' ok · ' + fail + ' fail ────────');
