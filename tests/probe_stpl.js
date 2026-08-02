@@ -81,13 +81,39 @@ const seed = () => {
   ok('в шапке — сколько проектов держится на шаблонах', await txt('#npw-money') === '3', await txt('#npw-money'));
   ok('счётчики разделов совпадают со списками', await page.evaluate(() =>
     ['tcat', 'tsvc', 'ttar'].map(k => document.getElementById('npw-c-' + k).textContent).join(',')) === '2,3,4');
-  ok('прокручивается только тело окна', await page.evaluate(() => {
+  const scrollers = () => page.evaluate(() => {
     const out = [];
     document.querySelectorAll('#ov-pd2 .modal.npw *').forEach(el => {
-      if (el.scrollHeight - el.clientHeight > 4 && /auto|scroll/.test(getComputedStyle(el).overflowY)) out.push(el.id || String(el.className));
+      if (/auto|scroll/.test(getComputedStyle(el).overflowY) && el.scrollHeight - el.clientHeight > 4) out.push(el.id || String(el.className).split(' ')[0]);
     });
-    return out.length <= 1 && out.every(x => x === 'npw-body');
+    return out;
+  });
+  ok('в справочниках прокручивается только тело окна', (await scrollers()).every(x => x === 'npw-body'), await scrollers());
+  /* На узком окне колонки услуг листаются каждая сама по себе: список услуг не
+     уезжает, пока правишь этапы справа. */
+  await page.setViewportSize({ width: 1440, height: 640 });
+  await page.evaluate(() => stplGo('tsvc'));
+  await page.waitForTimeout(250);
+  const sc2 = await scrollers();
+  const cols = await page.evaluate(() => ({
+    l: getComputedStyle(document.querySelector('.tpl-col-l')).overflowY,
+    r: getComputedStyle(document.querySelector('.tpl-col-r')).overflowY,
+    body: getComputedStyle(document.getElementById('npw-body')).overflowY,
   }));
+  ok('в услугах у каждой колонки своя прокрутка', cols.l === 'auto' && cols.r === 'auto', cols);
+  ok('и тело окна при этом стоит', cols.body === 'hidden' && sc2.indexOf('npw-body') < 0, [cols.body, sc2]);
+  ok('правая колонка прокручивается, не двигая левую', await page.evaluate(() => {
+    const l = document.querySelector('.tpl-col-l'), r = document.querySelector('.tpl-col-r');
+    const t = l.getBoundingClientRect().top; r.scrollTop = 150;
+    return Math.abs(l.getBoundingClientRect().top - t) < 1 && r.scrollTop > 0;
+  }));
+  await page.evaluate(() => stplGo('ttar'));
+  await page.waitForTimeout(250);
+  ok('в тарифах прокрутка снова одна — тело окна', (await scrollers()).every(x => x === 'npw-body'), await scrollers());
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => stplGo('tcat'));
+  await page.waitForTimeout(200);
+  ok('полосы «что увидит менеджер» в окне нет', await page.evaluate(() => !document.getElementById('tpl-demo')));
   ok('высота окна не зависит от раздела', await page.evaluate(async () => {
     const h = () => document.querySelector('#ov-pd2 .modal.npw').getBoundingClientRect().height;
     const a = h(); stplGo('tsvc'); const bb = h(); stplGo('ttar'); const c = h(); stplGo('tcat');
@@ -327,22 +353,6 @@ const seed = () => {
   }));
   ok('из прайса попадаем в этапы этого тарифа', jump.sec === 'tsvc' && jump.svc === 'PROD' && jump.tf === 'GOLD', jump);
   ok('и видим именно его этапы', jump.stages.join(',') === 'Бриф,Съёмка,Монтаж,Сдача', jump.stages);
-
-  /* ——— K. живой пример совпадает с тем, что подставится ——— */
-  console.log('\n[K] живой пример');
-  const demo = await page.evaluate(() => {
-    const box = document.getElementById('tpl-demo');
-    return { sts: [...box.querySelectorAll('.tpl-demo-st')].map(x => x.textContent.replace(/^\d+/, '')),
-      real: stageSetFor('PROD', 'GOLD'),
-      price: (box.querySelector('.tpl-demo-c .p') || {}).textContent,
-      realPrice: svcTariffPrice('PROD', 'GOLD') };
-  });
-  ok('пример показывает те же этапы, что подставятся', demo.sts.join(',') === demo.real.join(','), demo);
-  ok('и ту же цену', demo.price.replace(/\s| | /g, '') === (demo.realPrice.toLocaleString('ru-RU') + ' сум / мес').replace(/\s| | /g, ''), [demo.price, demo.realPrice]);
-  await page.evaluate(() => { stplPickTariff(''); });
-  await page.waitForTimeout(250);
-  ok('смена тарифа перестраивает пример', await page.evaluate(() =>
-    [...document.querySelectorAll('#tpl-demo .tpl-demo-st')].map(x => x.textContent.replace(/^\d+/, '')).join(',')) === 'Предпродакшн,Продакшн,Постпродакшн');
 
   /* ——— L. удаление услуги называет последствия ——— */
   console.log('\n[L] удаление услуги и тарифа');
