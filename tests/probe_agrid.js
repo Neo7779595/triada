@@ -146,7 +146,23 @@ const measure = (m) => {
   ok('кнопка подсвечена, пока фильтры открыты', pop.btnOn === true, pop);
   ok('повторное нажатие закрывает', pop.closedAgain === 'none', pop.closedAgain);
 
-  console.log('\n[F] в «Дедлайнах» нет полосы-вердикта');
+  console.log('\n[F] над списком проектов нет второго счётчика');
+  const pj = await page.evaluate(() => { agNav('projects');
+    const c = document.getElementById('content-ag');
+    const tb = c.querySelector('.toolbar'), card = c.querySelector('#pj-list > *');
+    return { listH: !!c.querySelector('.list-h'),
+      tile: (c.querySelector('.px-ov-v') || {}).textContent,
+      gap: Math.round(card.getBoundingClientRect().top - tb.getBoundingClientRect().bottom),
+      card: (card.className || card.tagName).toString().slice(0, 20) };
+  });
+  ok('строки «N проектов» над списком нет — то же число крупно стоит в плитке',
+    pj.listH === false, pj);
+  ok('число проектов при этом никуда не делось — оно в «Активном портфеле»',
+    String(pj.tile || '').trim() === '3', pj.tile);
+  ok('первая карточка идёт сразу за панелью, тем же шагом 16 px',
+    pj.gap === STEP && /pjh/.test(pj.card), pj);
+
+  console.log('\n[G] в «Дедлайнах» нет полосы-вердикта');
   const dl = await page.evaluate(() => { agNav('deadlines');
     const c = document.getElementById('content-ag');
     return { insight: !!c.querySelector('.dl-insight'),
