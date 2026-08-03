@@ -20,7 +20,13 @@ const setup = () => {
   window.agCanSeeProject = () => true;
   kbAutoEnsure = function () {};                    /* иначе сводка пойдёт в базу и упрётся в заглушку */
   const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
-  const P1 = { id: 'p1', key: 'p1', name: 'APOLO COFFEE', logo: 'A', st: 'active',
+  /* Лицо и марка нарисованы прямо здесь: важно не что на картинке, а что
+     она встаёт на место буквы. */
+  const FACE = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#2E3B4E"/><circle cx="32" cy="25" r="11" fill="#E8C9A8"/></svg>');
+  const LOGO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" fill="#12281f"/><circle cx="24" cy="20" r="9" fill="#37E6C8"/></svg>');
+  const P1 = { id: 'p1', key: 'p1', name: 'APOLO COFFEE', logo: 'A', logoUrl: LOGO, st: 'active',
     svc: 'PROD', cat: 'IT компания', tariff: 'DeGold', status: 'active', pct: 25, stages: '2/8',
     mrr: 45000000, note: 'Клиент просит больше вертикального видео.', createdAt: '2026-06-15',
     tg_chat_id: -1001234567890, tg_settings: {},
@@ -37,8 +43,8 @@ const setup = () => {
   KB_AUTO['p1'] = { _loaded: 1, _at: Date.now(),
     contract: { start_date: day(-9), end_date: day(51) },
     services: [{ service: 'PROD', tariff: 'DeGold', mrr: 25000000, status: 'active' }],
-    members: [{ role_in_project: 'Оператор', prof: { id: 'm2', full_name: 'Худойберди', role_title: 'Оператор', phone: '', tg_username: '@h' } }],
-    lead: { id: 'm1', full_name: 'DTR Hunter', role_title: 'Проект-менеджер', phone: '+998907770011', tg_username: '@dtr' },
+    members: [{ role_in_project: 'Оператор', prof: { id: 'm2', full_name: 'Худойберди', role_title: 'Оператор', phone: '', tg_username: '@h', avatar_url: FACE } }],
+    lead: { id: 'm1', full_name: 'DTR Hunter', role_title: 'Проект-менеджер', phone: '+998907770011', tg_username: '@dtr', avatar_url: FACE },
     client: null,
     content: [{ id: 'c1', data: { sheets: [{ rows: [] }] }, updated_at: new Date().toISOString() }],
     reports: [{ id: 'r1', title: 'SMM-отчёт · август', kind: 'SMM', published_at: new Date().toISOString(), payload: { metrics: {} } },
@@ -145,6 +151,30 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
   ok('пустые «Отчёты» — не карточка с бейджем «0»', emp.empty === true && emp.zero === false, emp);
   ok('пустой «Договор» говорит, откуда он берётся',
     emp.ctEmpty === true && /не заведён/.test(emp.ctTxt), emp.ctTxt);
+
+  console.log('\n[H] лица и знаки вместо букв');
+  const ph = await page.evaluate(() => {
+    setKbProj('p1'); kbBoardBack();
+    const c = document.getElementById('content-ag');
+    const r = { logo: !!c.querySelector('.kb-pi .lg img'), mark: !!c.querySelector('.kb-bmark img'),
+      faces: c.querySelectorAll('.kb-tile .kb-face').length,
+      facePh: c.querySelectorAll('.kb-tile .kb-face img').length,
+      marks: c.querySelectorAll('.kb-tile .kb-mmark').length };
+    kbOpenBlock('cont'); r.cardPh = c.querySelectorAll('.kb-ccard-av img').length;
+    kbOpenBlock('tg');   r.tgPh = c.querySelectorAll('.kb-tgp-av img').length;
+    kbBoardBack();
+    return r;
+  });
+  console.log('    ' + JSON.stringify(ph));
+  ok('у проекта в списке стоит логотип, а не буква', ph.logo === true, ph);
+  ok('логотип повторён в шапке досье', ph.mark === true, ph);
+  /* Трое на проекте: у контактного лица клиента фото нет — оно живёт в
+     JSON контактов, а не в профиле, — поэтому лиц три, фотографий две. */
+  ok('на плитке «Контакты» стопка из трёх лиц', ph.faces === 3, ph.faces);
+  ok('две из них — фотографии, третья осталась инициалом', ph.facePh === 2, ph.facePh);
+  ok('на плитке «Материалы» знаки сервисов — Miro и Google Doc', ph.marks === 2, ph.marks);
+  ok('в карточках контактов фотографии из профиля', ph.cardPh === 2, ph.cardPh);
+  ok('в списке участников группы — те же лица', ph.tgPh === 2, ph.tgPh);
 
   ok('страница не сыпала ошибок', errs.length === 0, errs.slice(0, 3));
   console.log(`\n──────── ${pass} ok · ${fail} fail ────────`);
