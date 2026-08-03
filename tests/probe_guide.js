@@ -254,8 +254,27 @@ const stripMinus = s => norm(s).replace(/^-\s*/, '');
       document.getElementById('mkg-body').getBoundingClientRect().top) }));
   ok('клик по последнему пункту приводит к нему и подсветка остаётся на нём',
     N2.k === 'cheat' && Math.abs(N2.top) < 40, N2);
+  /* Переход по пункту едет плавно: пока он едет, каждый его шаг продлевает
+     защёлку подсветки — она нужна, чтобы на короткой последней главе
+     подсветка не убегала к предыдущей. Значит, сначала ждём, пока прокрутка
+     доедет, и только потом уходим наверх. Фиксированной паузы не хватало:
+     под нагрузкой всей пачки падал секундомер, а не продукт. */
+  const settled = async () => {
+    let last = -1;
+    for (let i = 0; i < 25; i++) {
+      const y = await page.evaluate(() => Math.round(document.getElementById('mkg-body').scrollTop));
+      if (y === last) return y;
+      last = y; await frames(2); await page.waitForTimeout(120);
+    }
+    return last;
+  };
+  await settled();
   await page.evaluate(() => { document.getElementById('mkg-body').scrollTo({ top: 0, behavior: 'auto' }); });
-  await page.waitForTimeout(450); await frames(8);
+  await settled();
+  for (let i = 0; i < 12; i++) {
+    if (await page.evaluate(() => (document.querySelector('.mkg-i.on') || {}).dataset.k === 'start')) break;
+    await frames(2); await page.waitForTimeout(120);
+  }
   ok('прокрутка наверх возвращает подсветку на первый пункт',
     await page.evaluate(() => document.querySelector('.mkg-i.on').dataset.k) === 'start',
     await page.evaluate(() => document.querySelector('.mkg-i.on').dataset.k));

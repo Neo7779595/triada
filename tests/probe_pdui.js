@@ -56,7 +56,9 @@ const bar = () => ({
     const acts = [...document.querySelectorAll('#pd-tabbar .pd-tabact > *')].map(pick);
     const sep = getComputedStyle(document.querySelector('#pd-tabbar .pd-tabact'), '::before');
     const docsLbl = getComputedStyle(document.querySelector('#pd-tabbar .pd-chip-docs .lbl')).display;
-    return { tabs, acts, sepW: sep.width, sepC: sep.backgroundColor, docsLbl };
+    const digits = [...document.querySelectorAll('#pd-tabbar .pd-tabact')]
+      .map(x => x.textContent).join('').replace(/[^0-9]/g, '');
+    return { tabs, acts, sepC: sep.content, docsLbl, digits };
   });
   const same = (a, b, f) => a.every(x => f(x) === f(b[0]));
   ok('вкладки и кнопки — одного кегля, начертания и разрядки',
@@ -68,9 +70,14 @@ const bar = () => ({
   ok('у кнопок нет ни плашки, ни рамки, ни скругления',
     st.acts.every(x => /rgba\(0, 0, 0, 0\)|transparent/.test(x.bg) && x.bl === '0px' && x.bt === '0px' && x.br === '0px'),
     st.acts.map(x => [x.k, x.bg, x.bl, x.br]));
-  ok('спокойный цвет у всех один', same(st.acts, [st.tabs[1]], x => x.col), { tab: st.tabs[1].col, acts: st.acts.map(x => x.col) });
-  ok('группы разделены волосяной линией, а не пустотой',
-    st.sepW === '1px' && !/rgba\(0, 0, 0, 0\)/.test(st.sepC), { w: st.sepW, c: st.sepC });
+  /* Группы в одной строке разводит цвет, а не линия: разделы проекта —
+     фирменным бирюзовым, действия — белым. */
+  ok('у разделов проекта один цвет на всех', same(st.tabs.slice(1), [st.tabs[1]], x => x.col), st.tabs.map(x => [x.k, x.col]));
+  ok('у действий один цвет на всех', same(st.acts, [st.acts[0]], x => x.col), st.acts.map(x => [x.k, x.col]));
+  ok('разделы и действия набраны разными цветами — это и разделяет группы',
+    st.tabs[1].col !== st.acts[0].col, { tab: st.tabs[1].col, act: st.acts[0].col });
+  ok('разделительной линии между группами больше нет', st.sepC === 'none', st.sepC);
+  ok('в кнопках панели не осталось цифр', st.digits === '', st.digits);
   ok('подпись «Документы» не прячется — иначе кнопка выглядит пропавшей', st.docsLbl !== 'none', st.docsLbl);
 
   const onSt = await page.evaluate(() => {
@@ -90,6 +97,32 @@ const bar = () => ({
     onSt.bb === '2px' && onSt.bbc === onSt.tabBb && onSt.col === onSt.tabCol, onSt);
   ok('пока открыт «Бриф», ни одна вкладка не подсвечена', onSt.noTabOn === true, onSt);
   await page.evaluate(() => { pdTabCur = 'stages'; pdTab('stages'); });
+
+  console.log('\n[A3] шапка проекта стоит на одной линии');
+  const hdr = await page.evaluate(() => {
+    /* Въезд шапки анимирован с разной задержкой у каждого блока: без кадров
+       он замирает на первом, и меряется не раскладка, а анимация. */
+    const st = document.createElement('style');
+    st.textContent = '.pd-top>*{animation:none!important}';
+    document.head.appendChild(st);
+    /* Срок договора считается от сегодня — берём дату впереди, чтобы плашка
+       была в обычном состоянии, а не «просрочен». */
+    const d = new Date(Date.now() + 51 * 86400000);
+    PROJECTS[0]._contract = { end: d.toISOString().slice(0, 10) };
+    openProject(0);
+    ['pd-hdr-cal', 'pd-hdr-drive', 'pd-hdr-time'].forEach(id => {
+      const e = document.getElementById(id); if (e) e.style.display = ''; });
+    const r = sel => { const e = document.querySelector(sel); if (!e) return null;
+      const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bot: Math.round(b.bottom), h: Math.round(b.height) }; };
+    return { name: r('.pd-id .nm'), ct: r('.pd-ct .pt-blk-val'),
+      cal: r('#pd-hdr-cal'), drive: r('#pd-hdr-drive'), time: r('#pd-hdr-time'),
+      barH: Math.round(document.querySelector('.pd-top').getBoundingClientRect().height) };
+  });
+  const line = [hdr.name, hdr.ct, hdr.cal, hdr.drive, hdr.time].filter(Boolean);
+  ok('название, срок договора и кнопки шапки стоят на одной линии',
+    line.length === 5 && line.every(x => x.bot === line[0].bot && x.top === line[0].top), hdr);
+  ok('и одной высоты — 30 пикселей, как у самой строки значений',
+    line.every(x => x.h === 30), line.map(x => x.h));
 
   console.log('\n[B] конструктор открывается');
   await page.evaluate(() => pdUiOpen());

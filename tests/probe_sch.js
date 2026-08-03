@@ -77,9 +77,13 @@ const setup = () => {
   await page.evaluate(setup);
   await page.waitForTimeout(500);
 
+  /* Меряем обычную карточку — ту, что не идёт прямо сейчас: у идущей кант
+     акцентный по замыслу, и на неё есть отдельная проверка ниже. Раньше брали
+     просто первую в разметке, а порядок зависит от часов: в понедельник ночью
+     первой оказывалась как раз «идущая», и падал не продукт, а секундомер. */
   console.log('\n[A] карточка брони: поверхность нейтральная, цвет — только кант');
   const card = await page.evaluate(() => {
-    const el = document.querySelector('.sched-chip');
+    const el = document.querySelector('.sched-chip:not(.live)');
     const s = getComputedStyle(el), r = getComputedStyle(el, '::before');
     return { bg: s.backgroundColor, top: s.borderTopColor, left: s.borderLeftColor, topW: s.borderTopWidth,
       shadow: s.boxShadow, radius: s.borderTopLeftRadius,
@@ -94,7 +98,7 @@ const setup = () => {
   ok('карточка не светится: наружных теней нет', outerShadow(card.shadow).length === 0, card.shadow);
 
   const hov = await page.evaluate(async () => {
-    const el = document.querySelector('.sched-chip');
+    const el = document.querySelector('.sched-chip:not(.live)');
     el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
     /* :hover через событие не включить — читаем правило из таблицы стилей */
     let rule = null;
@@ -111,7 +115,7 @@ const setup = () => {
 
   console.log('\n[B] порядок чтения: время → название → место → вид и люди');
   const hier = await page.evaluate(() => {
-    const el = document.querySelector('.sched-chip');
+    const el = document.querySelector('.sched-chip:not(.live)');
     const g = q => { const x = el.querySelector(q); return x ? getComputedStyle(x) : null; };
     const tm = g('.sched-chip-tm'), tt = g('.sched-chip-tt'), btm = g('.sched-chip-btm'), kind = g('.sched-chip-kind');
     const k = el.querySelector('.sched-chip-kind');
