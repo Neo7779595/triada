@@ -91,7 +91,28 @@ const setup = () => {
   ok('счётчик в навигации 0 / 14', await page.evaluate(() => document.getElementById('empw-c-perm').textContent) === '0/14');
   const groups = await page.evaluate(() => [...document.querySelectorAll('#e-perms .perm-gh')].map(e => e.textContent));
   ok('модули разбиты на группы', groups.join('|') === 'Работа|Аналитика|Агентство', groups);
-  ok('строк ровно по числу ключей', await page.evaluate(() => document.querySelectorAll('#e-perms .perm-row').length === _permKeys().length));
+  ok('строк ровно по числу ключей', await page.evaluate(() => document.querySelectorAll('#e-perms .perm-row:not(.perm-sub)').length === _permKeys().length));
+  /* У финансов есть ступень, которой нет больше ни у кого: финансист ведёт
+     счета и платежи, но кто из совладельцев сколько внёс и взял — не его дело.
+     По умолчанию она снята и без просмотра финансов включиться не может. */
+  const SUB = await page.evaluate(() => {
+    const row = () => document.querySelector('#e-perms .perm-sub');
+    const btn = () => row().querySelector('.perm-tg');
+    const off = !!(empPerms.finance && empPerms.finance.partners);
+    const locked = btn().hasAttribute('disabled');
+    togglePerm('finance', 'partners', true);
+    const auto = !!(empPerms.finance && empPerms.finance.view);
+    togglePerm('finance', 'view', false);
+    return { exists: !!row(), off, locked, auto, cleared: !!(empPerms.finance && empPerms.finance.partners),
+      label: row().textContent };
+  });
+  ok('у финансов есть подстрока про расчёты с владельцами',
+    SUB.exists && /Расчёты с владельцами/.test(SUB.label), SUB.label);
+  ok('по умолчанию она снята и заперта, пока нет просмотра финансов',
+    SUB.off === false && SUB.locked === true, SUB);
+  ok('включение права само открывает просмотр финансов', SUB.auto === true, SUB.auto);
+  ok('снятие просмотра финансов гасит и её', SUB.cleared === false, SUB.cleared);
+  await page.evaluate(() => permPreset('none'));
   ok('пресеты живут в шапке раздела, не в таблице', await page.evaluate(() => !document.querySelector('#e-perms .perm-presets') && document.querySelectorAll('#empw-s-perm .empw-preset').length === 3));
   ok('итог ушёл из таблицы в подвал окна', await page.evaluate(() => !document.querySelector('#e-perms .perm-foot') && !!document.getElementById('empw-sum')));
   await page.evaluate(() => permPreset('view'));
