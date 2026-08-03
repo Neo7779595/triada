@@ -39,6 +39,11 @@ const setup = () => {
   window.agIsOwner = () => true; window.agCanView = () => true; window.agCanEdit = () => true;
   window.agCanSeeProject = () => true;
   kbAutoEnsure = function () {};
+  /* Числа в продукте докручиваются анимацией (animateCounters ловит .v),
+     и проверка успевала снять их на середине. У продукта для этого есть
+     собственный тормоз — им и пользуемся, чтобы читать готовые значения. */
+  window._cntPause = true;
+
   window.kbPortEnsure = () => {};
   const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   const ts = n => new Date(Date.now() + n * 86400000).toISOString();
@@ -183,7 +188,7 @@ const setup = () => {
   });
   ok('наблюдения стоят над плитками, а не под ними', geo.obsY < geo.tileY, geo);
   ok('свёрнутое действительно не занимает места', geo.hiddenShown === false, geo);
-  ok('витрина на месте — все десять блоков', geo.tiles === 10, geo.tiles);
+  ok('витрина на месте — четыре плитки периода', geo.tiles === 4, geo.tiles);
 
   console.log('[C] под каждой фразой — арифметика');
   const math = await page.evaluate(() => {
@@ -250,15 +255,17 @@ const setup = () => {
   console.log('[E] сравнение с портфелем считает по проектам, а не по строкам списка');
   const bench = await page.evaluate(() => {
     const c = document.getElementById('content-ag');
-    return { bars: c.querySelectorAll('.kb-tile .kb-bm').length,
-      pass: (c.querySelector('.kb-tile .kb-bm .cap') || {}).textContent || '',
+    const cell = c.querySelector('.kb-hero .cell[data-k="pass"]');
+    return { bars: c.querySelectorAll('.kb-hero .kb-bm').length,
+      pass: cell ? cell.querySelector('.c').textContent.trim() : '',
+      words: [...c.querySelectorAll('.kb-tile .cap')].filter(x => /медиана/.test(x.textContent)).length,
       ids: _kbPortIds().join(','), mine: (_kbBench('pass') || {}).mine };
   });
   ok('портфель собран по id проектов', bench.ids === 'p1,p2,p3,p4', bench.ids);
   ok('своё значение в сравнении найдено', bench.mine === 25, bench.mine);
-  ok('прогресс 25 при медиане 44 — четвёртое из четырёх',
-    /медиана 44% · 4-е из 4/.test(bench.pass), bench.pass);
-  ok('полосы сравнения появились на плитках', bench.bars >= 4, bench.bars);
+  ok('прогресс 25 — четвёртое место из четырёх', /4-е из 4/.test(bench.pass), bench.pass);
+  ok('в состоянии проекта сравнение стоит полосой', bench.bars >= 1, bench.bars);
+  ok('в плитках периода — словами', bench.words >= 1, bench.words);
 
   console.log('[F] правило молчит, когда данных нет');
   /* Level Studio: договор до day(200), отчёт 10 дней назад, маржа 60%,
@@ -325,7 +332,7 @@ const setup = () => {
   ok('у завершённого проекта наблюдений нет', arch.obs === 0 && arch.none === 0, arch);
   ok('и самой секции «Что видно» тоже нет',
     !arch.heads.some(h => /Что видно/.test(h)), arch.heads);
-  ok('витрина при этом на месте', arch.tiles === 10, arch.tiles);
+  ok('витрина при этом на месте', arch.tiles === 4, arch.tiles);
   ok('завершённый проект действительно уехал в архив списка', arch.archRows === 1, arch);
   ok('треугольник у завершённого проекта не рисуется', arch.warn === 0, arch);
 

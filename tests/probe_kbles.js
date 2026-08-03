@@ -29,6 +29,11 @@ const setup = () => {
   window.agIsOwner = () => true; window.agCanView = () => true; window.agCanEdit = () => true;
   window.agCanSeeProject = () => true;
   kbAutoEnsure = function () {}; window.kbPortEnsure = () => {};
+  /* Числа в продукте докручиваются анимацией (animateCounters ловит .v),
+     и проверка успевала снять их на середине. У продукта для этого есть
+     собственный тормоз — им и пользуемся, чтобы читать готовые значения. */
+  window._cntPause = true;
+
   const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   const ts = n => new Date(Date.now() + n * 86400000).toISOString();
 
@@ -302,7 +307,7 @@ const setup = () => {
   });
   ok('на карточке есть ссылка на проект-источник', /источник — APOLO COFFEE/.test(src.txt), src.txt);
   ok('по ней открывается досье этого проекта',
-    src.view === '' && src.proj === 'p1' && src.tiles === 10, src);
+    src.view === '' && src.proj === 'p1' && src.tiles === 4, src);
 
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 4)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));

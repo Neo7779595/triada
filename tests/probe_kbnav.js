@@ -18,7 +18,12 @@ const setup = () => {
   window.toast = () => {}; window.LIVE = true; window.SB = window.SB || { from: () => ({}) };
   window.agIsOwner = () => true; window.agCanView = () => true; window.agCanEdit = () => true;
   window.agCanSeeProject = () => true;
-  kbAutoEnsure = function () {};                    /* иначе сводка пойдёт в базу и упрётся в заглушку */
+  kbAutoEnsure = function () {};
+  /* Числа в продукте докручиваются анимацией (animateCounters ловит .v),
+     и проверка успевала снять их на середине. У продукта для этого есть
+     собственный тормоз — им и пользуемся, чтобы читать готовые значения. */
+  window._cntPause = true;
+                    /* иначе сводка пойдёт в базу и упрётся в заглушку */
   const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
   /* Лицо и марка нарисованы прямо здесь: важно не что на картинке, а что
      она встаёт на место буквы. */
@@ -32,12 +37,12 @@ const setup = () => {
     tg_chat_id: -1001234567890, tg_settings: {},
     contacts: { person: { name: 'Шохрух Каримов', role: 'Директор', phone: '+998901234567', tg: '@shohruh' } } };
   /* Второй проект пустой — на нём видно, как выглядит блок без содержимого. */
-  const P2 = { id: 'p2', key: 'p2', name: 'Artel', logo: 'A', st: 'active', status: 'active', pct: 0, stages: '0/5' };
+  const P2 = { id: 'p2', key: 'p2', name: 'Artel', logo: 'A', st: 'active', status: 'active', pct: 0, stages: '0/5', mrr: 20000000 };
   /* Ещё два проекта — чтобы бенчмарку было с чем сравнивать: меньше трёх
      он не показывается намеренно. Прогресс: 25, 0, 70, 48 → медиана 36,5,
      у нашего 25 — третье место из четырёх. */
-  const P3 = { id: 'p3', key: 'p3', name: 'Level Studio', logo: 'L', st: 'active', status: 'active', pct: 70, stages: '7/10' };
-  const P4 = { id: 'p4', key: 'p4', name: 'DeTroyd', logo: 'D', st: 'active', status: 'active', pct: 48, stages: '4/8' };
+  const P3 = { id: 'p3', key: 'p3', name: 'Level Studio', logo: 'L', st: 'active', status: 'active', pct: 70, stages: '7/10', mrr: 30000000 };
+  const P4 = { id: 'p4', key: 'p4', name: 'DeTroyd', logo: 'D', st: 'active', status: 'active', pct: 48, stages: '4/8', mrr: 10000000 };
   PROJECTS.length = 0; PROJECTS.push(P1, P2, P3, P4);
   window.agVisibleProjects = () => PROJECTS;
   KB_PROJECTS.length = 0; KB_PROJECTS.push(P1, P2, P3, P4);
@@ -98,15 +103,30 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
   const heads = await page.evaluate(() => [...document.querySelectorAll('#content-ag .kb-sub-h')].map(e => e.textContent.replace(/\s+/g, ' ').trim()));
   const stripN = await page.evaluate(() => document.querySelectorAll('#content-ag .kb-si').length);
   console.log('    ' + JSON.stringify(A2.map(t => t.n + '=' + t.v)));
-  ok('на витрине ровно десять блоков', A2.length === 10, A2.length);
-  /* Над плитками с недавних пор живёт «Что видно» — наблюдения. Группы
-     ищем по названию, а не по номеру: иначе проверка ломается от любого
-     нового блока над витриной, ничего не сказав о самих группах. */
-  const grp = heads.filter(h => /Проект · вне периода/.test(h) || /^За /.test(h));
-  ok('они разведены на «проект» и «за период»',
-    /Проект · вне периода/.test(grp[0] || '') && /^За /.test(grp[1] || ''), grp);
-  ok('в подписи нижней группы сказано, что фильтр меняет только её',
-    /фильтр меняет эти четыре/.test(grp[1] || ''), grp[1]);
+  /* Витрина больше не десять одинаковых прямоугольников, а три яруса:
+     состояние проекта строкой, четыре плитки периода и справочное внизу.
+     Проверяем не число плиток, а что до каждого блока по-прежнему можно
+     дотянуться — иначе один из десяти однажды тихо пропадёт. */
+  const board = await page.evaluate(() => {
+    const c = document.getElementById('content-ag');
+    const keys = e => [...c.querySelectorAll(e)].map(x => x.dataset.k);
+    return { cells: keys('.kb-hero .cell'), tiles: keys('.kb-tiles .kb-tile'), rest: keys('.kb-rest .r'),
+      all: KB_BLOCKS.map(b => b.k) };
+  });
+  const reach = board.cells.concat(board.tiles, board.rest);
+  ok('состояние проекта — одной строкой из пяти ячеек', board.cells.length === 5, board.cells);
+  ok('фильтр периода режет ровно четыре плитки', board.tiles.length === 4, board.tiles);
+  ok('материалы и заметка ушли в справочную строку', board.rest.join(',') === 'mat,note', board.rest);
+  ok('все десять блоков остались доступны с витрины',
+    board.all.every(k => reach.indexOf(k) >= 0), { нет: board.all.filter(k => reach.indexOf(k) < 0) });
+  /* Над витриной живёт «Что видно» — наблюдения. Группы ищем по названию,
+     а не по номеру: иначе проверка ломается от любого нового блока сверху,
+     ничего не сказав о самих группах. */
+  const grp = heads.filter(h => /Состояние проекта/.test(h) || /^За /.test(h));
+  ok('ярусы подписаны: состояние и период',
+    /Состояние проекта/.test(grp[0] || '') && /^За /.test(grp[1] || ''), grp);
+  ok('и сказано, что состояние фильтр не режет, а нижние четыре — режет',
+    /вне периода/.test(grp[0] || '') && /фильтр меняет эти четыре/.test(grp[1] || ''), grp);
   ok('пока открыта витрина, ленты блоков нет — переключать нечего', stripN === 0, stripN);
 
   /* Три управления в шапке пришли из разных мест и выглядели как три
@@ -125,14 +145,25 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
   ok('одинаковое скругление', new Set(bar.box.map(b => b.r)).size === 1, bar.box);
   ok('и они стоят ровно на одной линии', new Set(bar.box.map(b => b.mid)).size === 1, bar.box);
 
-  console.log('\n[B] плитка показывает главное число своего блока');
+  console.log('\n[B] у каждого блока своё главное число там, где блок живёт');
   const byName = n => (A2.find(t => t.n === n) || {}).v;
-  ok('«Контакты» — три человека', byName('Контакты') === '3человека', byName('Контакты'));
-  ok('«Договор» — 51 день до конца', byName('Договор') === '51день', byName('Договор'));
-  ok('«Материалы» — два', byName('Материалы') === '2материала', byName('Материалы'));
+  const num = await page.evaluate(() => {
+    const c = document.getElementById('content-ag');
+    const one = (sel, k) => { const e = c.querySelector(sel + '[data-k="' + k + '"]'); return e ? e.textContent.replace(/\s+/g, ' ').trim() : ''; };
+    return { pass: one('.kb-hero .cell', 'pass'), ct: one('.kb-hero .cell', 'ct'),
+      cont: one('.kb-hero .cell', 'cont'), tg: one('.kb-hero .cell', 'tg'),
+      money: [...c.querySelectorAll('.kb-hero .cell[data-k="pass"]')].map(e => e.textContent.replace(/\s+/g, ' ').trim())[1] || '',
+      mat: one('.kb-rest .r', 'mat'), note: one('.kb-rest .r', 'note') };
+  });
+  ok('«Готовность» — 25%', /Готовность25 ?%/.test(num.pass), num.pass);
+  ok('«Договор» — 51 день до конца', /51 ?дней|51 ?день/.test(num.ct) && /до /.test(num.ct), num.ct);
+  ok('«Деньги» — 25 млн в месяц', /25 млн ?\/мес/.test(num.money), num.money);
+  ok('«Команда» — три человека', /3 человека/.test(num.cont), num.cont);
+  ok('«Telegram» — на связи', /на связи/.test(num.tg), num.tg);
+  ok('«Материалы» — два', /2 материала/.test(num.mat), num.mat);
   ok('«Отчёты» — два', byName('Отчёты') === '2отчёта', byName('Отчёты'));
   ok('«Заметка» показывает саму заметку, а не число',
-    /вертикального видео/.test(byName('Заметка') || ''), byName('Заметка'));
+    /вертикального видео/.test(num.note), num.note);
 
   console.log('\n[C] плитка открывает свой блок');
   const rep = await page.evaluate(`(()=>{ kbOpenBlock('rep'); return (${head.toString()})(); })()`);
@@ -155,10 +186,17 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
   const both = await page.evaluate(`(()=>{ const s=(${strip.toString()})(); kbBoardBack(); const t=(${tiles.toString()})();
     return { strip:s, tiles:t }; })()`);
   const stripC = n => (both.strip.find(x => x.n === n) || {}).c;
-  ok('«Контакты»: 3 и там, и там', stripC('Контакты') === '3' && byName('Контакты') === '3человека',
-    { strip: stripC('Контакты'), tile: byName('Контакты') });
-  ok('«Материалы»: 2 и там, и там', stripC('Материалы') === '2', stripC('Материалы'));
-  ok('стрелка вернула на витрину', both.tiles.length === 10, both.tiles.length);
+  const same = await page.evaluate(() => {
+    const c = document.getElementById('content-ag');
+    const cell = k => { const e = c.querySelector('.kb-hero .cell[data-k="' + k + '"]'); return e ? e.textContent.replace(/\s+/g, ' ') : ''; };
+    const rest = k => { const e = c.querySelector('.kb-rest .r[data-k="' + k + '"]'); return e ? e.textContent.replace(/\s+/g, ' ') : ''; };
+    return { cont: cell('cont'), mat: rest('mat') };
+  });
+  ok('«Контакты»: 3 и в ленте, и в состоянии проекта',
+    stripC('Контакты') === '3' && /3 человека/.test(same.cont), { strip: stripC('Контакты'), cell: same.cont });
+  ok('«Материалы»: 2 и в ленте, и в справочной строке',
+    stripC('Материалы') === '2' && /2 материала/.test(same.mat), { strip: stripC('Материалы'), rest: same.mat });
+  ok('стрелка вернула на витрину', both.tiles.length === 4, both.tiles.length);
 
   console.log('\n[F] период показан там, где он действует');
   const per = await page.evaluate(`(()=>{ kbOpenBlock('cont'); const a=(${head.toString()})();
@@ -177,35 +215,43 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
     const e2=document.querySelector('#content-ag .kb-eblk');
     return { tiles:t, empty:!!e, zero:zero, ctEmpty:!!e2, ctTxt:e2?e2.textContent.replace(/\\s+/g,' ').trim().slice(0,60):'' }; })()`);
   await page.waitForTimeout(150);
-  ok('у пустого проекта плитки помечены пунктиром',
-    emp.tiles.filter(t => t.mut).length >= 6, emp.tiles.filter(t => t.mut).length);
+  ok('у пустого проекта все четыре плитки периода помечены пунктиром',
+    emp.tiles.length === 4 && emp.tiles.every(t => t.mut), emp.tiles);
   ok('пустые «Отчёты» — не карточка с бейджем «0»', emp.empty === true && emp.zero === false, emp);
   ok('пустой «Договор» говорит, откуда он берётся',
     emp.ctEmpty === true && /не заведён/.test(emp.ctTxt), emp.ctTxt);
 
   console.log('\n[G2] место среди своих проектов');
+  /* Сравнение говорит двумя способами: в состоянии — точками на полосе,
+     в плитках периода — словами в подписи. Точки заняли бы место кривой. */
   const bm = await page.evaluate(() => {
     const c = document.getElementById('content-ag');
     setKbProj('p1'); kbBoardBack();
-    const of = n => { const t = [...c.querySelectorAll('.kb-tile')].find(x => x.querySelector('.tn').textContent === n);
-      const b = t && t.querySelector('.kb-bm');
-      return { has: !!b, cap: b ? b.querySelector('.cap').textContent.trim() : '',
-        dots: b ? b.querySelectorAll('.ln i').length : 0 }; };
-    return { pass: of('Паспорт'), ct: of('Договор'), rep: of('Отчёты'), cont: of('Контакты'),
-      total: c.querySelectorAll('.kb-tile .kb-bm').length };
+    const cell = k => { const e = c.querySelector('.kb-hero .cell[data-k="' + k + '"]');
+      const b = e && e.querySelector('.kb-bm');
+      return { has: !!b, dots: b ? b.querySelectorAll('.ln i').length : 0,
+        cap: e ? e.querySelector('.c').textContent.trim() : '' }; };
+    const tile = n => { const t = [...c.querySelectorAll('.kb-tile')].find(x => x.querySelector('.tn').textContent === n);
+      return t ? t.querySelector('.cap').textContent.replace(/\s+/g, ' ').trim() : ''; };
+    return { pass: cell('pass'), ct: cell('ct'), cont: cell('cont'), tg: cell('tg'),
+      rep: tile('Отчёты'), ops: tile('Оперативка'),
+      lines: c.querySelectorAll('.kb-hero .kb-bm').length,
+      words: [...c.querySelectorAll('.kb-tile .cap')].filter(x => /медиана/.test(x.textContent)).length };
   });
   console.log('    ' + JSON.stringify(bm));
-  ok('у «Паспорта» показано место среди активных проектов',
-    bm.pass.has && /медиана 36,5% · 3-е из 4/.test(bm.pass.cap), bm.pass);
+  ok('у «Готовности» показано место среди активных проектов',
+    bm.pass.has && /3-е из 4/.test(bm.pass.cap), bm.pass);
   ok('на полосе точка на каждый проект плюс медиана и своя',
     bm.pass.dots === 6, bm.pass.dots);
-  ok('«Отчёты» тоже сравниваются: 2 против медианы 1,5',
-    bm.rep.has && /медиана 1,5 · 2-е из 4/.test(bm.rep.cap), bm.rep);
+  ok('«Отчёты» сравниваются словами: 2 против медианы 1,5',
+    /медиана 1,5 · 2-е из 4/.test(bm.rep), bm.rep);
   /* У договоров разная длина, и «второе место по остатку дней» не значит
      ничего — там полезна дата, а не место. */
   ok('у «Договора» места нет — сравнивать сроки договоров бессмысленно', bm.ct.has === false, bm.ct);
-  ok('у «Контактов» тоже нет — число людей не соревнование', bm.cont.has === false, bm.cont);
-  ok('сравнением накрыто пять плиток из десяти', bm.total === 5, bm.total);
+  ok('у «Команды» тоже нет — число людей не соревнование', bm.cont.has === false, bm.cont);
+  ok('у «Оперативки» тоже: закрытые задачи ничему не медиана', !/медиана/.test(bm.ops), bm.ops);
+  ok('в состоянии сравниваются двое — готовность и деньги', bm.lines === 2, bm.lines);
+  ok('в плитках периода сравнение стоит словами у троих', bm.words === 3, bm.words);
 
   const few = await page.evaluate(() => {
     /* Меньше трёх проектов — не сравниваем: медиана двух чисел ничего не
@@ -213,7 +259,8 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
     const keep = KB_PROJECTS.slice(0, 2);
     KB_PROJECTS.length = 0; keep.forEach(x => KB_PROJECTS.push(x));
     renderKB();
-    const n = document.querySelectorAll('#content-ag .kb-tile .kb-bm').length;
+    const n = document.querySelectorAll('#content-ag .kb-hero .kb-bm').length
+      + [...document.querySelectorAll('#content-ag .kb-tile .cap')].filter(x => /медиана/.test(x.textContent)).length;
     KB_PROJECTS.length = 0; PROJECTS.forEach(x => KB_PROJECTS.push(x));
     renderKB();
     return n;
@@ -225,9 +272,9 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
     setKbProj('p1'); kbBoardBack();
     const c = document.getElementById('content-ag');
     const r = { logo: !!c.querySelector('.kb-pi .lg img'), mark: !!c.querySelector('.kb-bmark img'),
-      faces: c.querySelectorAll('.kb-tile .kb-face').length,
-      facePh: c.querySelectorAll('.kb-tile .kb-face img').length,
-      marks: c.querySelectorAll('.kb-tile .kb-mmark').length };
+      faces: c.querySelectorAll('.kb-hero .kb-face').length,
+      facePh: c.querySelectorAll('.kb-hero .kb-face img').length,
+      marks: c.querySelectorAll('.kb-rest .kb-mmark').length };
     kbOpenBlock('cont'); r.cardPh = c.querySelectorAll('.kb-ccard-av img').length;
     kbOpenBlock('tg');   r.tgPh = c.querySelectorAll('.kb-tgp-av img').length;
     kbBoardBack();
