@@ -126,12 +126,14 @@ const setup = () => {
     const e = c.querySelector('.kb-lentry'), first = c.querySelector('.kb-plist .kb-pi');
     return { nm: e.querySelector('.nm').textContent, ct: e.querySelector('.ct').textContent,
       above: e.getBoundingClientRect().top < first.getBoundingClientRect().top,
+      gap: Math.round(e.getBoundingClientRect().top - c.querySelector('.search').getBoundingClientRect().bottom),
       on: e.classList.contains('on') };
   });
   ok('в левой колонке есть вход в уроки', entry.nm === 'Уроки агентства', entry);
   ok('и он стоит выше списка проектов', entry.above === true, entry);
   ok('на нём — сколько уроков в библиотеке', entry.ct === '3', entry.ct);
   ok('пока открыто досье, вход не подсвечен', entry.on === false, entry);
+  ok('вход не прилипает к полю поиска', entry.gap >= 10, entry);
 
   console.log('[B] закрепить наблюдение уроком');
   const pin = await page.evaluate(() => {

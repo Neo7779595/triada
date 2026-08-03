@@ -109,6 +109,22 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
     /фильтр меняет эти четыре/.test(grp[1] || ''), grp[1]);
   ok('пока открыта витрина, ленты блоков нет — переключать нечего', stripN === 0, stripN);
 
+  /* Три управления в шапке пришли из разных мест и выглядели как три
+     разные детали: «Обновить» ростом 23 и пилюлей, период — 30, кнопка —
+     30, и все три на разной высоте. Проверяем не пиксели, а равенство. */
+  const bar = await page.evaluate(() => {
+    const c = document.getElementById('content-ag');
+    const box = e => { const b = e.getBoundingClientRect(), s = getComputedStyle(e);
+      return { h: Math.round(b.height), mid: Math.round((b.top + b.bottom) / 2), r: s.borderRadius }; };
+    const els = [c.querySelector('.kb-bhd .kb-per-pick'), c.querySelector('.kb-bhd .kb-refresh'),
+                 c.querySelector('.kb-bhd .kb-act')].filter(Boolean);
+    return { n: els.length, box: els.map(box) };
+  });
+  ok('в шапке досье все три управления на месте', bar.n === 3, bar);
+  ok('у них одинаковый рост', new Set(bar.box.map(b => b.h)).size === 1, bar.box);
+  ok('одинаковое скругление', new Set(bar.box.map(b => b.r)).size === 1, bar.box);
+  ok('и они стоят ровно на одной линии', new Set(bar.box.map(b => b.mid)).size === 1, bar.box);
+
   console.log('\n[B] плитка показывает главное число своего блока');
   const byName = n => (A2.find(t => t.n === n) || {}).v;
   ok('«Контакты» — три человека', byName('Контакты') === '3человека', byName('Контакты'));
