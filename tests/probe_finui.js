@@ -206,6 +206,73 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('с причиной — уходит вместе с ней', VD.voided && VD.voided[1] === 'ошиблись счётом', VD.voided);
   ok('системных окон браузера модуль не открывает', dialogs.length === 0, dialogs);
 
+  console.log('[H] полоса платежей и «Свободно»');
+  const PL = await page.evaluate(() => {
+    /* Планы строим от сегодняшнего дня, иначе проверка начнёт зависеть от
+       того, какое сегодня число, и сломается не от поломки кода. */
+    const z = v => String(v).padStart(2, '0');
+    const dd = k => { const d = new Date(); d.setDate(d.getDate() + k);
+      return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); };
+    window.FINX = { ready: true,
+      accounts: [{ id: 'W', name: 'Карта', kind: 'card', opening_balance: 3000000, sort: 1 }],
+      ops: [] };
+    window.FINP = [];
+    const noPlans = finPlanBlock();
+    window.FINP = [
+      { id: 'p1', flow: 'out', title: 'Зарплаты', amount: 5000000, every: 'once', due_date: dd(3) },
+      { id: 'p2', flow: 'in',  title: 'Клиент',   amount: 9000000, every: 'once', due_date: dd(6) },
+      { id: 'p3', flow: 'out', title: 'Аренда',   amount: 1000000, every: 'once', due_date: dd(9) } ];
+    const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
+    const rows = Array.from(d.querySelectorAll('.fnx-pr:not(.hd)'));
+    const f = finFreeNow();
+    const cell = (r, s) => (r.querySelector(s) || {}).textContent || '';
+    return {
+      noPlans: /Собрать из своих данных/.test(noPlans) && /fnx-pl-empty/.test(noPlans),
+      rows: rows.length,
+      bad: d.querySelectorAll('.fnx-pr.bad').length,
+      bals: rows.map(r => cell(r, '.fnx-pr-b').replace(/\s/g, '')),
+      free: f.free, solo: f.freeSolo, gap: f.gapDate, gapAmt: f.gapAmt,
+      card: (d.querySelector('.fnx-h-free') || {}).textContent || '',
+      cardBad: !!d.querySelector('.fnx-h-free.bad'),
+      dep: f.dependsOn.length };
+  });
+  /* На бумаге: 3 000 000 − 5 000 000 = −2 000 000 (разрыв), +9 000 000 =
+     7 000 000, −1 000 000 = 6 000 000. Свободно 0, без поступления тоже 0. */
+  ok('без планов — приглашение собрать их, а не пустое место', PL.noPlans, PL.noPlans);
+  ok('в полосе три строки', PL.rows === 3, PL.rows);
+  ok('остатки в полосе — те же, что в прогоне: −2 000 000, 7 000 000, 6 000 000',
+    PL.bals.join('|') === '−2000000|7000000|6000000', PL.bals);
+  ok('день, когда денег не хватит, подсвечен', PL.bad === 1, PL.bad);
+  ok('разрыв назван датой и суммой', !!PL.gap && PL.gapAmt === 2000000, [PL.gap, PL.gapAmt]);
+  ok('«Свободно» ноль и карточка красная', PL.free === 0 && PL.cardBad, [PL.free, PL.cardBad]);
+  ok('в карточке написано, на каком поступлении держится расчёт',
+    PL.dep === 1 && /Держится на 1 поступлении/.test(PL.card), [PL.dep, PL.card]);
+
+  console.log('[I] оплата плана — это проводка, а не галочка');
+  const PY2 = await page.evaluate(async () => {
+    let sent = null; window.tFinSaveOp = r => { sent = r; return Promise.resolve(); };
+    const said = []; const _t = window.toast; window.toast = m => said.push(m);
+    const per = window.FINP[0].due_date;
+    finPayPlan('p1', per);
+    await new Promise(r => setTimeout(r, 140));
+    const amt = (document.getElementById('fnx-o-am') || {}).value || '';
+    const warn = (document.querySelector('#fnx-op-b .fnx-warn') || {}).textContent || '';
+    window._finDupOk = false; finOpSave();
+    const first = sent;
+    /* Следующая операция — обычная: привязка к плану не должна за ней тянуться. */
+    finOpOpen('expense');
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    set('fnx-o-am', '10 000'); window._finDupOk = false; finOpSave();
+    window.toast = _t;
+    return { amt: amt.replace(/\s/g, ''), warn, first, second: sent, said };
+  });
+  ok('сумма подставлена из плана', PY2.amt === '5000000', PY2.amt);
+  ok('и сказано, какой план это закрывает', /Закрывает план/.test(PY2.warn), PY2.warn);
+  ok('операция уходит со ссылкой на план и период',
+    !!PY2.first && PY2.first.plan_id === 'p1' && !!PY2.first.plan_period, PY2.first);
+  ok('следующая обычная операция чужой план не закрывает',
+    !!PY2.second && !PY2.second.plan_id, PY2.second);
+
   await page.evaluate(() => { const d = document.getElementById('fnx-probe'); if (d) d.remove(); finClose(); });
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
