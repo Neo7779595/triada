@@ -32,7 +32,9 @@ const setup = (D) => {
     _full: { briefs: [{ id: 'b1', name: 'Бриф проекта', fields: D.FIELDS, answers: D.ANS }], briefAt: '2026-08-01' } };
   document.querySelectorAll('.app').forEach(a => a.classList.remove('on'));
   document.getElementById('app-ag').classList.add('on');
-  renderKB();
+  /* Бриф живёт в блоке «Паспорт» — досье открывается витриной, блок надо
+     открыть явно. */
+  kbOpenBlock('pass');
 };
 
 (async () => {

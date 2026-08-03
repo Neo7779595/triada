@@ -1,0 +1,153 @@
+/* probe_kbnav — досье в базе знаний: витрина, блоки, лента переходов.
+
+   Раньше правая колонка была одной лентой из восьми разделов: оглавление
+   сверху уезжало при прокрутке, пустой раздел занимал столько же места,
+   сколько полный, а материалы лежали ниже всего остального. Теперь у
+   досье два состояния — витрина из плиток и один открытый блок.
+
+   Числа в проверках посчитаны по фикстуре ниже, а не сняты с экрана:
+   10 блоков (6 «проект» + 4 «за период»), 3 человека, 2 материала,
+   2 отчёта, 1 контент-план, 51 день до конца договора. */
+const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+let pass = 0, fail = 0;
+const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n + (x !== undefined ? '  → ' + JSON.stringify(x) : '')); } };
+
+const setup = () => {
+  window.__me = { id: 'u1', full_name: 'detroyd', role: 'agency_owner', agency_id: 'AG', agencySlug: 'probe' };
+  window.tMe = () => window.__me; window.ME = window.__me;
+  window.toast = () => {}; window.LIVE = true; window.SB = window.SB || { from: () => ({}) };
+  window.agIsOwner = () => true; window.agCanView = () => true; window.agCanEdit = () => true;
+  window.agCanSeeProject = () => true;
+  kbAutoEnsure = function () {};                    /* иначе сводка пойдёт в базу и упрётся в заглушку */
+  const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const P1 = { id: 'p1', key: 'p1', name: 'APOLO COFFEE', logo: 'A', st: 'active',
+    svc: 'PROD', cat: 'IT компания', tariff: 'DeGold', status: 'active', pct: 25, stages: '2/8',
+    mrr: 45000000, note: 'Клиент просит больше вертикального видео.', createdAt: '2026-06-15',
+    tg_chat_id: -1001234567890, tg_settings: {},
+    contacts: { person: { name: 'Шохрух Каримов', role: 'Директор', phone: '+998901234567', tg: '@shohruh' } } };
+  /* Второй проект пустой — на нём видно, как выглядит блок без содержимого. */
+  const P2 = { id: 'p2', key: 'p2', name: 'Artel', logo: 'A', st: 'active', status: 'active', pct: 0, stages: '0/5' };
+  PROJECTS.length = 0; PROJECTS.push(P1, P2);
+  window.agVisibleProjects = () => PROJECTS;
+  KB_PROJECTS.length = 0; KB_PROJECTS.push(P1, P2);
+  kbProj = 'p1';
+  KB_DATA['p1'] = { 'Контент-стратегия': [
+    { t: 'Контент-стратегия · осень', ty: 'Miro', url: 'https://miro.com/x', at: day(-6), _id: 'm1' },
+    { t: 'Рубрикатор', ty: 'Google Doc', url: '', at: day(-12), _id: 'm2' } ] };
+  KB_AUTO['p1'] = { _loaded: 1, _at: Date.now(),
+    contract: { start_date: day(-9), end_date: day(51) },
+    services: [{ service: 'PROD', tariff: 'DeGold', mrr: 25000000, status: 'active' }],
+    members: [{ role_in_project: 'Оператор', prof: { id: 'm2', full_name: 'Худойберди', role_title: 'Оператор', phone: '', tg_username: '@h' } }],
+    lead: { id: 'm1', full_name: 'DTR Hunter', role_title: 'Проект-менеджер', phone: '+998907770011', tg_username: '@dtr' },
+    client: null,
+    content: [{ id: 'c1', data: { sheets: [{ rows: [] }] }, updated_at: new Date().toISOString() }],
+    reports: [{ id: 'r1', title: 'SMM-отчёт · август', kind: 'SMM', published_at: new Date().toISOString(), payload: { metrics: {} } },
+              { id: 'r2', title: 'Performance', kind: 'PERF', published_at: new Date().toISOString(), payload: {} }],
+    tasks: [{ status: 'done', time_spent: 3600, completed_at: new Date().toISOString() }],
+    stages: [{ status: 'done', completed_at: new Date().toISOString() }],
+    briefs: [], briefAt: '' };
+  KB_AUTO['p2'] = { _loaded: 1, _at: Date.now(), contract: null, services: [], members: [], lead: null,
+    client: null, content: [], reports: [], tasks: [], stages: [], briefs: [], briefAt: '' };
+  document.querySelectorAll('.app').forEach(a => a.classList.remove('on'));
+  document.getElementById('app-ag').classList.add('on');
+  KB_BLOCK = '';
+  renderKB();
+};
+
+const tiles = () => [...document.querySelectorAll('#content-ag .kb-tile')].map(t => ({
+  n: t.querySelector('.tn').textContent,
+  v: ((t.querySelector('.big') || t.querySelector('.note') || {}).textContent || '').trim(),
+  mut: t.classList.contains('mut') }));
+const strip = () => [...document.querySelectorAll('#content-ag .kb-si')].map(e => ({
+  n: e.textContent.replace(/\d+$/, '').trim(),
+  c: ((e.querySelector('b') || {}).textContent || ''),
+  on: e.classList.contains('on'), mut: e.classList.contains('mut') }));
+const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') || {}).textContent,
+  t: (document.querySelector('#content-ag .kb-bhd .t') || {}).textContent,
+  back: !!document.querySelector('#content-ag .kb-back'),
+  per: !!document.querySelector('#content-ag .kb-bhd .kb-per') });
+
+(async () => {
+  const b = await chromium.launch();
+  const page = await b.newPage({ viewport: { width: 1400, height: 950 } });
+  const errs = []; page.on('pageerror', e => errs.push(String(e).slice(0, 140)));
+  await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1300);
+  await page.evaluate(setup);
+  await page.waitForTimeout(300);
+
+  console.log('\n[A] досье открывается витриной, а не лентой разделов');
+  const A2 = await page.evaluate(`(${tiles.toString()})()`);
+  const heads = await page.evaluate(() => [...document.querySelectorAll('#content-ag .kb-sub-h')].map(e => e.textContent.replace(/\s+/g, ' ').trim()));
+  const stripN = await page.evaluate(() => document.querySelectorAll('#content-ag .kb-si').length);
+  console.log('    ' + JSON.stringify(A2.map(t => t.n + '=' + t.v)));
+  ok('на витрине ровно десять блоков', A2.length === 10, A2.length);
+  ok('они разведены на «проект» и «за период»',
+    /Проект · вне периода/.test(heads[0] || '') && /За /.test(heads[1] || ''), heads.slice(0, 2));
+  ok('в подписи нижней группы сказано, что фильтр меняет только её',
+    /фильтр меняет эти четыре/.test(heads[1] || ''), heads[1]);
+  ok('пока открыта витрина, ленты блоков нет — переключать нечего', stripN === 0, stripN);
+
+  console.log('\n[B] плитка показывает главное число своего блока');
+  const byName = n => (A2.find(t => t.n === n) || {}).v;
+  ok('«Контакты» — три человека', byName('Контакты') === '3человека', byName('Контакты'));
+  ok('«Договор» — 51 день до конца', byName('Договор') === '51день', byName('Договор'));
+  ok('«Материалы» — два', byName('Материалы') === '2материала', byName('Материалы'));
+  ok('«Отчёты» — два', byName('Отчёты') === '2отчёта', byName('Отчёты'));
+  ok('«Заметка» показывает саму заметку, а не число',
+    /вертикального видео/.test(byName('Заметка') || ''), byName('Заметка'));
+
+  console.log('\n[C] плитка открывает свой блок');
+  const rep = await page.evaluate(`(()=>{ kbOpenBlock('rep'); return (${head.toString()})(); })()`);
+  const repStrip = await page.evaluate(`(${strip.toString()})()`);
+  console.log('    ' + JSON.stringify(rep));
+  ok('в шапке — название блока, а над ним проект', rep.t === 'Отчёты' && rep.crumb === 'APOLO COFFEE', rep);
+  ok('появилась стрелка назад', rep.back === true, rep);
+  ok('в ленте подсвечен ровно один блок — открытый',
+    repStrip.filter(x => x.on).length === 1 && (repStrip.find(x => x.on) || {}).n === 'Отчёты', repStrip.filter(x => x.on));
+  ok('в теле блока только его секция',
+    (await page.evaluate(() => [...document.querySelectorAll('#content-ag .kb-body [id^="kbs-"]')].map(e => e.id).join(','))) === 'kbs-rep');
+
+  console.log('\n[D] лента переводит из блока в блок, минуя витрину');
+  const mat = await page.evaluate(`(()=>{ document.querySelectorAll('#content-ag .kb-si').forEach(function(e){ if(/Материалы/.test(e.textContent)) e.click(); }); return (${head.toString()})(); })()`);
+  ok('из «Отчётов» в «Материалы» — один клик', mat.t === 'Материалы' && mat.back === true, mat);
+  ok('материалы больше не лежат под всеми разделами — это свой блок',
+    (await page.evaluate(() => !!document.querySelector('#content-ag .kb-body #kbs-mat'))) === true);
+
+  console.log('\n[E] числа на плитке и в ленте — одни и те же');
+  const both = await page.evaluate(`(()=>{ const s=(${strip.toString()})(); kbBoardBack(); const t=(${tiles.toString()})();
+    return { strip:s, tiles:t }; })()`);
+  const stripC = n => (both.strip.find(x => x.n === n) || {}).c;
+  ok('«Контакты»: 3 и там, и там', stripC('Контакты') === '3' && byName('Контакты') === '3человека',
+    { strip: stripC('Контакты'), tile: byName('Контакты') });
+  ok('«Материалы»: 2 и там, и там', stripC('Материалы') === '2', stripC('Материалы'));
+  ok('стрелка вернула на витрину', both.tiles.length === 10, both.tiles.length);
+
+  console.log('\n[F] период показан там, где он действует');
+  const per = await page.evaluate(`(()=>{ kbOpenBlock('cont'); const a=(${head.toString()})();
+    kbOpenBlock('rep'); const b=(${head.toString()})(); kbBoardBack(); const c=(${head.toString()})();
+    return { cont:a.per, rep:b.per, board:c.per }; })()`);
+  ok('в «Контактах» кнопки периода нет — данные проекта целиком', per.cont === false, per);
+  ok('в «Отчётах» она есть — фильтр их режет', per.rep === true, per);
+  ok('на витрине она есть — фильтр меняет нижний ряд плиток', per.board === true, per);
+
+  console.log('\n[G] пустой блок объясняет, а не показывает ноль');
+  const emp = await page.evaluate(`(()=>{ setKbProj('p2'); const t=(${tiles.toString()})();
+    kbOpenBlock('rep');
+    const e=document.querySelector('#content-ag .kb-eblk');
+    const zero=/\\b0\\b/.test((document.querySelector('#content-ag .kb-body')||{}).textContent||'');
+    kbOpenBlock('ct');
+    const e2=document.querySelector('#content-ag .kb-eblk');
+    return { tiles:t, empty:!!e, zero:zero, ctEmpty:!!e2, ctTxt:e2?e2.textContent.replace(/\\s+/g,' ').trim().slice(0,60):'' }; })()`);
+  await page.waitForTimeout(150);
+  ok('у пустого проекта плитки помечены пунктиром',
+    emp.tiles.filter(t => t.mut).length >= 6, emp.tiles.filter(t => t.mut).length);
+  ok('пустые «Отчёты» — не карточка с бейджем «0»', emp.empty === true && emp.zero === false, emp);
+  ok('пустой «Договор» говорит, откуда он берётся',
+    emp.ctEmpty === true && /не заведён/.test(emp.ctTxt), emp.ctTxt);
+
+  ok('страница не сыпала ошибок', errs.length === 0, errs.slice(0, 3));
+  console.log(`\n──────── ${pass} ok · ${fail} fail ────────`);
+  await b.close();
+  process.exit(fail ? 1 : 0);
+})();

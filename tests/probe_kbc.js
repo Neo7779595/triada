@@ -29,7 +29,10 @@ const setup = () => {
               { role_in_project: '', prof: { id: 'm3', full_name: 'Мадина', role_title: '', phone: '', tg_username: '' } }] };
   document.querySelectorAll('.app').forEach(a => a.classList.remove('on'));
   document.getElementById('app-ag').classList.add('on');
-  renderKB();
+  /* Досье открывается витриной; контакты — отдельный блок, и его надо
+     открыть. Раньше все разделы шли одной лентой, и раздел был на экране
+     сразу после отрисовки. */
+  kbOpenBlock('cont');
 };
 
 (async () => {
@@ -51,7 +54,11 @@ const setup = () => {
       no: !!c.querySelector('.kb-ccard-no') }));
     const sides = [...s.querySelectorAll('.kb-side')].map(e => ({ t: e.querySelector('.t').textContent, s: (e.querySelector('.s') || {}).textContent || '',
       idx: [...s.querySelectorAll('*')].indexOf(e) }));
-    return { sides, cards, txt: s.textContent, cnt: (s.querySelector('.ct') || {}).textContent,
+    /* Счётчик людей теперь стоит в ленте блоков, а не в шапке секции:
+       у блока своя шапка, и второе такое же название под ней читалось
+       как ошибка вёрстки. */
+    const nav = [...document.querySelectorAll('#content-ag .kb-si')].find(x => /Контакты/.test(x.textContent));
+    return { sides, cards, txt: s.textContent, cnt: ((nav && nav.querySelector('b')) || {}).textContent,
       subs: [...s.querySelectorAll('.kb-sub-h')].map(e => e.textContent.trim()),
       kv: [...s.querySelectorAll('.kb-kv')].map(e => e.textContent.replace(/\s+/g, ' ').trim()) };
   });
@@ -98,7 +105,7 @@ const setup = () => {
   const empty = await page.evaluate(() => {
     PROJECTS[0].contacts = { person: { name: '', role: '', phone: '', tg: '' }, place: { url: '', name: '' }, channels: {} };
     KB_AUTO['p1'].lead = null; KB_AUTO['p1'].members = [];
-    renderKB();
+    kbOpenBlock('cont');
     const s = document.getElementById('kbs-cont');
     return { txt: s.textContent.replace(/\s+/g, ' ').trim(), cards: s.querySelectorAll('.kb-ccard').length, sides: s.querySelectorAll('.kb-side').length };
   });
