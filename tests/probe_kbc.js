@@ -69,6 +69,26 @@ const setup = () => {
   ok('сначала клиент, потом мы', d.sides.map(x => x.t).join(' → ') === 'Клиент → Агентство', d.sides);
   ok('и подписано, кто есть кто', /их стороны/.test(d.sides[0].s) && /нашей стороны/.test(d.sides[1].s), d.sides);
 
+  /* Клиент и агентство раньше шли одной лентой карточек: черта между
+     сторонами была ровно такой же, как между двумя людьми внутри стороны.
+     Теперь у каждой стороны своя коробка с цветным корешком. */
+  const sep = await page.evaluate(() => {
+    const c = document.getElementById('content-ag');
+    const boxes = [...c.querySelectorAll('.kb-sbox')];
+    return { n: boxes.length,
+      heads: boxes.map(b => (b.querySelector('.kb-side .t') || {}).textContent || ''),
+      spine: boxes.map(b => getComputedStyle(b).boxShadow.indexOf('inset') >= 0),
+      inside: boxes.map(b => b.querySelectorAll('.kb-ccard').length),
+      rows: [...c.querySelectorAll('.kb-crow')].map(r => r.querySelector('.k').textContent) };
+  });
+  ok('стороны разведены по своим коробкам', sep.n === 2, sep);
+  ok('и подписаны: клиент и агентство', sep.heads.join(',') === 'Клиент,Агентство', sep.heads);
+  ok('у каждой коробки свой цветной корешок', sep.spine.every(Boolean), sep.spine);
+  ok('карточки людей лежат внутри своей стороны, а не между ними',
+    sep.inside.every(n => n > 0), sep.inside);
+  ok('способ связи назван словом, а не только иконкой',
+    sep.rows.indexOf('Телефон') >= 0 && sep.rows.indexOf('Telegram') >= 0 && sep.rows.indexOf('Адрес') >= 0, sep.rows);
+
   console.log('\n[B] клиент');
   const anvar = d.cards.find(c => /Анвар/.test(c.nm));
   ok('контактное лицо на месте', !!anvar && /Директор/.test(anvar.role), anvar);
