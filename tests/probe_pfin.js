@@ -203,6 +203,29 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('гонорар уходит вместе с человеком', l.sal.length === 1 && l.sal[0].staffId === 'm1' && l.sal[0].amount === 1500000, l.sal);
   ok('расход уходит как был', l.opex.length === 1 && l.opex[0].amount === 300000, l.opex);
 
+  console.log('\n[N] факт по журналу рядом с планом');
+  /* План сам себя подтверждает: пока рядом не встанут настоящие деньги,
+     «маржа 50%» остаётся намерением. */
+  const FA = await page.evaluate(() => {
+    const z = v => String(v).padStart(2, '0');
+    const n = new Date(), td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
+    window.FINX = { ready: true, accounts: [{ id: 'W', name: 'К', kind: 'card', opening_balance: 0 }], ops: [] };
+    const empty = pfFactHtml();
+    window.FINX.ops = [
+      { id: '1', op_date: td, kind: 'income',  amount: 3000000, account_id: 'W', project_id: PFIN.id },
+      { id: '2', op_date: td, kind: 'expense', amount: 1800000, account_id: 'W', project_id: PFIN.id },
+      { id: '3', op_date: td, kind: 'expense', amount: 900000,  account_id: 'W' } ];
+    const d = document.createElement('div'); d.innerHTML = pfFactHtml();
+    return { empty, txt: (d.textContent || '').replace(/\s+/g, ' '),
+      vals: Array.from(d.querySelectorAll('.pf-fact b')).map(e => e.textContent.replace(/\s/g, '')) };
+  });
+  ok('без операций — не пустота, а объяснение, как факт сюда попадёт',
+    /не записано ни одной операции/.test(FA.empty), FA.empty.slice(0, 90));
+  ok('пришло 3 000 000, потрачено 1 800 000 — чужой расход не приписан',
+    FA.vals[0] === '3000000' && FA.vals[1] === '1800000', FA.vals);
+  ok('маржа факт 40%', FA.vals[2] === '40%', FA.vals);
+  ok('долг клиента посчитан от суммы договора', FA.vals[3] !== undefined, FA.vals);
+
   const bad = errs.filter(e => /SyntaxError|is not defined|Cannot read/.test(e));
   console.log('\n[M] ошибки');
   ok('нет ошибок страницы', bad.length === 0, bad.slice(0, 3));

@@ -295,6 +295,46 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('следующая обычная операция чужой план не закрывает',
     !!PY2.second && !PY2.second.plan_id, PY2.second);
 
+  console.log('[J] сверка: разницу считает модуль, а не человек');
+  /* Тип операции «излишек / недостача» был и раньше, но вычитать учётный
+     остаток из фактического приходилось в уме — ровно там и ошибаются. */
+  await seed();
+  const RC = await page.evaluate(async () => {
+    let sent = null; window.tFinSaveOp = r => { sent = r; return Promise.resolve(); };
+    const said = []; const _t = window.toast; window.toast = m => said.push(m);
+    const out = () => (document.getElementById('fnx-rc-out') || {}).textContent || '';
+    finRecOpen('B');                                   // по учёту 6 500 000
+    const shown = (document.getElementById('fnx-rc-am') || {}).value.replace(/\s/g, '');
+    const same = out();
+    const set = v => { const e = document.getElementById('fnx-rc-am'); e.value = v; finRecCalc(); };
+    set('6 300 000'); const less = out();
+    set('6 900 000'); const more = out();
+    finRecSave();                                      // без причины
+    const noWhy = said.slice();
+    document.getElementById('fnx-rc-nt').value = 'сдача не записана';
+    finRecSave();
+    const surplus = sent;
+    finRecOpen('B'); set('6 200 000');
+    document.getElementById('fnx-rc-nt').value = 'потеряли чек';
+    finRecSave();
+    window.toast = _t;
+    return { shown, same, less, more, noWhy, surplus, shortage: sent,
+      hint: (document.querySelector('#ov-fin .fnx-hint') || {}).textContent || '' };
+  });
+  ok('в поле сразу стоит учётный остаток — сверяют с ним', RC.shown === '6500000', RC.shown);
+  ok('пока цифры равны — «сходится», а не пустота', /Сходится/.test(RC.same), RC.same);
+  ok('меньше учётного — недостача 200 000', /Недостача/.test(RC.less) && /200 000/.test(RC.less), RC.less);
+  ok('больше — излишек 400 000', /Излишек/.test(RC.more) && /400 000/.test(RC.more), RC.more);
+  ok('без объяснения корректировка не проходит', /Без объяснения/.test(RC.noWhy[0] || ''), RC.noWhy);
+  ok('излишек уходит как «излишек при сверке» ровно на разницу',
+    RC.surplus && RC.surplus.kind === 'adjust_in' && RC.surplus.amount === 400000, RC.surplus);
+  ok('недостача — как «недостача», тоже на разницу',
+    RC.shortage && RC.shortage.kind === 'adjust_out' && RC.shortage.amount === 300000, RC.shortage);
+  ok('причина уходит в запись, а не теряется',
+    /потеряли чек/.test((RC.shortage && RC.shortage.note) || ''), RC.shortage);
+  ok('и рядом сказано, что сверка — последнее средство, а не первое',
+    /внесите её обычной записью/.test(RC.hint), RC.hint);
+
   await page.evaluate(() => { const d = document.getElementById('fnx-probe'); if (d) d.remove(); finClose(); });
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
