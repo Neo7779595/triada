@@ -146,6 +146,48 @@ const measure = (m) => {
   ok('кнопка подсвечена, пока фильтры открыты', pop.btnOn === true, pop);
   ok('повторное нажатие закрывает', pop.closedAgain === 'none', pop.closedAgain);
 
+  console.log('\n[E2] «Сбросить / Применить» — одна плитка в ряду фильтров');
+  for (const m of ['projects', 'deadlines']) {
+    const a = await page.evaluate((mm) => {
+      agNav(mm); window._tbAdvSet(true);
+      const adv = document.querySelector('#content-ag .tb-adv');
+      const act = adv.querySelector('.tb-adv-act'), dd = adv.querySelector('.dd-btn');
+      const ab = act.getBoundingClientRect(), db = dd.getBoundingClientRect();
+      const r = { h: Math.round(ab.height), ddH: Math.round(db.height),
+        w: Math.round(ab.width), ddW: Math.round(db.width),
+        rad: getComputedStyle(act).borderRadius, ddRad: getComputedStyle(dd).borderRadius,
+        halves: [...act.children].map(e => e.textContent.trim()),
+        equal: (() => { const k = [...act.children].map(e => Math.round(e.getBoundingClientRect().width));
+          return k.length === 2 && Math.abs(k[0] - k[1]) <= 1; })(),
+        resetOff: act.querySelector('.ta-reset').disabled,
+        fclear: getComputedStyle(adv.querySelector('.pk-fclear') || act).display };
+      act.querySelector('.ta-apply').click();
+      r.closed = !window._tbAdvOpen;
+      return r;
+    }, m);
+    await page.waitForTimeout(180);
+    ok('«' + m + '»: кнопка того же роста и формы, что фильтры рядом',
+      a.h === CTRL && a.h === a.ddH && a.rad === a.ddRad, a);
+    ok('«' + m + '»: и той же ширины — она занимает ячейку сетки целиком',
+      a.w === a.ddW, a);
+    ok('«' + m + '»: в одной плитке две половины, поровну',
+      a.halves.join('/') === 'Сбросить/Применить' && a.equal, a);
+    ok('«' + m + '»: «Сбросить» погашен, пока сбрасывать нечего', a.resetOff === true, a);
+    ok('«' + m + '»: «Применить» закрывает панель', a.closed === true, a);
+  }
+  /* Сброс оставляет панель открытой: фильтр обычно правят дальше. */
+  const afterReset = await page.evaluate(() => {
+    agNav('projects'); setAgCat('IT компания'); window._tbAdvSet(true);
+    const off = document.querySelector('#content-ag .ta-reset').disabled;
+    document.querySelector('#content-ag .ta-reset').click();
+    return { offBefore: off, stillOpen: !!window._tbAdvOpen, cat: agCat };
+  });
+  await page.waitForTimeout(250);
+  ok('когда фильтр применён, «Сбросить» оживает', afterReset.offBefore === false, afterReset);
+  ok('сброс возвращает фильтр в «Все» и не закрывает панель',
+    afterReset.cat === 'all' && afterReset.stillOpen === true, afterReset);
+  await page.evaluate(() => window._tbAdvSet(false));
+
   console.log('\n[F] над списком проектов нет второго счётчика');
   const pj = await page.evaluate(() => { agNav('projects');
     const c = document.getElementById('content-ag');
