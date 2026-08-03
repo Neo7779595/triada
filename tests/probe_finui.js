@@ -22,19 +22,26 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1400);
 
+  /* Даты — от сегодняшнего дня и только назад: остаток считается на сегодня,
+     и операция, датированная завтра, в него намеренно не входит. С жёстко
+     вписанными датами проверка ломалась бы от смены числа, а не от кода. */
   const seed = () => page.evaluate(() => {
+    const z = v => String(v).padStart(2, '0');
+    const dd = k => { const d = new Date(); d.setDate(d.getDate() + k);
+      return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); };
+    window.FINP = []; window.FINO = []; window.FINS = {};
     window.FINX = { ready: true, accounts: [
       { id: 'A', name: 'Наличка', kind: 'cash',   opening_balance: 300000,  sort: 1 },
       { id: 'B', name: 'Карта',   kind: 'card',   opening_balance: 5000000, sort: 2 },
       { id: 'R', name: 'Резерв',  kind: 'card',   opening_balance: 4000000, sort: 3, is_reserve: true },
     ], ops: [
-      { id: 'o1', op_date: '2026-08-02', kind: 'expense', amount: 1000000, account_id: 'A',
+      { id: 'o1', op_date: dd(-3), kind: 'expense', amount: 1000000, account_id: 'A',
         category: 'Аренда', note: 'август', created_at: '2026-08-02T09:00:00Z' },
-      { id: 'o2', op_date: '2026-08-03', kind: 'income',  amount: 2000000, account_id: 'B',
+      { id: 'o2', op_date: dd(-2), kind: 'income',  amount: 2000000, account_id: 'B',
         note: 'Qushbegi', created_at: '2026-08-03T09:00:00Z' },
-      { id: 'o3', op_date: '2026-08-04', kind: 'transfer', amount: 500000, account_id: 'B', account_to: 'R',
+      { id: 'o3', op_date: dd(-1), kind: 'transfer', amount: 500000, account_id: 'B', account_to: 'R',
         created_at: '2026-08-04T09:00:00Z' },
-      { id: 'o4', op_date: '2026-08-05', kind: 'expense', amount: 900000, account_id: 'B',
+      { id: 'o4', op_date: dd(-1), kind: 'expense', amount: 900000, account_id: 'B',
         voided_at: '2026-08-05T10:00:00Z', void_reason: 'записана дважды', created_at: '2026-08-05T09:00:00Z' },
     ] };
   });
@@ -54,7 +61,7 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
     const d = document.createElement('div'); d.id = 'fnx-probe';
     d.innerHTML = finMoneyBlock(); document.body.appendChild(d);
     const txt = s => (d.querySelector(s) || {}).textContent || '';
-    const m = finMath(window.FINX.accounts, window.FINX.ops, {});
+    const m = finMath(window.FINX.accounts, window.FINX.ops, { asOf: finToday() });
     return { hero: txt('.fnx-h-v').replace(/\s/g, ''), sub: txt('.fnx-h-sub').replace(/\s/g, ''),
       cards: d.querySelectorAll('.fnx-acc').length,
       res: d.querySelectorAll('.fnx-acc.res').length,
@@ -78,6 +85,21 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('и рядом сказано, что так обычно выглядит ошибка ввода', M.warn, M.warn);
   ok('кнопка «+ счёт» стоит в том же ряду', M.add, M.add);
 
+  /* Опечатка в дате — самая тихая из ошибок ввода: операция есть, а денег
+     не убыло. Модуль про такие говорит вслух, а не прячет их. */
+  const AH = await page.evaluate(() => {
+    const z = v => String(v).padStart(2, '0');
+    const d1 = new Date(); d1.setDate(d1.getDate() + 5);
+    window.FINX.ops = window.FINX.ops.concat([{ id: 'fut', kind: 'expense', amount: 400000, account_id: 'B',
+      op_date: d1.getFullYear() + '-' + z(d1.getMonth() + 1) + '-' + z(d1.getDate()) }]);
+    const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
+    const m = finMath(window.FINX.accounts, window.FINX.ops, { asOf: finToday() });
+    return { total: m.total, txt: (d.textContent || '').replace(/\s+/g, ' ') };
+  });
+  ok('операция будущим числом остаток не трогает', AH.total === 10300000, AH.total);
+  ok('но про неё сказано прямо — это чаще всего опечатка в дате',
+    /будущим числом/.test(AH.txt), AH.txt.slice(0, 160));
+
   /* Деньги и прибыль стоят рядом намеренно: их путают чаще всего.
      Аванс раздувает первое, не трогая второе, — и это сказано словами. */
   const H = await page.evaluate(() => {
@@ -91,7 +113,7 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
              { id: 'e1', op_date: td, kind: 'expense', amount: 400000,  account_id: 'B' } ] };
     const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
     const t = s => (d.querySelector(s) || {}).textContent || '';
-    const m = finMath(window.FINX.accounts, window.FINX.ops, {});
+    const m = finMath(window.FINX.accounts, window.FINX.ops, { asOf: finToday() });
     return { per: t('.fnx-h-per').replace(/\s+/g, ' '), note: t('.fnx-h-note'),
       hero: t('.fnx-h-v').replace(/\s/g, ''), rev: m.revenue, prof: m.profit, pre: m.prepaid };
   });
