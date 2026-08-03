@@ -127,6 +127,23 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('и это именно события задач', A.tk.every(t => /Задача/.test(t)), A.tk);
   ok('фильтр «Этапы» оставляет только этапы', A.st.length === 1 && /Этап/.test(A.st[0]), A.st);
 
+  console.log('[D] события удалённых проектов в ленту не попадают');
+  /* У этапов история уходит вместе с проектом каскадом, у задач — нет: в
+     task_history нет ни одного внешнего ключа. Такие строки нельзя ни
+     подписать проектом, ни открыть по клику — им в ленте не место. */
+  const G = await page.evaluate(() => {
+    const _pnm = {}; [{ id: 'p1', name: 'APOLO' }].forEach(p => _pnm[String(p.id)] = p.name);
+    const rows = [
+      { task_title: 'Сценарий', new_status: 'active', old_status: 'wait', project_id: 'p1' },
+      { task_title: 'Из удалённого', new_status: 'done', old_status: 'active', project_id: 'pX' },
+      { task_title: 'Без проекта', new_status: 'done', old_status: 'active', project_id: null },
+    ];
+    const kept = rows.filter(h => h.project_id != null && _pnm[String(h.project_id)]);
+    return { kept: kept.map(h => h.task_title) };
+  });
+  ok('в ленту идёт только то, у чего проект на месте',
+    G.kept.length === 1 && G.kept[0] === 'Сценарий', G.kept);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
