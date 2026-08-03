@@ -33,9 +33,20 @@ const setup = () => {
     contacts: { person: { name: 'Шохрух Каримов', role: 'Директор', phone: '+998901234567', tg: '@shohruh' } } };
   /* Второй проект пустой — на нём видно, как выглядит блок без содержимого. */
   const P2 = { id: 'p2', key: 'p2', name: 'Artel', logo: 'A', st: 'active', status: 'active', pct: 0, stages: '0/5' };
-  PROJECTS.length = 0; PROJECTS.push(P1, P2);
+  /* Ещё два проекта — чтобы бенчмарку было с чем сравнивать: меньше трёх
+     он не показывается намеренно. Прогресс: 25, 0, 70, 48 → медиана 36,5,
+     у нашего 25 — третье место из четырёх. */
+  const P3 = { id: 'p3', key: 'p3', name: 'Level Studio', logo: 'L', st: 'active', status: 'active', pct: 70, stages: '7/10' };
+  const P4 = { id: 'p4', key: 'p4', name: 'DeTroyd', logo: 'D', st: 'active', status: 'active', pct: 48, stages: '4/8' };
+  PROJECTS.length = 0; PROJECTS.push(P1, P2, P3, P4);
   window.agVisibleProjects = () => PROJECTS;
-  KB_PROJECTS.length = 0; KB_PROJECTS.push(P1, P2);
+  KB_PROJECTS.length = 0; KB_PROJECTS.push(P1, P2, P3, P4);
+  KB_PORT = { _loading: 0, _loaded: 1, _at: Date.now(), _err: '', rows: {
+    p1: { rep: [new Date().toISOString(), new Date().toISOString()], smm: [new Date().toISOString()], plan: [new Date().toISOString()], ctEnd: day(51) },
+    p2: { rep: [], smm: [], plan: [], ctEnd: '' },
+    p3: { rep: [new Date().toISOString()], smm: [], plan: [new Date().toISOString(), new Date().toISOString()], ctEnd: day(120) },
+    p4: { rep: [new Date().toISOString(), new Date().toISOString(), new Date().toISOString()], smm: [], plan: [], ctEnd: day(20) } } };
+  window.kbPortEnsure = () => {};
   kbProj = 'p1';
   KB_DATA['p1'] = { 'Контент-стратегия': [
     { t: 'Контент-стратегия · осень', ty: 'Miro', url: 'https://miro.com/x', at: day(-6), _id: 'm1' },
@@ -151,6 +162,43 @@ const head = () => ({ crumb: (document.querySelector('#content-ag .kb-bhd .cr') 
   ok('пустые «Отчёты» — не карточка с бейджем «0»', emp.empty === true && emp.zero === false, emp);
   ok('пустой «Договор» говорит, откуда он берётся',
     emp.ctEmpty === true && /не заведён/.test(emp.ctTxt), emp.ctTxt);
+
+  console.log('\n[G2] место среди своих проектов');
+  const bm = await page.evaluate(() => {
+    const c = document.getElementById('content-ag');
+    setKbProj('p1'); kbBoardBack();
+    const of = n => { const t = [...c.querySelectorAll('.kb-tile')].find(x => x.querySelector('.tn').textContent === n);
+      const b = t && t.querySelector('.kb-bm');
+      return { has: !!b, cap: b ? b.querySelector('.cap').textContent.trim() : '',
+        dots: b ? b.querySelectorAll('.ln i').length : 0 }; };
+    return { pass: of('Паспорт'), ct: of('Договор'), rep: of('Отчёты'), cont: of('Контакты'),
+      total: c.querySelectorAll('.kb-tile .kb-bm').length };
+  });
+  console.log('    ' + JSON.stringify(bm));
+  ok('у «Паспорта» показано место среди активных проектов',
+    bm.pass.has && /медиана 36,5% · 3-е из 4/.test(bm.pass.cap), bm.pass);
+  ok('на полосе точка на каждый проект плюс медиана и своя',
+    bm.pass.dots === 6, bm.pass.dots);
+  ok('«Отчёты» тоже сравниваются: 2 против медианы 1,5',
+    bm.rep.has && /медиана 1,5 · 2-е из 4/.test(bm.rep.cap), bm.rep);
+  /* У договоров разная длина, и «второе место по остатку дней» не значит
+     ничего — там полезна дата, а не место. */
+  ok('у «Договора» места нет — сравнивать сроки договоров бессмысленно', bm.ct.has === false, bm.ct);
+  ok('у «Контактов» тоже нет — число людей не соревнование', bm.cont.has === false, bm.cont);
+  ok('сравнением накрыто пять плиток из десяти', bm.total === 5, bm.total);
+
+  const few = await page.evaluate(() => {
+    /* Меньше трёх проектов — не сравниваем: медиана двух чисел ничего не
+       значит, а «первое место из двух» вводит в заблуждение. */
+    const keep = KB_PROJECTS.slice(0, 2);
+    KB_PROJECTS.length = 0; keep.forEach(x => KB_PROJECTS.push(x));
+    renderKB();
+    const n = document.querySelectorAll('#content-ag .kb-tile .kb-bm').length;
+    KB_PROJECTS.length = 0; PROJECTS.forEach(x => KB_PROJECTS.push(x));
+    renderKB();
+    return n;
+  });
+  ok('на двух проектах сравнение не показывается вовсе', few === 0, few);
 
   console.log('\n[H] лица и знаки вместо букв');
   const ph = await page.evaluate(() => {
