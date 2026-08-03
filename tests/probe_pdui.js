@@ -51,7 +51,8 @@ const bar = () => ({
       return { k: x.dataset.k || 'gear', fs: c.fontSize, fw: c.fontWeight, ls: c.letterSpacing,
         tt: c.textTransform, col: c.color, bg: c.backgroundColor,
         bt: c.borderTopWidth, bl: c.borderLeftWidth, br: c.borderRadius,
-        top: Math.round(r.top), h: Math.round(r.height) }; };
+        top: Math.round(r.top), h: Math.round(r.height),
+        x1: Math.round(r.left), x2: Math.round(r.right) }; };
     const tabs = [...document.querySelectorAll('#pd-tabbar .pd-tab')].map(pick);
     const acts = [...document.querySelectorAll('#pd-tabbar .pd-tabact > *')].map(pick);
     const sep = getComputedStyle(document.querySelector('#pd-tabbar .pd-tabact'), '::before');
@@ -67,6 +68,19 @@ const bar = () => ({
   ok('все стоят в одну строку и одной высоты',
     [...st.tabs, ...st.acts].every(x => x.top === st.tabs[0].top && x.h === st.tabs[0].h),
     [...st.tabs, ...st.acts].map(x => [x.k, x.top, x.h]));
+  /* Кнопки идут сразу за «Историей» тем же шагом. Прижатые к правому краю,
+     они читались как вторая, отдельная панель, а дыра посередине заставляла
+     глаз прыгать через полэкрана. Шаг на окне 1500px — 16px (правило
+     @media(max-width:1560px)), считано по разметке, а не снято с экрана. */
+  {
+    const row = [...st.tabs, ...st.acts];
+    const gaps = row.slice(1).map((x, i) => [row[i].k + '→' + x.k, x.x1 - row[i].x2]);
+    ok('шаг между подписями один на весь ряд — 16px на окне 1500px',
+      gaps.every(g => g[1] === 16), gaps);
+    ok('кнопки продолжают ряд вкладок, а не жмутся к правому краю',
+      st.acts[0].x1 - st.tabs[st.tabs.length - 1].x2 === 16,
+      { history: st.tabs[st.tabs.length - 1], brief: st.acts[0] });
+  }
   ok('у кнопок нет ни плашки, ни рамки, ни скругления',
     st.acts.every(x => /rgba\(0, 0, 0, 0\)|transparent/.test(x.bg) && x.bl === '0px' && x.bt === '0px' && x.br === '0px'),
     st.acts.map(x => [x.k, x.bg, x.bl, x.br]));
