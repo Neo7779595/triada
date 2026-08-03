@@ -213,7 +213,10 @@ const setup = () => {
   const geo = await page.evaluate(() => {
     const f = document.querySelector('.pk-filters'), bd = document.querySelector('.pk-board');
     const fr = f.getBoundingClientRect(), br = bd.getBoundingClientRect();
-    const kids = [...f.children].map(c => Math.round(c.getBoundingClientRect().y));
+    /* Ряд считаем по середине ребёнка, а не по его верху: у поиска и кнопки
+       фильтров разная высота, и по верхней кромке одна строка выглядела как
+       две. */
+    const kids = [...f.children].map(c => { const b = c.getBoundingClientRect(); return Math.round((b.top + b.bottom) / 2); });
     return { rows: new Set(kids).size, boardBelow: br.top >= fr.bottom - 1, gap: Math.round(br.top - fr.bottom),
       moderow: !!document.querySelector('.pk-moderow'), h: Math.round(fr.height),
       boardTop: Math.round(br.top), vh: window.innerHeight };
@@ -222,18 +225,52 @@ const setup = () => {
   ok('фильтры в один ряд', geo.rows === 1, geo);
   ok('доска идёт сразу за фильтрами', geo.boardBelow && !geo.moderow && geo.gap <= 24, geo);
   ok('доске досталась почти вся высота', (geo.vh - geo.boardTop) / geo.vh > 0.86, geo);
+  /* Кнопки режима переехали в ту же строку, что поиск и фильтры: отдельный
+     ряд под ними отнимал у доски высоту, ничего к ней не прибавляя. */
   const geoN = await page.evaluate(() => { pkZen(false);
-    const mr = document.querySelector('.pk-moderow'), f = document.querySelector('.pk-filters');
-    if (!mr) return { moderow: false };
-    const fr = f.getBoundingClientRect(), mb = mr.getBoundingClientRect();
-    return { moderow: true, below: mb.top >= fr.bottom - 1, left: Math.abs(mb.left - fr.left) < 2,
-      btns: [...mr.querySelectorAll('.pk-modebtn')].map(b => b.textContent.trim()) };
+    const m = document.querySelector('.pk-toolrow .pk-mode'), f = document.querySelector('.pk-filters');
+    if (!m) return { mode: false };
+    const fr = f.getBoundingClientRect(), mb = m.getBoundingClientRect();
+    const mid = e => Math.round((e.top + e.bottom) / 2);
+    return { mode: true, sameRow: Math.abs(mid(fr) - mid(mb)) <= 2, right: mb.left > fr.left,
+      oldRow: !!document.querySelector('.pk-moderow'),
+      btns: [...m.querySelectorAll('.pk-modebtn')].map(b => b.textContent.trim()) };
   });
   console.log('    обычный режим: ' + JSON.stringify(geoN));
-  ok('в обычном режиме кнопки на месте — под фильтрами слева', geoN.moderow && geoN.below && geoN.left, geoN);
+  ok('в обычном режиме кнопки стоят в одной строке с фильтрами',
+    geoN.mode && geoN.sameRow && geoN.right && !geoN.oldRow, geoN);
   ok('и это «Статистика», «Доска» и вход в полный экран', geoN.btns.length === 3 && /Статистика/.test(geoN.btns[0]) && /весь экран/.test(geoN.btns[2]), geoN.btns);
   await page.evaluate(() => pkZen(true));
   await page.waitForTimeout(200);
+
+  /* Пять выпадающих в ряд не помещались и переносились на вторую строку, а
+     вместе с кнопками режима отнимали у доски три ряда высоты. Теперь как в
+     «Проектах»: строка одна, фильтры — во всплывающей панели. */
+  const pop = await page.evaluate(() => { pkZen(false);
+    const c = document.querySelector('.pk-toolrow');
+    const before = !!document.querySelector('.pk-fpop.on');
+    pkAdvToggle();
+    const p = document.querySelector('.pk-fpop');
+    const r = p.getBoundingClientRect(), t = c.getBoundingClientRect();
+    const out = { before, open: p.classList.contains('on'), dd: p.querySelectorAll('.dd').length,
+      wide: Math.round(r.width), below: r.top >= t.bottom - 12,
+      acts: [...p.querySelectorAll('.pk-fpop-act button')].map(b => b.textContent.trim()),
+      inRow: [...c.children].filter(x => x.className.indexOf('pk-fpop') < 0).length };
+    pkAdvClose();
+    out.closed = !document.querySelector('.pk-fpop.on');
+    return out;
+  });
+  console.log('    панель фильтров: ' + JSON.stringify(pop));
+  ok('панель фильтров по умолчанию закрыта', pop.before === false, pop);
+  ok('кнопка её открывает', pop.open === true, pop);
+  ok('в ней все пять фильтров', pop.dd === 5, pop.dd);
+  ok('и она шире одной колонки, чтобы фильтры легли в два столбца', pop.wide >= 400, pop.wide);
+  ok('панель висит под строкой, а не раздвигает её', pop.below === true, pop);
+  ok('«Сбросить» и «Применить» — одной деталью',
+    pop.acts.join(' / ') === 'Сбросить / Применить', pop.acts);
+  ok('«Применить» закрывает панель', pop.closed === true, pop);
+  await page.evaluate(() => pkZen(true));
+  await page.waitForTimeout(150);
 
   console.log('\n[F] счётчик колонки и превышение');
   const ct0 = await page.evaluate(() => [...document.querySelectorAll('.pk-col')].map(c => ({
