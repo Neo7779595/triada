@@ -14,11 +14,19 @@ const setup = () => {
   window.giEnsureStatus = async () => ({ status: 'active' });
   window.ctBadge = () => '';
   window.tLoadProjectWork = null;
+  /* Лицо с картинкой и лицо с инициалом: цветная подложка вылезала только
+     под фотографией, на инициалах её не видно. */
+  const face = c => 'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="' + c + '"/></svg>');
+  const TM = [
+    { _id: 't1', name: 'Иван', color: '#E3B567', avatar: face('#6C5A3E') },
+    { _id: 't2', name: 'Мадина', color: '#37E6C8', avatar: null },
+  ];
   const P = (id, name) => ({ id, name, logo: name[0], logoUrl: null, cat: 'IT', svc: 'SMM', pct: 0,
     stages: '0 / 3', status: 'active', mrr: 0, cost: 0, tg_chat_id: null, contacts: null, ui: null,
-    _stages: [], _tasks: [], _reports: [] });
+    _stages: [], _tasks: [], _reports: [{ id: 'r1', kind: 'SMM' }, { id: 'r2', kind: 'PERF' }], _team: TM });
   PROJECTS = [P('p1', 'APOLO COFFEE'), P('p2', 'Artel')];
-  TEAM = [];
+  TEAM = TM.map(t => ({ ...t, dept: 'Альфа - HoReCa' }));
   openProject(0);
 };
 const bar = () => ({
@@ -92,6 +100,12 @@ const bar = () => ({
     st.tabs[1].col !== st.acts[0].col, { tab: st.tabs[1].col, act: st.acts[0].col });
   ok('разделительной линии между группами больше нет', st.sepC === 'none', st.sepC);
   ok('в кнопках панели не осталось цифр', st.digits === '', st.digits);
+  /* Счётчиков нет и у вкладок: в проекте два отчёта, но числа в ряду
+     быть не должно — по нему всё равно не принимают решений, а пилюля
+     растягивала ряд и ломала его шаг. */
+  ok('у вкладок нет счётчиков — число отчётов ни на что не влияет',
+    (await page.evaluate(() => document.getElementById('pd-tabbar').textContent.replace(/[^0-9]/g, ''))) === '',
+    await page.evaluate(() => document.getElementById('pd-tabbar').textContent));
   ok('подпись «Документы» не прячется — иначе кнопка выглядит пропавшей', st.docsLbl !== 'none', st.docsLbl);
 
   const onSt = await page.evaluate(() => {
@@ -128,15 +142,30 @@ const bar = () => ({
       const e = document.getElementById(id); if (e) e.style.display = ''; });
     const r = sel => { const e = document.querySelector(sel); if (!e) return null;
       const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bot: Math.round(b.bottom), h: Math.round(b.height) }; };
-    return { name: r('.pd-id .nm'), ct: r('.pd-ct .pt-blk-val'),
+    const av = document.querySelector('.pd-team .pt-av'), im = av && av.querySelector('img');
+    const box = e => { const b = e.getBoundingClientRect();
+      return { l: Math.round(b.left), t: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) }; };
+    return { name: r('.pd-id .nm'), ct: r('.pd-ct .pt-blk-val'), tm: r('.pd-team .pt-blk-val'),
       cal: r('#pd-hdr-cal'), drive: r('#pd-hdr-drive'), time: r('#pd-hdr-time'),
+      teamKids: [...document.querySelectorAll('.pd-team .pt-blk-val > *')].map(e => e.className),
+      avBorder: av ? getComputedStyle(av).borderTopWidth : null,
+      avBox: av ? box(av) : null, imgBox: im ? box(im) : null,
       barH: Math.round(document.querySelector('.pd-top').getBoundingClientRect().height) };
   });
-  const line = [hdr.name, hdr.ct, hdr.cal, hdr.drive, hdr.time].filter(Boolean);
-  ok('название, срок договора и кнопки шапки стоят на одной линии',
-    line.length === 5 && line.every(x => x.bot === line[0].bot && x.top === line[0].top), hdr);
+  const line = [hdr.name, hdr.ct, hdr.tm, hdr.cal, hdr.drive, hdr.time].filter(Boolean);
+  ok('название, состав, срок договора и кнопки шапки стоят на одной линии',
+    line.length === 6 && line.every(x => x.bot === line[0].bot && x.top === line[0].top), hdr);
   ok('и одной высоты — 30 пикселей, как у самой строки значений',
     line.every(x => x.h === 30), line.map(x => x.h));
+  /* В шапке важно, кто сидит на проекте, а не как называется отдел:
+     названия занимали треть строки и ни одного решения не меняли. */
+  ok('в составе — только стопка лиц, названий отделов рядом нет',
+    hdr.teamKids.join(',') === 'pt-team2-av', hdr.teamKids);
+  /* Рамка резала два пикселя внутрь плитки, и цветная подложка вылезала
+     по скруглению — вокруг каждого лица висел свой цветной контур. */
+  ok('фотография занимает плитку целиком — цветной подложке негде вылезти',
+    hdr.avBorder === '0px' && !!hdr.imgBox && JSON.stringify(hdr.avBox) === JSON.stringify(hdr.imgBox),
+    { border: hdr.avBorder, av: hdr.avBox, img: hdr.imgBox });
 
   console.log('\n[B] конструктор открывается');
   await page.evaluate(() => pdUiOpen());
