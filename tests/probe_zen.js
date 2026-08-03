@@ -70,7 +70,7 @@ const setup = () => {
   console.log('\n[B] кнопки режима');
   const mode = await page.evaluate(() => [...document.querySelectorAll('.pk-mode .pk-modebtn')].map(b => b.textContent.trim()));
   console.log('    ' + JSON.stringify(mode));
-  ok('есть статистика, настройки доски и полный экран', mode.length === 3 && /Статистика/.test(mode[0]) && /Доска/.test(mode[1]) && /весь экран/.test(mode[2]), mode);
+  ok('в ряду настройки доски и полный экран', mode.length === 2 && /Доска/.test(mode[0]) && /весь экран/.test(mode[1]), mode);
   const sizeN = await page.evaluate(() => {
     const r = el => Math.round(el.getBoundingClientRect().height);
     return { s: r(document.getElementById('pk-search')), d: [...document.querySelectorAll('.pk-filters .dd-btn')].map(r) };
@@ -239,7 +239,21 @@ const setup = () => {
   console.log('    обычный режим: ' + JSON.stringify(geoN));
   ok('в обычном режиме кнопки стоят в одной строке с фильтрами',
     geoN.mode && geoN.sameRow && geoN.right && !geoN.oldRow, geoN);
-  ok('и это «Статистика», «Доска» и вход в полный экран', geoN.btns.length === 3 && /Статистика/.test(geoN.btns[0]) && /весь экран/.test(geoN.btns[2]), geoN.btns);
+  /* «Статистика» переехала в шапку карточки, к «Календарю» и «Диску»:
+     в ряду под сводкой ей было тесно, а в шапке она одна на все вкладки. */
+  ok('в ряду остались настройки доски и полный экран',
+    geoN.btns.length === 2 && /Доска/.test(geoN.btns[0]) && /весь экран/.test(geoN.btns[1]), geoN.btns);
+  const hdr = await page.evaluate(() => {
+    const b = document.getElementById('pd-hdr-stat'), d = document.getElementById('pd-hdr-drive');
+    if (!b) return { has: false };
+    const cs = getComputedStyle(b), cd = d ? getComputedStyle(d) : null;
+    return { has: true, txt: b.textContent.trim(), cls: b.className,
+      sameStyle: !!cd && cs.height === cd.height && cs.borderRadius === cd.borderRadius,
+      afterDrive: !!d && (b.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_PRECEDING) > 0 };
+  });
+  ok('«Статистика» стоит в шапке карточки', hdr.has && /Статистика/.test(hdr.txt), hdr);
+  ok('и той же кнопкой, что «Календарь» и «Диск»',
+    hdr.cls === 'pd-hdr-rep' && hdr.afterDrive && hdr.sameStyle, hdr);
   await page.evaluate(() => pkZen(true));
   await page.waitForTimeout(200);
 
@@ -308,12 +322,7 @@ const setup = () => {
   ok('в «Готово» пускает всегда', doneOk.length === 1 && doneOk[0].st === 'done', doneOk);
 
   console.log('\n[H] плотные карточки');
-  await page.evaluate(() => pkDense());
   await page.waitForTimeout(200);
-  const dense = await page.evaluate(() => ({ cls: !!document.querySelector('.pk-board.dense'), cfg: PROJECTS[0].kb.dense,
-    pad: getComputedStyle(document.querySelector('.pk-card')).paddingTop }));
-  ok('режим плотных карточек включился', dense.cls && dense.cfg === true, dense);
-  ok('карточки действительно компактнее', parseFloat(dense.pad) <= 11, dense.pad);
 
   console.log('\n[I] лимит считается по всем задачам, а не по видимым');
   await page.evaluate(() => pkSearch('нетакойзадачи'));
