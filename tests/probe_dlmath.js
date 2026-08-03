@@ -144,6 +144,40 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('в ленту идёт только то, у чего проект на месте',
     G.kept.length === 1 && G.kept[0] === 'Сценарий', G.kept);
 
+  console.log('[E] опоздание считается от часа срока, и час срока видно');
+  /* Живой случай, из-за которого «закрыт с опозданием» выглядел ошибкой:
+     срок 31 июля 18:00, закрыто 2 августа в 09:04 → 24 ч до 1 августа 18:00
+     плюс 15 ч 04 мин = 1 день 15 часов. Час срока в строке был спрятан за
+     словом «закрыт», и опоздание не с чем было сверить. */
+  const L = await page.evaluate(() => {
+    const iso = (Y, M, D, h, m, s) => new Date(Y, M - 1, D, h, m, s || 0).toISOString();
+    const mk = (dueTime, done) => ({ id: 'x', type: 'task', stage: 'Задача', project: 'P', pid: 'p1', _id: 't1',
+      due: '2026-07-31', dueTime, status: 'done', bucket: 'done', done_at: done, assignee: null,
+      day: '31', mon: 'июл', spent: 1500 });
+    const at18 = mk('18:00', iso(2026, 8, 2, 9, 4, 52));
+    const at1630 = mk('16:30', iso(2026, 8, 3, 20, 36, 4));
+    const noTime = mk('', iso(2026, 8, 2, 9, 4, 52));
+    const row = _dlRow(at18), rowNo = _dlRow(noTime);
+    const chip = h => (h.match(/<div class="dlx-date">[\s\S]*?<\/div>\s*<\/div>/) || [''])[0];
+    return {
+      l18: _dlDoneStatus(at18).label,
+      l1630: _dlDoneStatus(at1630).label,
+      lNo: _dlDoneStatus(noTime).label,
+      chip: chip(row), chipNo: chip(rowNo),
+      badge: (row.match(/<div class="l1">([^<]*)<\/div><div class="l2">([^<]*)</) || []).slice(1, 3),
+    };
+  });
+  ok('срок 31 июля 18:00, закрыто 2 августа 09:04 — опоздание 1 день 15 часов',
+    L.l18 === 'Позже на 1 день 15 часов', L.l18);
+  ok('срок 16:30, закрыто 3 августа 20:36 — 3 дня 4 часа', L.l1630 === 'Позже на 3 дня 4 часа', L.l1630);
+  ok('без часа срок держится до конца дня: то же закрытие — 1 день 9 часов',
+    L.lNo === 'Позже на 1 день 9 часов', L.lNo);
+  ok('час срока виден в дате и у закрытой строки', /18:00/.test(L.chip), L.chip);
+  ok('без часа срока на его месте по-прежнему «закрыт»',
+    /закрыт/.test(L.chipNo) && !/\d\d:\d\d/.test(L.chipNo), L.chipNo);
+  ok('заголовок справа называет и опоздание, и момент закрытия',
+    L.badge[0] === 'Закрыт с опозданием' && /^на 1 день 15 часов · 2 авг 09:04$/.test(L.badge[1]), L.badge);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
