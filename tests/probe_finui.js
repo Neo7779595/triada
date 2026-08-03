@@ -1,0 +1,215 @@
+/* probe_finui — экран денег, окно операции и журнал.
+
+   Арифметику проверяет probe_finmath. Здесь другое: доходит ли посчитанное
+   до экрана без потерь и не даёт ли форма записать заведомо неверное.
+
+   Что проверяем:
+     пока счетов нет — не пустой экран, а объяснение и две кнопки;
+     остаток на карточке равен посчитанному, минус показан минусом;
+     резерв помечен и в оборотные не входит;
+     форма меняет поля от типа: у перевода второй счёт, у займа проценты;
+     перевод на тот же счёт, нулевая сумма и проценты больше платежа — не проходят;
+     отмена требует причину и не спрашивает её системным окном. */
+const { chromium } = require('/home/claude/.npm-global/lib/node_modules/playwright');
+let pass = 0, fail = 0;
+const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n + (x !== undefined ? '  → ' + JSON.stringify(x) : '')); } };
+
+(async () => {
+  const b = await chromium.launch();
+  const page = await b.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = []; page.on('pageerror', e => errs.push(String(e).slice(0, 180)));
+  const dialogs = []; page.on('dialog', d => { dialogs.push(d.type()); d.dismiss().catch(() => {}); });
+  await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1400);
+
+  const seed = () => page.evaluate(() => {
+    window.FINX = { ready: true, accounts: [
+      { id: 'A', name: 'Наличка', kind: 'cash',   opening_balance: 300000,  sort: 1 },
+      { id: 'B', name: 'Карта',   kind: 'card',   opening_balance: 5000000, sort: 2 },
+      { id: 'R', name: 'Резерв',  kind: 'card',   opening_balance: 4000000, sort: 3, is_reserve: true },
+    ], ops: [
+      { id: 'o1', op_date: '2026-08-02', kind: 'expense', amount: 1000000, account_id: 'A',
+        category: 'Аренда', note: 'август', created_at: '2026-08-02T09:00:00Z' },
+      { id: 'o2', op_date: '2026-08-03', kind: 'income',  amount: 2000000, account_id: 'B',
+        note: 'Qushbegi', created_at: '2026-08-03T09:00:00Z' },
+      { id: 'o3', op_date: '2026-08-04', kind: 'transfer', amount: 500000, account_id: 'B', account_to: 'R',
+        created_at: '2026-08-04T09:00:00Z' },
+      { id: 'o4', op_date: '2026-08-05', kind: 'expense', amount: 900000, account_id: 'B',
+        voided_at: '2026-08-05T10:00:00Z', void_reason: 'записана дважды', created_at: '2026-08-05T09:00:00Z' },
+    ] };
+  });
+
+  console.log('[A] пока счетов нет');
+  const E = await page.evaluate(() => {
+    window.FINX = { ready: true, accounts: [], ops: [] };
+    const h = finMoneyBlock();
+    return { h, empty: /fnx-empty/.test(h), quick: /finAccQuick/.test(h), manual: /finAccOpen/.test(h) };
+  });
+  ok('вместо пустоты — объяснение, что такое счёт', E.empty, E.h.slice(0, 80));
+  ok('и два пути: четыре типовых счёта или вручную', E.quick && E.manual, [E.quick, E.manual]);
+
+  console.log('[B] экран денег');
+  await seed();
+  const M = await page.evaluate(() => {
+    const d = document.createElement('div'); d.id = 'fnx-probe';
+    d.innerHTML = finMoneyBlock(); document.body.appendChild(d);
+    const txt = s => (d.querySelector(s) || {}).textContent || '';
+    const m = finMath(window.FINX.accounts, window.FINX.ops, {});
+    return { hero: txt('.fnx-h-v').replace(/\s/g, ''), sub: txt('.fnx-h-sub').replace(/\s/g, ''),
+      cards: d.querySelectorAll('.fnx-acc').length,
+      res: d.querySelectorAll('.fnx-acc.res').length,
+      resTag: /резерв/.test(txt('.fnx-acc.res')),
+      negV: (d.querySelector('.fnx-a-v.neg') || {}).textContent || '',
+      warn: /ушёл в минус/.test(d.textContent || ''),
+      add: !!d.querySelector('.fnx-add'),
+      math: { total: m.total, working: m.working, reserve: m.reserve, A: m.byId.A.bal } };
+  });
+  /* На бумаге: A = 300 000 − 1 000 000 = −700 000 (отменённая не в счёт),
+     B = 5 000 000 + 2 000 000 − 500 000 = 6 500 000, R = 4 000 000 + 500 000 = 4 500 000.
+     Всего 10 300 000, резерв 4 500 000, оборотных 5 800 000. */
+  ok('всего денег 10 300 000 и это же стоит в заголовке',
+    M.math.total === 10300000 && M.hero.indexOf('10300000') === 0, [M.math.total, M.hero]);
+  ok('оборотные 5 800 000 — резерв в них не входит',
+    M.math.working === 5800000 && M.math.reserve === 4500000 && /5800000/.test(M.sub), [M.math, M.sub]);
+  ok('карточек ровно три, резервная помечена',
+    M.cards === 3 && M.res === 1 && M.resTag, [M.cards, M.res, M.resTag]);
+  ok('минус на счету показан минусом, а не нулём',
+    M.math.A === -700000 && /−\s*700/.test(M.negV.replace(/ /g, ' ')), [M.math.A, M.negV]);
+  ok('и рядом сказано, что так обычно выглядит ошибка ввода', M.warn, M.warn);
+  ok('кнопка «+ счёт» стоит в том же ряду', M.add, M.add);
+
+  /* Деньги и прибыль стоят рядом намеренно: их путают чаще всего.
+     Аванс раздувает первое, не трогая второе, — и это сказано словами. */
+  const H = await page.evaluate(() => {
+    /* Все три операции датированы сегодня — иначе проверка сломалась бы
+       в первый же день следующего месяца, а не при поломке кода. */
+    const n = new Date(), z = v => String(v).padStart(2, '0');
+    const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
+    window.FINX = { ready: true, accounts: [{ id: 'B', name: 'Карта', kind: 'card', opening_balance: 0, sort: 1 }],
+      ops: [ { id: 'i1', op_date: td, kind: 'income',  amount: 1000000, account_id: 'B' },
+             { id: 'p1', op_date: td, kind: 'prepay',  amount: 3000000, account_id: 'B' },
+             { id: 'e1', op_date: td, kind: 'expense', amount: 400000,  account_id: 'B' } ] };
+    const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
+    const t = s => (d.querySelector(s) || {}).textContent || '';
+    const m = finMath(window.FINX.accounts, window.FINX.ops, {});
+    return { per: t('.fnx-h-per').replace(/\s+/g, ' '), note: t('.fnx-h-note'),
+      hero: t('.fnx-h-v').replace(/\s/g, ''), rev: m.revenue, prof: m.profit, pre: m.prepaid };
+  });
+  ok('рядом с деньгами стоит прибыль за месяц, а не только остаток',
+    /Выручка/.test(H.per) && /Расходы/.test(H.per) && /Прибыль/.test(H.per), H.per);
+  ok('денег принесли 4 000 000, а выручки из них только 1 000 000',
+    H.hero.indexOf('3600000') === 0 && H.rev === 1000000, [H.hero, H.rev]);
+  ok('аванс 3 000 000 в прибыль не вошёл: прибыль 600 000',
+    H.pre === 3000000 && H.prof === 600000, [H.pre, H.prof]);
+  ok('и про аванс сказано прямо, а не оставлено догадываться',
+    /авансов на 3 000 000/.test(H.note) && /не заработаны/.test(H.note), H.note);
+
+  console.log('[C] форма операции подстраивается под тип');
+  const F = await page.evaluate(() => {
+    const q = () => document.getElementById('fnx-op-b').innerHTML;
+    finOpOpen('expense'); const exp = q();
+    finOpKind('transfer'); const tr = q();
+    finOpGrp('in'); const inn = q();
+    finOpKind('loan_repay'); const lr = q();
+    finOpKind('prepay'); const pp = q();
+    return {
+      groups: (document.querySelectorAll('.fnx-g') || []).length,
+      expCat: /fnx-o-ct/.test(exp), expNoTo: !/fnx-o-a2/.test(exp),
+      trTo: /fnx-o-a2/.test(tr), trNoCat: !/fnx-o-ct/.test(tr),
+      inFirst: /fnx-k on/.test(inn),
+      lrInt: /fnx-o-it/.test(lr), ppPer: /fnx-o-pf/.test(pp) && /fnx-o-pt/.test(pp),
+      hint: (document.querySelector('.fnx-hint') || {}).textContent || '' };
+  });
+  ok('четыре кнопки наверху — всё, что выбирают в обычный день', F.groups === 4, F.groups);
+  ok('у расхода есть статья и нет второго счёта', F.expCat && F.expNoTo, F);
+  ok('у перевода появляется «куда» и исчезает статья', F.trTo && F.trNoCat, F);
+  ok('у платежа по займу спрашивают проценты отдельно', F.lrInt, F.lrInt);
+  ok('у аванса спрашивают, за какой период он', F.ppPer, F.ppPer);
+  ok('под формой объяснено, что этот тип делает с прибылью',
+    /аванс/i.test(F.hint) && F.hint.length > 40, F.hint);
+
+  console.log('[D] форма не даёт записать заведомо неверное');
+  const V = await page.evaluate(async () => {
+    const said = [];
+    const _t = window.toast; window.toast = m => said.push(m);
+    window.tFinSaveOp = () => Promise.resolve();
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    finOpOpen('expense'); set('fnx-o-am', ''); finOpSave();            // нулевая сумма
+    finOpOpen('transfer'); set('fnx-o-am', '100 000');
+    set('fnx-o-ac', 'B'); set('fnx-o-a2', 'B'); finOpSave();            // сам себе
+    finOpOpen('loan_repay'); set('fnx-o-am', '100 000'); set('fnx-o-it', '200 000'); finOpSave();
+    finOpOpen('expense'); set('fnx-o-am', '50 000'); set('fnx-o-dt', ''); finOpSave();
+    window.toast = _t;
+    return said;
+  });
+  ok('нулевую сумму не пропускает', /больше нуля/.test(V[0] || ''), V);
+  ok('перевод на тот же счёт не пропускает', /тот же счёт/.test(V[1] || ''), V);
+  ok('проценты больше платежа не пропускает', /больше платежа/.test(V[2] || ''), V);
+  ok('операцию без даты не пропускает', /без даты/i.test(V[3] || ''), V);
+
+  console.log('[E] защита от двойного ввода');
+  await seed();
+  const D = await page.evaluate(async () => {
+    const said = []; const _t = window.toast; window.toast = m => said.push(m);
+    let saved = 0; window.tFinSaveOp = () => { saved++; return Promise.resolve(); };
+    const today = new Date(), z = n => String(n).padStart(2, '0');
+    const td = today.getFullYear() + '-' + z(today.getMonth() + 1) + '-' + z(today.getDate());
+    window.FINX.ops = window.FINX.ops.concat([{ id: 'dup', op_date: td, kind: 'expense', amount: 500000,
+      account_id: 'A', created_at: new Date().toISOString() }]);
+    window._finDupOk = false;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    finOpOpen('expense'); set('fnx-o-am', '500 000'); set('fnx-o-ac', 'A'); set('fnx-o-dt', td);
+    finOpSave();                       // первый раз — предупреждение
+    const first = saved;
+    finOpSave();                       // второй раз — записываем
+    window.toast = _t;
+    return { said, first, after: saved };
+  });
+  ok('похожая операция за последние минуты — сначала предупреждение',
+    D.first === 0 && /уже записана/.test(D.said[0] || ''), D);
+  ok('но повторное нажатие записывает: решает человек, а не догадка', D.after === 1, D);
+
+  console.log('[F] журнал');
+  await seed();
+  const L = await page.evaluate(() => {
+    finLogOpen();
+    const b = document.getElementById('fnx-log-b');
+    const rows = b.querySelectorAll('.fnx-row').length;
+    const voided = b.querySelectorAll('.fnx-row.void').length;
+    const reason = /записана дважды/.test(b.textContent || '');
+    finLogSet('grp', 'out'); const onlyOut = b.querySelectorAll('.fnx-row').length;
+    finLogSet('grp', ''); finLogSet('acc', 'R'); const onlyR = b.querySelectorAll('.fnx-row').length;
+    finLogSet('acc', '');
+    return { rows, voided, reason, onlyOut, onlyR };
+  });
+  ok('в журнале все четыре операции, включая отменённую', L.rows === 4, L);
+  ok('отменённая помечена и причина видна', L.voided === 1 && L.reason, L);
+  ok('фильтр «Ушло» оставляет только расходы', L.onlyOut === 2, L.onlyOut);
+  ok('фильтр по счёту ловит и вторую сторону перевода', L.onlyR === 1, L.onlyR);
+
+  console.log('[G] отмена требует причину и не зовёт системное окно');
+  const VD = await page.evaluate(async () => {
+    const said = []; const _t = window.toast; window.toast = m => said.push(m);
+    let voided = null; window.tFinVoidOp = (id, why) => { voided = [id, why]; return Promise.resolve(); };
+    finLogOpen(); finOpVoid('o1');
+    const asked = !!document.getElementById('fnx-void-r');
+    finOpVoidGo('o1');                                   // без причины
+    const empty = said.slice();
+    document.getElementById('fnx-void-r').value = 'ошиблись счётом';
+    finOpVoidGo('o1');
+    await new Promise(r => setTimeout(r, 60));
+    window.toast = _t;
+    return { asked, empty, voided };
+  });
+  ok('причину спрашивает своё окно внутри журнала', VD.asked, VD.asked);
+  ok('без причины отмена не проходит', /Без причины/.test(VD.empty[0] || ''), VD.empty);
+  ok('с причиной — уходит вместе с ней', VD.voided && VD.voided[1] === 'ошиблись счётом', VD.voided);
+  ok('системных окон браузера модуль не открывает', dialogs.length === 0, dialogs);
+
+  await page.evaluate(() => { const d = document.getElementById('fnx-probe'); if (d) d.remove(); finClose(); });
+  console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
+  ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
+  await b.close();
+  console.log(`\n${pass} ok · ${fail} fail`);
+  process.exit(fail ? 1 : 0);
+})();
