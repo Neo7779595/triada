@@ -137,28 +137,42 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('крупный расход мимо проектов помечает таблицу неполной',
     THIN.thin === true && /не вся картина/.test(THIN.cov), THIN);
 
-  console.log('[F] портфель договоров — полосой, а не вторым экраном');
-  /* Движение договоров, концентрация и прибыль за час — не про кассу, а про
-     то, что с ней случится через месяц. Держим четырьмя числами; глубина
-     раскрывается кнопкой, чтобы экран не был двумя мирами. */
-  const PT = await page.evaluate(() => {
+  console.log('[F] шаг 2: таблица живёт внутри шага, а не рядом с тремя копиями себя');
+  /* Раньше на экране стояли четыре ответа на один вопрос: столбики маржи по
+     сметам, карточки P&L по сметам, эта таблица по журналу и полоса
+     портфеля. Остался один — таблица. Всё, что было полезного в остальных,
+     переехало внутрь шага: месяц в шапку, оценки портфеля — под «Подробно». */
+  const ST = await page.evaluate(() => {
     window.FINANCE = { ready: true, totalMrr: 13500000, totalCost: 6600000, profit: 6900000,
       marginPct: 51, costPct: 49, paying: 3, total: 3, avgMrr: 4500000, profitPerHour: 168240,
-      concentrationPct: 48, concentrationTop: 'RESTO', newMrr: 3000000, churnMrr: 500000 };
-    const d = document.createElement('div'); d.innerHTML = finPortStrip();
-    const t = Array.from(d.querySelectorAll('.fnx-pt')).map(e => ({
-      l: (e.querySelector('.l') || {}).textContent || '',
-      v: ((e.querySelector('.v') || {}).textContent || '').replace(/\s/g, '') }));
-    return { n: t.length, t, btn: (d.querySelector('.fnx-pl-h .fnx-btn') || {}).textContent || '',
-      empty: (() => { window.FINANCE = { ready: false }; return finPortStrip(); })() };
+      totalHours: 120, concentrationPct: 48, concentrationTop: 'RESTO',
+      newMrr: 3000000, churnMrr: 500000, services: [], tariffs: [] };
+    window.FINP = [];                       // правил платежей нет ни по одному проекту
+    const d = document.createElement('div'); d.innerHTML = finStepProjects();
+    return { n: (d.querySelector('.fst-n') || {}).textContent || '',
+      title: (d.querySelector('.fst-t') || {}).textContent || '',
+      mon: !!d.querySelector('.fst-mon'),
+      warn: (d.querySelector('.fst-warn') || {}).textContent || '',
+      rows: d.querySelectorAll('.fnx-fc:not(.hd):not(.tot)').length,
+      charts: d.querySelectorAll('.fin-chart, .pl-row, .fnx-pts').length,
+      deep: (d.querySelector('.fst-more summary') || {}).textContent || '',
+      conc: (() => { const c = Array.from(d.querySelectorAll('.fst-more .fst-c'))
+        .filter(e => /Концентрация/.test((e.querySelector('.l') || {}).textContent || ''))[0];
+        return c ? (c.querySelector('.v') || {}).textContent : ''; })() };
   });
-  ok('в полосе четыре числа, а не полэкрана', PT.n === 4, PT.n);
-  ok('движение за месяц — приход минус отток: +2 500 000',
-    PT.t[0] && PT.t[0].v === '+2500000', PT.t[0]);
-  ok('концентрация и прибыль за час на месте',
-    /Концентрация/.test(PT.t[1].l) && PT.t[1].v === '48%' && PT.t[2].v === '+168240', PT.t);
-  ok('глубина раскрывается кнопкой, а не занимает экран', /Подробнее/.test(PT.btn), PT.btn);
-  ok('без загруженного P&L полоса не рисуется вовсе', PT.empty === '', PT.empty);
+  ok('это шаг 2 и он называется «Проекты»', ST.n === '2' && ST.title === 'Проекты', ST);
+  ok('месяц переключается прямо в шапке шага', ST.mon === true, ST.mon);
+  ok('таблица план-факт осталась одна: три строки живых проектов', ST.rows === 3, ST.rows);
+  ok('столбиков маржи, карточек P&L и полосы портфеля больше нет', ST.charts === 0, ST.charts);
+  ok('про проекты без правил платежей сказано, что маржа по ним завышена',
+    /маржа по ним завышена/.test(ST.warn), ST.warn);
+  ok('оценки портфеля убраны под «Подробно», а не стоят шестью плитками',
+    /ПОДРОБНО/i.test(ST.deep), ST.deep);
+  /* Концентрация раньше стояла на двух экранах разными числами: 48% от суммы
+     договоров и 45% от прибыли под одной подписью. Теперь она одна и считается
+     от факта — от денег, которые действительно пришли за месяц. */
+  ok('концентрация считается от прихода, а не от суммы договоров: 10 из 19,5 млн — 51%',
+    ST.conc === '51%', ST.conc);
 
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));

@@ -103,32 +103,52 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('но про неё сказано прямо — это чаще всего опечатка в дате',
     /будущим числом/.test(AH.txt), AH.txt.slice(0, 160));
 
-  /* Деньги и прибыль стоят рядом намеренно: их путают чаще всего.
-     Аванс раздувает первое, не трогая второе, — и это сказано словами. */
+  /* Деньги и заработок теперь стоят на разных шагах — намеренно. Шаг 1
+     отвечает «чем платить сегодня», шаг 3 — «сколько заработали за месяц».
+     Раньше оба числа стояли в одной шапке под похожими подписями, и аванс,
+     который раздувает первое и не трогает второе, читался как прибыль.
+
+     ── На бумаге ─────────────────────────────────────────────────────
+     оплата 1 000 000 + аванс 3 000 000 − расход 400 000 = 3 600 000 на счёте
+     приход месяца 4 000 000 (это деньги), расход 400 000, остаток 3 600 000
+     выручка при этом 1 000 000, прибыль 600 000: аванс ещё не заработан */
   const H = await page.evaluate(() => {
-    finSimpleSet(false);   // проверяем развёрнутую шапку: там выручка и прибыль
-    /* Все три операции датированы сегодня — иначе проверка сломалась бы
-       в первый же день следующего месяца, а не при поломке кода. */
     const n = new Date(), z = v => String(v).padStart(2, '0');
     const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
+    window._FINOFF = 0;
     window.FINX = { ready: true, accounts: [{ id: 'B', name: 'Карта', kind: 'card', opening_balance: 0, sort: 1 }],
       ops: [ { id: 'i1', op_date: td, kind: 'income',  amount: 1000000, account_id: 'B' },
              { id: 'p1', op_date: td, kind: 'prepay',  amount: 3000000, account_id: 'B' },
              { id: 'e1', op_date: td, kind: 'expense', amount: 400000,  account_id: 'B' } ] };
+    window.FINP = []; window.FINO = []; window.FINS = {};
     const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
     const t = s => (d.querySelector(s) || {}).textContent || '';
     const m = finMath(window.FINX.accounts, window.FINX.ops, { asOf: finToday() });
-    return { per: t('.fnx-h-per').replace(/\s+/g, ' '), note: t('.fnx-h-note'),
-      hero: t('.fnx-h-v').replace(/\s/g, ''), rev: m.revenue, prof: m.profit, pre: m.prepaid };
+    const s3 = document.createElement('div'); s3.innerHTML = finStepMonth();
+    const nums = Array.from(s3.querySelectorAll('.fst-3 .fst-c')).map(e => ({
+      l: (e.querySelector('.l') || {}).textContent || '',
+      v: ((e.querySelector('.v') || {}).textContent || '').replace(/\s/g, '') }));
+    const s4 = document.createElement('div'); s4.innerHTML = finStepRest();
+    return { note: t('.fnx-h-note'), hero: t('.fnx-h-v').replace(/\s/g, ''),
+      rev: m.revenue, prof: m.profit, pre: m.prepaid, nums,
+      noPer: !d.querySelector('.fnx-h-per'),
+      restNote: (s4.querySelector('.fst-note') || {}).textContent || '' };
   });
-  ok('рядом с деньгами стоит прибыль за месяц, а не только остаток',
-    /Выручка/.test(H.per) && /Расходы/.test(H.per) && /Прибыль/.test(H.per), H.per);
-  ok('денег принесли 4 000 000, а выручки из них только 1 000 000',
-    H.hero.indexOf('3600000') === 0 && H.rev === 1000000, [H.hero, H.rev]);
-  ok('аванс 3 000 000 в прибыль не вошёл: прибыль 600 000',
-    H.pre === 3000000 && H.prof === 600000, [H.pre, H.prof]);
+  ok('на первом шаге стоит только «сколько есть» — месяц уехал в шаг 3',
+    H.noPer === true && H.hero.indexOf('3600000') === 0, [H.noPer, H.hero]);
   ok('и про аванс сказано прямо, а не оставлено догадываться',
     /авансов на 3 000 000/.test(H.note) && /не заработаны/.test(H.note), H.note);
+  ok('шаг 3: приход 4 000 000 — это деньги, а не выручка',
+    H.nums[0] && /Приход/.test(H.nums[0].l) && H.nums[0].v === '+4000000\u0441\u0443\u043c', H.nums[0]);
+  ok('расход 400 000 и остаток месяца 3 600 000',
+    H.nums[1].v === '\u2212400000\u0441\u0443\u043c' && H.nums[2].v === '+3600000\u0441\u0443\u043c', H.nums);
+  ok('аванс 3 000 000 в прибыль не вошёл: выручка 1 000 000, прибыль 600 000',
+    H.pre === 3000000 && H.rev === 1000000 && H.prof === 600000, [H.pre, H.rev, H.prof]);
+  /* Остаток месяца и деньги на счетах здесь совпадают — и модуль обязан
+     сказать это словами. Молчание в этом месте читается как «одно из двух
+     чисел неверно». */
+  ok('шаг 4 объясняет, что деньги на счетах равны остатку месяца',
+    /равны остатку месяца/.test(H.restNote), H.restNote);
 
   console.log('[C] форма операции подстраивается под тип');
   const F = await page.evaluate(() => {
@@ -323,50 +343,56 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('и имя счёта набрано как подпись плитки, а не как заголовок',
     mono(TY.accNm) && TY.accNm.tt === 'uppercase', TY.accNm);
 
-  console.log('[G3] простой режим: одно действие вместо пяти блоков');
-  /* Модуль умеет много, но человеку, который только начал вести деньги,
-     нужно ровно одно: записать движение. Экран, в котором нельзя
-     разобраться за пять минут, не используют вовсе — и тогда не работает
-     ни одна из умных частей. */
+  console.log('[G3] семь шагов сверху вниз — и ни одного дубля');
+  /* Раньше в модуле жили две несвязанные системы: плановая (сметы) и
+     фактическая (журнал). Одна и та же маржа считалась в четырёх местах по
+     трём базам, распределение прибыли — в localStorage рядом с
+     совладельцами из базы. Правильного ответа на вопрос «на что смотреть»
+     не было вовсе. Теперь порядок и есть ответ. */
   const SM = await page.evaluate(() => {
     const n = new Date(), z = v => String(v).padStart(2, '0');
     const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
-    window.FINX = { ready: true, accounts: [{ id: 'B', name: 'Карта', kind: 'card', opening_balance: 1000000, sort: 1 }],
-      ops: [ { id: 'i', op_date: td, kind: 'income',  amount: 5000000, account_id: 'B' },
-             { id: 'p', op_date: td, kind: 'prepay',  amount: 2000000, account_id: 'B' },
-             { id: 'e', op_date: td, kind: 'expense', amount: 3000000, account_id: 'B' },
-             { id: 't', op_date: td, kind: 'transfer', amount: 900000, account_id: 'B', account_to: 'B2' } ] };
-    window.FINP = [{ id: 'x', flow: 'out', title: 'Аренда', amount: 100000, every: 'month', day_of_month: 10 }];
-    window.FINO = []; window.FINS = {};
-    const grab = () => { const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
-      return { html: d.innerHTML, txt: (d.textContent || '').replace(/\s+/g, ' '),
-        free: !!d.querySelector('.fnx-h-free'), two: !!d.querySelector('.fnx-hero.two'),
-        more: !!d.querySelector('.fnx-more'), plans: !!d.querySelector('.fnx-pr'),
-        per: Array.from(d.querySelectorAll('.fnx-h-pr b')).map(e => e.textContent.replace(/\s/g, '')) }; };
-    finSimpleSet(true); const simple = grab();
-    finSimpleSet(false); const full = grab();
-    finSimpleSet(true);
-    return { simple, full };
+    window._FINOFF = 0;
+    window.FINX = { ready: true,
+      accounts: [{ id: 'B', name: 'Карта', kind: 'card', opening_balance: 1000000, sort: 1 },
+                 { id: 'R', name: 'Резерв', kind: 'bank', opening_balance: 2000000, is_reserve: true, sort: 2 }],
+      ops: [ { id: 'i', op_date: td, kind: 'income',  amount: 5000000, account_id: 'B', category: 'Оплата клиента' },
+             { id: 'p', op_date: td, kind: 'prepay',  amount: 2000000, account_id: 'B', category: 'Оплата клиента' },
+             { id: 'e', op_date: td, kind: 'expense', amount: 3000000, account_id: 'B', category: 'Зарплаты' },
+             { id: 't', op_date: td, kind: 'transfer', amount: 900000, account_id: 'B', account_to: 'R' } ] };
+    window.FINP = [{ id: 'x', flow: 'out', title: 'Аренда', amount: 100000, every: 'month',
+      day_of_month: 10, category: 'Аренда' }];
+    window.FINO = []; window.FINS = { reserve_pct: 10 };
+    PROJECTS.length = 0; PROJECTS.push({ id: 'a', name: 'APOLO', mrr: 5000000, cost: 2000000, status: 'active' });
+    window.FINANCE = { ready: true, totalMrr: 5000000, totalCost: 2000000, profit: 3000000,
+      marginPct: 60, costPct: 40, paying: 1, total: 1, avgMrr: 5000000, totalHours: 0,
+      services: [], tariffs: [], snapshots: [] };
+    renderFinance();
+    const root = document.getElementById('content-ag');
+    const steps = Array.from(root.querySelectorAll('.fst')).map(e => ({
+      n: (e.querySelector('.fst-n') || {}).textContent || '',
+      t: (e.querySelector('.fst-t') || {}).textContent || '' }));
+    const txt = (root.textContent || '').replace(/\s+/g, ' ');
+    return { steps, txt,
+      oldToggle: root.querySelectorAll('.fnx-more').length,
+      oldPl: root.querySelectorAll('.pl-row, .fin-hero, .fin-grid, .pdist-card, .alloc-bar, .finx').length,
+      monNav: root.querySelectorAll('.fst-mon').length,
+      mrrTimes: (txt.match(/Плановая прибыль/g) || []).length };
   });
-  ok('по умолчанию экран простой: одна кнопка вместо пяти блоков',
-    SM.simple.more && !SM.simple.plans, SM.simple);
-  ok('в простом режиме «Свободно» не показывается, а колонок две',
-    !SM.simple.free && SM.simple.two, SM.simple);
-  /* Пришло 5 000 000 + 2 000 000 аванс = 7 000 000; ушло 3 000 000.
-     Перевод между своими счетами в движение не идёт — деньги переехали. */
-  ok('за месяц показано движение денег, а не выручка: +7 000 000 и −3 000 000',
-    SM.simple.per[0] === '+7000000' && SM.simple.per[1] === '−3000000', SM.simple.per);
-  ok('разница 4 000 000 — и она названа разницей, а не прибылью',
-    SM.simple.per[2] === '+4000000' && /Разница/.test(SM.simple.txt)
-      && !/Прибыль/.test(SM.simple.txt), SM.simple.per);
-  ok('в кнопке честно перечислено, что за ней спрятано',
-    /Планы платежей/.test(SM.simple.txt) && /Совладельцы/.test(SM.simple.txt), SM.simple.txt.slice(0, 200));
-  ok('развёрнутый режим возвращает всё: планы, «Свободно» и прибыль',
-    SM.full.plans && SM.full.free && /Прибыль/.test(SM.full.txt), SM.full);
+  ok('шаги идут по порядку 1…7 и не перепрыгивают',
+    SM.steps.map(s => s.n).join('') === '1234567', SM.steps.map(s => s.n));
+  ok('и называются так, как человек про них спрашивает',
+    SM.steps.map(s => s.t).join('|') ===
+    'Сейчас|Проекты|Месяц|Остаток|Распределение|Следующий месяц|Сравнение', SM.steps.map(s => s.t));
+  ok('переключателя «показать остальное» больше нет — режимов не осталось',
+    SM.oldToggle === 0, SM.oldToggle);
+  ok('плановых блоков по сметам на экране нет ни одного',
+    SM.oldPl === 0 && SM.mrrTimes === 0, [SM.oldPl, SM.mrrTimes]);
+  ok('месяц переключается ровно в двух местах, где он что-то меняет',
+    SM.monNav === 2, SM.monNav);
 
   console.log('[H] полоса платежей и «Свободно»');
   const PL = await page.evaluate(() => {
-    finSimpleSet(false);
     /* Планы строим от сегодняшнего дня, иначе проверка начнёт зависеть от
        того, какое сегодня число, и сломается не от поломки кода. */
     const z = v => String(v).padStart(2, '0');
@@ -381,7 +407,9 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
       { id: 'p1', flow: 'out', title: 'Зарплаты', amount: 5000000, every: 'once', due_date: dd(3) },
       { id: 'p2', flow: 'in',  title: 'Клиент',   amount: 9000000, every: 'once', due_date: dd(6) },
       { id: 'p3', flow: 'out', title: 'Аренда',   amount: 1000000, every: 'once', due_date: dd(9) } ];
-    const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
+    /* Планы уехали в шаг 6 и в блок денег больше не вклеиваются: раньше
+       один блок рисовал пять чужих. Собираем оба и проверяем как было. */
+    const d = document.createElement('div'); d.innerHTML = finMoneyBlock() + finPlanBlock();
     const rows = Array.from(d.querySelectorAll('.fnx-pr:not(.hd)'));
     const f = finFreeNow();
     const cell = (r, s) => (r.querySelector(s) || {}).textContent || '';

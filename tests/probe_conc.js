@@ -44,67 +44,79 @@ const show = () => { const c = document.getElementById('content-ag'); if (!c) re
   ok('45% на крупнейшем проекте', ov.v === '45%', ov.v);
   ok('назван сам проект', /APOLO COFFEE/.test(ov.s || ''), ov.s);
 
-  console.log('\n[B] финансы');
+  console.log('\n[B] финансы: концентрация теперь считается по деньгам и названа иначе');
+  /* Раньше на двух экранах стояли два числа под одним названием
+     «Концентрация выручки»: в сводке — доля крупнейшего в сумме договоров,
+     в финансах — доля в прибыли. Числа расходились (45% против 48%), и по
+     названию нельзя было понять, какое из них про что.
+
+     Теперь в финансах вопрос другой: какую долю денег, реально пришедших
+     за месяц, принёс один клиент. Это другая база — значит, и название
+     другое: «Концентрация прихода». Одинаково назвать разное — та же
+     ошибка, что и по-разному назвать одинаковое.
+
+     ── На бумаге ─────────────────────────────────────────────────────
+     APOLO заплатил 45 000 000, DETROYD 20 000 000, ещё 5 000 000 пришло
+     без проекта. Всего пришло 70 000 000, доля APOLO = 45/70 = 64,3% → 64%. */
   const fin = await page.evaluate((D) => {
+    const z = v => String(v).padStart(2, '0');
+    const n = new Date(), td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
     const rows = D.filter(p => p.status !== 'done').map(p => ({ id: p.id, name: p.name, service: '—', status: p.status,
       cat: '—', tariff: '—', logo: p.name[0], logoUrl: '', mrr: p.mrr, cost: p.cost, trackedSec: 0, hours: 0, finance: {} }));
     const totalMrr = rows.reduce((s, p) => s + p.mrr, 0), totalCost = rows.reduce((s, p) => s + p.cost, 0);
-    const profit = totalMrr - totalCost;
-    const top = [...rows].sort((a, b) => b.mrr - a.mrr)[0];
-    const topP = rows.map(p => ({ name: p.name, prof: p.mrr - p.cost })).filter(x => x.prof > 0).sort((a, b) => b.prof - a.prof)[0];
     const pay = rows.filter(p => p.mrr > 0);
-    window.FINANCE = { ready: true, rows, projects: rows.map(p => Object.assign({}, p, { margin: p.mrr > 0 ? Math.round(100 * (p.mrr - p.cost) / p.mrr) : null, profit: p.mrr - p.cost })), totalMrr, totalCost, profit,
-      marginPct: Math.round(100 * profit / totalMrr), costPct: Math.round(100 * totalCost / totalMrr),
-      totalHours: 0, profitPerHour: 0, paying: pay.length, total: rows.length,
-      avgMrr: Math.round(totalMrr / pay.length), avgCost: 0, avgProfit: 0,
-      concentrationPct: Math.round(100 * top.mrr / totalMrr), concentrationTop: top.name,
-      profConcPct: Math.round(100 * topP.prof / profit), profConcTop: topP.name, profConcAmt: topP.prof,
-      services: [], tariffs: [], snapshots: [], prevSnap: null, cats: [] };
+    window.FINANCE = { ready: true, rows, projects: rows, totalMrr, totalCost, profit: totalMrr - totalCost,
+      marginPct: 65, costPct: 35, totalHours: 0, profitPerHour: 0, paying: pay.length, total: rows.length,
+      avgMrr: Math.round(totalMrr / pay.length), services: [], tariffs: [], snapshots: [], prevSnap: null, cats: [] };
+    window._FINOFF = 0;
+    window.FINX = { ready: true, accounts: [{ id: 'W', name: 'Карта', kind: 'card', opening_balance: 0, sort: 1 }],
+      ops: [ { id: '1', op_date: td, kind: 'income', amount: 45000000, account_id: 'W', project_id: 'a' },
+             { id: '2', op_date: td, kind: 'income', amount: 20000000, account_id: 'W', project_id: 'b' },
+             { id: '3', op_date: td, kind: 'income', amount: 5000000,  account_id: 'W' } ] };
+    window.FINP = []; window.FINO = []; window.FINS = {};
     renderFinance();
-    const gs = [...document.querySelectorAll('#content-ag .fin-grid .fg')].map(g => ({
-      l: g.querySelector('.l').textContent.trim(), v: g.querySelector('.gv').textContent.trim(),
-      s: g.querySelector('.gs').textContent.trim() }));
-    return { gs, conc: gs.find(g => /Концентрация/.test(g.l)), avg: gs.find(g => /Средний чек/.test(g.l)),
-      mrr: window.FINANCE.totalMrr, prof: window.FINANCE.profit,
-      cp: window.FINANCE.concentrationPct, pp: window.FINANCE.profConcPct };
+    const root = document.getElementById('content-ag');
+    const tile = lbl => { const c = [...root.querySelectorAll('.fst-c')]
+      .find(e => new RegExp(lbl).test((e.querySelector('.l') || {}).textContent || ''));
+      return c ? { l: c.querySelector('.l').textContent.trim(),
+                   v: c.querySelector('.v').textContent.trim(),
+                   s: (c.querySelector('.s') || {}).textContent.trim() } : null; };
+    return { conc: tile('Концентрация'), avg: tile('Средний чек'),
+      txt: (root.textContent || '').replace(/\s+/g, ' '),
+      concCount: [...root.querySelectorAll('.fst-c .l')].filter(e => /Концентрация/.test(e.textContent)).length };
   }, DATA);
-  console.log('    ' + JSON.stringify(fin.gs));
-  ok('в финансах тоже концентрация выручки', /^Концентрация выручки$/.test((fin.conc || {}).l || ''), fin.conc);
-  ok('число совпало со сводкой', (fin.conc || {}).v === ov.v, [ov.v, (fin.conc || {}).v]);
-  ok('доля прибыли осталась подписью', /48% прибыли/.test((fin.conc || {}).s || ''), fin.conc);
-  ok('в подписи назван тот же проект', /APOLO COFFEE/.test((fin.conc || {}).s || ''), fin.conc);
-  ok('одной «концентрации» на экране, а не двух', fin.gs.filter(g => /Концентрация/.test(g.l)).length === 1, fin.gs.map(g => g.l));
-  ok('у среднего чека своя подпись, а не чужая концентрация', !/конц\./.test((fin.avg || {}).s || '') && /на платящий проект/.test((fin.avg || {}).s || ''), fin.avg);
-  ok('арифметика на месте: 45 из 100 млн', fin.mrr === 100000000 && fin.cp === 45, fin);
-  ok('и 48% прибыли из 64,9 млн', fin.prof === 64888500 && fin.pp === 48, fin);
+  console.log('    ' + JSON.stringify(fin.conc));
+  ok('в финансах концентрация названа по своей базе — прихода, а не выручки',
+    /^Концентрация прихода$/.test((fin.conc || {}).l || ''), fin.conc);
+  ok('и не выдаёт себя за число из сводки: 45 из 70 млн — 64%',
+    (fin.conc || {}).v === '64%' && fin.conc.v !== ov.v, [(fin.conc || {}).v, ov.v]);
+  ok('назван тот же проект и сказано, что это доля в приходе',
+    /APOLO COFFEE/.test((fin.conc || {}).s || '') && /доля в приходе/.test((fin.conc || {}).s || ''), fin.conc);
+  ok('одной «концентрации» на экране, а не двух', fin.concCount === 1, fin.concCount);
+  ok('у среднего чека своя подпись, а не чужая концентрация',
+    !/конц\./.test((fin.avg || {}).s || '') && /по договорам/.test((fin.avg || {}).s || ''), fin.avg);
+  ok('и сказано, что средний чек — про договоры, а приход — про деньги',
+    /не по деньгам/.test(fin.txt), fin.txt.slice(0, 40));
   await page.evaluate(show);
   await page.waitForTimeout(1200);
   await page.screenshot({ path: '/tmp/work/shot_fin.png', clip: await page.evaluate(() => {
-    const b = document.querySelector('#content-ag .fin-grid').getBoundingClientRect();
+    const b = document.querySelector('#content-ag .fst').getBoundingClientRect();
     return { x: Math.max(0, b.x), y: Math.max(0, b.y), width: Math.min(b.width, 1560), height: Math.min(b.height, 400) }; }) });
 
-  console.log('\n[C] крупнейший по выручке и по прибыли — разные проекты');
-  const diff = await page.evaluate(() => {
-    const F = window.FINANCE;
-    F.concentrationTop = 'APOLO COFFEE'; F.profConcTop = 'Artel'; F.profConcPct = 31;
-    renderFinance();
-    const g = [...document.querySelectorAll('#content-ag .fin-grid .fg')].find(x => /Концентрация/.test(x.querySelector('.l').textContent));
-    return g.querySelector('.gs').textContent.trim();
-  });
-  console.log('    ' + JSON.stringify(diff));
-  ok('подпись не приписывает чужую долю', /APOLO COFFEE/.test(diff) && /по прибыли — Artel 31%/.test(diff), diff);
-
-  console.log('\n[D] бюджетов нет');
+  console.log('\n[C] оплат за месяц не было');
+  /* Ноль в проценте — это утверждение «зависимости нет», и оно неверно, когда
+     считать просто не из чего. Прочерк и объяснение честнее. */
   const zero = await page.evaluate(() => {
-    const F = window.FINANCE; F.totalMrr = 0; F.concentrationPct = 0; F.profConcPct = 0; F.profConcTop = '—'; F.paying = 0;
+    window.FINX.ops = [];
     renderFinance();
-    const g = [...document.querySelectorAll('#content-ag .fin-grid .fg')].find(x => /Концентрация/.test(x.querySelector('.l').textContent));
-    const a = [...document.querySelectorAll('#content-ag .fin-grid .fg')].find(x => /Средний чек/.test(x.querySelector('.l').textContent));
-    return { v: g.querySelector('.gv').textContent.trim(), s: g.querySelector('.gs').textContent.trim(), a: a.querySelector('.gs').textContent.trim() };
+    const root = document.getElementById('content-ag');
+    const c = [...root.querySelectorAll('.fst-c')]
+      .find(e => /Концентрация/.test((e.querySelector('.l') || {}).textContent || ''));
+    return c ? { v: c.querySelector('.v').textContent.trim(), s: c.querySelector('.s').textContent.trim() } : null;
   });
   console.log('    ' + JSON.stringify(zero));
-  ok('без бюджетов не выдумываем процент', zero.v === '—' && /бюджеты не заданы/.test(zero.s), zero);
-  ok('и про средний чек сказано честно', /платящих проектов нет/.test(zero.a), zero.a);
+  ok('без оплат не выдумываем процент', zero && zero.v === '—', zero);
+  ok('и сказано, почему прочерк', zero && /оплат за месяц не было/.test(zero.s), zero);
 
   const bad = errs.filter(e => /SyntaxError|is not defined|Cannot read/.test(e));
   console.log('\n[E] ошибки');
