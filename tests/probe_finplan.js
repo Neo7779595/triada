@@ -149,6 +149,25 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('расход с резервного счёта оборотных не касается', R.inRes === R.base, [R.base, R.inRes]);
   ok('перевод между двумя рабочими счетами не меняет ничего', R.wToW === R.base, [R.base, R.wToW]);
 
+  console.log('[F] «свободно» не бывает больше, чем есть на счетах');
+  /* Оборотные считаются как «всего минус резерв». Если резерв ушёл в минус —
+     а это случается, когда расход по ошибке записали с резервного счёта, —
+     оборотные оказываются больше всей кассы, и на экране появляется
+     «свободно 22 млн» при «есть 15 млн». Арифметика верна, читается как
+     бессмыслица. */
+  const N = await page.evaluate(() => {
+    const A = [
+      { id: 'W', name: 'Наличка', kind: 'cash', opening_balance: 22000000, sort: 1 },
+      { id: 'R', name: 'Резерв',  kind: 'card', opening_balance: 0, sort: 2, is_reserve: true }];
+    const ops = [{ id: 'x', op_date: '2026-08-01', kind: 'expense', amount: 7000000, account_id: 'R' }];
+    const f = finFree(A, ops, [], { today: '2026-08-04', to: '2026-08-31' });
+    return { total: f.total, working: f.working, reserve: f.reserve, free: f.free, neg: f.resNeg };
+  });
+  ok('резерв в минусе делает оборотные больше кассы — это и было видно на экране',
+    N.total === 15000000 && N.working === 22000000 && N.reserve === -7000000, N);
+  ok('но «свободно» ограничено тем, что реально есть', N.free === 15000000, N.free);
+  ok('и модуль помечает, что резерв в минусе', N.neg === true, N.neg);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();

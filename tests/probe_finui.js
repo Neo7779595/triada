@@ -177,6 +177,47 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('у перевода стороны разные, а не «сам себе»',
     NC.from && NC.to && NC.from !== NC.to && NC.to === NC.second, NC);
 
+  console.log('[C3] счёт по умолчанию — рабочий, а не первый в списке');
+  /* Живой случай: резерв заведён первым, и расход по умолчанию уходил с
+     него, загоняя резерв в минус. Резерв тратят осознанно, а не по
+     умолчанию — и предзаполненный платёж обязан показывать тот счёт,
+     который на самом деле подставлен. */
+  const DF = await page.evaluate(async () => {
+    window.FINX = { ready: true, accounts: [
+      { id: 'R', name: 'РЕЗЕРВ', kind: 'card', opening_balance: 0, sort: 1, is_reserve: true },
+      { id: 'C', name: 'Наличка', kind: 'cash', opening_balance: 9000000, sort: 2 },
+      { id: 'K', name: 'Карта',   kind: 'card', opening_balance: 0, sort: 3 } ], ops: [] };
+    const z = v => String(v).padStart(2, '0');
+    const n = new Date(); const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
+    window.FINP = [{ id: 'p1', flow: 'out', title: 'Аутсорс', amount: 7000000, every: 'once',
+      due_date: td, account_id: 'K' }];
+    window.FINO = []; window.FINS = {};
+    finOpOpen('expense');
+    const def = { v: (document.getElementById('fnx-o-ac') || {}).value,
+      lbl: (document.getElementById('fnx-o-ac-lbl') || {}).textContent || '',
+      warn: (document.getElementById('fnx-o-resw') || {}).style.display };
+    /* Явный выбор резерва разрешён, но о нём предупреждают. */
+    _finFill('fnx-o-ac', 'R');
+    const onRes = { v: (document.getElementById('fnx-o-ac') || {}).value,
+      lbl: (document.getElementById('fnx-o-ac-lbl') || {}).textContent || '',
+      warn: (document.getElementById('fnx-o-resw') || {}).style.display };
+    finClose();
+    finPayPlan('p1', td);
+    await new Promise(r => setTimeout(r, 160));
+    const paid = { v: (document.getElementById('fnx-o-ac') || {}).value,
+      lbl: (document.getElementById('fnx-o-ac-lbl') || {}).textContent || '' };
+    finClose();
+    return { def, onRes, paid };
+  });
+  ok('по умолчанию подставлен рабочий счёт, а не резерв, стоящий первым',
+    DF.def.v === 'C' && /Наличка/.test(DF.def.lbl), DF.def);
+  ok('и предупреждения про резерв нет, пока резерв не выбран',
+    DF.def.warn === 'none', DF.def);
+  ok('выбрать резерв можно, но об этом говорят вслух',
+    DF.onRes.v === 'R' && DF.onRes.warn !== 'none', DF.onRes);
+  ok('счёт из плана подставляется и в значение, и в подпись',
+    DF.paid.v === 'K' && /Карта/.test(DF.paid.lbl), DF.paid);
+
   console.log('[D] форма не даёт записать заведомо неверное');
   const V = await page.evaluate(async () => {
     const said = [];
