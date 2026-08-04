@@ -107,12 +107,18 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
       ops: window._O.map(o => Object.assign({}, o, { op_date: td })) };
     window.FINP = []; window.FINO = []; window.FINS = {};
     const d = document.createElement('div'); d.innerHTML = finFactBlock();
-    return { rows: d.querySelectorAll('.fnx-fc:not(.hd)').length,
+    return { rows: d.querySelectorAll('.fnx-fc:not(.hd):not(.tot)').length,
+      tot: (d.querySelector('.fnx-fc.tot') || {}).textContent || '',
+      head: (d.querySelector('.fnx-fc.hd') || {}).textContent || '',
       cov: (d.querySelector('.fnx-fc-cov') || {}).textContent || '',
       thin: !!d.querySelector('.fnx-fc-cov.thin'),
       txt: (d.textContent || '').replace(/\s+/g, ' ') };
   });
   ok('на экране три строки — по числу живых проектов', V.rows === 3, V.rows);
+  ok('и итоговая строка, в которой живут бывшие «MRR» и «плановая прибыль»',
+    V.tot && /20 000 000/.test(V.tot) && /12 000 000/.test(V.tot), V.tot);
+  ok('смета расходов стоит в той же строке, что и факт',
+    /СМЕТА/i.test(V.head) && /ПОТРАЧЕНО/i.test(V.head), V.head);
   ok('план по марже стоит рядом с фактом', /план 40%/.test(V.txt), V.txt.slice(0, 200));
   ok('покрытие названо в процентах', /привязано поступлений 97% и расходов 81%/.test(V.cov), V.cov);
   ok('привязано больше семидесяти процентов — таблица не помечена неполной',
@@ -130,6 +136,29 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   });
   ok('крупный расход мимо проектов помечает таблицу неполной',
     THIN.thin === true && /не вся картина/.test(THIN.cov), THIN);
+
+  console.log('[F] портфель договоров — полосой, а не вторым экраном');
+  /* Движение договоров, концентрация и прибыль за час — не про кассу, а про
+     то, что с ней случится через месяц. Держим четырьмя числами; глубина
+     раскрывается кнопкой, чтобы экран не был двумя мирами. */
+  const PT = await page.evaluate(() => {
+    window.FINANCE = { ready: true, totalMrr: 13500000, totalCost: 6600000, profit: 6900000,
+      marginPct: 51, costPct: 49, paying: 3, total: 3, avgMrr: 4500000, profitPerHour: 168240,
+      concentrationPct: 48, concentrationTop: 'RESTO', newMrr: 3000000, churnMrr: 500000 };
+    const d = document.createElement('div'); d.innerHTML = finPortStrip();
+    const t = Array.from(d.querySelectorAll('.fnx-pt')).map(e => ({
+      l: (e.querySelector('.l') || {}).textContent || '',
+      v: ((e.querySelector('.v') || {}).textContent || '').replace(/\s/g, '') }));
+    return { n: t.length, t, btn: (d.querySelector('.fnx-pl-h .fnx-btn') || {}).textContent || '',
+      empty: (() => { window.FINANCE = { ready: false }; return finPortStrip(); })() };
+  });
+  ok('в полосе четыре числа, а не полэкрана', PT.n === 4, PT.n);
+  ok('движение за месяц — приход минус отток: +2 500 000',
+    PT.t[0] && PT.t[0].v === '+2500000', PT.t[0]);
+  ok('концентрация и прибыль за час на месте',
+    /Концентрация/.test(PT.t[1].l) && PT.t[1].v === '48%' && PT.t[2].v === '+168240', PT.t);
+  ok('глубина раскрывается кнопкой, а не занимает экран', /Подробнее/.test(PT.btn), PT.btn);
+  ok('без загруженного P&L полоса не рисуется вовсе', PT.empty === '', PT.empty);
 
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
