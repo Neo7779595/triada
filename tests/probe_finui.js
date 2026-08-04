@@ -106,6 +106,7 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   /* Деньги и прибыль стоят рядом намеренно: их путают чаще всего.
      Аванс раздувает первое, не трогая второе, — и это сказано словами. */
   const H = await page.evaluate(() => {
+    finSimpleSet(false);   // проверяем развёрнутую шапку: там выручка и прибыль
     /* Все три операции датированы сегодня — иначе проверка сломалась бы
        в первый же день следующего месяца, а не при поломке кода. */
     const n = new Date(), z = v => String(v).padStart(2, '0');
@@ -281,8 +282,50 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('и имя счёта набрано как подпись плитки, а не как заголовок',
     mono(TY.accNm) && TY.accNm.tt === 'uppercase', TY.accNm);
 
+  console.log('[G3] простой режим: одно действие вместо пяти блоков');
+  /* Модуль умеет много, но человеку, который только начал вести деньги,
+     нужно ровно одно: записать движение. Экран, в котором нельзя
+     разобраться за пять минут, не используют вовсе — и тогда не работает
+     ни одна из умных частей. */
+  const SM = await page.evaluate(() => {
+    const n = new Date(), z = v => String(v).padStart(2, '0');
+    const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
+    window.FINX = { ready: true, accounts: [{ id: 'B', name: 'Карта', kind: 'card', opening_balance: 1000000, sort: 1 }],
+      ops: [ { id: 'i', op_date: td, kind: 'income',  amount: 5000000, account_id: 'B' },
+             { id: 'p', op_date: td, kind: 'prepay',  amount: 2000000, account_id: 'B' },
+             { id: 'e', op_date: td, kind: 'expense', amount: 3000000, account_id: 'B' },
+             { id: 't', op_date: td, kind: 'transfer', amount: 900000, account_id: 'B', account_to: 'B2' } ] };
+    window.FINP = [{ id: 'x', flow: 'out', title: 'Аренда', amount: 100000, every: 'month', day_of_month: 10 }];
+    window.FINO = []; window.FINS = {};
+    const grab = () => { const d = document.createElement('div'); d.innerHTML = finMoneyBlock();
+      return { html: d.innerHTML, txt: (d.textContent || '').replace(/\s+/g, ' '),
+        free: !!d.querySelector('.fnx-h-free'), two: !!d.querySelector('.fnx-hero.two'),
+        more: !!d.querySelector('.fnx-more'), plans: !!d.querySelector('.fnx-pr'),
+        per: Array.from(d.querySelectorAll('.fnx-h-pr b')).map(e => e.textContent.replace(/\s/g, '')) }; };
+    finSimpleSet(true); const simple = grab();
+    finSimpleSet(false); const full = grab();
+    finSimpleSet(true);
+    return { simple, full };
+  });
+  ok('по умолчанию экран простой: одна кнопка вместо пяти блоков',
+    SM.simple.more && !SM.simple.plans, SM.simple);
+  ok('в простом режиме «Свободно» не показывается, а колонок две',
+    !SM.simple.free && SM.simple.two, SM.simple);
+  /* Пришло 5 000 000 + 2 000 000 аванс = 7 000 000; ушло 3 000 000.
+     Перевод между своими счетами в движение не идёт — деньги переехали. */
+  ok('за месяц показано движение денег, а не выручка: +7 000 000 и −3 000 000',
+    SM.simple.per[0] === '+7000000' && SM.simple.per[1] === '−3000000', SM.simple.per);
+  ok('разница 4 000 000 — и она названа разницей, а не прибылью',
+    SM.simple.per[2] === '+4000000' && /Разница/.test(SM.simple.txt)
+      && !/Прибыль/.test(SM.simple.txt), SM.simple.per);
+  ok('в кнопке честно перечислено, что за ней спрятано',
+    /Планы платежей/.test(SM.simple.txt) && /Совладельцы/.test(SM.simple.txt), SM.simple.txt.slice(0, 200));
+  ok('развёрнутый режим возвращает всё: планы, «Свободно» и прибыль',
+    SM.full.plans && SM.full.free && /Прибыль/.test(SM.full.txt), SM.full);
+
   console.log('[H] полоса платежей и «Свободно»');
   const PL = await page.evaluate(() => {
+    finSimpleSet(false);
     /* Планы строим от сегодняшнего дня, иначе проверка начнёт зависеть от
        того, какое сегодня число, и сломается не от поломки кода. */
     const z = v => String(v).padStart(2, '0');
