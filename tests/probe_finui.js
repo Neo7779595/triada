@@ -153,6 +153,29 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('под формой объяснено, что этот тип делает с прибылью',
     /аванс/i.test(F.hint) && F.hint.length > 40, F.hint);
 
+  console.log('[C2] контролы платформенные, а не браузерные');
+  await seed();
+  /* Родное поле type=date рисует календарь силами системы: белый, синий и
+     ни в одной теме не участвует. Родной select — то же самое. В форме
+     финансов их быть не должно. */
+  const NC = await page.evaluate(() => {
+    finOpOpen('transfer');
+    const b = document.getElementById('fnx-op-b');
+    const accs = window.FINX.accounts.filter(a => !a.archived_at);
+    return { natSel: b.querySelectorAll('select').length,
+      natDate: b.querySelectorAll('input[type=date]').length,
+      dd: b.querySelectorAll('.dd.ddsel').length,
+      dp: b.querySelectorAll('.dpick').length,
+      from: (document.getElementById('fnx-o-ac') || {}).value,
+      to: (document.getElementById('fnx-o-a2') || {}).value,
+      second: accs[1] && accs[1].id };
+  });
+  ok('родных выпадающих списков в форме нет', NC.natSel === 0, NC.natSel);
+  ok('родного поля даты тоже нет', NC.natDate === 0, NC.natDate);
+  ok('вместо них — платформенные', NC.dd >= 2 && NC.dp === 1, NC);
+  ok('у перевода стороны разные, а не «сам себе»',
+    NC.from && NC.to && NC.from !== NC.to && NC.to === NC.second, NC);
+
   console.log('[D] форма не даёт записать заведомо неверное');
   const V = await page.evaluate(async () => {
     const said = [];
