@@ -325,23 +325,67 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
     d.innerHTML = finMoneyBlock(); document.body.appendChild(d);
     const f = s => { const e = d.querySelector(s); if (!e) return null;
       const c = getComputedStyle(e); return { fam: c.fontFamily, ls: c.letterSpacing, tt: c.textTransform }; };
-    const old = (() => { const e = document.createElement('div');
-      e.className = 'fin-grid'; e.innerHTML = '<div class="fg"><div class="l">x</div><div class="gv">1</div></div>';
-      document.body.appendChild(e); const c = getComputedStyle(e.querySelector('.gv')).fontFamily;
-      const l = getComputedStyle(e.querySelector('.l')); e.remove();
-      return { num: c, lab: l.fontFamily, lls: l.letterSpacing }; })();
-    const r = { hero: f('.fnx-h-v'), lab: f('.fnx-h-l'), acc: f('.fnx-a-v'), accNm: f('.fnx-a-nm'), old };
+    /* Раньше сверялись со старым блоком P&L. Его больше нет — сверяемся с
+       шагом «Месяц»: он и есть эталон нового языка модуля. */
+    const st = document.createElement('div'); st.innerHTML = finStepMonth();
+    document.body.appendChild(st);
+    const g = s2 => { const e = st.querySelector(s2); if (!e) return null;
+      const c = getComputedStyle(e); return { fam: c.fontFamily, ls: c.letterSpacing, tt: c.textTransform }; };
+    const step = { num: g('.fst-3 .fst-c .v'), lab: g('.fst-3 .fst-c .l') };
+    st.remove();
+    const r = { hero: f('.fnx-h-v'), lab: f('.fnx-h-l'), acc: f('.fnx-a-v'), accNm: f('.fnx-a-nm'), step };
     d.remove(); return r;
   });
   const mono = v => v && /Mono|mono/.test(v.fam);
-  ok('главное число набрано тем же моноширинным, что и в старом P&L',
-    mono(TY.hero) && /Mono|mono/.test(TY.old.num), [TY.hero, TY.old]);
+  ok('главное число и числа шагов набраны одним моноширинным',
+    mono(TY.hero) && mono(TY.step.num) && TY.hero.fam === TY.step.num.fam, [TY.hero, TY.step.num]);
+  ok('подписи шагов — тот же капительный моноширинный, что и здесь',
+    mono(TY.step.lab) && TY.step.lab.tt === 'uppercase' && parseFloat(TY.step.lab.ls) > 1, TY.step.lab);
   ok('подписи — тот же моноширинный в разрядку и капителью',
     mono(TY.lab) && TY.lab.tt === 'uppercase' && parseFloat(TY.lab.ls) > 1, TY.lab);
   ok('остаток счёта тоже моноширинный — цифры в колонке выстраиваются',
     mono(TY.acc), TY.acc);
   ok('и имя счёта набрано как подпись плитки, а не как заголовок',
     mono(TY.accNm) && TY.accNm.tt === 'uppercase', TY.accNm);
+
+  console.log('[G2b] ни одного системного списка и календаря во всём модуле');
+  /* Серый прямоугольник, нарисованный операционной системой, посреди
+     фирменного окна читается как чужая программа — и заодно ведёт себя
+     иначе на каждой платформе. В журнале два таких списка жили с самого
+     начала: их не замечали, потому что они были «просто фильтры». */
+  const NAT = await page.evaluate(() => {
+    const n = new Date(), z = v => String(v).padStart(2, '0');
+    const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
+    window.__me = { id: 'u1', role: 'agency_owner' }; window.tMe = () => window.__me;
+    window._FINOFF = 0;
+    window.FINX = { ready: true, accounts: [
+      { id: 'W', name: 'Карта', kind: 'card', opening_balance: 0, sort: 1 },
+      { id: 'R', name: 'Резерв', kind: 'bank', opening_balance: 0, purpose: 'reserve', is_reserve: true, sort: 2 }],
+      ops: [ { id: 'i', op_date: td, kind: 'income', amount: 20000000, account_id: 'W', category: 'Оплата клиента' },
+             { id: 'e', op_date: td, kind: 'expense', amount: 8000000, account_id: 'W', category: 'Зарплаты' } ] };
+    window.FINP = [{ id: 'p1', flow: 'out', title: 'Аренда', amount: 1000000, every: 'month',
+      day_of_month: 10, category: 'Аренда' }];
+    window.FINO = [{ id: 'o1', name: 'Нурислам', share_pct: 100, sort: 1 }];
+    window.FINS = { owners_pct: 40, reserve_pct: 20, charity_pct: 0 }; window.FINM = [];
+    const count = () => document.querySelectorAll('#ov-fin select, #ov-fin input[type=date]').length;
+    const out = {};
+    finLogOpen();        out.log = count();
+    finAccOpen();        out.accs = count();
+    finAccEdit('W');     out.acc = count();
+    finOpOpen('expense');out.op = count();
+    finOpKind('transfer');out.tr = count();
+    finRecOpen('W');     out.rec = count();
+    finDistCfg();        out.cfg = count();
+    finDistOpen();       out.dist = count();
+    finNextOpen();       out.next = count();
+    finClose();
+    return out;
+  });
+  ok('в журнале фильтры платформенные, а не системные', NAT.log === 0, NAT.log);
+  ok('в счетах и в карточке счёта тоже', NAT.accs === 0 && NAT.acc === 0, NAT);
+  ok('в записи операции и в переводе', NAT.op === 0 && NAT.tr === 0, NAT);
+  ok('в сверке, долях, распределении и следующем месяце',
+    NAT.rec === 0 && NAT.cfg === 0 && NAT.dist === 0 && NAT.next === 0, NAT);
 
   console.log('[G3] семь шагов сверху вниз — и ни одного дубля');
   /* Раньше в модуле жили две несвязанные системы: плановая (сметы) и
@@ -390,6 +434,63 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
     SM.oldPl === 0 && SM.mrrTimes === 0, [SM.oldPl, SM.mrrTimes]);
   ok('месяц переключается ровно в двух местах, где он что-то меняет',
     SM.monNav === 2, SM.monNav);
+
+  console.log('[G4] зона доступа: проект-менеджер видит деньги своих проектов');
+  /* У агентства может быть три ПМ на три направления. «Приход агентства» —
+     не его число: он отвечает за свои проекты и должен видеть деньги ровно
+     по ним. Операции без проекта — аренда, налоги, администрация — в его
+     картину не входят: это расходы агентства, а не его проектов.
+
+     ── На бумаге ─────────────────────────────────────────────────────
+     Его проект APOLO: пришло 10 000 000, ушло 4 000 000 → остаток 6 000 000.
+     Чужой RESTO (30 000 000) и общая аренда (5 000 000) в счёт не идут. */
+  const SC = await page.evaluate(() => {
+    const n = new Date(), z = v => String(v).padStart(2, '0');
+    const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-' + z(n.getDate());
+    window._FINOFF = 0; window._aggLoaded = true;
+    window.__me = { id: 'u9', role: 'member', is_pm: true, is_director: false,
+      permissions: { projects: { scope: 'assigned' }, finance: { view: true } } };
+    window.tMe = () => window.__me;
+    PROJECTS.length = 0;
+    PROJECTS.push({ id: 'a', name: 'APOLO', status: 'active', mrr: 12000000, cost: 0,
+      _team: [{ _id: 'u9' }] });
+    PROJECTS.push({ id: 'r', name: 'RESTO', status: 'active', mrr: 30000000, cost: 0, _team: [{ _id: 'u1' }] });
+    window.FINX = { ready: true, accounts: [{ id: 'W', name: 'Карта', kind: 'card', opening_balance: 0, sort: 1 }],
+      ops: [ { id: '1', op_date: td, kind: 'income',  amount: 10000000, account_id: 'W', project_id: 'a' },
+             { id: '2', op_date: td, kind: 'income',  amount: 30000000, account_id: 'W', project_id: 'r' },
+             { id: '3', op_date: td, kind: 'expense', amount: 4000000,  account_id: 'W', project_id: 'a', category: 'Зарплаты' },
+             { id: '4', op_date: td, kind: 'expense', amount: 5000000,  account_id: 'W', category: 'Аренда' } ] };
+    window.FINP = []; window.FINO = []; window.FINS = {}; window.FINM = [];
+    window.FINANCE = { ready: true, projects: PROJECTS, totalMrr: 42000000, totalCost: 0, profit: 42000000,
+      marginPct: 100, costPct: 0, paying: 2, total: 2, avgMrr: 21000000, totalHours: 40,
+      services: [], tariffs: [], snapshots: [] };
+    renderFinance();
+    const root = document.getElementById('content-ag');
+    const nums = [...root.querySelectorAll('.fst-3 .fst-c')].map(e => ({
+      l: (e.querySelector('.l') || {}).textContent || '',
+      v: ((e.querySelector('.v') || {}).textContent || '').replace(/\s/g, '') }));
+    const out = { steps: [...root.querySelectorAll('.fst-n')].map(e => e.textContent),
+      warn: (root.querySelector('.fst-warn') || {}).textContent || '',
+      rows: [...root.querySelectorAll('.fnx-fc:not(.hd):not(.tot) .fnx-fc-nm')].map(e => e.textContent),
+      money: root.querySelectorAll('.fnx-hero').length,
+      nums: nums,
+      avg: nums.filter(x => /Средний чек|Время/.test(x.l)).length };
+    window.__me = null; window.tMe = () => null; window._aggLoaded = false;
+    return out;
+  });
+  ok('остаются только шаги про проекты: 2, 3 и 7',
+    SC.steps.join('') === '237', SC.steps);
+  ok('счета агентства ему не показывают вовсе', SC.money === 0, SC.money);
+  ok('и сказано, почему их нет, а не оставлено гадать',
+    /только по вашим проектам/.test(SC.warn) && /владельцу и директору/.test(SC.warn), SC.warn);
+  ok('в таблице только его проект', SC.rows.join(',') === 'APOLO', SC.rows);
+  const scv = l => (SC.nums.filter(x => new RegExp(l).test(x.l))[0] || {}).v;
+  ok('приход 10 000 000: чужие 30 000 000 в его число не входят',
+    scv('^Приход$') === '+10000000сум', SC.nums);
+  ok('расход 4 000 000: общая аренда — расход агентства, не его проектов',
+    scv('^Расход$') === '−4000000сум' && scv('Остаток месяца') === '+6000000сум', SC.nums);
+  ok('средний чек и время агентства ему не показывают — это чужие числа',
+    SC.avg === 0, SC.avg);
 
   console.log('[H] полоса платежей и «Свободно»');
   const PL = await page.evaluate(() => {
