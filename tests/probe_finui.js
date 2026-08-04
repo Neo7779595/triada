@@ -231,6 +231,33 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('с причиной — уходит вместе с ней', VD.voided && VD.voided[1] === 'ошиблись счётом', VD.voided);
   ok('системных окон браузера модуль не открывает', dialogs.length === 0, dialogs);
 
+  console.log('[G2] один язык с остальным модулем');
+  /* Модуль уже говорит моноширинными числами с разрядкой в подписях. Новые
+     блоки обязаны говорить так же: третий стиль на одном экране — это не
+     стиль, а разнобой. */
+  const TY = await page.evaluate(() => {
+    const d = document.createElement('div'); d.id = 'fnx-ty';
+    d.innerHTML = finMoneyBlock(); document.body.appendChild(d);
+    const f = s => { const e = d.querySelector(s); if (!e) return null;
+      const c = getComputedStyle(e); return { fam: c.fontFamily, ls: c.letterSpacing, tt: c.textTransform }; };
+    const old = (() => { const e = document.createElement('div');
+      e.className = 'fin-grid'; e.innerHTML = '<div class="fg"><div class="l">x</div><div class="gv">1</div></div>';
+      document.body.appendChild(e); const c = getComputedStyle(e.querySelector('.gv')).fontFamily;
+      const l = getComputedStyle(e.querySelector('.l')); e.remove();
+      return { num: c, lab: l.fontFamily, lls: l.letterSpacing }; })();
+    const r = { hero: f('.fnx-h-v'), lab: f('.fnx-h-l'), acc: f('.fnx-a-v'), accNm: f('.fnx-a-nm'), old };
+    d.remove(); return r;
+  });
+  const mono = v => v && /Mono|mono/.test(v.fam);
+  ok('главное число набрано тем же моноширинным, что и в старом P&L',
+    mono(TY.hero) && /Mono|mono/.test(TY.old.num), [TY.hero, TY.old]);
+  ok('подписи — тот же моноширинный в разрядку и капителью',
+    mono(TY.lab) && TY.lab.tt === 'uppercase' && parseFloat(TY.lab.ls) > 1, TY.lab);
+  ok('остаток счёта тоже моноширинный — цифры в колонке выстраиваются',
+    mono(TY.acc), TY.acc);
+  ok('и имя счёта набрано как подпись плитки, а не как заголовок',
+    mono(TY.accNm) && TY.accNm.tt === 'uppercase', TY.accNm);
+
   console.log('[H] полоса платежей и «Свободно»');
   const PL = await page.evaluate(() => {
     /* Планы строим от сегодняшнего дня, иначе проверка начнёт зависеть от
