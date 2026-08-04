@@ -77,7 +77,25 @@ const setup = () => {
   await page.evaluate(() => { empPM = false; document.getElementById('e-pm').checked = false; _renderPrjScope(); });
   await page.evaluate(() => { const c = document.getElementById('e-pm'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.waitForTimeout(80);
-  ok('ПМ тоже видит все проекты', await page.evaluate(() => /Проектный менеджер<\/b> видит все проекты/.test(document.getElementById('e-prj-hint').innerHTML)));
+  /* Раньше ПМ обходил зону доступа наравне с директором, и выбор проектов
+     ему подменялся баннером. У агентства бывает три ПМ на три направления,
+     и каждому незачем видеть чужие: теперь набор задаётся, как у всех. */
+  const PMS = await page.evaluate(() => ({
+    banner: /видит все проекты/.test(document.getElementById('e-prj-hint').innerHTML),
+    pickable: !document.getElementById('e-prj-t-all').hasAttribute('disabled')
+      && !document.getElementById('e-prj-t-asg').hasAttribute('disabled'),
+    scope: (typeof empProjectScope !== 'undefined') ? empProjectScope : null }));
+  ok('у ПМ выбор проектов доступен, а не подменён баннером',
+    PMS.pickable && !PMS.banner, PMS);
+  ok('и по умолчанию он видит только назначенные', PMS.scope === 'assigned', PMS.scope);
+  const PMD = await page.evaluate(() => {
+    empSetDirector(true);
+    const r = { banner: /видит все проекты/.test(document.getElementById('e-prj-hint').innerHTML),
+      locked: document.getElementById('e-prj-t-all').hasAttribute('disabled') };
+    empSetDirector(false); return r;
+  });
+  ok('а директору выбор по-прежнему не нужен: он видит всё агентство',
+    PMD.banner && PMD.locked, PMD);
   ok('бейдж «Проектный менеджер»', await page.evaluate(() => document.getElementById('empw-badge').textContent) === 'Проектный менеджер');
   await page.evaluate(() => { const c = document.getElementById('e-pm'); c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.waitForTimeout(80);

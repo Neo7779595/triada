@@ -178,6 +178,34 @@ const setup = () => {
   await page.waitForTimeout(150);
 
   console.log('\n[E] настройки доски и WIP-лимиты');
+  /* WIP-лимит — не личный вкус, а договорённость команды: он меняет правила
+     работы сразу для всех. Поэтому кнопку видит тот, кто за поток отвечает. */
+  const CFG = await page.evaluate(() => {
+    const _me = window.tMe;
+    const as = m => { window.tMe = () => m; return agCanBoardCfg(); };
+    const r = {
+      owner: as({ role: 'agency_owner' }),
+      dir: as({ role: 'member', is_director: true }),
+      pm: as({ role: 'member', is_pm: true }),
+      plain: as({ role: 'member', permissions: { projects: { view: true, edit: true } } }) };
+    window.tMe = _me;
+    /* Кнопка рядового сотрудника не просто отключена — её нет в разметке. */
+    window.tMe = () => ({ role: 'member', permissions: { projects: { view: true, edit: true } } });
+    renderPd(); r.btnHidden = !document.getElementById('pk-setbtn');
+    const said = []; const _t = window.toast; window.toast = m => said.push(m);
+    pkBoardSettings(); r.said = said[0] || '';
+    r.noModal = !document.querySelector('#ov-pd2 .modal.pksetm');
+    window.toast = _t; window.tMe = _me; renderPd();
+    return r;
+  });
+  await page.waitForTimeout(200);
+  ok('владелец, директор и ПМ настройки доски меняют',
+    CFG.owner && CFG.dir && CFG.pm, CFG);
+  ok('рядовой сотрудник — нет, и кнопки у него просто нет',
+    CFG.plain === false && CFG.btnHidden, CFG);
+  ok('и в обход кнопки окно не открывается, а объясняет почему',
+    CFG.noModal && /проект-менеджер, директор или владелец/.test(CFG.said), CFG);
+
   await page.evaluate(() => document.querySelector('#pk-setbtn').click());
   await page.waitForTimeout(220);
   const set0 = await page.evaluate(() => {
