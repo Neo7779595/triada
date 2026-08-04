@@ -326,6 +326,70 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('и строки проектов', MOB.fc === 0, MOB.fc);
   ok('крупные числа шагов не вылезают из карточек', MOB.three === 0, MOB.three);
 
+  console.log('[Q] один язык на всём экране');
+  /* Модуль читается как последовательность, но на экране это были семь
+     независимых плит, а часть блоков осталась в старом языке: крупный
+     заголовок без разрядки, цветная полоса, скруглённая карточка внутри
+     карточки. Рядом с новыми шагами это читалось как чужой продукт. */
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  const D = await page.evaluate(() => {
+    window._FINOFF = 0;
+    window.__me = { id: 'u1', role: 'agency_owner' }; window.tMe = () => window.__me;
+    const z = v => String(v).padStart(2, '0'); const n = new Date();
+    const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-01';
+    PROJECTS.length = 0;
+    PROJECTS.push({ id: 'a', name: 'АЛЬФА', status: 'active', mrr: 45000000, cost: 20000000 });
+    window.FINX = { ready: true, accounts: [
+      { id: 'W', name: 'Карта', kind: 'card', opening_balance: 5000000, sort: 1 },
+      { id: 'R', name: 'Резерв', kind: 'bank', opening_balance: 8000000, purpose: 'reserve', is_reserve: true, sort: 2 }],
+      ops: [ { id: '1', op_date: td, kind: 'income',  amount: 45000000, account_id: 'W', project_id: 'a', category: 'Оплата' },
+             { id: '2', op_date: td, kind: 'expense', amount: 22000000, account_id: 'W', category: 'Зарплаты' } ] };
+    window.FINP = [{ id: 'p', flow: 'out', title: 'Зарплаты', amount: 22000000, every: 'month',
+      day_of_month: 5, category: 'Зарплаты' }];
+    window.FINO = [{ id: 'o1', name: 'Нурислам', role_title: 'CEO', share_pct: 60, sort: 1 },
+                   { id: 'o2', name: 'Партнёр', role_title: 'Совладелец', share_pct: 40, sort: 2 }];
+    window.FINS = { owners_pct: 40, reserve_pct: 15, charity_pct: 5, reserve_target_months: 3 };
+    window.FINM = [];
+    window.FINANCE = { ready: true, projects: PROJECTS, totalMrr: 45000000, totalCost: 20000000,
+      profit: 25000000, marginPct: 56, costPct: 44, paying: 1, total: 1, avgMrr: 45000000, totalHours: 120,
+      services: [{ name: 'SMART', amount: 45000000, pct: 100, margin: 56, count: 1, color: '#37E6C8' }],
+      tariffs: [], snapshots: [] };
+    renderFinance();
+    const root = document.getElementById('content-ag');
+    root.querySelectorAll('details').forEach(d => d.open = true);
+    const box = document.body.appendChild(root);
+    box.style.cssText = 'position:fixed;left:0;top:0;width:1460px;background:#0a0d0c;z-index:99;padding:24px';
+    const num = [...box.querySelectorAll('.fst-n')].map(e => Math.round(e.getBoundingClientRect().left));
+    const panels = [...box.querySelectorAll('.fst>.fnx-pl, .fst>.fst-3')].map(e => Math.round(e.getBoundingClientRect().left));
+    const heads = [...box.querySelectorAll('.fnx-pl-h')].map(e => Math.round(e.getBoundingClientRect().height));
+    const mono = s2 => { const e = box.querySelector(s2); return e ? /Mono|mono/.test(getComputedStyle(e).fontFamily) : null; };
+    const cs = s2 => { const e = box.querySelector(s2); return e ? getComputedStyle(e) : null; };
+    const ow = cs('.fnx-ow');
+    const spine = box.querySelector('.fst') ? getComputedStyle(box.querySelector('.fst'), '::before').width : '';
+    return {
+      numLeft: [...new Set(num)], panelLeft: [...new Set(panels)],
+      headH: [...new Set(heads)],
+      oldBrk: box.querySelectorAll('.brk, .brk-card, .brk-top').length,
+      brkMono: mono('.fbr-v'), brkLbl: (cs('.fbr-r.hd') || {}).textTransform,
+      owRadius: ow ? ow.borderRadius : null, owBg: ow ? ow.backgroundColor : null,
+      owLbl: (cs('.fnx-ow-g span') || {}).textTransform,
+      spine: spine,
+      overflow: [...box.querySelectorAll('.fnx-pl, .fst-3, .fbr-r, .fnx-ow')]
+        .filter(e => e.scrollWidth > e.clientWidth + 1).length };
+  });
+  ok('номера шагов стоят на одной вертикали', D.numLeft.length === 1, D.numLeft);
+  ok('и все панели шагов начинаются с одной левой кромки', D.panelLeft.length === 1, D.panelLeft);
+  ok('между номерами протянута линия — лента читается как последовательность',
+    D.spine === '1px', D.spine);
+  ok('шапки панелей одной высоты, а не каждая своей', D.headH.length === 1, D.headH);
+  ok('старой карточки разбивки на экране нет', D.oldBrk === 0, D.oldBrk);
+  ok('разбивка набрана теми же моноширинными числами и капительными подписями',
+    D.brkMono === true && D.brkLbl === 'uppercase', [D.brkMono, D.brkLbl]);
+  ok('совладелец — ячейка панели, а не карточка внутри карточки',
+    D.owRadius === '0px' && /rgba\(0, 0, 0, 0\)|transparent/.test(D.owBg), [D.owRadius, D.owBg]);
+  ok('и его подписи — тот же капительный моноширинный', D.owLbl === 'uppercase', D.owLbl);
+  ok('ничего не вылезает за свои границы', D.overflow === 0, D.overflow);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
