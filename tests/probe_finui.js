@@ -65,7 +65,8 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
     return { hero: txt('.fnx-h-v').replace(/\s/g, ''), sub: txt('.fnx-h-sub').replace(/\s/g, ''),
       cards: d.querySelectorAll('.fnx-acc').length,
       res: d.querySelectorAll('.fnx-acc.res').length,
-      resTag: /резерв/.test(txt('.fnx-acc.res')),
+      resTag: /резерв/.test(txt('.fnx-acc.res .fnx-a-f')),
+      resNameFull: (txt('.fnx-acc.res .fnx-a-nm') || '').trim() === 'Резерв',
       negV: (d.querySelector('.fnx-a-v.neg') || {}).textContent || '',
       warn: /ушёл в минус/.test(d.textContent || ''),
       add: !!d.querySelector('.fnx-add'),
@@ -83,6 +84,8 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('минус на счету показан минусом, а не нулём',
     M.math.A === -700000 && /−\s*700/.test(M.negV.replace(/ /g, ' ')), [M.math.A, M.negV]);
   ok('и рядом сказано, что так обычно выглядит ошибка ввода', M.warn, M.warn);
+  ok('«резерв» стоит в подписи, а не съедает имя счёта',
+    M.resTag && M.resNameFull, [M.resTag, M.resNameFull]);
   ok('кнопка «+ счёт» стоит в том же ряду', M.add, M.add);
 
   /* Опечатка в дате — самая тихая из ошибок ввода: операция есть, а денег
