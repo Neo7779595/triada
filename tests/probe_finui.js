@@ -690,6 +690,119 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
     /запишу как есть/.test(WH.чужой) && WH.связь_чужого === '', WH);
   ok('уволенного в подсказках нет', WH.все.length === 3 && WH.все.indexOf('m4') < 0, WH.все);
 
+  console.log('[M] разбор проекта: из чего сложились деньги');
+  /* По строке проекта открывался мастер экономики: человек хотел посмотреть,
+     куда ушли деньги, а попадал в форму настройки. Разбор встал на клик,
+     мастер — на кнопку внизу справа.
+
+     ── На бумаге ───────────────────────────────────────────────────────
+     Проект DTRP1. Оплата клиента 30 000 000, возврат 1 000 000,
+     расходы 8 000 000 и 4 100 000. Аренда 2 000 000 без проекта.
+     Пришло    = 30 000 000 − 1 000 000 = 29 000 000
+     Потрачено = 8 000 000 + 4 100 000  = 12 100 000
+     Прибыль   = 29 000 000 − 12 100 000 = 16 900 000, маржа 58%
+     Операций в списке 4: аренда без проекта в него не входит.
+     Часы: трекер 21 ч + вручную 6 + 4,5 = 31,5 ч. Запись на 99 ч
+     помечена 2020 годом и в месяц не попадает.
+     Прибыль за час = 16 900 000 / 31,5 = 536 508. */
+  const сцена = () => page.evaluate(() => {
+    const z = v => String(v).padStart(2, '0');
+    const n = new Date(), Y = n.getFullYear(), M = n.getMonth() + 1;
+    const d = day => Y + '-' + z(M) + '-' + z(day);
+    window.__me = { id: 'u1', role: 'agency_owner' }; window.tMe = () => window.__me;
+    window._FINOFF = 0;
+    PROJECTS.length = 0;
+    PROJECTS.push({ id: 'a', name: 'DTRP1', status: 'active', mrr: 30000000, cost: 0,
+      finance: { hlog: [{ id: 'h1', label: 'Съёмка', h: 6, date: d(7) },
+                        { id: 'h2', label: 'Монтаж', h: 4.5, date: d(9) },
+                        { id: 'h3', label: 'Прошлый год', h: 99, date: '2020-01-01' }] } });
+    PROJECTS.push({ id: 'b', name: 'Чужой', status: 'active', mrr: 0, cost: 0 });
+    window.FINX = { ready: true, accounts: [{ id: 'W', name: 'Карта', kind: 'card', opening_balance: 0, sort: 1 }],
+      ops: [
+        { id: '1', op_date: d(5),  kind: 'income',     amount: 30000000, account_id: 'W', project_id: 'a', category: 'Оплата клиента' },
+        { id: '2', op_date: d(6),  kind: 'expense',    amount: 8000000,  account_id: 'W', project_id: 'a', category: 'Подрядчики', counterparty: 'Оператор', note: 'Съёмка ролика' },
+        { id: '3', op_date: d(8),  kind: 'expense',    amount: 4100000,  account_id: 'W', project_id: 'a', category: 'Реклама' },
+        { id: '4', op_date: d(9),  kind: 'expense',    amount: 2000000,  account_id: 'W', category: 'Аренда' },
+        { id: '5', op_date: d(10), kind: 'refund_out', amount: 1000000,  account_id: 'W', project_id: 'a' },
+        { id: '6', op_date: d(11), kind: 'expense',    amount: 7000000,  account_id: 'W', project_id: 'b', category: 'Реклама' },
+        { id: '7', op_date: (M > 1 ? Y : Y - 1) + '-' + z(M > 1 ? M - 1 : 12) + '-15',
+          kind: 'expense', amount: 3300000, account_id: 'W', project_id: 'a', category: 'Прошлый месяц' } ] };
+    window.FINP = []; window.FINO = []; window.FINS = {}; window.FINM = [];
+    window.LIVE = true;
+    return true;
+  });
+  const снять = () => page.evaluate(() => {
+    const box = document.getElementById('ov-fin');
+    const плитка = l => { const c = [...box.querySelectorAll('.fst-c')]
+      .filter(e => new RegExp(l).test((e.querySelector('.l') || {}).textContent || ''))[0];
+      return c ? { v: c.querySelector('.v').textContent.trim(),
+                   s: (c.querySelector('.s') || {}).textContent.trim() } : null; };
+    const кнопки = [...box.querySelectorAll('.modal-f button')]
+      .map(e => ({ t: e.textContent.trim(), on: e.getAttribute('onclick') || '' }));
+    return { пришло: плитка('^Пришло$'), потрачено: плитка('^Потрачено$'),
+      прибыль: плитка('^Прибыль$'), часы: плитка('^Часы за месяц$'), вчас: плитка('^Прибыль за час$'),
+      строки: [...box.querySelectorAll('.fnx-row')].map(r =>
+        (r.querySelector('.fnx-r-t') || {}).textContent + '|' + (r.querySelector('.fnx-r-a') || {}).textContent),
+      кнопки, заметка: ((box.querySelector('.fnx-fc-cov') || {}).textContent || '').replace(/\s+/g, ' ').trim() };
+  });
+
+  /* Раньше в этой же проверке падало сохранение счёта, а оно через 400 мс
+     само открывает окно счетов. Ждём, пока чужой таймер отработает, и только
+     потом открываем своё окно — иначе оно окажется закрыто чужой рукой. */
+  await сцена();
+  await page.waitForTimeout(700);
+  const PJ = await page.evaluate(() => {
+    const t = document.createElement('div'); t.innerHTML = finFactBlock();
+    const строка = [...t.querySelectorAll('.fnx-fc.clk')].filter(e => /DTRP1/.test(e.textContent))[0];
+    window.tProjectHours = async () => 21 * 3600;
+    finProjOpen('a');
+    const r = finProjOps('a', window.FINX.ops, _finMonth());
+    return { клик: строка ? строка.getAttribute('onclick') : '',
+      расчёт: { got: r.got, spent: r.spent, profit: r.profit, n: r.ops.length } };
+  });
+  await page.waitForTimeout(400);
+  const PV = await снять();
+
+  await сцена();
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { window.tProjectHours = async () => null; finProjOpen('a'); });
+  await page.waitForTimeout(300);
+  const БЕЗ = await снять();
+
+  await сцена();
+  await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    window.FINX.ops = window.FINX.ops.filter(o => o.kind === 'income');
+    window.tProjectHours = async () => 3600; finProjOpen('a');
+  });
+  await page.waitForTimeout(300);
+  const ПУСТО = await снять();
+  await page.evaluate(() => finClose());
+
+  ok('строка проекта открывает разбор, а не форму настройки',
+    /finProjOpen/.test(PJ.клик) && !/finEcoOpen/.test(PJ.клик), PJ.клик);
+  ok('пришло 29 000 000 — возврат вычтен', PJ.расчёт.got === 29000000, PJ.расчёт);
+  ok('потрачено 12 100 000 — только привязанное к проекту',
+    PJ.расчёт.spent === 12100000, PJ.расчёт);
+  ok('прибыль 16 900 000 и маржа 58%',
+    PJ.расчёт.profit === 16900000 && /58%/.test((PV.прибыль || {}).s || ''), [PJ.расчёт, PV.прибыль]);
+  ok('в списке 4 операции: чужой проект, расход без проекта и прошлый месяц не попали',
+    PJ.расчёт.n === 4 && PV.строки.length === 4
+    && !PV.строки.join('|').includes('7 000 000')
+    && !PV.строки.join('|').includes('2 000 000')
+    && !PV.строки.join('|').includes('3 300 000'), PV.строки);
+  ok('часы за месяц — трекер плюс вписанные руками, 31 ч 30 мин',
+    /31 ч 30 мин/.test((PV.часы || {}).v || ''), PV.часы);
+  ok('запись за другой год в месяц не попала', !/99/.test((PV.часы || {}).v || ''), PV.часы);
+  ok('прибыль за час 536 508 — и сказано, что делят одно на другое за тот же месяц',
+    /536 508/.test((PV.вчас || {}).v || '') && /за тот же месяц/.test((PV.вчас || {}).s || ''), PV.вчас);
+  ok('не пришли часы — число не выдумывается',
+    (БЕЗ.вчас || {}).v === '—' && /делить нельзя/.test((БЕЗ.вчас || {}).s || ''), БЕЗ.вчас);
+  ok('проект без единого расхода честно помечен, а не показан прибыльным на сто процентов',
+    /не привязан ни один расход/.test(ПУСТО.заметка), ПУСТО.заметка.slice(0, 200));
+  ok('мастер экономики — кнопка внизу справа, а не клик по строке',
+    PV.кнопки.length === 2 && /Настроить расходы/.test(PV.кнопки[1].t) && /finEcoOpen/.test(PV.кнопки[1].on), PV.кнопки);
+
   await page.evaluate(() => { const d = document.getElementById('fnx-probe'); if (d) d.remove(); finClose(); });
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
