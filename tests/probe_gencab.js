@@ -121,6 +121,55 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('и её нет там, где не задана', L.нет === 'none', L);
   ok('ссылка из одних пробелов за ссылку не считается', L.пробелы === 'none', L);
 
+  console.log('\n[E] строка раздела выглядит строкой, а не слипшимся текстом');
+  /* Строка — это <label> внутри .fld, а общий стиль .fld label ставит
+     display:block и ПРОПИСНЫЕ. Селектор в один класс проигрывал ему по весу,
+     и вместо ряда с переключателем выходило «ФИНАНСЫвыключен» без пробела. */
+  const S = await page.evaluate(() => {
+    /* Меряем только на открытом окне: у скрытого все прямоугольники нулевые,
+       и проверка на размер переключателя проверяла бы саму себя. */
+    document.getElementById('ov-agency').classList.add('on');
+    document.getElementById('f-mods-fld').style.display = '';
+    agModsRender({ finance: false });
+    const r = document.querySelector('#f-mods .agmod-r');
+    const cs = getComputedStyle(r);
+    const n = r.querySelector('.agmod-n'), sw = r.querySelector('input');
+    const cn = getComputedStyle(n), cw = getComputedStyle(sw);
+    const порядок = [...r.children].map(x => x.tagName === 'INPUT' ? 'переключатель' : x.className);
+    return { раскладка: cs.display, зазор: cs.gap, регистр: cn.textTransform,
+      имя: n.textContent, порядок,
+      ширинаПереключателя: Math.round(sw.getBoundingClientRect().width),
+      кругл: cw.borderRadius, свой: cw.appearance,
+      налезает: Math.round(n.getBoundingClientRect().right) <= Math.round(sw.getBoundingClientRect().left) };
+  });
+  ok('строка — ряд, а не блок', S.раскладка === 'flex' && S.зазор !== 'normal', S);
+  ok('название раздела набрано как название, а не капсом', S.регистр === 'none' && S.имя === 'Финансы', S);
+  ok('переключатель — переключатель, а не квадратик по умолчанию',
+    S.свой === 'none' && S.ширинаПереключателя >= 30 && /999|9999/.test(S.кругл), S);
+  ok('название, состояние и переключатель идут в этом порядке и не налезают',
+    S.порядок.join(',') === 'agmod-n,agmod-s,переключатель' && S.налезает === true, S);
+
+  console.log('\n[F] окно правки агентства помещается на экран ноутбука');
+  /* Полей в окне девять плюс блок разделов. На экране 900 пикселей окно
+     переставало помещаться, и кнопки «Отмена» и «Сохранить» уезжали за
+     нижний край: человек не видел, чем закончить. */
+  const W = await page.evaluate(() => {
+    const ov = document.getElementById('ov-agency');
+    document.getElementById('f-mods-fld').style.display = '';
+    agModsRender({ finance: true });
+    ov.classList.add('on');
+    const m = ov.querySelector('.modal'), b = m.querySelector('.modal-b'), f = m.querySelector('.modal-f');
+    const rm = m.getBoundingClientRect(), rf = f.getBoundingClientRect();
+    return { окно: Math.round(rm.height), экран: window.innerHeight,
+      низКнопок: Math.round(rf.bottom), кнопкиВидны: rf.bottom <= window.innerHeight,
+      телоПрокручивается: getComputedStyle(b).overflowY,
+      шапкаНеЖмётся: getComputedStyle(m.querySelector('.modal-h')).flexGrow };
+  });
+  ok('окно не выше экрана', W.окно <= W.экран, W);
+  ok('кнопки «Отмена» и «Сохранить» видны без прокрутки страницы', W.кнопкиВидны === true, W);
+  ok('прокручивается тело окна, а не всё окно целиком',
+    W.телоПрокручивается === 'auto' || W.телоПрокручивается === 'scroll', W);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
