@@ -523,6 +523,61 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('на пределе истории назад больше нельзя — и это видно',
     NV.edge && NV.edge.back === true && NV.edge.fwd === false, NV.edge);
 
+  console.log('[X] пояснение под числами — низ той же панели, а не плашка под ней');
+  /* Числа держали скругление со всех четырёх сторон и собственную тень, а
+     пояснение начиналось своим прямым верхом. Две кромки вставали друг
+     напротив друга, между ними падала тень — и текст, который объясняет
+     стоящие над ним числа, читался как чужой блок. */
+  const NT = await page.evaluate(() => {
+    /* Своя сцена: пояснения появляются только там, где есть что пояснять,
+       и правило про одну панель должно держаться на всех сразу. */
+    const z = v => String(v).padStart(2, '0'); const n = new Date();
+    const td = n.getFullYear() + '-' + z(n.getMonth() + 1) + '-01';
+    window._FINOFF = 0;
+    PROJECTS.length = 0;
+    PROJECTS.push({ id: 'a', name: 'АЛЬФА', status: 'active', mrr: 45000000, cost: 20000000 });
+    window.FINX = { ready: true, accounts: [
+      { id: 'W', name: 'Карта', kind: 'card', opening_balance: 5000000, sort: 1 }],
+      ops: [ { id: '1', op_date: td, kind: 'income',  amount: 45000000, account_id: 'W', project_id: 'a', category: 'Оплата' },
+             { id: '2', op_date: td, kind: 'expense', amount: 22000000, account_id: 'W', category: 'Зарплаты' } ] };
+    window.FINP = [{ id: 'p', flow: 'out', title: 'Зарплаты', amount: 22000000, every: 'month',
+      day_of_month: 5, category: 'Зарплаты' }];
+    window.FINO = []; window.FINM = [];
+    window.FINS = { owners_pct: 40, reserve_pct: 15, charity_pct: 5, reserve_target_months: 3 };
+    window.FINANCE = { ready: true, projects: PROJECTS, rows: PROJECTS, totalMrr: 45000000,
+      totalCost: 20000000, profit: 25000000, marginPct: 56, costPct: 44, paying: 1, total: 1,
+      avgMrr: 45000000, totalHours: 0, profitPerHour: 0, services: [], tariffs: [], snapshots: [],
+      prevSnap: null, cats: [] };
+    renderFinance();
+    const cs = e => e ? getComputedStyle(e) : null;
+    const pairs = [...document.querySelectorAll('#content-ag .fst-note')]
+      .map(note => ({ note, grid: note.previousElementSibling }))
+      .filter(p => p.grid && p.grid.classList.contains('fst-3'));
+    if (!pairs.length) return { n: 0 };
+    const drop = s => /rgba?\([^)]*\)\s+0px\s+26px\s+60px|0px 26px 60px/.test(s || '');
+    const bad = { нижнее_скругление_у_чисел: 0, тень_у_чисел: 0,
+      нет_скругления_у_пояснения: 0, нет_тени_у_пояснения: 0, шов: 0 };
+    pairs.forEach(({ note, grid }) => {
+      const g = cs(grid), t = cs(note);
+      if (g.borderBottomLeftRadius !== '0px' || g.borderBottomRightRadius !== '0px')
+        bad.нижнее_скругление_у_чисел++;
+      if (drop(g.boxShadow)) bad.тень_у_чисел++;
+      if (t.borderBottomLeftRadius === '0px' || t.borderBottomRightRadius === '0px')
+        bad.нет_скругления_у_пояснения++;
+      if (!drop(t.boxShadow)) bad.нет_тени_у_пояснения++;
+      if (t.borderTopStyle !== 'none' || t.marginTop !== '-1px') bad.шов++;
+    });
+    return { n: pairs.length, bad, пример: cs(pairs[0].grid).borderRadius + ' / ' + cs(pairs[0].note).borderRadius };
+  });
+  ok('на экране есть числа с пояснением под ними', NT.n >= 2, NT.n);
+  ok('числа не закругляются снизу — панель на них не заканчивается',
+    NT.bad && NT.bad.нижнее_скругление_у_чисел === 0, NT);
+  ok('и не отбрасывают свою тень на пояснение', NT.bad && NT.bad.тень_у_чисел === 0, NT);
+  ok('скругление и тень достались пояснению: панель одна',
+    NT.bad && NT.bad.нет_скругления_у_пояснения === 0 && NT.bad.нет_тени_у_пояснения === 0, NT);
+  ok('между числами и пояснением нет шва — одна общая линия',
+    NT.bad && NT.bad.шов === 0, NT);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
