@@ -28,6 +28,11 @@ const stripMinus = s => norm(s).replace(/^-\s*/, '');
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
   await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1300);
+
+  /* В продукте из калькулятора оставлены «Быстрые расчёты»: остальные вкладки
+     и строка расчёта выключены. Проверки на них не выкинуты — они охраняют
+     то, что вернётся, как только вкладки включат обратно. */
+  await page.evaluate(() => { if (window.MK_UI) { MK_UI.tabs = MK_TABS.map(t => t[0]); MK_UI.bar = true; } });
   const frames = async (n = 4) => { for (let i = 0; i < n; i++) await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))); };
 
   await page.evaluate(() => {

@@ -26,6 +26,17 @@ const setup = () => {
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
   await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1400);
+
+  /* В продукте из калькулятора оставлены «Быстрые расчёты»: остальные вкладки
+     и строка расчёта выключены. Проверки на них не выкинуты — они охраняют
+     то, что вернётся, как только вкладки включат обратно. Поэтому здесь
+     включаем всё, а «что показано по умолчанию» проверяется отдельно. */
+  await page.evaluate(() => { if (window.MK_UI) {
+    /* Что стоит по умолчанию — запоминаем до того, как включим всё:
+       иначе проверка «оставлены быстрые расчёты» проверяла бы саму себя. */
+    window.__MK_DEF = { tabs: MK_UI.tabs.slice(), bar: MK_UI.bar };
+    MK_UI.tabs = MK_TABS.map(t => t[0]); MK_UI.bar = true;
+  } });
   await page.evaluate(setup);
   await page.waitForTimeout(700);
   await page.evaluate(() => { MK.cur = 'usd'; MK.rate = 12800; if (typeof mkTab === 'function') mkTab('quick'); });
@@ -129,6 +140,48 @@ const setup = () => {
   ok('и на кнопке видно его имя', pick.lbl === 'APOLO COFFEE', pick);
   ok('метка пустого выбора снята', pick.isPh === false, pick);
   ok('кнопка осталась на своей линии', pick.top === pick.barTop, pick);
+
+  console.log('\n[G] в калькуляторе оставлены «Быстрые расчёты»');
+  /* Решение владельца: из калькулятора остаётся одна вкладка. Остальные и
+     строка расчёта — название, проект, сохранение, копирование, печать —
+     выключены, а не удалены: код и проверки на месте.
+
+     Когда вкладка одна, полосы вкладок нет вовсе: ряд из одной кнопки,
+     которая ведёт туда, где ты и так стоишь, — не навигация, а украшение.
+     Наверху остаётся выбор валюты и курс: без них цифры нечем читать. */
+  const ONLY = await page.evaluate(() => {
+    MK_UI.tabs = ['quick']; MK_UI.bar = false;
+    MK.tab = 'funnel';                       // как будто пришли с прежней вкладки
+    renderCalc();
+    const host = document.getElementById('content-ag');
+    const bar = host.querySelector('.mk-bar');
+    return {
+      вкладка: MK.tab,
+      кнопокВкладок: host.querySelectorAll('.mk-tab').length,
+      полосаРасчёта: host.querySelectorAll('#mk-bar2').length,
+      валюта: [...host.querySelectorAll('.mk-cur button')].map(b => b.textContent.trim()),
+      курс: !!host.querySelector('.mk-rate input'),
+      карточек: host.querySelectorAll('.mk-qc').length,
+      наСкрытую: (function () { mkTab('media'); return MK.tab; })(),
+      верх: bar ? bar.textContent.replace(/\s+/g, ' ').trim() : null
+    };
+  });
+  const DEF = await page.evaluate(() => window.__MK_DEF || null);
+  ok('по умолчанию в продукте включена одна вкладка — быстрые расчёты',
+    DEF && DEF.tabs.join(',') === 'quick', DEF);
+  ok('и строка расчёта по умолчанию выключена', DEF && DEF.bar === false, DEF);
+  ok('вход в калькулятор сразу открывает быстрые расчёты', ONLY.вкладка === 'quick', ONLY.вкладка);
+  ok('и сохранённый расчёт с выключенной вкладки туда же не уводит',
+    ONLY.карточек === 16, ONLY.карточек);
+  ok('полосы вкладок нет — из одной кнопки навигацию не делают',
+    ONLY.кнопокВкладок === 0, ONLY.кнопокВкладок);
+  ok('строки расчёта нет: ни названия, ни проекта, ни сохранения с печатью',
+    ONLY.полосаРасчёта === 0, ONLY.полосаРасчёта);
+  ok('наверху остались только валюта и курс',
+    ONLY.валюта.join('/') === 'сум/$' && ONLY.курс === true && ONLY.верх === 'сум $ курс', ONLY);
+  ok('переход на выключенную вкладку не проходит даже из кода',
+    ONLY.наСкрытую === 'quick', ONLY.наСкрытую);
+  await page.evaluate(() => { MK_UI.tabs = MK_TABS.map(t => t[0]); MK_UI.bar = true; });
 
   ok('страница без ошибок', errs.length === 0, errs.slice(0, 2));
   console.log('\n──────── ' + pass + ' ok · ' + fail + ' fail ────────');
