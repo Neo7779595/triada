@@ -103,6 +103,11 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
 
   console.log('[C] проводки распределения не уходят со счёта-фонда');
   const WA = await page.evaluate(() => {
+    /* Сцена [B] уже перевела в резерв и фонд ровно их доли, и распределению
+       после исправления двойного откладывания переводить стало нечего.
+       Здесь проверяется не сумма, а выбор счёта, — поэтому переводы из
+       сцены убираем, оставляя приход и расход. */
+    window.FINX.ops = (window.FINX.ops || []).filter(o => o.kind !== 'transfer');
     window.FINX.accounts = [
       { id: 'C', name: 'Фонд', kind: 'bank', opening_balance: 0, purpose: 'charity', sort: 1 },
       { id: 'W', name: 'Карта', kind: 'card', opening_balance: 0, purpose: 'active', sort: 2 },
