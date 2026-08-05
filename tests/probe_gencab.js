@@ -170,6 +170,73 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('прокручивается тело окна, а не всё окно целиком',
     W.телоПрокручивается === 'auto' || W.телоПрокручивается === 'scroll', W);
 
+  console.log('\n[G] собственный кабинет владельца — не выручка платформы');
+  /* Тариф собственному агентству нужен ради лимитов, но платить самому себе
+     нельзя. Пока такие кабинеты считались наравне с клиентскими, платформа
+     показывала доход, которого не существует, и портила себе и MRR, и
+     средний чек, и «сколько платящих». */
+  const O = await page.evaluate(() => {
+    TARIFFS.length = 0; TARIFFS.push({ key: 'p1', price: 299000 }, { key: 'p2', price: 159000 });
+    AGENCIES.length = 0;
+    AGENCIES.push({ id: 'a1', name: 'Своё', plan: 'p1', status: 'active', mrr: 0, isOwn: true });
+    AGENCIES.push({ id: 'a2', name: 'Клиент', plan: 'p2', status: 'active', mrr: 0, isOwn: false });
+    agEnrichMrr();
+    const до = { своё: AGENCIES[0].mrr, клиент: AGENCIES[1].mrr,
+      платящих: payingCount(AGENCIES), mrr: platMrr(AGENCIES) };
+    /* Сняли признак — кабинет снова считается клиентским. */
+    AGENCIES[0].isOwn = false; delete AGENCIES[0]._mrrDb; agEnrichMrr();
+    return { до, послеСнятия: AGENCIES[0].mrr, платящихПосле: payingCount(AGENCIES) };
+  });
+  ok('своему кабинету выручка не начисляется', O.до.своё === 0, O.до);
+  ok('а клиентскому — по цене его тарифа', O.до.клиент === 159000, O.до);
+  ok('в MRR платформы и в «платящих» своё не попадает',
+    O.до.mrr === 159000 && O.до.платящих === 1, O.до);
+  ok('признак снимается — кабинет снова считается клиентом',
+    O.послеСнятия === 299000 && O.платящихПосле === 2, O);
+
+  const OF = await page.evaluate(() => {
+    const c = document.getElementById('f-own');
+    if (!c) return { нет: true };
+    c.checked = true; agOwnSync();
+    const вкл = { знач: agOwnValue(), подпись: document.getElementById('f-own-s').textContent,
+      класс: c.closest('.agmod-r').classList.contains('on') };
+    c.checked = false; agOwnSync();
+    return { вкл, выкл: { знач: agOwnValue(), подпись: document.getElementById('f-own-s').textContent } };
+  });
+  ok('признак переключается из окна агентства, а не только в базе',
+    OF.вкл && OF.вкл.знач === true && OF.выкл.знач === false, OF);
+  ok('и подписан словами, а не одной галочкой',
+    OF.вкл.подпись === 'наше' && OF.выкл.подпись === 'клиент' && OF.вкл.класс === true, OF);
+
+  /* Признак живёт в базе, а считается в интерфейсе: если он потеряется по
+     дороге, выручка молча вернётся — цифра неверная, а видимых поломок нет. */
+  const MAP = await page.evaluate(() => {
+    const c = { emp: {}, cl: {}, pr: {}, seen: {}, online: {} };
+    return { своё: mapAgency({ id: 'x', name: 'n', slug: 's', plan: 'p', status: 'active', is_own: true }, c).isOwn,
+      клиент: mapAgency({ id: 'y', name: 'n', slug: 's', plan: 'p', status: 'active', is_own: false }, c).isOwn,
+      безПоля: mapAgency({ id: 'z', name: 'n', slug: 's', plan: 'p', status: 'active' }, c).isOwn };
+  });
+  ok('признак доезжает из базы в интерфейс и не выдумывается',
+    MAP.своё === true && MAP.клиент === false && MAP.безПоля === false, MAP);
+
+  /* И уезжает обратно: окно, которое показывает переключатель, но не пишет
+     его в базу, — худший вид поломки: человек уверен, что сохранил. */
+  const SAVE = await page.evaluate(() => {
+    const было = window.LIVE, ту = window.tUpdateAgency;
+    let патч = null;
+    window.LIVE = true; window.tUpdateAgency = (id, p) => { патч = p; };
+    AGENCIES.length = 0;
+    AGENCIES.push({ id: 'a9', name: 'Своё', slug: 'own', plan: 'p1', status: 'active',
+      mrr: 0, isOwn: false, accent: '#37E6C8', logoUrl: '', vertical: '—', owner: 'o', modules: {} });
+    openAgency('a9');
+    document.getElementById('f-own').checked = true; agOwnSync();
+    saveAgency();
+    window.LIVE = было; window.tUpdateAgency = ту;
+    return { есть: патч && Object.prototype.hasOwnProperty.call(патч, 'is_own'), знач: патч && патч.is_own };
+  });
+  ok('переключатель уезжает в базу вместе с остальными полями',
+    SAVE.есть === true && SAVE.знач === true, SAVE);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
