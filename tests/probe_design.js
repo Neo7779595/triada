@@ -18,6 +18,11 @@ const css = html.slice(cssStart, html.indexOf('Почта сотрудника �
   await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
 
+  /* В продукте из калькулятора оставлены «Быстрые расчёты»: остальные вкладки
+     и строка расчёта выключены. Проверки на них не выкинуты — они охраняют
+     то, что вернётся, как только вкладки включат обратно. */
+  await page.evaluate(() => { if (window.MK_UI) { MK_UI.tabs = MK_TABS.map(t => t[0]); MK_UI.bar = true; } });
+
   console.log('\n[A] шкала, а не значения «на глаз»');
   const sizes = [...new Set((css.match(/font-size:([\d.]+)px/g) || []))];
   const radii = [...new Set((css.match(/border-radius:([\d.]+)px/g) || []))];

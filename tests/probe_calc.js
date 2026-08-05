@@ -27,6 +27,12 @@ const CFG = {
   await page.goto('http://127.0.0.1:8897/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
 
+  /* В продукте из калькулятора оставлены «Быстрые расчёты»: остальные вкладки
+     и строка расчёта выключены. Проверки на них не выкинуты — они охраняют
+     то, что вернётся, как только вкладки включат обратно. Поэтому здесь
+     включаем всё, а «что показано по умолчанию» проверяется отдельно. */
+  await page.evaluate(() => { if (window.MK_UI) { MK_UI.tabs = MK_TABS.map(t => t[0]); MK_UI.bar = true; } });
+
   console.log('\n[A] «не посчитать» — это прочерк, а не ноль');
   const A = await page.evaluate(() => ({
     n: [MKC.num('1 200 000'), MKC.num('12,5'), MKC.num(''), MKC.num('абв'), MKC.num(0)],
