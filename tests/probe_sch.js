@@ -153,18 +153,26 @@ const setup = () => {
   ok('«весь день» набрано меткой', st.adCase === 'uppercase', st.adCase);
 
   console.log('\n[D] идёт сейчас — карточка говорит об этом сама');
+  /* Идущих сейчас броней может быть больше одной: сцена ставит смену на среду
+     с 16:00 до 19:20, и один день в неделю прогон попадает внутрь этого окна.
+     Правило звучит как «идущая помечена», а не «идущая ровно одна» — так и
+     проверяем, иначе тест краснеет по средам после четырёх. */
   const live = await page.evaluate(() => {
-    const el = document.querySelector('.sched-chip.live');
-    if (!el) return { none: true };
-    const chip = el.querySelector('.sched-chip-now');
+    const els = [...document.querySelectorAll('.sched-chip.live')];
+    if (!els.length) return { none: true };
+    const el = els[0], chip = el.querySelector('.sched-chip-now');
     const others = [...document.querySelectorAll('.sched-chip')].filter(x => !x.classList.contains('live'));
-    return { txt: chip ? chip.textContent.trim() : null, title: el.querySelector('.sched-chip-tt').textContent,
+    return { txt: chip ? chip.textContent.trim() : null,
+      titles: els.map(x => x.querySelector('.sched-chip-tt').textContent),
+      безМетки: els.filter(x => !x.querySelector('.sched-chip-now')).length,
       border: getComputedStyle(el).borderTopColor, anim: chip ? getComputedStyle(chip).animationName : null,
       shadow: chip ? getComputedStyle(chip).boxShadow : null,
       othersMarked: others.filter(x => x.querySelector('.sched-chip-now')).length };
   });
-  ok('у идущей сейчас брони стоит метка «сейчас»', live.txt === 'сейчас', live);
-  ok('и это именно та бронь, которая идёт', /Съёмка в студии/.test(live.title || ''), live.title);
+  ok('у идущей сейчас брони стоит метка «сейчас»',
+    live.txt === 'сейчас' && live.безМетки === 0, live);
+  ok('и помечена именно та бронь, которая идёт',
+    (live.titles || []).some(t => /Съёмка в студии/.test(t)), live.titles);
   ok('метка не мигает', live.anim === 'none', live.anim);
   ok('и не светится — только кант', outerShadow(live.shadow).length === 0, live.shadow);
   ok('остальные брони меткой не помечены', live.othersMarked === 0, live.othersMarked);
