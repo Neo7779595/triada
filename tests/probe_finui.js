@@ -605,6 +605,91 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('и рядом сказано, что сверка — последнее средство, а не первое',
     /внесите её обычной записью/.test(RC.hint), RC.hint);
 
+  console.log('[K] статьи — справочник агентства, а не закон');
+  /* Зашитый список статей подходит одному агентству и не подходит
+     следующему: у одних «Реклама» и «Софт», у других «Аренда студии» и
+     «Свет». Свою статью надо уметь завести и убрать, но убранная статья
+     не имеет права переписать журнал — записанное ею остаётся записанным. */
+  const CT = await page.evaluate(() => {
+    window.__me = { id: 'u1', role: 'agency_owner' }; window.tMe = () => window.__me;
+    PROJECT_TAGS.fincat_exp = ['Аренда студии', 'Свет', 'Зарплаты'];
+    PROJECT_TAGS.fincat_inc = [];
+    window.FINX = { ready: true, accounts: [{ id: 'W', name: 'Карта', kind: 'card', opening_balance: 0, sort: 1 }],
+      ops: [{ id: 'o', op_date: '2026-08-01', kind: 'expense', amount: 1000000, account_id: 'W', category: 'Свет' }] };
+    window.FINP = []; window.FINO = []; window.FINS = {}; window.FINM = [];
+    finOpOpen('expense');
+    const box = document.querySelector('.modal');
+    const свои = [...document.querySelectorAll('#fnx-o-ct-list .dd-opt')].map(e => e.textContent.trim());
+    const удалить = document.querySelectorAll('#fnx-o-ct-list .cmb-del').length;
+    /* при пустом справочнике прихода подставляются встроенные — иначе
+       на чистой базе выбирать было бы не из чего */
+    finOpOpen('income');
+    const встроенные = [...document.querySelectorAll('#fnx-o-ct-list .dd-opt')].map(e => e.textContent.trim());
+    finOpOpen('expense');
+    // новая статья заводится прямо из поля
+    const q = document.getElementById('fnx-o-ct-q'); q.value = 'Свет и звук'; cmbFilter('fnx-o-ct');
+    const создать = !!document.querySelector('#fnx-o-ct-list .cmb-new');
+    document.querySelector('#fnx-o-ct-list .cmb-new').click();
+    const после = document.getElementById('fnx-o-ct').value;
+    const подпись = (document.getElementById('fnx-o-ct-lbl') || {}).textContent;
+    finClose();
+    return { свои, удалить, встроенные, создать, после, подпись,
+      системных: box ? box.querySelectorAll('select, datalist, input[list]').length : -1 };
+  });
+  ok('в списке стоят статьи агентства, а не зашитые в код',
+    CT.свои.join('|') === 'Аренда студии|Свет|Зарплаты', CT.свои);
+  ok('у каждой статьи есть чем её убрать', CT.удалить === 3, CT.удалить);
+  ok('на пустом справочнике подставляются встроенные — выбирать всегда есть из чего',
+    CT.встроенные.length >= 3 && CT.встроенные.indexOf('Абонплата') >= 0, CT.встроенные);
+  ok('новая статья заводится прямо в форме', CT.создать === true, CT.создать);
+  ok('и сразу становится выбранной — записано и показано одно и то же',
+    CT.после === 'Свет и звук' && CT.подпись === 'Свет и звук', CT);
+  ok('ни одного системного списка в окне операции не появилось', CT.системных === 0, CT.системных);
+
+  console.log('[L] «Кому» узнаёт своих, но не мешает вписать чужого');
+  /* Здесь стоял системный datalist: подсказки рисовал браузер, и он же
+     принимал поле за адресное — поверх имён всплывал автозаполнитель с
+     чужими адресами. А имя, набранное руками, оставалось строкой: на
+     вопрос «сколько мы заплатили этому человеку» ответить было нечем. */
+  const WH = await page.evaluate(() => {
+    TEAM.length = 0;
+    TEAM.push({ _id: 'm1', name: 'Абдурауф Каримов', role: 'Дизайнер', color: '#37E6C8' });
+    TEAM.push({ _id: 'm2', name: 'Нурислам Холмирзаев', role: 'Монтажёр', color: '#8A8FFF' });
+    TEAM.push({ _id: 'm3', name: 'Мира Юсупова', role: 'Копирайтер', color: '#E3B567' });
+    TEAM.push({ _id: 'm4', name: 'Уволенный', role: 'Дизайнер', color: '#888', archived_at: '2026-01-01' });
+    finOpOpen('expense');
+    const cp = document.getElementById('fnx-o-cp'), mid = document.getElementById('fnx-o-cp-mid');
+    const автозаполнение = cp.getAttribute('autocomplete');
+    cp.value = 'нур'; finWhoType('fnx-o-cp');
+    const найдено = [...document.querySelectorAll('#fnx-o-cp-list .fnw-o')]
+      .map(e => e.textContent.replace(/\s+/g, ' ').trim());
+    const аватар = document.querySelectorAll('#fnx-o-cp-list .fnw-o .sel-av').length;
+    finWhoPick('fnx-o-cp', document.querySelector('#fnx-o-cp-list .fnw-o').dataset.v);
+    const выбрано = { имя: cp.value, связь: mid.value };
+    cp.value = 'Нурислам Х'; finWhoType('fnx-o-cp');
+    const после_правки = mid.value;
+    cp.value = 'ООО Свет и Звук'; finWhoType('fnx-o-cp');
+    const чужой = ((document.querySelector('#fnx-o-cp-list .fnw-free') || {}).textContent || '').replace(/\s+/g, ' ').trim();
+    const связь_чужого = mid.value;
+    cp.value = ''; finWhoType('fnx-o-cp');
+    const все = [...document.querySelectorAll('#fnx-o-cp-list .fnw-o')].map(e => e.dataset.v);
+    finClose();
+    return { автозаполнение, найдено, аватар, выбрано, после_правки, чужой, связь_чужого, все };
+  });
+  ok('подсказки рисует модуль, а не браузер — автозаполнение выключено',
+    WH.автозаполнение === 'off', WH.автозаполнение);
+  ok('набрал часть имени — вышел один человек, а не весь список',
+    WH.найдено.length === 1 && /Нурислам Холмирзаев/.test(WH.найдено[0]), WH.найдено);
+  ok('и он назван должностью и показан лицом, а не одной строкой',
+    /Монтажёр/.test(WH.найдено[0]) && WH.аватар === 1, WH);
+  ok('выбор связывает операцию с человеком, а не только вписывает имя',
+    WH.выбрано.имя === 'Нурислам Холмирзаев' && WH.выбрано.связь === 'm2', WH.выбрано);
+  ok('правка имени после выбора рвёт связь: к человеку не привязано чужое имя',
+    WH.после_правки === '', WH.после_правки);
+  ok('чужого можно вписать как есть — и сказано, что он не из команды',
+    /запишу как есть/.test(WH.чужой) && WH.связь_чужого === '', WH);
+  ok('уволенного в подсказках нет', WH.все.length === 3 && WH.все.indexOf('m4') < 0, WH.все);
+
   await page.evaluate(() => { const d = document.getElementById('fnx-probe'); if (d) d.remove(); finClose(); });
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));

@@ -578,6 +578,44 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('между числами и пояснением нет шва — одна общая линия',
     NT.bad && NT.bad.шов === 0, NT);
 
+  /* Обратная беда той же правки: пояснение стало низом панели, но своего
+     нижнего отступа у него не было. Под ним, в шаге «Следующий месяц»,
+     сразу шли «Ближайшие платежи» — и две скруглённые кромки вставали
+     вплотную, панели слипались. Шаг между панелями в модуле один и тот
+     же, 12; проверка меряет его у всех соседей сразу, а не у этой пары. */
+  const GAP = await page.evaluate(() => {
+    /* вкладка агентства обычно скрыта — без этого у всего нулевые размеры,
+       и проверка на зазоры прошла бы, ничего не измерив */
+    const el = document.getElementById('content-ag');
+    let up = el;
+    while (up && up !== document.body) {
+      up.style.setProperty('display', 'block', 'important');
+      up.style.setProperty('visibility', 'visible', 'important');
+      up = up.parentElement;
+    }
+    document.querySelectorAll('[id^="content-"]').forEach(e => {
+      if (e !== el) e.style.setProperty('display', 'none', 'important');
+    });
+    const слиплись = [], измерено = [];
+    document.querySelectorAll('#content-ag section.fst').forEach(sec => {
+      const t = ((sec.querySelector('.fst-t') || {}).textContent || '?').trim();
+      const kids = [...sec.children].filter(e => !/fst-h/.test(String(e.className)));
+      for (let i = 0; i + 1 < kids.length; i++) {
+        const a = kids[i], b2 = kids[i + 1];
+        const g = Math.round(b2.getBoundingClientRect().top - a.getBoundingClientRect().bottom);
+        /* −1 — намеренный стык чисел и пояснения: это одна панель */
+        const шов = a.classList.contains('fst-3') && b2.classList.contains('fst-note');
+        if (шов) continue;
+        измерено.push(t + ': ' + g);
+        if (g < 10) слиплись.push(t + ' · ' + String(a.className).slice(0, 20)
+          + ' → ' + String(b2.className).slice(0, 20) + ' · зазор ' + g);
+      }
+    });
+    return { слиплись, измерено, всего: измерено.length };
+  });
+  ok('зазоры между панелями шагов вообще измерены, а не приняты на веру', GAP.всего >= 3, GAP);
+  ok('ни одна панель внутри шага не прилипла к соседней', GAP.слиплись.length === 0, GAP.слиплись);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
