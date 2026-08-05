@@ -242,6 +242,78 @@ const setup = (D) => {
   ok('заголовок помещается в одну строку', mob.titleLines === 1, mob.titleLines);
   ok('кнопка «Добавить часы» ушла на свою строку', mob.btnRow !== null && mob.btnRow > 0, mob.btnRow);
 
+  console.log('\n[K] «Добавить часы» открывает часы, а не всю экономику проекта');
+  /* Раздел «Финансы» агентству не показывают. Пока кнопка вела в полное окно
+     «Финансы проекта», спрятанное открывалось с чёрного хода: услуги клиента,
+     гонорары команды, P&L. Теперь окно одно, а видов у него два. */
+  const HOURS = await page.evaluate(() => {
+    window.LIVE = false; window.toast = () => {};
+    FINANCE = { ready: true, projects: [{ id: 'p1', name: 'Q', logo: 'Q', logoUrl: null, mrr: 6600000, _svcs: null,
+      finance: { salaries: [{ name: 'Оператор', role: 'Оператор', unit: 'piece', rate: 450000, qty: 16, amount: 7200000 }],
+        opex: [], projex: [], hlog: [{ id: 'h1', label: 'Съёмка', h: 4, date: '2026-07-20', note: '' }], hours: 4 } }] };
+    window.FINANCE = FINANCE;
+    pd2Close(); openProjHours('p1');
+    const m = document.querySelector('#ov-pd2 .modal');
+    const txt = m.textContent.replace(/\s+/g, ' ');
+    return {
+      вид: m.className,
+      заголовок: (m.querySelector('h3') || {}).textContent,
+      справочники: m.querySelectorAll('.pf-cat-btn').length,
+      услуги: m.querySelectorAll('.pf-sec-svc').length,
+      разделов: m.querySelectorAll('.pf-sec').length,
+      pl: m.querySelectorAll('.pf-pl').length,
+      часовыхСтрок: m.querySelectorAll('.pf-row-h').length,
+      кнопка: (m.querySelector('.modal-f .btn-add') || {}).textContent,
+      /* Подпись кнопки — ещё не поведение: она может обещать часы и вызывать
+         сохранение всего P&L, которое соберёт услуги из пустой формы. */
+      кнопкаКод: (m.querySelector('.modal-f .btn-add') || { getAttribute: () => '' }).getAttribute('onclick'),
+      естьГонорары: /Команда и гонорары|Операционные расходы|Расходы на проект|доход от клиента/.test(txt),
+    };
+  });
+  ok('вид окна — только часы', /pfin-hours/.test(HOURS.вид), HOURS.вид);
+  ok('и назван так же — «Часы проекта»', HOURS.заголовок === 'Часы проекта', HOURS.заголовок);
+  ok('в окне ровно один раздел — журнал часов',
+    HOURS.разделов === 1 && HOURS.услуги === 0 && HOURS.pl === 0, HOURS);
+  ok('ни услуг, ни гонораров, ни расходов даже словом', HOURS.естьГонорары === false, HOURS);
+  ok('справочники ролей и категорий сюда не ведут', HOURS.справочники === 0, HOURS.справочники);
+  ok('журнал раскрыт сразу, а не спрятан за стрелкой', HOURS.часовыхСтрок === 1, HOURS.часовыхСтрок);
+  ok('кнопка сохраняет часы, а не P&L',
+    /Сохранить часы/.test(HOURS.кнопка || '') && /saveProjHours/.test(HOURS.кнопкаКод || '')
+    && !/saveProjFinance/.test(HOURS.кнопкаКод || ''), HOURS);
+
+  /* Сохранение из окна часов не имеет права тронуть то, чего в нём нет.
+     svcCollect() собрал бы пустой список из несуществующей формы. */
+  const KEEP = await page.evaluate(async () => {
+    PFIN.hlog.push({ id: 'h2', label: 'Проезд', h: 2, date: '2026-07-21', note: 'такси' });
+    await saveProjHours();
+    const p = FINANCE.projects.find(x => x.id === 'p1');
+    return { гонорары: p.finance.salaries.length, ставка: p.finance.salaries[0].rate,
+      записей: p.finance.hlog.length, часов: p.finance.hours, mrr: p.mrr, окно: !!document.querySelector('#ov-pd2 .modal') };
+  });
+  ok('часы сохранились', KEEP.записей === 2 && KEEP.часов === 6, KEEP);
+  ok('и гонорары остались на месте, а не стёрлись пустой формой',
+    KEEP.гонорары === 1 && KEEP.ставка === 450000, KEEP);
+  ok('доход проекта не тронут', KEEP.mrr === 6600000, KEEP.mrr);
+
+  const FULL = await page.evaluate(() => {
+    pd2Close(); openProjFinance('p1');
+    const m = document.querySelector('#ov-pd2 .modal');
+    return { вид: m.className, заголовок: (m.querySelector('h3') || {}).textContent,
+      разделов: m.querySelectorAll('.pf-sec').length, pl: m.querySelectorAll('.pf-pl').length,
+      кнопка: (m.querySelector('.modal-f .btn-add') || {}).textContent };
+  });
+  ok('полное окно финансов при этом осталось прежним',
+    !/pfin-hours/.test(FULL.вид) && FULL.заголовок === 'Финансы проекта'
+    && FULL.разделов >= 4 && FULL.pl === 1 && /Сохранить P&L/.test(FULL.кнопка || ''), FULL);
+
+  const ИЗРАЗБОРА = await page.evaluate(() => {
+    pd2Close(); openProject(0); pdTimeOpen();
+    const b = document.querySelector('.pdt-modal .pf-cat-btn');
+    return b ? b.getAttribute('onclick') : null;
+  });
+  ok('кнопка в разборе времени ведёт именно в часы',
+    /openProjHours/.test(ИЗРАЗБОРА || '') && !/openProjFinance/.test(ИЗРАЗБОРА || ''), ИЗРАЗБОРА);
+
   ok('страница без ошибок', errs.length === 0, errs.slice(0, 2));
   console.log('\n──────── ' + pass + ' ok · ' + fail + ' fail ────────');
   await b.close();

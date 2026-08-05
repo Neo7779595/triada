@@ -159,8 +159,9 @@ const setup = () => {
       вкладка: MK.tab,
       кнопокВкладок: host.querySelectorAll('.mk-tab').length,
       полосаРасчёта: host.querySelectorAll('#mk-bar2').length,
-      валюта: [...host.querySelectorAll('.mk-cur button')].map(b => b.textContent.trim()),
-      курс: !!host.querySelector('.mk-rate input'),
+      валюта: [...host.querySelectorAll('.mk-qchips .mk-cur button')].map(b => b.textContent.trim()),
+      курс: !!host.querySelector('.mk-qchips .mk-rate input'),
+      полос: host.querySelectorAll('.mk-bar').length,
       карточек: host.querySelectorAll('.mk-qc').length,
       вСписке: MK_QUICK.length,
       наСкрытую: (function () { mkTab('media'); return MK.tab; })(),
@@ -168,6 +169,7 @@ const setup = () => {
     };
   });
   const DEF = await page.evaluate(() => window.__MK_DEF || null);
+  const MK_TABS_N = await page.evaluate(() => MK_TABS.length);
   ok('по умолчанию в продукте включена одна вкладка — быстрые расчёты',
     DEF && DEF.tabs.join(',') === 'quick', DEF);
   ok('и строка расчёта по умолчанию выключена', DEF && DEF.bar === false, DEF);
@@ -181,11 +183,31 @@ const setup = () => {
     ONLY.кнопокВкладок === 0, ONLY.кнопокВкладок);
   ok('строки расчёта нет: ни названия, ни проекта, ни сохранения с печатью',
     ONLY.полосаРасчёта === 0, ONLY.полосаРасчёта);
-  ok('наверху остались только валюта и курс',
-    ONLY.валюта.join('/') === 'сум/$' && ONLY.курс === true && ONLY.верх === 'сум $ курс', ONLY);
+  /* Полоса наверху существует ради вкладок. Их не осталось, и держать
+     строку в 58 пикселей под один выбор валюты незачем: валюта переехала
+     в ряд фильтров, высота ушла карточкам. */
+  ok('верхней полосы нет вовсе', ONLY.полос === 0 && ONLY.верх === null, ONLY);
+  ok('выбор валюты и курс стоят в ряду фильтров',
+    ONLY.валюта.join('/') === 'сум/$' && ONLY.курс === true, ONLY);
   ok('переход на выключенную вкладку не проходит даже из кода',
     ONLY.наСкрытую === 'quick', ONLY.наСкрытую);
-  await page.evaluate(() => { MK_UI.tabs = MK_TABS.map(t => t[0]); MK_UI.bar = true; });
+  /* Вкладки выключены, а не удалены. Когда их вернут, вернуться должна и
+     полоса с навигацией — вместе с валютой внутри неё. И ровно один раз:
+     два выбора валюты на экране разойдутся при первом же переключении. */
+  const BACK = await page.evaluate(() => {
+    MK_UI.tabs = MK_TABS.map(t => t[0]); MK_UI.bar = true; MK.tab = 'quick'; renderCalc();
+    const host = document.getElementById('content-ag');
+    const bar = host.querySelector('.mk-bar');
+    return { полос: host.querySelectorAll('.mk-bar').length,
+      вкладок: host.querySelectorAll('.mk-tab').length,
+      валютаВПолосе: !!(bar && bar.querySelector('.mk-cur')),
+      валютаВЧипах: !!host.querySelector('.mk-qchips .mk-cur'),
+      валютВсего: host.querySelectorAll('.mk-cur').length };
+  });
+  ok('вернули вкладки — вернулась полоса с навигацией и валютой',
+    BACK.полос === 1 && BACK.вкладок === MK_TABS_N && BACK.валютаВПолосе === true, BACK);
+  ok('и выбор валюты на экране остался один',
+    BACK.валютВсего === 1 && BACK.валютаВЧипах === false, BACK);
 
   ok('страница без ошибок', errs.length === 0, errs.slice(0, 2));
   console.log('\n──────── ' + pass + ' ok · ' + fail + ' fail ────────');

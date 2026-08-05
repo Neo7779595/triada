@@ -27,8 +27,13 @@ const show = () => { const c = document.getElementById('content-ag'); if (!c) re
   await page.waitForTimeout(1200);
 
   console.log('\n[A] сводка');
-  const ov = await page.evaluate((D) => {
+  /* Плитка про выручку живёт вместе с разделом «Финансы». Раздел агентству
+     не показывают — и доля крупнейшего клиента в сводке становится цифрой
+     ниоткуда: денег в интерфейсе нет, а процент от них есть. Проверяем оба
+     состояния: с включённым разделом плитка на месте, с выключенным её нет. */
+  const свод = async (модули) => page.evaluate(([D, m]) => {
     window.__me = { id: 'u1', full_name: 'd', role: 'agency_owner', agency_id: 'AG' };
+    if (m) window.__me.agencyModules = m;
     window.tMe = () => window.__me; window.toast = () => {};
     PROJECTS = D.map(p => Object.assign({}, p, { pct: 30, cat: '—', svc: '—', logo: p.name[0], logoUrl: null,
       _stot: 2, _sdone: 1, _overdue: false, _lastActDays: 1, _nextDue: null, createdAt: '2026-06-01' }));
@@ -37,12 +42,17 @@ const show = () => { const c = document.getElementById('content-ag'); if (!c) re
     const cells = [...document.querySelectorAll('#content-ag .ov-quick-item')].map(c => ({
       l: c.querySelector('.l').textContent.trim(), v: c.querySelector('.v').textContent.trim(),
       s: (c.querySelector('.s') || {}).textContent || '' }));
-    return cells.find(c => /Концентрация/.test(c.l)) || { cells };
-  }, DATA);
-  console.log('    ' + JSON.stringify(ov));
-  ok('в сводке — концентрация выручки', /Концентрация выручки/.test(ov.l || ''), ov);
+    return { плитка: cells.find(c => /Концентрация/.test(c.l)) || null, всего: cells.length };
+  }, [DATA, модули]);
+  const ovOn = await свод({ finance: true });
+  const ovOff = await свод(null);
+  const ov = ovOn.плитка || {};
+  console.log('    ' + JSON.stringify(ovOn));
+  ok('в сводке — концентрация выручки', /Концентрация выручки/.test(ov.l || ''), ovOn);
   ok('45% на крупнейшем проекте', ov.v === '45%', ov.v);
   ok('назван сам проект', /APOLO COFFEE/.test(ov.s || ''), ov.s);
+  ok('раздел «Финансы» выключен — плитки про выручку нет вовсе',
+    ovOff.плитка === null && ovOff.всего === ovOn.всего - 1, [ovOff, ovOn.всего]);
 
   console.log('\n[B] финансы: концентрация теперь считается по деньгам и названа иначе');
   /* Раньше на двух экранах стояли два числа под одним названием
