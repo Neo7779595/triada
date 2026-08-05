@@ -188,6 +188,21 @@ const собрать = () => [...document.querySelectorAll('#content-ag .per-tag
   ok('и расшифровки под ними — тоже', один(РЯД.расшифровки), РЯД.расшифровки);
   ok('период у каждой ячейки ровно один', один(РЯД.строк) && РЯД.строк[0] === 1, РЯД.строк);
 
+  console.log('\n[F] плитки циклов тоже стоят в ряд, а не лесенкой');
+  const ПЛИТКИ = await page.evaluate((сценаSrc) => {
+    (0, eval)('(' + сценаSrc + ')')();
+    return [...document.querySelectorAll('#content-ag .px-ov')].map(g => {
+      const cells = [...g.querySelectorAll('.px-ov-cell')];
+      return { ячеек: cells.length,
+        подписи: cells.map(c => Math.round(c.querySelector('.px-ov-l').getBoundingClientRect().height)),
+        числа: cells.map(c => { const v = c.querySelector('.px-ov-v'); return v ? Math.round(v.getBoundingClientRect().top) : null; }) };
+    });
+  }, СЦЕНА.toString());
+  const рвано = ПЛИТКИ.filter(g => new Set(g.подписи).size !== 1);
+  const числаРвано = ПЛИТКИ.filter(g => new Set(g.числа.filter(x => x != null)).size !== 1);
+  ok('в каждом ряду плиток подписи одной высоты', ПЛИТКИ.length >= 3 && рвано.length === 0, рвано.slice(0, 2));
+  ok('и числа под ними — на одной линии', числаРвано.length === 0, числаРвано.slice(0, 2));
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
