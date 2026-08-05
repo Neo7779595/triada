@@ -165,6 +165,29 @@ const собрать = () => [...document.querySelectorAll('#content-ag .per-tag
     && сп('Клиент отвечает') === 'всё время', СОГЛ);
   ok('а «ждут ответа» — про сейчас, это не окно', сп('Ждут ответа') === 'сейчас', СОГЛ);
 
+  console.log('\n[E] метка не должна ломать ряд');
+  /* Пока период стоял в строку с названием, «Активные» влезали, а «On-time
+     delivery» переносилось — и числа под ними вставали на разной высоте.
+     Ряд из четырёх ячеек обязан читаться как ряд, а не как лесенка. */
+  const РЯД = await page.evaluate(() => {
+    renderOverview();
+    const cells = [...document.querySelectorAll('.ov-hero-cell')];
+    const y = el => Math.round(el.getBoundingClientRect().top);
+    const h = el => Math.round(el.getBoundingClientRect().height);
+    return { ячеек: cells.length,
+      подписи: cells.map(c => h(c.querySelector('.l'))),
+      верхПодписи: cells.map(c => y(c.querySelector('.l'))),
+      числа: cells.map(c => y(c.querySelector('.v'))),
+      расшифровки: cells.map(c => y(c.querySelector('.s'))),
+      строк: cells.map(c => c.querySelectorAll('.l .per-tag').length) };
+  });
+  const один = a => new Set(a).size === 1;
+  ok('во всех четырёх ячейках подпись одной высоты', РЯД.ячеек === 4 && один(РЯД.подписи), РЯД);
+  ok('подписи начинаются на одном уровне', один(РЯД.верхПодписи), РЯД.верхПодписи);
+  ok('числа стоят на одной линии', один(РЯД.числа), РЯД.числа);
+  ok('и расшифровки под ними — тоже', один(РЯД.расшифровки), РЯД.расшифровки);
+  ok('период у каждой ячейки ровно один', один(РЯД.строк) && РЯД.строк[0] === 1, РЯД.строк);
+
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
   await b.close();
