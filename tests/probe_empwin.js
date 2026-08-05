@@ -106,44 +106,64 @@ const setup = () => {
   await page.evaluate(() => permPreset('none'));
   await page.waitForTimeout(60);
   ok('«Очистить» снимает всё', await page.evaluate(() => _permKeys().every(k => !empPerms[k].view)));
-  ok('счётчик в навигации 0 / 14', await page.evaluate(() => document.getElementById('empw-c-perm').textContent) === '0/14');
+  const N = await page.evaluate(() => _permKeys().length);
+  const FIN = await page.evaluate(() => !(typeof agModuleOff === 'function' && agModuleOff('finance')));
+  ok('счётчик в навигации показывает ноль из всех ключей',
+    await page.evaluate(() => document.getElementById('empw-c-perm').textContent) === '0/' + N, N);
   const groups = await page.evaluate(() => [...document.querySelectorAll('#e-perms .perm-gh')].map(e => e.textContent));
   ok('модули разбиты на группы', groups.join('|') === 'Работа|Аналитика|Агентство', groups);
   ok('строк ровно по числу ключей', await page.evaluate(() => document.querySelectorAll('#e-perms .perm-row:not(.perm-sub)').length === _permKeys().length));
+
   /* У финансов есть ступень, которой нет больше ни у кого: финансист ведёт
      счета и платежи, но кто из совладельцев сколько внёс и взял — не его дело.
-     По умолчанию она снята и без просмотра финансов включиться не может. */
-  const SUB = await page.evaluate(() => {
-    const row = () => document.querySelector('#e-perms .perm-sub');
-    const btn = () => row().querySelector('.perm-tg');
-    const off = !!(empPerms.finance && empPerms.finance.partners);
-    const locked = btn().hasAttribute('disabled');
-    togglePerm('finance', 'partners', true);
-    const auto = !!(empPerms.finance && empPerms.finance.view);
-    togglePerm('finance', 'view', false);
-    return { exists: !!row(), off, locked, auto, cleared: !!(empPerms.finance && empPerms.finance.partners),
-      label: row().textContent };
-  });
-  ok('у финансов есть подстрока про расчёты с владельцами',
-    SUB.exists && /Расчёты с владельцами/.test(SUB.label), SUB.label);
-  ok('по умолчанию она снята и заперта, пока нет просмотра финансов',
-    SUB.off === false && SUB.locked === true, SUB);
-  ok('включение права само открывает просмотр финансов', SUB.auto === true, SUB.auto);
-  ok('снятие просмотра финансов гасит и её', SUB.cleared === false, SUB.cleared);
+     Раздел сейчас выключен целиком, и тогда права на него не выдают вовсе —
+     проверяем именно это. Вернут раздел в строй — вернутся и проверки: они
+     не удалены, а зависят от того же выключателя, что и сам раздел. */
+  if (!FIN) {
+    const NOFIN = await page.evaluate(() => ({
+      вКлючах: _permKeys().indexOf('finance'),
+      строка: [...document.querySelectorAll('#e-perms .perm-name')].some(e => /Финанс/.test(e.textContent)),
+      подстрока: !!document.querySelector('#e-perms .perm-sub')
+    }));
+    ok('раздел выключен — права на него не выдают вовсе',
+      NOFIN.вКлючах === -1 && NOFIN.строка === false, NOFIN);
+    ok('и подстроки про расчёты с владельцами в таблице нет', NOFIN.подстрока === false, NOFIN);
+  } else {
+    const SUB = await page.evaluate(() => {
+      const row = () => document.querySelector('#e-perms .perm-sub');
+      const btn = () => row().querySelector('.perm-tg');
+      const off = !!(empPerms.finance && empPerms.finance.partners);
+      const locked = btn().hasAttribute('disabled');
+      togglePerm('finance', 'partners', true);
+      const auto = !!(empPerms.finance && empPerms.finance.view);
+      togglePerm('finance', 'view', false);
+      return { exists: !!row(), off, locked, auto, cleared: !!(empPerms.finance && empPerms.finance.partners),
+        label: row().textContent };
+    });
+    ok('у финансов есть подстрока про расчёты с владельцами',
+      SUB.exists && /Расчёты с владельцами/.test(SUB.label), SUB.label);
+    ok('по умолчанию она снята и заперта, пока нет просмотра финансов',
+      SUB.off === false && SUB.locked === true, SUB);
+    ok('включение права само открывает просмотр финансов', SUB.auto === true, SUB.auto);
+    ok('снятие просмотра финансов гасит и её', SUB.cleared === false, SUB.cleared);
+  }
   await page.evaluate(() => permPreset('none'));
   ok('пресеты живут в шапке раздела, не в таблице', await page.evaluate(() => !document.querySelector('#e-perms .perm-presets') && document.querySelectorAll('#empw-s-perm .empw-preset').length === 3));
   ok('итог ушёл из таблицы в подвал окна', await page.evaluate(() => !document.querySelector('#e-perms .perm-foot') && !!document.getElementById('empw-sum')));
   await page.evaluate(() => permPreset('view'));
   await page.waitForTimeout(60);
-  ok('«Смотреть всё» — видит 14, редактирует 0', await page.evaluate(() => document.getElementById('empw-sum').textContent.replace(/\s+/g, ' ')).then ? true : true);
   const sum1 = await page.evaluate(() => document.getElementById('empw-sum').textContent.replace(/\s+/g, ' '));
-  ok('подвал: видит 14 из 14, редактирует 0', /Видит 14 из 14/.test(sum1) && /редактирует 0/.test(sum1), sum1);
-  await page.evaluate(() => togglePerm('finance', 'edit', true));
+  ok('подвал: видит все ключи, редактирует ноль',
+    new RegExp('Видит ' + N + ' из ' + N).test(sum1) && /редактирует 0/.test(sum1), sum1);
+  /* Ступень «правка поднимает просмотр» — общая для всех модулей, поэтому
+     берём любой живой ключ, а не тот, который могли выключить. */
+  const K = await page.evaluate(() => _permKeys().filter(k => k !== 'mail' && k !== 'integrations')[0]);
+  await page.evaluate(k => togglePerm(k, 'edit', true), K);
   await page.waitForTimeout(60);
-  ok('правка поднимает просмотр', await page.evaluate(() => empPerms.finance.view === true && empPerms.finance.edit === true));
-  await page.evaluate(() => togglePerm('finance', 'view', false));
+  ok('правка поднимает просмотр', await page.evaluate(k => empPerms[k].view === true && empPerms[k].edit === true, K), K);
+  await page.evaluate(k => togglePerm(k, 'view', false), K);
   await page.waitForTimeout(60);
-  ok('снятие просмотра гасит правку', await page.evaluate(() => empPerms.finance.view === false && empPerms.finance.edit === false));
+  ok('снятие просмотра гасит правку', await page.evaluate(k => empPerms[k].view === false && empPerms[k].edit === false, K), K);
   ok('чипы предпросмотра показывают модули', await page.evaluate(() => document.querySelectorAll('#empw-prev-chips .empw-chip').length > 0));
 
   /* ——— F. проекты ——— */

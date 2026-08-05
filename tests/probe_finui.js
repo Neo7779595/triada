@@ -803,6 +803,55 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   ok('мастер экономики — кнопка внизу справа, а не клик по строке',
     PV.кнопки.length === 2 && /Настроить расходы/.test(PV.кнопки[1].t) && /finEcoOpen/.test(PV.кнопки[1].on), PV.кнопки);
 
+  console.log('[N] раздел выключен целиком, но не потерян');
+  /* Решение владельца: «Финансы» из продукта убраны. Выключить — не
+     удалить: расчёты, окна и весь этот файл проверок остаются рабочими,
+     иначе вернуть раздел было бы отдельной стройкой, а не одной строкой.
+
+     Выключенного не видит никто, включая владельца. «Скрыто, но у меня
+     работает» — это два разных продукта в одном коде, и через месяц они
+     расходятся. */
+  const OFF = await page.evaluate(() => {
+    window.__me = { id: 'u1', role: 'agency_owner' }; window.tMe = () => window.__me;
+    applyAgencyPerms();
+    const пункт = document.querySelector('#app-ag .nav-i[data-m="finance"]');
+    agNav('finance');
+    const открыт = document.querySelector('#app-ag .nav-i.on');
+    /* сотрудник с явным правом на финансы тоже не видит выключенное */
+    window.__me = { id: 'u2', role: 'member', permissions: { finance: { view: true, edit: true },
+      projects: { view: true } } };
+    applyAgencyPerms();
+    const уСотрудника = document.querySelector('#app-ag .nav-i[data-m="finance"]');
+    const правоСотрудника = agCanView('finance');
+    window.__me = { id: 'u1', role: 'agency_owner' };
+    applyAgencyPerms();
+    return { выключен: agModuleOff('finance'),
+      пункт: пункт ? getComputedStyle(пункт).display : 'нет узла',
+      уСотрудника: уСотрудника ? getComputedStyle(уСотрудника).display : 'нет узла',
+      правоСотрудника, право: agCanView('finance'), безВыключателя: agCanViewRaw('finance'),
+      деньгиВПаспорте: _kbCanMoney(),
+      ушли: открыт ? открыт.dataset.m : null,
+      вНастройкахПрав: _permKeys().indexOf('finance'),
+      считаетПрежнему: typeof finMonthMath === 'function' && finMonthMath([
+        { op_date: '2026-08-01', kind: 'income', amount: 1000000, account_id: 'W' }],
+        { from: '2026-08-01', to: '2026-08-31' }, {}).income,
+      остальные: ['projects', 'deadlines', 'team', 'kpi', 'kb'].every(k => agCanView(k)),
+      пунктовВМеню: [...document.querySelectorAll('#app-ag .nav-i')]
+        .filter(n => getComputedStyle(n).display !== 'none' && n.dataset.m).length };
+  });
+  ok('раздел выключен', OFF.выключен === true, OFF.выключен);
+  ok('пункта в меню нет ни у владельца, ни у сотрудника с правом на него',
+    OFF.пункт === 'none' && OFF.уСотрудника === 'none', [OFF.пункт, OFF.уСотрудника]);
+  ok('и право на него больше не выдаётся никому',
+    OFF.право === false && OFF.правоСотрудника === false, OFF);
+  ok('прямой переход не врёт про доступ, а уводит в проекты', OFF.ушли === 'projects', OFF.ушли);
+  ok('в настройках прав такой строки больше нет', OFF.вНастройкахПрав === -1, OFF.вНастройкахПрав);
+  ok('деньги в паспорте проекта остались: это право видеть суммы, а не наличие раздела',
+    OFF.безВыключателя === true && OFF.деньгиВПаспорте === true, OFF);
+  ok('расчёты живы — раздел выключен, а не удалён', OFF.считаетПрежнему === 1000000, OFF.считаетПрежнему);
+  ok('остальные разделы не задеты', OFF.остальные === true && OFF.пунктовВМеню >= 10,
+    [OFF.остальные, OFF.пунктовВМеню]);
+
   await page.evaluate(() => { const d = document.getElementById('fnx-probe'); if (d) d.remove(); finClose(); });
   console.log(errs.length ? 'ОШИБКИ: ' + JSON.stringify(errs.slice(0, 3)) : '');
   ok('страница не бросила ни одной ошибки', errs.length === 0, errs.slice(0, 3));
