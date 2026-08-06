@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Дедлайны: экспертный уровень</title>
+<style>
+  :root{
+    --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
+    --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+    --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
+    --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
+    --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
+    --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:16px/1.65 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:860px;margin:0 auto;padding:56px 24px 120px}
+  header{margin-bottom:52px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+  h1{font-size:38px;line-height:1.12;letter-spacing:-.03em;margin:12px 0 0;font-weight:700}
+  .lead{margin-top:16px;font-size:18px;line-height:1.6;color:var(--txt2);max-width:62ch}
+  .lead b{color:var(--txt);font-weight:650}
+  h2{font-size:25px;letter-spacing:-.02em;margin:60px 0 6px;font-weight:700;scroll-margin-top:20px}
+  h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:8px;letter-spacing:.1em}
+  h3{font-size:18px;margin:34px 0 8px;font-weight:650;letter-spacing:-.01em}
+  p{margin:12px 0;color:var(--txt2);max-width:66ch}
+  p b,li b,td b{color:var(--txt);font-weight:600}
+  .sub{color:var(--txt3);font-size:15px}
+  ul,ol{color:var(--txt2);padding-left:22px;max-width:66ch}
+  li{margin:7px 0}
+  code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
+
+  .toc{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin-top:36px}
+  .toc ol{margin:8px 0 0;padding-left:20px}
+  .toc a{color:var(--txt2);text-decoration:none;border-bottom:1px solid transparent}
+  .toc a:hover{color:var(--ac);border-bottom-color:var(--ac-line)}
+
+  .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:22px 0}
+  .card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.05),transparent 60%),var(--bg1)}
+  .card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.05),transparent 60%),var(--bg1)}
+  .card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.05),transparent 60%),var(--bg1)}
+  .card h4{margin:0 0 4px;font-size:17px;font-weight:650}
+  .card p:last-child{margin-bottom:0}
+
+  .frm{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:18px 22px;margin:20px 0;
+    font-family:var(--mono);font-size:16px;color:var(--txt);text-align:center;letter-spacing:.01em}
+  .frm .sm{display:block;font-size:12px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+  .frm em{color:var(--ac);font-style:normal}
+
+  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
+  .tag.ac{background:var(--ac-dim);color:var(--ac)}
+  .tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
+  .tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
+
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:20px 0}
+  .kpi>div{background:var(--bg1);padding:16px 18px}
+  .kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
+  .kpi .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:7px;line-height:1}
+  .kpi .s{font-size:12.5px;color:var(--txt3);margin-top:6px;font-family:var(--mono)}
+
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
+  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--txt3);font-weight:600;padding:0 12px 10px 0;border-bottom:1px solid var(--line)}
+  th.num{text-align:right;padding-right:0}
+  td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+  td:first-child{color:var(--txt);font-weight:600}
+  td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
+  td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
+  tr.hi td{background:rgba(240,120,92,.07)}
+  tr.ok td{background:rgba(67,216,140,.06)}
+
+  .quote{border-left:2px solid var(--ac-line);padding:4px 0 4px 18px;margin:22px 0;color:var(--txt2);font-size:16.5px}
+  .quote b{color:var(--txt)}
+
+  .step{display:flex;gap:16px;margin:18px 0;align-items:flex-start}
+  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--ac-dim);color:var(--ac);
+    display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:700}
+  .step .bd{flex:1;min-width:0}
+  .step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:2px}
+  .step .bd span{color:var(--txt2);font-size:15px}
+
+  .bars{margin:22px 0}
+  .bar{display:flex;align-items:center;gap:12px;margin:9px 0;font-family:var(--mono);font-size:13px}
+  .bar .bl{flex:none;width:52px;color:var(--txt2);text-align:right}
+  .bar .bt{flex:1;height:22px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative}
+  .bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
+    border-right:2px solid var(--ac)}
+  .bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
+  .bar .bv{flex:none;width:74px;color:var(--txt);font-weight:600}
+
+  hr{border:0;border-top:1px solid var(--line);margin:56px 0}
+  .foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:70px;padding-top:22px;border-top:1px solid var(--line)}
+  @media(max-width:640px){ .wrap{padding:34px 16px 80px} h1{font-size:29px} h2{font-size:21px} .lead{font-size:16.5px}
+    .frm{font-size:13.5px;padding:16px 14px} .bar .bl{width:44px} .bar .bv{width:62px}
+    table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
+    td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
+    table{display:block;max-width:100%;overflow-x:auto} }
+
+  /* Шапка академии: документ открывается из кабинета в новой вкладке, и без
+     обратной ссылки человек оказывается в тупике. Полоса не липкая намеренно —
+     на длинном тексте липкая шапка съедает высоту и мешает читать. */
+  .acad{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:13px 0 15px;margin:0 0 -14px;border-bottom:1px solid var(--line)}
+  .acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--txt3)}
+  .acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);
+    box-shadow:0 0 10px -1px var(--ac);flex:none}
+  .acad-lvl{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .acad-lvl span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3)}
+  .acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+  .acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+    transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
+  .acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+  @media(max-width:600px){ .acad-lvl{margin-left:0;width:100%;order:3} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="acad"><div class="acad-b"><i></i>DETROYD Academy · Дедлайны</div><div class="acad-lvl"><span class="">Тренинг</span><span class="on">Экспертный</span></div><a class="acad-back" href="https://detroyd.com">← В кабинет</a></div>
+
+<header>
+  <div class="eyebrow">DETROYD SMART SYSTEM · Дедлайны · экспертный уровень</div>
+  <h1>Журнал событий как источник истины</h1>
+  <p class="lead">Базовый тренинг разбирал экран. Этот — <b>про архитектуру данных, которая стоит за всей платформой, и про то, как из ленты событий восстанавливать факты, когда агрегаты вводят в заблуждение</b>.</p>
+  <p class="lead">Плюс разбор конкретного случая: как счётчик «13 возвратов» пережил три модуля, попал в мой прошлый вывод и был опровергнут одной колонкой с метками времени.</p>
+
+  <div class="toc">
+    <div class="eyebrow">Что внутри</div>
+    <ol>
+      <li><a href="#a1">Событийная модель: почему журнал первичен</a></li>
+      <li><a href="#a2">Разбор ошибки: цена агрегации на живом примере</a></li>
+      <li><a href="#a3">Шум в журнале и как его отделять</a></li>
+      <li><a href="#a4">Анатомия просрочки: оценка против внимания</a></li>
+      <li><a href="#a5">Как назначать сроки: от рефлекса к перцентилю</a></li>
+      <li><a href="#a6">Пакетное закрытие: что именно оно уничтожает</a></li>
+      <li><a href="#a7">Владение работой: почему этап дороже задачи</a></li>
+      <li><a href="#a8">Что ещё вычислимо из этого журнала</a></li>
+      <li><a href="#a9">Гигиена событийных данных</a></li>
+      <li><a href="#a10">Ловушки экспертного уровня</a></li>
+    </ol>
+  </div>
+</header>
+
+<h2 id="a1"><span class="n">01</span>Событийная модель</h2>
+
+<p>Платформа устроена как <b>журнал событий с производными представлениями</b>. Это классическая архитектура, и у неё есть строгие свойства, которые стоит понимать, потому что из них следуют все ограничения аналитики.</p>
+
+<div class="frm">
+  <span class="sm">Устройство</span>
+  <em>События</em> (что произошло) → <em>Проекции</em> (циклы, возвраты, velocity, on-time)
+</div>
+
+<table>
+<tr><th>Свойство</th><th>Что означает</th></tr>
+<tr><td><b>События неизменны</b></td><td>Запись «взял в работу в 21:51» уже не отменить. Можно только добавить следующее событие</td></tr>
+<tr><td><b>Проекции выводимы</b></td><td>Любой счётчик пересчитывается из журнала заново. Поэтому исправлять надо правила, а не цифры</td></tr>
+<tr><td><b>Проекции теряют информацию</b></td><td>Необратимо. Счётчик «13» не хранит меток времени — значит по нему никогда нельзя восстановить, за какой срок эти 13 набрались</td></tr>
+<tr><td><b>Журнал полон, проекция избирательна</b></td><td>В журнале есть всё. В сводку попадает то, что заложили в правило</td></tr>
+</table>
+
+<div class="card ac">
+  <h4>Третье свойство — самое практичное</h4>
+  <p>Агрегация всегда что-то теряет, и потеря <b>необратима на уровне числа</b>. Единственный способ вернуть потерянное — спуститься к событиям.</p>
+  <p>Отсюда рабочее правило зрелого пользователя: <b>агрегат порождает гипотезу, событие её подтверждает или убивает</b>. Дашборд говорит «здесь что-то не так, посмотри сюда». Решение принимается после того, как вы посмотрели.</p>
+</div>
+
+<hr>
+
+<h2 id="a2"><span class="n">02</span>Разбор ошибки</h2>
+
+<p>Разберу собственную ошибку целиком — она хороший учебный случай, потому что показывает, как убедительный агрегат ведёт не туда.</p>
+
+<div class="card">
+  <h4>Как это развивалось</h4>
+  <p><b>Шаг 1.</b> Статистика проекта показала: «Разработать бриф» — 13 возвратов, lead и cycle по 4 д 9 ч. Максимум по проекту, вчетверо выше медианы.</p>
+  <p><b>Шаг 2.</b> Экран «Потраченное время» показал: таймер 1 ч 04 м, проверка 0:04.</p>
+  <p><b>Шаг 3.</b> Я разделил 105 часов цикла на 14 просмотров и получил «7,5 часа календаря на круг», а 4 минуты проверки на 14 — «17 секунд на просмотр». Вывод: плохая проверка порождает бесконечные круги.</p>
+  <p><b>Шаг 4.</b> Лента активности: все видимые переключения по этой задаче — <b>4 августа, 21:51</b>. Одна минута. Автор один — Abdurauf Parpiyev.</p>
+</div>
+
+<table>
+<tr><th>Утверждение</th><th>Статус</th><th>Комментарий</th></tr>
+<tr class="ok"><td>Цикл 4 д 9 ч</td><td>Верно</td><td>31 июл 14:20 → 4 авг 23:30. Факт из журнала</td></tr>
+<tr class="ok"><td>Таймер 1 ч 04 м</td><td>Верно</td><td>Эффективность около 1% — тоже факт</td></tr>
+<tr class="hi"><td>13 кругов проверки за 4 дня</td><td>Неверно</td><td>Переключения уложились в одну минуту</td></tr>
+<tr class="hi"><td>7,5 часа на круг</td><td>Неверно</td><td>Деление предполагало равномерность, которой не было</td></tr>
+<tr class="hi"><td>17 секунд на просмотр</td><td>Не подтверждается</td><td>Просмотров, скорее всего, было не 14</td></tr>
+</table>
+
+<div class="card neg">
+  <h4>Где именно был сделан неверный шаг</h4>
+  <p>В делении. Разделив 105 часов на 14 событий, я <b>неявно предположил, что события распределены равномерно</b>. Счётчик такого предположения не содержит — я добавил его сам, потому что оно казалось естественным.</p>
+  <p>Это самая распространённая ошибка в работе с агрегатами: сумма или счётчик молчат о распределении, а деление на них навязывает распределение, которого может не быть. С медианой такого не случается — она поэтому и предпочтительнее.</p>
+</div>
+
+<div class="card ac">
+  <h4>Что теперь известно точно</h4>
+  <p>Реальная картина по задаче: около <b>104 часов простоя</b> (31 июля 14:20 — 4 августа 21:51), затем минута переключений, затем через 1 ч 39 м закрытие другим человеком.</p>
+  <p>Диагноз меняется полностью. Это <b>не</b> проблема качества проверки. Это <b>одна длинная остановка</b>: задачу завели, поставили срок на тот же день, и четверо суток к ней не возвращались. Лечится это не критериями приёмки, а тем, чтобы работа не выпадала из поля зрения, — то есть возрастом незавершённого и владельцами.</p>
+</div>
+
+<hr>
+
+<h2 id="a3"><span class="n">03</span>Шум в журнале</h2>
+
+<p>Журнал фиксирует всё, включая то, что не является работой. Восемь переключений за минуту — не процесс, а взаимодействие человека с интерфейсом: перетащил не туда, вернул, попробовал снова.</p>
+
+<div class="card">
+  <h4>Три правила, отделяющие сигнал от шума</h4>
+  <p><b>Дебаунс по времени.</b> Пара событий «туда-обратно» внутри одного окна — скажем, пяти минут — считается одним действием или не считается вовсе. Это стандартный приём, и он убирает почти весь интерфейсный шум.</p>
+  <p><b>Возврат как отдельное событие.</b> Настоящий отказ должен отличаться от простого перемещения карточки: у него есть автор-проверяющий, отличный от исполнителя, и причина. Пока это одно и то же событие, счётчик будет смешивать разное.</p>
+  <p><b>Минимальная длительность состояния.</b> Статус, продержавшийся секунды, — вероятно, ошибка ввода. Он не должен попадать в расчёт цикла. Кстати, в блоке «Как считаются метрики» уже есть родственное правило: задачи без единой отметки «в работе» не входят в выборку цикла. Это ровно та же идея, доведённая до конца.</p>
+</div>
+
+<div class="card warn">
+  <h4>Практический вывод для вашего случая</h4>
+  <p>Пока эти правила не введены, <b>счётчик возвратов непригоден для выводов</b> — ни о качестве работы, ни о качестве проверки. Он смешивает отказы и клики.</p>
+  <p>Это касается не только этого экрана: тот же счётчик участвует в метрике «откаты 36% переходов назад» в Сводке по другому кабинету. Её тоже стоит перепроверить по журналу, прежде чем считать 36% диагнозом.</p>
+</div>
+
+<hr>
+
+<h2 id="a4"><span class="n">04</span>Анатомия просрочки</h2>
+
+<p>Опоздания бывают двух видов, и различить их можно арифметически: сравнить отведённое время с фактически затраченным.</p>
+
+<div class="frm">
+  <span class="sm">Признак</span>
+  время до срока < время работы → <em>ошибка оценки</em><br>
+  время до срока > время работы → <em>ошибка внимания</em>
+</div>
+
+<table>
+<tr><th>Задача</th><th class="num">Дали</th><th class="num">Работы</th><th class="num">Запас</th><th>Тип</th></tr>
+<tr><td>Разработать бриф</td><td class="num">2 ч 10 м</td><td class="num">1 ч 04 м</td><td class="num">+66 м</td><td>Внимание</td></tr>
+<tr><td>Провести брифинг</td><td class="num">5 ч 38 м</td><td class="num">57 м</td><td class="num">+281 м</td><td>Внимание</td></tr>
+<tr><td>Настроить клиентскую группу</td><td class="num">2 ч 23 м</td><td class="num">25 м</td><td class="num">+118 м</td><td>Внимание</td></tr>
+<tr><td>Настроить клиентский кабинет</td><td class="num">2 ч 21 м</td><td class="num">23 м</td><td class="num">+118 м</td><td>Внимание</td></tr>
+</table>
+
+<div class="card neg">
+  <h4>Все четыре опоздания — одного типа</h4>
+  <p>Ни в одном случае работы не было больше, чем времени. Запас везде положительный, в одном случае почти пять часов. Оценка была нормальной.</p>
+  <p>Значит проблема не в том, что вы неправильно оцениваете объём. Проблема в том, что <b>заведённая задача выпадает из поля зрения</b>. Это принципиально другой класс лечения: не обучение оценке, а механика — владелец, очередь, возраст незавершённого.</p>
+  <p>И это согласуется с находкой по «Разработать бриф»: 104 часа простоя — предельный случай той же болезни.</p>
+</div>
+
+<hr>
+
+<h2 id="a5"><span class="n">05</span>Как назначать сроки</h2>
+
+<p>Все четыре опоздания родились от одного жеста: дедлайн поставлен на день создания задачи. Это не решение, а поведение по умолчанию — календарь открывается на сегодняшней дате.</p>
+
+<div class="card">
+  <h4>Три уровня зрелости постановки сроков</h4>
+  <p><b>Рефлекс.</b> «Пусть будет сегодня к вечеру». Срок не связан ни с объёмом, ни с загрузкой. Ваш текущий уровень.</p>
+  <p><b>Оценка.</b> «Тут часа на два работы, ставлю на послезавтра». Уже лучше, но систематически оптимистично: человек оценивает работу и забывает про очередь, переключения и ожидание чужих ответов.</p>
+  <p><b>Расчёт по факту.</b> Срок берётся не из оценки объёма, а из <b>исторического распределения времени выполнения</b>. У вас оно уже посчитано: 85% задач укладываются в 1 д 18 ч. Значит срок, поставленный на два дня вперёд, будет выдержан примерно в 85 случаях из ста — и это утверждение проверяемо.</p>
+</div>
+
+<div class="frm">
+  <span class="sm">Правило назначения срока</span>
+  <em>Срок</em> = момент, когда работа будет <em>начата</em> + 85-й перцентиль времени выполнения
+</div>
+
+<p>Ключевое слово — <b>начата</b>. Именно его пропуск и создал ваши четыре опоздания: срок отсчитывали от момента создания, а работа начиналась через двое суток. Пока в очереди нет явного порядка и понимания, когда за задачу сядут, любой срок — это пожелание.</p>
+
+<hr>
+
+<h2 id="a6"><span class="n">06</span>Пакетное закрытие</h2>
+
+<p>Три задачи с меткой завершения <b>2 августа 09:04</b> — одна и та же минута.</p>
+
+<div class="card neg">
+  <h4>Что именно ломается</h4>
+  <p><b>Время выполнения.</b> Все три получают одинаковую дату конца, хотя работа над ними завершалась в разное время. Разброс схлопывается искусственно.</p>
+  <p><b>Выработка по дням.</b> Появляется всплеск в один день и провалы вокруг. Именно так на графике «Завершено по дням» возник пик из шести задач 2 августа — и он описывает не производство, а разбор доски.</p>
+  <p><b>Атрибуция опоздания.</b> Задача, реально сделанная 1 августа и отмеченная 2-го, засчитывается как опоздавшая сильнее, чем была.</p>
+  <p><b>Возраст незавершённого.</b> Пока карточка не закрыта, она числится живой. Значит любой упреждающий сигнал приходит с задержкой в размере вашей привычки разбирать доску.</p>
+</div>
+
+<div class="quote">
+  Правило: <b>статус меняется в момент события, а не в момент, когда до доски дошли руки.</b> Это единственная дисциплина, без которой все временны́е метрики описывают ваш распорядок дня, а не работу.
+</div>
+
+<hr>
+
+<h2 id="a7"><span class="n">07</span>Владение работой</h2>
+
+<p>У задач исполнитель проставлен. У этапов — «Не назначен». Логика перевёрнута, и цена этого несимметрична.</p>
+
+<table>
+<tr><th></th><th>Задача без владельца</th><th>Этап без владельца</th></tr>
+<tr><td>Размер</td><td>Часы</td><td>Дни или недели</td></tr>
+<tr><td>Кто подберёт</td><td>Часто кто-нибудь заметит</td><td>Никто: слишком крупно, чтобы взять походя</td></tr>
+<tr><td>Когда обнаружится</td><td>Быстро</td><td>В день срока</td></tr>
+<tr class="hi"><td>Цена</td><td>Смещение на часы</td><td>Смещение всего проекта</td></tr>
+</table>
+
+<div class="card neg">
+  <h4>Живой пример прямо сейчас</h4>
+  <p>ПРОДАКШН: срок завтра 18:00, владельца нет, потрачено ноль, последнее событие — пятиминутное включение позавчера вечером и возврат. Больше двадцати двух часов тишины.</p>
+  <p>Ни одна плитка об этом не сигналит, потому что срок формально не наступил. Обнаружится это завтра в 18:01 — то есть тогда, когда сделать уже ничего нельзя.</p>
+  <p>Это третье независимое появление одной и той же дыры: «проверяющий не указан» в Циклах по Artel, все дедлайны на одном человеке в Сводке, «не назначен» здесь. Владение работой — системная слабость, а не частный случай.</p>
+</div>
+
+<hr>
+
+<h2 id="a8"><span class="n">08</span>Что ещё вычислимо из этого журнала</h2>
+
+<p>Раз журнал пишется на каждый переход, всё перечисленное уже доступно — нужен только расчёт.</p>
+
+<div class="card">
+  <h4>Время в каждом статусе</h4>
+  <p>Разница между соседними событиями по одной сущности даёт длительность каждого состояния. Отсюда — где именно работа стоит: в ожидании, в работе, на утверждении. Сейчас видно только суммарный цикл, а состав его неизвестен.</p>
+</div>
+
+<div class="card">
+  <h4>Кумулятивная диаграмма потока</h4>
+  <p>Число сущностей в каждом статусе по дням накопленным итогом. Прямо выводится из журнала. Показывает расширение очереди перед узким местом за недели до того, как это станет видно по срокам.</p>
+</div>
+
+<div class="card">
+  <h4>Возраст незавершённого</h4>
+  <p>Для каждой открытой сущности — время с последнего события. ПРОДАКШН имел бы сейчас возраст более 22 часов без движения при сроке через сутки. Это и есть тот упреждающий сигнал, которого не хватает во всех модулях.</p>
+</div>
+
+<div class="card">
+  <h4>Матрица передач</h4>
+  <p>Кто кому передаёт работу и сколько времени она проводит между этими людьми. Из журнала выводится однозначно: автор события известен. Показывает, на каких стыках теряется время, — обычно там же, где нет владельца.</p>
+</div>
+
+<hr>
+
+<h2 id="a9"><span class="n">09</span>Гигиена событийных данных</h2>
+
+<table>
+<tr><th>Правило</th><th>Зачем</th></tr>
+<tr><td>Событие пишется в момент действия</td><td>Иначе метки времени описывают распорядок дня, а не работу</td></tr>
+<tr><td>Автор события фиксируется всегда</td><td>Без этого невозможны матрица передач и разделение отказа от перемещения</td></tr>
+<tr><td>Дебаунс интерфейсного шума</td><td>Переключения внутри минуты не должны попадать в счётчики</td></tr>
+<tr><td>Возврат несёт причину</td><td>Двадцать возвратов без причин — это двадцать потерянных фактов</td></tr>
+<tr><td>Дата не может быть в будущем</td><td>Одна проверка при вводе. У вас уже есть ручная запись, датированная на неделю вперёд</td></tr>
+<tr><td>Журнал не редактируется</td><td>Исправление вносится новым событием. Иначе история перестаёт быть историей</td></tr>
+</table>
+
+<div class="card ac">
+  <h4>Почему это не бюрократия</h4>
+  <p>Каждое правило здесь защищает конкретную метрику от конкретного искажения, и все шесть — дешёвые: пять из них реализуются проверками при вводе, а не дисциплиной.</p>
+  <p>Общий принцип: <b>там, где можно поставить валидацию, не надо ставить регламент</b>. Регламент забывают, валидация работает всегда.</p>
+</div>
+
+<hr>
+
+<h2 id="a10"><span class="n">10</span>Ловушки экспертного уровня</h2>
+
+<div class="card">
+  <h4>Деление на счётчик</h4>
+  <p>Главная ловушка этого разбора и моя собственная. Разделить длительность на число событий — значит предположить равномерность. Счётчик о распределении молчит. Если распределение важно для вывода, его надо посмотреть, а не вывести делением.</p>
+</div>
+
+<div class="card">
+  <h4>Убедительность агрегата</h4>
+  <p>«13 возвратов» звучит как готовый диагноз, потому что число большое и круглое. Именно убедительные агрегаты опаснее всего: их не хочется проверять. Правило простое — чем сильнее цифра подтверждает вашу гипотезу, тем обязательнее спуститься к событиям.</p>
+</div>
+
+<div class="card">
+  <h4>Журнал как доказательство вины</h4>
+  <p>В ленте виден автор каждого перехода. Использовать это в разборе полётов — верный способ убить данные: люди начнут избегать переходов, дробить действия и просить коллег «нажать за них». Журнал восстанавливает факты о работе, а не о людях.</p>
+</div>
+
+<div class="card">
+  <h4>Метка времени как момент работы</h4>
+  <p>Время события — это момент нажатия кнопки, а не момент работы. При пакетном закрытии разница составляет сутки. Без дисциплины «отмечаю сразу» весь событийный анализ описывает не то.</p>
+</div>
+
+<div class="card">
+  <h4>Полнота журнала как полнота картины</h4>
+  <p>Журнал полон относительно того, что в нём фиксируется. Переписка, созвоны, обдумывание, ожидание ответа клиента событиями не являются и в нём отсутствуют. Восстановленная по журналу история всегда беднее реальной — и в этом зазоре живут самые долгие простои.</p>
+</div>
+
+<div class="card">
+  <h4>Исправление цифр вместо правил</h4>
+  <p>Соблазн подправить неверный счётчик руками. В событийной модели это бессмысленно: проекция пересчитается из журнала и вернёт прежнее. Менять надо правило вывода — тогда исправятся все проекции разом и задним числом.</p>
+</div>
+
+<div class="foot">
+  DETROYD SMART SYSTEM · Дедлайны · экспертный уровень<br>
+  Событийная модель данных (event sourcing), кумулятивная диаграмма потока (Anderson, 2010).<br>
+  Разбор построен на кабинете DETROYD SYSTEM, проект Qushbegi Milliy Taomlar, данные от 6 августа 2026 года.
+</div>
+
+</div>
+</body>
+</html>
