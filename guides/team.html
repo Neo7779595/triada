@@ -3,136 +3,258 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0B0D">
 <title>Команда: как это работает</title>
 <style>
-  :root{
-    --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
-    --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
-    --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
-    --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
-    --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
-    --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);
-    font:16px/1.65 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:860px;margin:0 auto;padding:56px 24px 120px}
-  header{margin-bottom:52px}
-  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
-  h1{font-size:38px;line-height:1.12;letter-spacing:-.03em;margin:12px 0 0;font-weight:700}
-  .lead{margin-top:16px;font-size:18px;line-height:1.6;color:var(--txt2);max-width:62ch}
-  .lead b{color:var(--txt);font-weight:650}
-  h2{font-size:25px;letter-spacing:-.02em;margin:60px 0 6px;font-weight:700;scroll-margin-top:20px}
-  h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:8px;letter-spacing:.1em}
-  h3{font-size:18px;margin:34px 0 8px;font-weight:650;letter-spacing:-.01em}
-  p{margin:12px 0;color:var(--txt2);max-width:66ch}
-  p b,li b,td b{color:var(--txt);font-weight:600}
-  .sub{color:var(--txt3);font-size:15px}
-  ul,ol{color:var(--txt2);padding-left:22px;max-width:66ch}
-  li{margin:7px 0}
-  code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
+/* ═══════════════════════════════════════════════════════════════════
+   DETROYD ACADEMY — оболочка разбора
+   Полосу прогресса, обложку во весь экран и боковую навигацию держим
+   в одном месте: шестнадцать документов обязаны выглядеть одной серией,
+   а не шестнадцатью самостоятельными страницами.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
+  --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
+  --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
+  --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
+  --e:cubic-bezier(.4,0,.2,1); --e-out:cubic-bezier(.16,1,.3,1);
+  --rail:266px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:16px/1.68 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
 
-  .toc{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin-top:36px}
-  .toc ol{margin:8px 0 0;padding-left:20px}
-  .toc a{color:var(--txt2);text-decoration:none;border-bottom:1px solid transparent}
-  .toc a:hover{color:var(--ac);border-bottom-color:var(--ac-line)}
+/* ——— полоса прочитанного ——— */
+.rp{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:transparent}
+.rp i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--ac),var(--violet));
+  box-shadow:0 0 12px -2px var(--ac);transition:width .1s linear}
 
-  .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:22px 0}
-  .card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.05),transparent 60%),var(--bg1)}
-  .card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.05),transparent 60%),var(--bg1)}
-  .card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.05),transparent 60%),var(--bg1)}
-  .card h4{margin:0 0 4px;font-size:17px;font-weight:650}
-  .card p:last-child{margin-bottom:0}
+/* ——— верхняя полоса академии ——— */
+.acad{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:14px 30px;background:rgba(10,11,13,.72);backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;transition:border-color .25s var(--e),background .25s var(--e)}
+.acad.stuck{border-bottom-color:var(--line)}
+.acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--txt3);min-width:0}
+.acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px -1px var(--ac);flex:none}
+.acad-b b{color:var(--txt2);font-weight:700}
+.acad-lvl{margin-left:auto;display:flex;align-items:center;gap:7px}
+.acad-lvl span{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3);white-space:nowrap}
+.acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+.acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+  transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
+.acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
 
-  .frm{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:18px 22px;margin:20px 0;
-    font-family:var(--mono);font-size:16px;color:var(--txt);text-align:center;letter-spacing:.01em}
-  .frm .sm{display:block;font-size:12px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
-  .frm em{color:var(--ac);font-style:normal}
+/* ——— обложка во весь экран ——— */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:120px 30px 90px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(55,230,200,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(55,230,200,.045) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%);
+  mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%)}
+.hero-gl{position:absolute;width:min(64vw,900px);aspect-ratio:1;left:-10vw;top:-16vh;pointer-events:none;
+  background:radial-gradient(circle,rgba(55,230,200,.13),transparent 62%);filter:blur(26px)}
+.hero-in{position:relative;width:100%;max-width:1180px;margin:0 auto}
+.hero .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3)}
+.hero h1{font-size:clamp(38px,5.6vw,76px);line-height:1.03;letter-spacing:-.035em;margin:20px 0 0;font-weight:700;
+  max-width:20ch}
+.hero h1 em{font-style:normal;color:var(--ac)}
+.hero .lead{margin-top:22px;font-size:clamp(16.5px,1.35vw,20px);line-height:1.6;color:var(--txt2);max-width:70ch}
+.hero .lead b{color:var(--txt);font-weight:650}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:34px}
+.hero-meta span{font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line2);color:var(--txt3)}
+.hero-meta span.ac{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+.hero-cue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:9px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--txt3);text-decoration:none}
+.hero-cue i{display:block;width:1px;height:34px;background:linear-gradient(var(--ac),transparent);
+  animation:cue 2.1s var(--e) infinite}
+@keyframes cue{0%{transform:scaleY(.3);opacity:.3;transform-origin:top}50%{transform:scaleY(1);opacity:1;transform-origin:top}100%{transform:scaleY(.3);opacity:.3;transform-origin:top}}
 
-  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
-  .tag.ac{background:var(--ac-dim);color:var(--ac)}
-  .tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
-  .tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
+/* ——— каркас: рельс слева, текст справа ——— */
+.shell{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr);
+  gap:0;max-width:1560px;margin:0 auto;padding:0 30px 140px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:80px 26px 80px 0}
+.rail-t{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);
+  margin-bottom:16px}
+.rail a{display:flex;gap:11px;align-items:flex-start;text-decoration:none;padding:7px 0;
+  color:var(--txt3);font-size:13.5px;line-height:1.35;transition:color .18s var(--e)}
+.rail a n{font-family:var(--mono);font-size:10.5px;padding-top:2px;opacity:.6;flex:none;width:16px}
+.rail a s{text-decoration:none;border-left:1px solid transparent;padding-left:0;transition:.18s var(--e)}
+.rail a:hover{color:var(--txt2)}
+.rail a.on{color:var(--txt)}
+.rail a.on n{color:var(--ac);opacity:1}
+.rail-line{position:absolute;left:0;top:0;width:1px;background:var(--line)}
+.doc{min-width:0;padding:0 0 0 44px;border-left:1px solid var(--line);max-width:1000px}
 
-  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:20px 0}
-  .kpi>div{background:var(--bg1);padding:16px 18px}
-  .kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
-  .kpi .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:7px;line-height:1}
-  .kpi .s{font-size:12.5px;color:var(--txt3);margin-top:6px;font-family:var(--mono)}
+/* ——— типографика разбора ——— */
+h2{font-size:clamp(26px,2.4vw,36px);letter-spacing:-.025em;margin:0 0 6px;font-weight:700;scroll-margin-top:96px;
+  position:relative}
+h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:10px;letter-spacing:.12em}
+.sec{padding:88px 0 0;position:relative}
+.sec:first-of-type{padding-top:70px}
+h3{font-size:clamp(17px,1.5vw,20px);margin:40px 0 8px;font-weight:650;letter-spacing:-.012em}
+p{margin:13px 0;color:var(--txt2);max-width:74ch}
+p b,li b,td b{color:var(--txt);font-weight:600}
+.sub{color:var(--txt3);font-size:15px}
+ul,ol{color:var(--txt2);padding-left:22px;max-width:74ch}
+li{margin:7px 0}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
 
-  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
-  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--txt3);font-weight:600;padding:0 12px 10px 0;border-bottom:1px solid var(--line)}
-  th.num{text-align:right;padding-right:0}
-  td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
-  td:first-child{color:var(--txt);font-weight:600}
-  td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
-  td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
-  tr.hi td{background:rgba(240,120,92,.07)}
-  tr.ok td{background:rgba(67,216,140,.06)}
+/* Оглавление карточкой нужно только там, где боковая рельса не помещается.
+   Живёт оно не в обложке, а первым блоком текста: в обложке одиннадцать
+   пунктов растягивали её на два экрана и сталкивали заголовок за край. */
+.toc{display:none}
 
-  .quote{border-left:2px solid var(--ac-line);padding:4px 0 4px 18px;margin:22px 0;color:var(--txt2);font-size:16.5px}
-  .quote b{color:var(--txt)}
+.card{background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin:22px 0;
+  transition:border-color .25s var(--e),transform .25s var(--e)}
+.card:hover{border-color:var(--line2)}
+.card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.055),transparent 58%),var(--bg1)}
+.card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.055),transparent 58%),var(--bg1)}
+.card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.055),transparent 58%),var(--bg1)}
+.card h4{margin:0 0 6px;font-size:17.5px;font-weight:650;letter-spacing:-.012em}
+.card p:last-child{margin-bottom:0}
 
-  .step{display:flex;gap:16px;margin:18px 0;align-items:flex-start}
-  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--ac-dim);color:var(--ac);
-    display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:700}
-  .step .bd{flex:1;min-width:0}
-  .step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:2px}
-  .step .bd span{color:var(--txt2);font-size:15px}
+.frm{background:var(--bg2);border:1px solid var(--line2);border-radius:16px;padding:22px 26px;margin:24px 0;
+  font-family:var(--mono);font-size:clamp(14px,1.15vw,17px);color:var(--txt);text-align:center;letter-spacing:.01em}
+.frm .sm{display:block;font-size:11.5px;color:var(--txt3);letter-spacing:.13em;text-transform:uppercase;margin-bottom:12px}
+.frm em{color:var(--ac);font-style:normal}
 
-  .bars{margin:22px 0}
-  .bar{display:flex;align-items:center;gap:12px;margin:9px 0;font-family:var(--mono);font-size:13px}
-  .bar .bl{flex:none;width:52px;color:var(--txt2);text-align:right}
-  .bar .bt{flex:1;height:22px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative}
-  .bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
-    border-right:2px solid var(--ac)}
-  .bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
-  .bar .bv{flex:none;width:74px;color:var(--txt);font-weight:600}
+.tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
+.tag.ac{background:var(--ac-dim);color:var(--ac)}
+.tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
+.tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
 
-  hr{border:0;border-top:1px solid var(--line);margin:56px 0}
-  .foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:70px;padding-top:22px;border-top:1px solid var(--line)}
-  @media(max-width:640px){ .wrap{padding:34px 16px 80px} h1{font-size:29px} h2{font-size:21px} .lead{font-size:16.5px}
-    .frm{font-size:13.5px;padding:16px 14px} .bar .bl{width:44px} .bar .bv{width:62px}
-    table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
-    td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
-    table{display:block;max-width:100%;overflow-x:auto} }
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:24px 0}
+.kpi>div{background:var(--bg1);padding:20px 22px}
+.kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt3)}
+.kpi .v{font-family:var(--mono);font-size:clamp(26px,2.6vw,34px);font-weight:700;letter-spacing:-.025em;margin-top:9px;line-height:1}
+.kpi .s{font-size:12.5px;color:var(--txt3);margin-top:7px;font-family:var(--mono)}
 
-  /* Шапка академии: документ открывается из кабинета в новой вкладке, и без
-     обратной ссылки человек оказывается в тупике. Полоса не липкая намеренно —
-     на длинном тексте липкая шапка съедает высоту и мешает читать. */
-  .acad{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:13px 0 15px;margin:0 0 -14px;border-bottom:1px solid var(--line)}
-  .acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
-    letter-spacing:.14em;text-transform:uppercase;color:var(--txt3)}
-  .acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);
-    box-shadow:0 0 10px -1px var(--ac);flex:none}
-  .acad-lvl{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .acad-lvl span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-    padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3)}
-  .acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
-  .acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
-    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-    padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
-    transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
-  .acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
-  @media(max-width:600px){ .acad-lvl{margin-left:0;width:100%;order:3} }
+table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14.5px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--txt3);font-weight:600;padding:0 14px 11px 0;border-bottom:1px solid var(--line)}
+th.num{text-align:right;padding-right:0}
+td{padding:14px 14px 14px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+td:first-child{color:var(--txt);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
+td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
+tr.hi td{background:rgba(240,120,92,.07)}
+tr.ok td{background:rgba(67,216,140,.06)}
+
+.quote{border-left:2px solid var(--ac-line);padding:6px 0 6px 22px;margin:26px 0;color:var(--txt2);
+  font-size:clamp(16.5px,1.35vw,19px);line-height:1.55}
+.quote b{color:var(--txt)}
+
+.step{display:flex;gap:18px;margin:20px 0;align-items:flex-start}
+.step .no{flex:none;width:34px;height:34px;border-radius:11px;background:var(--ac-dim);color:var(--ac);
+  display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:700}
+.step .bd{flex:1;min-width:0}
+.step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:3px;font-size:16px}
+.step .bd span{color:var(--txt2);font-size:15px}
+
+.bars{margin:24px 0}
+.bar{display:flex;align-items:center;gap:14px;margin:10px 0;font-family:var(--mono);font-size:13px}
+.bar .bl{flex:none;min-width:56px;color:var(--txt2);text-align:right;white-space:nowrap}
+.bar .bt{flex:1;height:24px;background:var(--bg2);border-radius:7px;overflow:hidden;position:relative}
+.bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
+  border-right:2px solid var(--ac);width:0;transition:width 1s var(--e-out)}
+.bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
+.bar .bv{flex:none;width:78px;color:var(--txt);font-weight:600}
+
+hr{border:0;border-top:1px solid var(--line);margin:0}
+.sec>hr:first-child{display:none}
+.foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:90px;padding-top:26px;
+  border-top:1px solid var(--line);line-height:1.7}
+
+/* ——— появление по мере чтения ——— */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s var(--e-out),transform .6s var(--e-out)}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:1180px){
+  :root{--rail:0px}
+  .shell{grid-template-columns:minmax(0,1fr);max-width:900px;padding:0 22px 110px}
+  .rail{display:none}
+  .doc{padding-left:0;border-left:0;max-width:none}
+  .toc{display:block;background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:22px 24px;margin:34px 0 0}
+  .toc .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+  .toc ol{margin:10px 0 0;padding-left:20px}
+  .toc a{color:var(--txt2);text-decoration:none}
+  .toc a:hover{color:var(--ac)}
+}
+@media(max-width:680px){
+  .acad{padding:11px 16px;gap:10px;flex-wrap:wrap}
+  .acad-lvl{margin-left:auto}
+  /* На телефоне обложка должна укладываться в один экран: длинный заголовок
+     плюс два абзаца вступления выталкивали подсказку «читать» за край, и
+     страница открывалась серединой фразы. Ужимаем поля и межстрочные отступы. */
+  .hero{padding:92px 18px 72px}
+  .hero h1{font-size:clamp(29px,7.6vw,38px);margin-top:16px}
+  .hero .lead{margin-top:15px;font-size:15.5px;line-height:1.55}
+  .hero-meta{margin-top:22px;gap:7px}
+  .hero-meta span{padding:6px 11px;font-size:10px}
+  .hero-cue{bottom:24px}
+  .shell{padding:0 16px 90px}
+  .sec{padding-top:64px}
+  .card{padding:20px 18px}
+  .frm{padding:18px 15px}
+  .step{gap:13px}
+  table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
+  td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
+  table{display:block;max-width:100%;overflow-x:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1;transform:none;transition:none}
+  .hero-cue i{animation:none}
+  .bar .bf{transition:none}
+  .rp i{transition:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-<div class="acad"><div class="acad-b"><i></i>DETROYD Academy · Команда</div><div class="acad-lvl"><span class="on">Тренинг</span><span class="">Экспертный</span></div><a class="acad-back" href="https://detroyd.com">← В кабинет</a></div>
+<div class="rp" aria-hidden="true"><i></i></div>
 
-<header>
-  <div class="eyebrow">DETROYD SMART SYSTEM · Команда · базовый тренинг</div>
-  <h1>Команда: рейтинг, нагрузка и три вкладки</h1>
-  <p class="lead">Это единственный модуль, который смотрит не на проекты, а на <b>людей</b>. И именно поэтому он требует самой большой осторожности: цифра про проект — это диагностика, цифра про человека — это оценка, и обращаться с ней надо иначе.</p>
-  <p class="lead">Разбор — на кабинете DETROYD SYSTEM, период 30 дней, оба сотрудника. Здесь же обнаружилось, что слово «медиана цикла» в трёх модулях платформы означает три разные величины — с разбросом в 467 раз.</p>
+<div class="acad">
+  <div class="acad-b"><i></i>DETROYD Academy · <b>Команда</b></div>
+  <div class="acad-lvl"><span class="on">Тренинг</span><span class="">Экспертный</span></div>
+  <a class="acad-back" href="https://detroyd.com">← В кабинет</a>
+</div>
 
-  <div class="toc">
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true"></div><div class="hero-gl" aria-hidden="true"></div>
+  <div class="hero-in">
+    <div class="eyebrow">DETROYD SMART SYSTEM · Команда · базовый тренинг</div>
+    <h1>Команда: рейтинг, нагрузка и три вкладки</h1>
+    <p class="lead">Это единственный модуль, который смотрит не на проекты, а на <b>людей</b>. И именно поэтому он требует самой большой осторожности: цифра про проект — это диагностика, цифра про человека — это оценка, и обращаться с ней надо иначе.</p>
+    <p class="lead">Разбор — на кабинете DETROYD SYSTEM, период 30 дней, оба сотрудника. Здесь же обнаружилось, что слово «медиана цикла» в трёх модулях платформы означает три разные величины — с разбросом в 467 раз.</p>
+    <div class="hero-meta"><span class="ac">тренинг уровень</span><span>10 разделов</span><span>на данных от 6 августа 2026</span></div>
+  </div>
+  <a class="hero-cue" href="#a1"><span>читать</span><i></i></a>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Разделы разбора">
+    <div class="rail-t">Разделы</div>
+    <a href="#a1"><n>01</n><s>Зачем модуль и что он меряет</s></a><a href="#a2"><n>02</n><s>Общие плитки</s></a><a href="#a3"><n>03</n><s>Вкладка «Рейтинг»: TPI и профиль</s></a><a href="#a4"><n>04</n><s>Вкладка «Нагрузка»</s></a><a href="#a5"><n>05</n><s>Вкладка «Команды»</s></a><a href="#a6"><n>06</n><s>Что говорят ваши данные</s></a><a href="#a7"><n>07</n><s>Что сделать</s></a><a href="#a8"><n>08</n><s>Ритуал</s></a><a href="#a9"><n>09</n><s>Ловушки</s></a><a href="#a10"><n>10</n><s>Как мыслить: метод</s></a>
+  </nav>
+  <main class="doc">
+<div class="toc">
     <div class="eyebrow">Что внутри</div>
     <ol>
       <li><a href="#a1">Зачем модуль и что он на самом деле меряет</a></li>
@@ -147,33 +269,29 @@
       <li><a href="#a10">Как мыслить: метод</a></li>
     </ol>
   </div>
-</header>
 
-<h2 id="a1"><span class="n">01</span>Зачем модуль и что он меряет</h2>
+<section class="sec"><h2 id="a1"><span class="n">01</span>Зачем модуль и что он меряет</h2>
 
 <p>Три вкладки отвечают на три разных вопроса, и путать их нельзя.</p>
 
-<table>
+<table class="rv">
 <tr><th>Вкладка</th><th>Вопрос</th><th>Тип данных</th></tr>
 <tr><td><b>Рейтинг</b></td><td>Кто как справляется</td><td>Оценка. Требует максимальной осторожности</td></tr>
 <tr><td><b>Нагрузка</b></td><td>Кто чем занят и сколько на ком висит</td><td>Факт. Читается прямо</td></tr>
 <tr><td><b>Команды</b></td><td>Как работает группа целиком</td><td>Диагностика процесса, а не людей</td></tr>
 </table>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Главное, что нужно понять про этот модуль</h4>
   <p>Вкладка «Нагрузка» безопасна и полезна всегда: она показывает распределение работы, а перекос нагрузки — это управленческий факт, а не оценка человека.</p>
   <p>Вкладка «Рейтинг» — инструмент с двойным дном. Она даёт полезный сигнал и одновременно создаёт риск: <b>как только по рейтингу начинают спрашивать, люди начинают управлять рейтингом, а не работой</b>. Дробят задачи, избегают сложных, не отмечают возвраты. Про это подробно в ловушках, и это не теория — у вас в системе уже есть следы такого поведения.</p>
   <p>Вкладка «Команды» — самая недооценённая. Она меряет группу, а групповые метрики почти всегда честнее личных, потому что результат в агентстве создаётся не в одиночку.</p>
-</div>
-
-<hr>
-
-<h2 id="a2"><span class="n">02</span>Общие плитки</h2>
+</div></section>
+<section class="sec"><h2 id="a2"><span class="n">02</span>Общие плитки</h2>
 
 <p>Шесть чисел, одинаковых на всех вкладках, за выбранный период.</p>
 
-<table>
+<table class="rv">
 <tr><th>Плитка</th><th class="num">У вас</th><th>Что означает и на что смотреть</th></tr>
 <tr><td>Выработка</td><td class="num">15</td><td>Сколько единиц закрыто за период. Подпись «нов. vs пред.» — сравнение с прошлым периодом</td></tr>
 <tr><td>Медиана цикла</td><td class="num">1,1 ч</td><td>Типичное время от старта до финиша. <b>Уточните, что именно считается</b> — об этом находка</td></tr>
@@ -183,20 +301,17 @@
 <tr><td>Сейчас в работе</td><td class="num">0</td><td>Что происходит прямо сейчас. Ноль — это не всегда хорошо</td></tr>
 </table>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>Про подпись «под контролем» рядом с 51%</h4>
   <p>Цифра красная, подпись успокаивающая. Это несостыковка интерфейса, но она влияет на прочтение: глаз цепляется за слова.</p>
   <p>Ориентир: <b>возвраты выше 20% — это уже много</b>, выше 40% — работа переделывается чаще, чем делается с первого раза. 51% значит, что каждая вторая единица работы возвращалась хотя бы раз.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a3"><span class="n">03</span>Вкладка «Рейтинг»: TPI и профиль</h2>
 
-<hr>
-
-<h2 id="a3"><span class="n">03</span>Вкладка «Рейтинг»: TPI и профиль</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Что такое TPI</h4>
   <p>Сводный балл от 0 до 100 плюс буквенный грейд. Собирается из четырёх осей, показанных рядом столбиками:</p>
-  <table>
+  <table class="rv">
     <tr><th>Ось</th><th>Что меряет</th><th class="num">Nurislam</th><th class="num">Команда</th></tr>
     <tr><td><b>O</b> — выработка</td><td>Сколько закрыто</td><td class="num">48</td><td class="num">35</td></tr>
     <tr><td><b>S</b> — скорость</td><td>Как быстро проходит цикл</td><td class="num">65</td><td class="num">65</td></tr>
@@ -207,57 +322,48 @@
   <p><b>Чего балл не говорит.</b> Он не говорит, из-за чего он такой, и не говорит, какой вес у каждой оси, — веса нигде не написаны. Это ограничение любого композита, и про него есть отдельная находка.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Колонки таблицы</h4>
   <p><b>Выработка</b> — число закрытого, под ним «↩ 7 переделок». <b>Медиана цикла</b> — типичная длительность. <b>Возвраты</b> — доля работы, которую возвращали. <b>Динамика</b> — направление за период. <b>Тип</b> — словесный ярлык: «Восходящий», «Мало данных».</p>
   <p><b>Важно про «Тип».</b> «Восходящий» описывает <b>направление</b>, а не уровень. Человек может расти с очень низкой базы и всё равно быть помечен восходящим. Это ярлык тренда, а не оценка качества.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Порог накопления</h4>
   <p>У Abdurauf вместо балла стоит «накопление 1 / 3» и «ещё 2 задачи до оценки». То есть система не выставляет оценку, пока нет трёх наблюдений.</p>
   <p>Это правильная идея — не оценивать по одной задаче. Но порог в три наблюдения всё ещё очень мал: устойчивая медиана требует минимум пяти, а композит из четырёх осей — восьми и больше. Об этом в находках.</p>
-</div>
-
-<hr>
-
-<h2 id="a4"><span class="n">04</span>Вкладка «Нагрузка»</h2>
+</div></section>
+<section class="sec"><h2 id="a4"><span class="n">04</span>Вкладка «Нагрузка»</h2>
 
 <p>Самая прямая и самая безопасная вкладка. Показывает, где сейчас лежит работа и сколько времени на неё потрачено.</p>
 
-<div class="card">
+<div class="card rv">
   <h4>Верхние плитки</h4>
   <p>Распределение по колонкам доски — в ожидании, в работе, на утверждении, завершено — и суммарное время по таймеру за период.</p>
   <p><b>У вас:</b> 0 / 0 / 0 / 9 и 7,9 часа. То есть весь объём завершён и ничего не находится в работе.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Таблица по сотрудникам</h4>
   <p>По каждому: сколько задач, как они распределены по колонкам, сколько готово и сколько времени по таймеру со средним на задачу.</p>
   <p><b>Как читать.</b> Главное здесь — не абсолютные числа, а <b>перекос</b>. Один человек с семью задачами и второй с двумя — это не про производительность, это про распределение работы, и вопрос адресуется тому, кто её распределяет.</p>
   <p><b>Второе полезное.</b> Столбец «время в работе» со средним на задачу — это ваша единственная возможность увидеть, отличается ли характер работы у людей. Средние в 16 и 30 минут говорят, что задачи разного типа, и значит сравнивать этих двоих по скорости нельзя.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a5"><span class="n">05</span>Вкладка «Команды»</h2>
 
-<hr>
-
-<h2 id="a5"><span class="n">05</span>Вкладка «Команды»</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Карточка команды</h4>
   <p>Группа, число людей, период и предупреждающий бейдж — у вас «возвраты» красным. Внутри — те же четыре оси, но посчитанные на группу, с грейдом.</p>
   <p><b>Руководство:</b> 55 из 100, грейд C. ВЫР 35 · СКО 65 · КАЧ 65 · НАД 67. Подписи: 15 закрыто, 7,5 на человека, цикл 1,1 ч, 11 возвратов.</p>
   <p><b>Зачем эта вкладка нужна.</b> Групповая метрика честнее личной, потому что результат создаётся совместно, а разброс между людьми чаще объясняется тем, какие задачи кому достались, чем тем, как они работают.</p>
   <p><b>Блок SMM</b> пуст: «Нет SMM-проектов у команды». Разделение по направлениям заработает, когда команд станет несколько и у них будут разные типы проектов.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a6"><span class="n">06</span>Что говорят ваши данные</h2>
 
-<hr>
-
-<h2 id="a6"><span class="n">06</span>Что говорят ваши данные</h2>
-
-<div class="card neg">
+<div class="card neg rv">
   <h4>1. Слово «медиана цикла» в трёх модулях означает три разные величины</h4>
   <p>Одна и та же работа, один и тот же период, три экрана:</p>
-  <table>
+  <table class="rv">
     <tr><th>Модуль</th><th>Формулировка на экране</th><th class="num">Значение</th></tr>
     <tr><td>Лидерборд</td><td>«типичное время этапа/задачи»</td><td class="num">2 мин</td></tr>
     <tr><td>Команда</td><td>«старт → финиш»</td><td class="num">1,1 ч</td></tr>
@@ -268,13 +374,13 @@
   <p>Пока определения не сведены, <b>ни по одной из трёх цифр нельзя принимать решения</b>: вы не знаете, какую из них сравниваете с чем.</p>
 </div>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>2. Возвраты 51% — единственная метрика качества, которой можно верить</h4>
   <p>В разборе Дедлайнов выяснилось, что счётчик возвратов загрязнён: тринадцать «возвратов» по одной задаче оказались серией кликов за одну минуту. Логичный вопрос — можно ли верить 51%.</p>
   <p><b>Можно, и вот почему.</b> Проверим, что именно считает эта цифра: у Nurislam выработка 14 и подпись «↩ 7 переделок», а возвраты 53%. Семь из четырнадцати — это половина. Значит <b>процент считает долю задач, которые хоть раз вернулись</b>, а не число событий возврата.</p>
   <p>А доля задач <b>устойчива к серии кликов</b>: тринадцать переключений по одной задаче дают одну задачу в числителе, а не тринадцать. Значит помеха на неё не влияет.</p>
   <p>Подтверждение из независимого источника: в статистике Операционки 4 задачи из 9 прошли без единого возврата — это 44% с первого раза. Здесь получается 49%. Числа сошлись.</p>
-  <div class="kpi">
+  <div class="kpi rv">
     <div><div class="l">С первого раза</div><div class="v" style="color:var(--warn)">49%</div><div class="s">надёжная цифра</div></div>
     <div><div class="l">Возвращалось</div><div class="v" style="color:var(--neg)">51%</div><div class="s">каждая вторая единица</div></div>
     <div><div class="l">Ориентир</div><div class="v" style="color:var(--pos)">80%+</div><div class="s">с первого раза</div></div>
@@ -282,17 +388,17 @@
   <p>А вот <b>«11 возвратов» на карточке команды и «откаты 36%» в Сводке — это счётчики событий</b>, и они шумом загрязнены. Ими пользоваться нельзя, пока не введён отсев переключений внутри минуты.</p>
 </div>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>3. Оба сотрудника — директора. Система ранжирует CEO по скорости закрытия задач</h4>
   <p>Nurislam Aliyev — Директор, CEO. Abdurauf Parpiyev — Директор, Арт директор. Оба в команде «Руководство». Линейных сотрудников в кабинете нет.</p>
   <p>TPI измеряет исполнительскую производительность: сколько закрыл, как быстро, сколько вернули, попал ли в срок. Для дизайнера или монтажёра это осмысленно. <b>Для владельца агентства — нет</b>: его результат складывается из продаж, решений, найма и переговоров, и ни одно из этих действий не является задачей на доске.</p>
   <p>Практический вывод: <b>сегодня рейтинг измеряет не то</b>. Пользуйтесь вкладками «Нагрузка» и «Команды», а рейтинг оставьте до появления людей, чья работа действительно состоит из задач.</p>
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>4. Порог оценки — три наблюдения. Этого мало</h4>
   <p>Abdurauf: «накопление 1 / 3». Значит система готова выставить оценку после трёх задач.</p>
-  <table>
+  <table class="rv">
     <tr><th>Что считаем</th><th class="num">Нужно наблюдений</th></tr>
     <tr class="hi"><td>Текущий порог системы</td><td class="num">3</td></tr>
     <tr><td>Устойчивая медиана</td><td class="num">5</td></tr>
@@ -302,23 +408,23 @@
   <p>У Nurislam стоит n=21 — этого уже достаточно. Но при трёх наблюдениях балл будет почти случайным, а выглядеть будет так же солидно, как при двадцати одном. Держите этот порог в голове и не относитесь к первой оценке всерьёз.</p>
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>5. Треть реального времени команды здесь не видна</h4>
   <p>Плитка «Время в работе за 30 дней» показывает 7,9 часа. Разложение сходится: 6,9 у Nurislam плюс 1 час у Abdurauf.</p>
   <p>Но на экране «Потраченное время» проекта видно, что 7 ч 56 м — это <b>только таймер задач</b>, а всего по проекту 11 ч 56 м, потому что есть ещё 4 часа ручных записей: проезд и переговоры.</p>
   <p>Значит модуль «Команда» видит <b>66% реального времени</b> людей. Дорога и встречи в нагрузку не попадают вообще — а это ровно тот тип работы, который съедает время руководителей.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>6. Одна из подписей «ср.» не сходится</h4>
   <p>У Abdurauf: 1 час на 2 задачи, подписано «ср. 30 мин» — верно.</p>
   <p>У Nurislam: 6,9 часа на 7 задач. Это <b>59 минут на задачу</b>, а подписано «ср. 16 мин». Чтобы получилось 16 минут, в знаменателе должно быть около 26 элементов, а не 7.</p>
   <p>Проверить стоит: либо среднее считается по другому множеству (например, по всем событиям, а не по задачам), либо это ошибка. Пока не выяснено — на эту подпись не опирайтесь.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>7. Выработка на трёх экранах — три числа</h4>
-  <table>
+  <table class="rv">
     <tr><th>Где</th><th class="num">Значение</th></tr>
     <tr><td>Общая плитка и карточка команды</td><td class="num">15</td></tr>
     <tr><td>Рейтинг, Nurislam</td><td class="num">14</td></tr>
@@ -328,99 +434,87 @@
   <p>Но одна цифра всё равно не сходится: 14 у Nurislam плюс 2 задачи Abdurauf даёт 16, а не 15. Эту единицу стоит проверить руками.</p>
 </div>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>8. «Сейчас в работе 0 · всё в срок» — а завтра срок без ответственного</h4>
   <p>Здесь: ноль в ожидании, ноль в работе, ноль на утверждении, зелёная подпись «всё в срок».</p>
   <p>В модуле «Дедлайны» в это же время: <b>7 августа в 18:00 срок по этапу ПРОДАКШН, ответственный не назначен, потрачено ноль</b>.</p>
   <p>Оба экрана правы: этап не является задачей и в доску не попадает, а срок формально ещё не наступил. Но человек, который утром откроет «Команду» и увидит «всё в срок», об этом не узнает.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>9. Профиль показывает, что чинить, лучше, чем балл</h4>
   <p>У Nurislam: O 48, S 65, Q 51, R 67. Скорость и надёжность в норме, <b>проседают выработка и качество</b>.</p>
   <p>Это согласуется со всем остальным разбором: работа идёт быстро, в сроки в основном укладывается, но половину приходится переделывать — а переделки съедают выработку. То есть <b>две низкие оси — это одна причина</b>, и лечится она в одном месте: на входе, критериями готовности.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a7"><span class="n">07</span>Что сделать</h2>
 
-<hr>
-
-<h2 id="a7"><span class="n">07</span>Что сделать</h2>
-
-<div class="step"><div class="no">1</div><div class="bd"><b>Свести определение «цикла» к одному</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Свести определение «цикла» к одному</b>
 <span>Взять формулировку Операционки — она единственная записана — и применить её везде. Пока три модуля называют одним словом три величины, сравнивать их нельзя.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Не использовать рейтинг для оценки, пока в команде только директора</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Не использовать рейтинг для оценки, пока в команде только директора</b>
 <span>TPI меряет исполнительскую производительность. Ранжировать по ней владельца агентства бессмысленно. Пользуйтесь «Нагрузкой» и «Командами».</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Работать с 51% возвратов как с главной целью квартала</b>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Работать с 51% возвратов как с главной целью квартала</b>
 <span>Это надёжная цифра и самая денежная: половина работы делается дважды. Цель — довести до 80% с первого раза. Инструмент вы уже знаете: критерии готовности перед переводом на проверку.</span></div></div>
 
-<div class="step"><div class="no">4</div><div class="bd"><b>Поднять порог оценки минимум до восьми наблюдений</b>
+<div class="step rv"><div class="no">4</div><div class="bd"><b>Поднять порог оценки минимум до восьми наблюдений</b>
 <span>Композит из четырёх осей на трёх задачах — это случайное число с солидным видом. Лучше показывать «мало данных» дольше, чем один раз оценить неверно: первая оценка запоминается.</span></div></div>
 
-<div class="step"><div class="no">5</div><div class="bd"><b>Проверить две несходящиеся цифры</b>
+<div class="step rv"><div class="no">5</div><div class="bd"><b>Проверить две несходящиеся цифры</b>
 <span>«ср. 16 мин» при 6,9 ч на 7 задач и выработку 15 против 14+2. Обе проверяются руками за пять минут и обе влияют на доверие ко всему модулю.</span></div></div>
 
-<div class="step"><div class="no">6</div><div class="bd"><b>Проговорить с командой, зачем существует рейтинг</b>
-<span>До того, как кто-то увидит свой балл впервые. Если люди решат, что по нему будут наказывать, вы получите управление рейтингом вместо управления работой — и данные испортятся необратимо.</span></div></div>
+<div class="step rv"><div class="no">6</div><div class="bd"><b>Проговорить с командой, зачем существует рейтинг</b>
+<span>До того, как кто-то увидит свой балл впервые. Если люди решат, что по нему будут наказывать, вы получите управление рейтингом вместо управления работой — и данные испортятся необратимо.</span></div></div></section>
+<section class="sec"><h2 id="a8"><span class="n">08</span>Ритуал</h2>
 
-<hr>
-
-<h2 id="a8"><span class="n">08</span>Ритуал</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Раз в неделю — 10 минут на вкладке «Нагрузка»</h4>
   <p>Три вопроса: <b>нет ли перекоса</b> (один везёт, другой простаивает), <b>не скопилось ли что-то на утверждении</b>, <b>у всех ли вообще есть работа</b>. Это разговор о распределении, а не о людях.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Раз в месяц — 20 минут на «Командах»</h4>
   <p>Четыре оси группы: какая просела и что изменилось за месяц. Групповая динамика говорит о процессе, а процессом вы управляете напрямую.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Рейтинг — раз в квартал и только для разговора</h4>
   <p>Не для премии и не для разбора. Открывается вместе с человеком, и вопрос звучит так: <b>«вот профиль, что тебе мешает по проседающей оси»</b>. Ответ почти всегда про процесс, а не про навык.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a9"><span class="n">09</span>Ловушки</h2>
 
-<hr>
-
-<h2 id="a9"><span class="n">09</span>Ловушки</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Сравнение людей, делающих разную работу</h4>
   <p>Средние в 16 и 30 минут на задачу — это разные типы задач, а не разная скорость. Сравнивать можно только внутри одного класса работы и при достаточном числе наблюдений у каждого.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Балл вместо профиля</h4>
   <p>TPI 56 не говорит, что делать. O 48 и Q 51 при S 65 и R 67 — говорят. Балл нужен для сортировки, решения принимаются по осям.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Ярлык вместо уровня</h4>
   <p>«Восходящий» — это направление. Можно расти от очень плохого к плохому и носить тот же ярлык. Смотрите на уровень и на тренд вместе.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Оценка по трём наблюдениям</h4>
   <p>Порог накопления защищает от оценки по одной задаче, но три — всё ещё почти ничто. Первая выставленная оценка при этом запоминается всеми надолго.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Подпись, противоречащая цвету</h4>
   <p>«51%» красным и «под контролем» серым. Мозг читает слова быстрее цифр. Всегда доверяйте числу и порогу, а не сопроводительному тексту.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Рейтинг как основание для денег</h4>
   <p>Самая разрушительная. Как только балл начинает влиять на премию, он перестаёт измерять работу: задачи дробятся, сложные обходятся стороной, возвраты не проставляются. Причём испортится не только рейтинг, а все данные платформы сразу — они питаются из одного журнала.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a10"><span class="n">10</span>Как мыслить: метод</h2>
 
-<hr>
-
-<h2 id="a10"><span class="n">10</span>Как мыслить: метод</h2>
-
-<div class="card ac">
+<div class="card ac rv">
   <h4>Главный сдвиг: разброс между людьми чаще создаёт система, а не люди</h4>
   <p>У Деминга есть наблюдение, подтверждённое десятилетиями практики: подавляющая часть различий в результатах порождается процессом — постановкой задач, входными данными, распределением работы, — а не способностями исполнителей.</p>
   <p>Проверить это можно прямо на вашем экране. Возвраты 51%: половина работы возвращается. Приписать это людям невозможно — оба сотрудника директора, оба опытные. Значит дело в том, <b>как ставится и принимается работа</b>, а не в том, кто её делает.</p>
@@ -429,35 +523,104 @@
 
 <h3>Четыре вопроса к этому модулю</h3>
 
-<div class="step"><div class="no">1</div><div class="bd"><b>Сколько наблюдений за этой цифрой?</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Сколько наблюдений за этой цифрой?</b>
 <span>Первый вопрос всегда. Три задачи — это анекдот. Восемь — можно смотреть. Двадцать — можно обсуждать.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Сравнимы ли эти люди вообще?</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Сравнимы ли эти люди вообще?</b>
 <span>Один тип работы, сопоставимая сложность, похожий объём. Если нет — любое сравнение измеряет распределение задач, а не людей.</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Это про человека или про процесс?</b>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Это про человека или про процесс?</b>
 <span>Возвраты, сроки, простои почти всегда про процесс. Про человека — только систематическое отклонение по одной оси при сопоставимых задачах и большом n.</span></div></div>
 
-<div class="step"><div class="no">4</div><div class="bd"><b>Что я сделаю, если цифра плохая?</b>
+<div class="step rv"><div class="no">4</div><div class="bd"><b>Что я сделаю, если цифра плохая?</b>
 <span>Если ответ «поговорю строго» — метрику лучше не смотреть. Если «посмотрю, что мешает» — смотрите.</span></div></div>
 
 <h3>Три различения</h3>
 
-<table>
+<table class="rv">
 <tr><td>Нагрузка против производительности</td><td>Семь задач против двух — это про распределение, и вопрос к тому, кто распределяет. Производительность — это результат при сопоставимых задачах, и её здесь пока не видно.</td></tr>
 <tr><td>Доля против счётчика</td><td>«51% задач возвращалось» устойчиво к помехам, «11 возвратов» — нет: тринадцать кликов за минуту дают одну задачу в первом случае и тринадцать событий во втором. При выборе метрики предпочитайте долю.</td></tr>
 <tr><td>Оценка против диагностики</td><td>Одни и те же цифры можно использовать, чтобы понять, где процесс ломается, или чтобы решить, кто виноват. Первое улучшает данные, второе их уничтожает. Выбор делается один раз и меняет всё.</td></tr>
 </table>
 
-<div class="quote">
+<div class="quote rv">
   <b>Правило первого разговора.</b> Прежде чем показать человеку его балл, ответьте себе: что вы сделаете, если он окажется низким. Если в ответе есть слово «спрошу» в смысле «взыщу» — не показывайте. Рейтинг работает только там, где за низкое место следует помощь, а не разбор.
-</div>
+</div></section>
 
 <div class="foot">
   DETROYD SMART SYSTEM · базовый тренинг по модулю «Команда»<br>
   Разбор построен на кабинете DETROYD SYSTEM, период 30 дней, данные от 6 августа 2026 года.
 </div>
-
+  </main>
 </div>
+
+<script>
+/* Оболочка разбора: полоса прочитанного, подсветка текущего раздела в рельсе,
+   появление блоков по мере прокрутки и рост полос-диаграмм. Всё на IntersectionObserver
+   и одном обработчике прокрутки — без библиотек и без работы, пока страница вне экрана.
+
+   Если человек попросил систему уменьшить движение, ничего из этого не включается:
+   блоки просто стоят на местах, полосы сразу нужной длины. */
+(function(){
+  var тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* полоса прочитанного + тень у верхней панели */
+  var rp = document.querySelector('.rp i'), acad = document.querySelector('.acad'), тик = false;
+  function прокрутка(){
+    var h = document.documentElement.scrollHeight - innerHeight;
+    var y = scrollY || pageYOffset;
+    if(rp) rp.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
+    if(acad) acad.classList.toggle('stuck', y > 12);
+    тик = false;
+  }
+  addEventListener('scroll', function(){ if(!тик){ тик = true; requestAnimationFrame(прокрутка); } }, {passive:true});
+  прокрутка();
+
+  /* появление блоков. Наблюдатель отцепляется сразу после показа: элемент,
+     который уже видели, не должен исчезать при прокрутке назад. */
+  var показ = document.querySelectorAll('.rv');
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var i=0;i<показ.length;i++) показ[i].classList.add('in');
+  } else {
+    var ob = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); ob.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:0.05});
+    for(var j=0;j<показ.length;j++) ob.observe(показ[j]);
+  }
+
+  /* полосы-диаграммы: ширина хранится в data-w и ставится в момент показа,
+     иначе анимация проходит впустую где-то за пределами экрана */
+  var полосы = document.querySelectorAll('.bar .bf[data-w]');
+  function налить(el){ el.style.width = el.getAttribute('data-w'); }
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var k=0;k<полосы.length;k++) налить(полосы[k]);
+  } else {
+    var ob2 = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ налить(e.target); ob2.unobserve(e.target); } });
+    }, {threshold:0.3});
+    for(var m=0;m<полосы.length;m++) ob2.observe(полосы[m]);
+  }
+
+  /* подсветка текущего раздела. Считаем не пересечение, а расстояние до верха:
+     разделы разной длины, и при пороговом методе короткие проскакивали
+     неподсвеченными, а длинные держали подсветку на два экрана дольше нужного. */
+  var ссылки = [].slice.call(document.querySelectorAll('.rail a'));
+  var цели = ссылки.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); });
+  function текущий(){
+    var лучший = 0, минимум = Infinity, порог = innerHeight * 0.32;
+    for(var i=0;i<цели.length;i++){
+      if(!цели[i]) continue;
+      var t = цели[i].getBoundingClientRect().top - порог;
+      if(t <= 0 && Math.abs(t) < минимум){ минимум = Math.abs(t); лучший = i; }
+    }
+    for(var j=0;j<ссылки.length;j++) ссылки[j].classList.toggle('on', j === лучший);
+  }
+  if(ссылки.length){
+    var тик2 = false;
+    addEventListener('scroll', function(){ if(!тик2){ тик2 = true; requestAnimationFrame(function(){ текущий(); тик2 = false; }); } }, {passive:true});
+    текущий();
+  }
+})();
+</script>
 </body>
 </html>

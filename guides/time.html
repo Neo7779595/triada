@@ -3,136 +3,258 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0B0D">
 <title>Потраченное время: как это работает</title>
 <style>
-  :root{
-    --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
-    --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
-    --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
-    --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
-    --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
-    --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);
-    font:16px/1.65 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:860px;margin:0 auto;padding:56px 24px 120px}
-  header{margin-bottom:52px}
-  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
-  h1{font-size:38px;line-height:1.12;letter-spacing:-.03em;margin:12px 0 0;font-weight:700}
-  .lead{margin-top:16px;font-size:18px;line-height:1.6;color:var(--txt2);max-width:62ch}
-  .lead b{color:var(--txt);font-weight:650}
-  h2{font-size:25px;letter-spacing:-.02em;margin:60px 0 6px;font-weight:700;scroll-margin-top:20px}
-  h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:8px;letter-spacing:.1em}
-  h3{font-size:18px;margin:34px 0 8px;font-weight:650;letter-spacing:-.01em}
-  p{margin:12px 0;color:var(--txt2);max-width:66ch}
-  p b,li b,td b{color:var(--txt);font-weight:600}
-  .sub{color:var(--txt3);font-size:15px}
-  ul,ol{color:var(--txt2);padding-left:22px;max-width:66ch}
-  li{margin:7px 0}
-  code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
+/* ═══════════════════════════════════════════════════════════════════
+   DETROYD ACADEMY — оболочка разбора
+   Полосу прогресса, обложку во весь экран и боковую навигацию держим
+   в одном месте: шестнадцать документов обязаны выглядеть одной серией,
+   а не шестнадцатью самостоятельными страницами.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
+  --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
+  --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
+  --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
+  --e:cubic-bezier(.4,0,.2,1); --e-out:cubic-bezier(.16,1,.3,1);
+  --rail:266px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:16px/1.68 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
 
-  .toc{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin-top:36px}
-  .toc ol{margin:8px 0 0;padding-left:20px}
-  .toc a{color:var(--txt2);text-decoration:none;border-bottom:1px solid transparent}
-  .toc a:hover{color:var(--ac);border-bottom-color:var(--ac-line)}
+/* ——— полоса прочитанного ——— */
+.rp{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:transparent}
+.rp i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--ac),var(--violet));
+  box-shadow:0 0 12px -2px var(--ac);transition:width .1s linear}
 
-  .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:22px 0}
-  .card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.05),transparent 60%),var(--bg1)}
-  .card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.05),transparent 60%),var(--bg1)}
-  .card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.05),transparent 60%),var(--bg1)}
-  .card h4{margin:0 0 4px;font-size:17px;font-weight:650}
-  .card p:last-child{margin-bottom:0}
+/* ——— верхняя полоса академии ——— */
+.acad{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:14px 30px;background:rgba(10,11,13,.72);backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;transition:border-color .25s var(--e),background .25s var(--e)}
+.acad.stuck{border-bottom-color:var(--line)}
+.acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--txt3);min-width:0}
+.acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px -1px var(--ac);flex:none}
+.acad-b b{color:var(--txt2);font-weight:700}
+.acad-lvl{margin-left:auto;display:flex;align-items:center;gap:7px}
+.acad-lvl span{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3);white-space:nowrap}
+.acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+.acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+  transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
+.acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
 
-  .frm{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:18px 22px;margin:20px 0;
-    font-family:var(--mono);font-size:16px;color:var(--txt);text-align:center;letter-spacing:.01em}
-  .frm .sm{display:block;font-size:12px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
-  .frm em{color:var(--ac);font-style:normal}
+/* ——— обложка во весь экран ——— */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:120px 30px 90px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(55,230,200,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(55,230,200,.045) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%);
+  mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%)}
+.hero-gl{position:absolute;width:min(64vw,900px);aspect-ratio:1;left:-10vw;top:-16vh;pointer-events:none;
+  background:radial-gradient(circle,rgba(55,230,200,.13),transparent 62%);filter:blur(26px)}
+.hero-in{position:relative;width:100%;max-width:1180px;margin:0 auto}
+.hero .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3)}
+.hero h1{font-size:clamp(38px,5.6vw,76px);line-height:1.03;letter-spacing:-.035em;margin:20px 0 0;font-weight:700;
+  max-width:20ch}
+.hero h1 em{font-style:normal;color:var(--ac)}
+.hero .lead{margin-top:22px;font-size:clamp(16.5px,1.35vw,20px);line-height:1.6;color:var(--txt2);max-width:70ch}
+.hero .lead b{color:var(--txt);font-weight:650}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:34px}
+.hero-meta span{font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line2);color:var(--txt3)}
+.hero-meta span.ac{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+.hero-cue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:9px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--txt3);text-decoration:none}
+.hero-cue i{display:block;width:1px;height:34px;background:linear-gradient(var(--ac),transparent);
+  animation:cue 2.1s var(--e) infinite}
+@keyframes cue{0%{transform:scaleY(.3);opacity:.3;transform-origin:top}50%{transform:scaleY(1);opacity:1;transform-origin:top}100%{transform:scaleY(.3);opacity:.3;transform-origin:top}}
 
-  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
-  .tag.ac{background:var(--ac-dim);color:var(--ac)}
-  .tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
-  .tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
+/* ——— каркас: рельс слева, текст справа ——— */
+.shell{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr);
+  gap:0;max-width:1560px;margin:0 auto;padding:0 30px 140px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:80px 26px 80px 0}
+.rail-t{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);
+  margin-bottom:16px}
+.rail a{display:flex;gap:11px;align-items:flex-start;text-decoration:none;padding:7px 0;
+  color:var(--txt3);font-size:13.5px;line-height:1.35;transition:color .18s var(--e)}
+.rail a n{font-family:var(--mono);font-size:10.5px;padding-top:2px;opacity:.6;flex:none;width:16px}
+.rail a s{text-decoration:none;border-left:1px solid transparent;padding-left:0;transition:.18s var(--e)}
+.rail a:hover{color:var(--txt2)}
+.rail a.on{color:var(--txt)}
+.rail a.on n{color:var(--ac);opacity:1}
+.rail-line{position:absolute;left:0;top:0;width:1px;background:var(--line)}
+.doc{min-width:0;padding:0 0 0 44px;border-left:1px solid var(--line);max-width:1000px}
 
-  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:20px 0}
-  .kpi>div{background:var(--bg1);padding:16px 18px}
-  .kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
-  .kpi .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:7px;line-height:1}
-  .kpi .s{font-size:12.5px;color:var(--txt3);margin-top:6px;font-family:var(--mono)}
+/* ——— типографика разбора ——— */
+h2{font-size:clamp(26px,2.4vw,36px);letter-spacing:-.025em;margin:0 0 6px;font-weight:700;scroll-margin-top:96px;
+  position:relative}
+h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:10px;letter-spacing:.12em}
+.sec{padding:88px 0 0;position:relative}
+.sec:first-of-type{padding-top:70px}
+h3{font-size:clamp(17px,1.5vw,20px);margin:40px 0 8px;font-weight:650;letter-spacing:-.012em}
+p{margin:13px 0;color:var(--txt2);max-width:74ch}
+p b,li b,td b{color:var(--txt);font-weight:600}
+.sub{color:var(--txt3);font-size:15px}
+ul,ol{color:var(--txt2);padding-left:22px;max-width:74ch}
+li{margin:7px 0}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
 
-  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
-  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--txt3);font-weight:600;padding:0 12px 10px 0;border-bottom:1px solid var(--line)}
-  th.num{text-align:right;padding-right:0}
-  td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
-  td:first-child{color:var(--txt);font-weight:600}
-  td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
-  td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
-  tr.hi td{background:rgba(240,120,92,.07)}
-  tr.ok td{background:rgba(67,216,140,.06)}
+/* Оглавление карточкой нужно только там, где боковая рельса не помещается.
+   Живёт оно не в обложке, а первым блоком текста: в обложке одиннадцать
+   пунктов растягивали её на два экрана и сталкивали заголовок за край. */
+.toc{display:none}
 
-  .quote{border-left:2px solid var(--ac-line);padding:4px 0 4px 18px;margin:22px 0;color:var(--txt2);font-size:16.5px}
-  .quote b{color:var(--txt)}
+.card{background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin:22px 0;
+  transition:border-color .25s var(--e),transform .25s var(--e)}
+.card:hover{border-color:var(--line2)}
+.card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.055),transparent 58%),var(--bg1)}
+.card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.055),transparent 58%),var(--bg1)}
+.card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.055),transparent 58%),var(--bg1)}
+.card h4{margin:0 0 6px;font-size:17.5px;font-weight:650;letter-spacing:-.012em}
+.card p:last-child{margin-bottom:0}
 
-  .step{display:flex;gap:16px;margin:18px 0;align-items:flex-start}
-  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--ac-dim);color:var(--ac);
-    display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:700}
-  .step .bd{flex:1;min-width:0}
-  .step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:2px}
-  .step .bd span{color:var(--txt2);font-size:15px}
+.frm{background:var(--bg2);border:1px solid var(--line2);border-radius:16px;padding:22px 26px;margin:24px 0;
+  font-family:var(--mono);font-size:clamp(14px,1.15vw,17px);color:var(--txt);text-align:center;letter-spacing:.01em}
+.frm .sm{display:block;font-size:11.5px;color:var(--txt3);letter-spacing:.13em;text-transform:uppercase;margin-bottom:12px}
+.frm em{color:var(--ac);font-style:normal}
 
-  .bars{margin:22px 0}
-  .bar{display:flex;align-items:center;gap:12px;margin:9px 0;font-family:var(--mono);font-size:13px}
-  .bar .bl{flex:none;width:52px;color:var(--txt2);text-align:right}
-  .bar .bt{flex:1;height:22px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative}
-  .bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
-    border-right:2px solid var(--ac)}
-  .bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
-  .bar .bv{flex:none;width:74px;color:var(--txt);font-weight:600}
+.tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
+.tag.ac{background:var(--ac-dim);color:var(--ac)}
+.tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
+.tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
 
-  hr{border:0;border-top:1px solid var(--line);margin:56px 0}
-  .foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:70px;padding-top:22px;border-top:1px solid var(--line)}
-  @media(max-width:640px){ .wrap{padding:34px 16px 80px} h1{font-size:29px} h2{font-size:21px} .lead{font-size:16.5px}
-    .frm{font-size:13.5px;padding:16px 14px} .bar .bl{width:44px} .bar .bv{width:62px}
-    table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
-    td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
-    table{display:block;max-width:100%;overflow-x:auto} }
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:24px 0}
+.kpi>div{background:var(--bg1);padding:20px 22px}
+.kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt3)}
+.kpi .v{font-family:var(--mono);font-size:clamp(26px,2.6vw,34px);font-weight:700;letter-spacing:-.025em;margin-top:9px;line-height:1}
+.kpi .s{font-size:12.5px;color:var(--txt3);margin-top:7px;font-family:var(--mono)}
 
-  /* Шапка академии: документ открывается из кабинета в новой вкладке, и без
-     обратной ссылки человек оказывается в тупике. Полоса не липкая намеренно —
-     на длинном тексте липкая шапка съедает высоту и мешает читать. */
-  .acad{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:13px 0 15px;margin:0 0 -14px;border-bottom:1px solid var(--line)}
-  .acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
-    letter-spacing:.14em;text-transform:uppercase;color:var(--txt3)}
-  .acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);
-    box-shadow:0 0 10px -1px var(--ac);flex:none}
-  .acad-lvl{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .acad-lvl span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-    padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3)}
-  .acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
-  .acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
-    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-    padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
-    transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
-  .acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
-  @media(max-width:600px){ .acad-lvl{margin-left:0;width:100%;order:3} }
+table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14.5px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--txt3);font-weight:600;padding:0 14px 11px 0;border-bottom:1px solid var(--line)}
+th.num{text-align:right;padding-right:0}
+td{padding:14px 14px 14px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+td:first-child{color:var(--txt);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
+td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
+tr.hi td{background:rgba(240,120,92,.07)}
+tr.ok td{background:rgba(67,216,140,.06)}
+
+.quote{border-left:2px solid var(--ac-line);padding:6px 0 6px 22px;margin:26px 0;color:var(--txt2);
+  font-size:clamp(16.5px,1.35vw,19px);line-height:1.55}
+.quote b{color:var(--txt)}
+
+.step{display:flex;gap:18px;margin:20px 0;align-items:flex-start}
+.step .no{flex:none;width:34px;height:34px;border-radius:11px;background:var(--ac-dim);color:var(--ac);
+  display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:700}
+.step .bd{flex:1;min-width:0}
+.step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:3px;font-size:16px}
+.step .bd span{color:var(--txt2);font-size:15px}
+
+.bars{margin:24px 0}
+.bar{display:flex;align-items:center;gap:14px;margin:10px 0;font-family:var(--mono);font-size:13px}
+.bar .bl{flex:none;min-width:56px;color:var(--txt2);text-align:right;white-space:nowrap}
+.bar .bt{flex:1;height:24px;background:var(--bg2);border-radius:7px;overflow:hidden;position:relative}
+.bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
+  border-right:2px solid var(--ac);width:0;transition:width 1s var(--e-out)}
+.bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
+.bar .bv{flex:none;width:78px;color:var(--txt);font-weight:600}
+
+hr{border:0;border-top:1px solid var(--line);margin:0}
+.sec>hr:first-child{display:none}
+.foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:90px;padding-top:26px;
+  border-top:1px solid var(--line);line-height:1.7}
+
+/* ——— появление по мере чтения ——— */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s var(--e-out),transform .6s var(--e-out)}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:1180px){
+  :root{--rail:0px}
+  .shell{grid-template-columns:minmax(0,1fr);max-width:900px;padding:0 22px 110px}
+  .rail{display:none}
+  .doc{padding-left:0;border-left:0;max-width:none}
+  .toc{display:block;background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:22px 24px;margin:34px 0 0}
+  .toc .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+  .toc ol{margin:10px 0 0;padding-left:20px}
+  .toc a{color:var(--txt2);text-decoration:none}
+  .toc a:hover{color:var(--ac)}
+}
+@media(max-width:680px){
+  .acad{padding:11px 16px;gap:10px;flex-wrap:wrap}
+  .acad-lvl{margin-left:auto}
+  /* На телефоне обложка должна укладываться в один экран: длинный заголовок
+     плюс два абзаца вступления выталкивали подсказку «читать» за край, и
+     страница открывалась серединой фразы. Ужимаем поля и межстрочные отступы. */
+  .hero{padding:92px 18px 72px}
+  .hero h1{font-size:clamp(29px,7.6vw,38px);margin-top:16px}
+  .hero .lead{margin-top:15px;font-size:15.5px;line-height:1.55}
+  .hero-meta{margin-top:22px;gap:7px}
+  .hero-meta span{padding:6px 11px;font-size:10px}
+  .hero-cue{bottom:24px}
+  .shell{padding:0 16px 90px}
+  .sec{padding-top:64px}
+  .card{padding:20px 18px}
+  .frm{padding:18px 15px}
+  .step{gap:13px}
+  table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
+  td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
+  table{display:block;max-width:100%;overflow-x:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1;transform:none;transition:none}
+  .hero-cue i{animation:none}
+  .bar .bf{transition:none}
+  .rp i{transition:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-<div class="acad"><div class="acad-b"><i></i>DETROYD Academy · Потраченное время</div><div class="acad-lvl"><span class="on">Тренинг</span><span class="">Экспертный</span></div><a class="acad-back" href="https://detroyd.com">← В кабинет</a></div>
+<div class="rp" aria-hidden="true"><i></i></div>
 
-<header>
-  <div class="eyebrow">DETROYD SMART SYSTEM · Потраченное время · базовый тренинг</div>
-  <h1>Потраченное время: единственное место, где живёт себестоимость</h1>
-  <p class="lead">Все остальные экраны отвечают на вопрос «сколько это заняло». Этот отвечает на другой, куда более денежный: <b>«сколько это нам стоило»</b>.</p>
-  <p class="lead">Разница принципиальная. Задача может идти четыре дня и стоить час работы — вы это уже видели в разборе Операционки. Срок продают клиенту, себестоимость определяет, заработали вы на проекте или нет. Разбор — на проекте Qushbegi Milliy Taomlar от 6 августа.</p>
+<div class="acad">
+  <div class="acad-b"><i></i>DETROYD Academy · <b>Потраченное время</b></div>
+  <div class="acad-lvl"><span class="on">Тренинг</span><span class="">Экспертный</span></div>
+  <a class="acad-back" href="https://detroyd.com">← В кабинет</a>
+</div>
 
-  <div class="toc">
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true"></div><div class="hero-gl" aria-hidden="true"></div>
+  <div class="hero-in">
+    <div class="eyebrow">DETROYD SMART SYSTEM · Потраченное время · базовый тренинг</div>
+    <h1>Потраченное время: единственное место, где живёт себестоимость</h1>
+    <p class="lead">Все остальные экраны отвечают на вопрос «сколько это заняло». Этот отвечает на другой, куда более денежный: <b>«сколько это нам стоило»</b>.</p>
+    <p class="lead">Разница принципиальная. Задача может идти четыре дня и стоить час работы — вы это уже видели в разборе Операционки. Срок продают клиенту, себестоимость определяет, заработали вы на проекте или нет. Разбор — на проекте Qushbegi Milliy Taomlar от 6 августа.</p>
+    <div class="hero-meta"><span class="ac">тренинг уровень</span><span>10 разделов</span><span>на данных от 6 августа 2026</span></div>
+  </div>
+  <a class="hero-cue" href="#a1"><span>читать</span><i></i></a>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Разделы разбора">
+    <div class="rail-t">Разделы</div>
+    <a href="#a1"><n>01</n><s>Зачем этот экран</s></a><a href="#a2"><n>02</n><s>Три плитки: два источника времени</s></a><a href="#a3"><n>03</n><s>Виды работ и ручные записи</s></a><a href="#a4"><n>04</n><s>Задачи с отработанным временем</s></a><a href="#a5"><n>05</n><s>Что говорят ваши данные</s></a><a href="#a6"><n>06</n><s>Возможности: что здесь можно получить</s></a><a href="#a7"><n>07</n><s>Что сделать</s></a><a href="#a8"><n>08</n><s>Ритуал</s></a><a href="#a9"><n>09</n><s>Ловушки</s></a><a href="#a10"><n>10</n><s>Как мыслить: метод</s></a>
+  </nav>
+  <main class="doc">
+<div class="toc">
     <div class="eyebrow">Что внутри</div>
     <ol>
       <li><a href="#a1">Зачем этот экран и чем он отличается от статистики</a></li>
@@ -147,78 +269,68 @@
       <li><a href="#a10">Как мыслить: метод</a></li>
     </ol>
   </div>
-</header>
 
-<h2 id="a1"><span class="n">01</span>Зачем этот экран</h2>
+<section class="sec"><h2 id="a1"><span class="n">01</span>Зачем этот экран</h2>
 
 <p>Агентство продаёт время. Не картинки, не ролики, не стратегии — время людей, упакованное в результат. Значит единственный вопрос, отделяющий прибыльный проект от убыточного: <b>сколько часов в него ушло и сколько за них заплатили</b>.</p>
 
 <p>Ответа на первую половину этого вопроса нет ни в одном другом модуле. Циклы показывают, сколько дней шёл этап. Операционка — сколько задача числилась открытой. Ни то, ни другое не является затратами: задача, висевшая четыре дня, может стоить час зарплаты.</p>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Три вещи, ради которых этот экран существует</h4>
   <p><b>Посчитать себестоимость.</b> Часы, умноженные на стоимость часа. Без этого числа вы не знаете маржу и торгуетесь вслепую.</p>
   <p><b>Увидеть накладные.</b> Дорога, встречи, созвоны, ожидания. Работа, которая не создаёт контент, но съедает те же часы, — и обычно нигде не видна.</p>
   <p><b>Получить норматив.</b> «Такой проект стоит нам примерно столько часов». Из этого рождается прайс, который можно защищать цифрами, а не ощущениями.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Чем отличается от статистики Операционки</h4>
   <p>Статистика меряет <b>календарь</b>: сколько прошло времени от создания задачи до её закрытия. Этот экран меряет <b>труд</b>: сколько часов человек реально потратил.</p>
   <p>По вашему же проекту: суммарный цикл всех задач — 245 часов, суммарный труд — около 12. Первое интересует клиента, второе — бухгалтерию. Путать их дорого в обе стороны.</p>
-</div>
-
-<hr>
-
-<h2 id="a2"><span class="n">02</span>Три плитки: два источника времени</h2>
+</div></section>
+<section class="sec"><h2 id="a2"><span class="n">02</span>Три плитки: два источника времени</h2>
 
 <p>Время в системе попадает двумя разными путями, и они принципиально отличаются по надёжности.</p>
 
-<table>
+<table class="rv">
 <tr><th>Источник</th><th class="num">У вас</th><th>Как попадает</th><th>Надёжность</th></tr>
 <tr><td>Задачи · таймер</td><td class="num">7 ч 56 м</td><td>Автоматически, по кнопке старт-стоп</td><td>Высокая: фиксируется в момент работы</td></tr>
 <tr><td>Записано вручную</td><td class="num">4 ч 00 м</td><td>Человек вносит сам, задним числом</td><td>Низкая: зависит от памяти и дисциплины</td></tr>
 <tr class="ok"><td>Всего по проекту</td><td class="num">11 ч 56 м</td><td>Сумма</td><td>—</td></tr>
 </table>
 
-<div class="card">
+<div class="card rv">
   <h4>Как читать эти три числа</h4>
   <p><b>Соотношение важнее суммы.</b> У вас ручные записи составляют треть всего учёта. Это много: чем больше доля ручного ввода, тем менее надёжен весь итог.</p>
   <p><b>Подпись «проверка 0:06 сверх»</b> — отдельный счётчик времени на проверку. Крошечная деталь, из которой получается одна из самых важных находок этого разбора.</p>
   <p><b>Кнопка «Добавить часы»</b> — вход для ручных записей. Всё, что не привязано к конкретной задаче, попадает через неё: дорога, встречи, созвоны, обучение.</p>
 </div>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Попутно закрыт вопрос из прошлого разбора</h4>
   <p>В тренинге по Операционке я отметил расхождение: в шапке проекта «11 ч 56 м», в плитке доски «7 ч 56 м», разница четыре часа, надо проверить.</p>
   <p>Вот ответ: <b>7 ч 56 м — таймер по задачам, 4 ч 00 м — ручные записи, 11 ч 56 м — их сумма.</b> Расхождения нет, у чисел просто разные области видимости. Запомните: плитка на доске показывает только задачи, шапка — весь проект.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a3"><span class="n">03</span>Виды работ и ручные записи</h2>
 
-<hr>
-
-<h2 id="a3"><span class="n">03</span>Виды работ и ручные записи</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Блок «На что ушло время»</h4>
   <p>Разбивка ручных записей по видам работ. У вас: <b>Проезд — 3 ч (75%)</b>, <b>Переговоры — 1 ч (25%)</b>.</p>
   <p><b>Зачем нужен.</b> Это зачаток управленческого учёта. Когда категорий станет пять-семь и они начнут повторяться от проекта к проекту, вы сможете ответить на вопросы, на которые сейчас ответить нечем: какая доля времени уходит на дорогу, какая на согласования, какая на само производство.</p>
   <p><b>Как читать.</b> Смотрите не на часы, а на долю. Три часа сами по себе — ничто. Три часа из двенадцати — это четверть всего проекта.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Таблица ручных записей</h4>
   <p>Вид работ, дата, комментарий, часы. Четыре поля, и из них <b>дата и комментарий — самые важные</b>, потому что именно они делают запись проверяемой.</p>
   <p><b>Как читать.</b> Первым делом — на даты. Запись, датированная вне срока проекта, либо ошибка ввода, либо чужие часы. У вас обе записи именно такие, разбор в находках.</p>
   <p><b>Комментарий</b> у вас пуст в обеих записях. Через месяц «Проезд, 3 ч» без пояснения невозможно ни проверить, ни оспорить, ни выставить клиенту.</p>
-</div>
-
-<hr>
-
-<h2 id="a4"><span class="n">04</span>Задачи с отработанным временем</h2>
+</div></section>
+<section class="sec"><h2 id="a4"><span class="n">04</span>Задачи с отработанным временем</h2>
 
 <p>Список задач с исполнителем, статусом и временем по таймеру. Здесь считается настоящая себестоимость производства.</p>
 
-<table>
+<table class="rv">
 <tr><th>Задача</th><th class="num">Время</th><th class="num">Доля таймера</th></tr>
 <tr><td>Заполнить паспорт проекта</td><td class="num">1 ч 32 м</td><td class="num">19%</td></tr>
 <tr><td>Анализ конкурентов</td><td class="num">1 ч 18 м</td><td class="num">16%</td></tr>
@@ -227,21 +339,18 @@
 <tr><td>Провести брифинг</td><td class="num">56 м</td><td class="num">12%</td></tr>
 </table>
 
-<div class="card">
+<div class="card rv">
   <h4>Как читать этот список</h4>
   <p><b>Ищите не самые долгие задачи, а несоответствия.</b> Задача, которая по календарю шла долго, а по таймеру заняла минуты, — это не быстрая работа, это простой. Задача с высоким таймером и коротким циклом — наоборот, честная плотная работа.</p>
   <p><b>Колонка «Кто»</b> нужна для будущего расчёта: у разных людей разная стоимость часа, и себестоимость задачи зависит от того, кто её делал.</p>
   <p><b>Отдельная пометка проверки</b> у «Разработать бриф» — единственное место в системе, где видно, сколько стоило ревью. И это оказалось самым говорящим числом на экране.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a5"><span class="n">05</span>Что говорят ваши данные</h2>
 
-<hr>
-
-<h2 id="a5"><span class="n">05</span>Что говорят ваши данные</h2>
-
-<div class="card neg">
+<div class="card neg rv">
   <h4>1. Обе ручные записи датированы вне проекта</h4>
   <p>Сегодня 6 августа. Первая задача проекта создана 31 июля. Договор до 31 августа.</p>
-  <table>
+  <table class="rv">
     <tr><th>Запись</th><th class="num">Дата</th><th>Что не так</th></tr>
     <tr class="hi"><td>Проезд · 3 ч</td><td class="num">13 авг 2026</td><td>На семь дней <b>в будущем</b> — эта поездка ещё не состоялась</td></tr>
     <tr class="hi"><td>Переговоры · 1 ч</td><td class="num">13 июл 2026</td><td>За <b>18 дней до первой задачи</b> проекта</td></tr>
@@ -250,10 +359,10 @@
   <p>Скорее всего, это опечатки при выборе даты в календаре. Исправляется за минуту. Но найти это можно было только глазами — ни одна проверка на такое не среагирует.</p>
 </div>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>2. Проверка занимает секунды. Вот откуда 13 возвратов</h4>
   <p>По всему проекту на проверку потрачено <b>6 минут</b>. Из них 4 минуты — на задачу «Разработать бриф», ту самую, которую вернули тринадцать раз.</p>
-  <div class="kpi">
+  <div class="kpi rv">
     <div><div class="l">Проверка на брифе</div><div class="v">4</div><div class="s">минуты всего</div></div>
     <div><div class="l">Возвратов</div><div class="v" style="color:var(--neg)">13</div><div class="s">кругов</div></div>
     <div><div class="l">На один круг</div><div class="v" style="color:var(--neg)">17</div><div class="s">секунд</div></div>
@@ -263,10 +372,10 @@
   <p><b>Это и есть механизм тринадцати возвратов.</b> Не плохая работа исполнителя, а проверка, которая не производит информации. Отправить назад дёшево, объяснить — дорого, поэтому отправляли назад тринадцать раз.</p>
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>3. Накладные — половина производственного времени</h4>
   <p>4 часа на дорогу и переговоры против 7 ч 56 м на все задачи проекта вместе.</p>
-  <div class="kpi">
+  <div class="kpi rv">
     <div><div class="l">Производство</div><div class="v">66%</div><div class="s">7 ч 56 м</div></div>
     <div><div class="l">Накладные</div><div class="v" style="color:var(--warn)">34%</div><div class="s">4 ч 00 м</div></div>
     <div><div class="l">Один проезд</div><div class="v" style="color:var(--warn)">25%</div><div class="s">всего проекта</div></div>
@@ -275,132 +384,117 @@
   <p>Это не значит, что ездить не надо. Это значит, что дорога должна быть посчитана и учтена в цене — либо сокращена переводом части встреч в онлайн, либо совмещена: одна поездка на несколько дел.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>4. Пять задач из девяти съели три четверти времени</h4>
   <p>Видимые пять задач дают 6 ч 07 м из 7 ч 56 м — <b>77% всего таймера</b>. Оставшиеся четыре — примерно по 27 минут каждая.</p>
   <p>Классическое распределение: примерно половина задач создаёт три четверти затрат. Практический вывод — при оценке нового проекта не считайте «сколько задач», считайте, <b>сколько среди них тяжёлых</b>. Число задач почти не коррелирует с трудоёмкостью.</p>
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>5. Учтённое время — это нижняя граница, а не правда</h4>
   <p>Что в 11 ч 56 м точно <b>не</b> попало: переписка с клиентом по тринадцати кругам брифа, внутренние обсуждения, время на возвращение в контекст после каждого возврата, чтение и ответы в Telegram.</p>
   <p>Всё это реальные часы реальных людей. Их нет в системе, потому что таймер запускают только на задачу, а ручные записи вносят только за крупные очевидные вещи вроде поездки.</p>
   <p><b>Значит настоящая себестоимость выше учтённой</b>, и считать маржу по 11 ч 56 м — значит завышать её. Насколько — вы узнаете, только начав фиксировать эти часы.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>6. У записей нет комментариев</h4>
   <p>Обе ручные записи с пустым полем комментария. Через две недели «Проезд, 3 ч» не проверить: куда ездили, зачем, кто, было ли это в интересах клиента.</p>
   <p>Это критично в одном конкретном случае — когда вы захотите выставить эти часы клиенту. Строка без пояснения в счёте вызывает вопрос, а вопрос по счёту — это всегда торг.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>7. Категорий всего две — и обе про накладные</h4>
   <p>«Проезд» и «Переговоры». Ни одной категории про производство: съёмка, монтаж, тексты, дизайн, публикации, правки.</p>
   <p>Причина понятна: производство идёт через таймер задач и в ручные записи не попадает. Но следствие неприятное: <b>блок «На что ушло время» показывает не структуру проекта, а структуру накладных</b>. Читать его как «на что ушло время проекта» — ошибка.</p>
-</div>
-
-<hr>
-
-<h2 id="a6"><span class="n">06</span>Возможности: что здесь можно получить</h2>
+</div></section>
+<section class="sec"><h2 id="a6"><span class="n">06</span>Возможности: что здесь можно получить</h2>
 
 <p>Это самый недоиспользованный экран в системе. Из тех же данных, если довести учёт до порядка, вырастают пять вещей — по возрастанию ценности.</p>
 
-<div class="step"><div class="no">1</div><div class="bd"><b>Себестоимость проекта</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Себестоимость проекта</b>
 <span>Часы, умноженные на стоимость часа. Одна формула — и вы впервые видите, сколько на самом деле стоил проект, а не сколько вы за него взяли.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Маржа и решение о цене</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Маржа и решение о цене</b>
 <span>Цена минус себестоимость. Проект, где маржа ниже целевой, либо недооценён, либо плохо организован, — и вы точно знаете, какое из двух, потому что видите структуру часов.</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Норматив часов по типу проекта</b>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Норматив часов по типу проекта</b>
 <span>После пяти-шести похожих проектов у вас появляется «SMM-ретейнер такого масштаба стоит нам примерно N часов в месяц». Это основание прайса, которое можно показать клиенту.</span></div></div>
 
-<div class="step"><div class="no">4</div><div class="bd"><b>Управление накладными</b>
+<div class="step rv"><div class="no">4</div><div class="bd"><b>Управление накладными</b>
 <span>Дорога, встречи, согласования — обычно 25–40% времени агентства и почти всегда невидимы. Как только они посчитаны, ими можно управлять: батчинг поездок, онлайн-встречи, лимит на согласования.</span></div></div>
 
-<div class="step"><div class="no">5</div><div class="bd"><b>Решение о найме на данных</b>
-<span>Сколько часов в месяц уходит на всех клиентов и какая доля рабочего времени команды занята. Это единственный честный ответ на вопрос «пора ли брать ещё человека» — и он приходит отсюда, а не из ощущения загруженности.</span></div></div>
+<div class="step rv"><div class="no">5</div><div class="bd"><b>Решение о найме на данных</b>
+<span>Сколько часов в месяц уходит на всех клиентов и какая доля рабочего времени команды занята. Это единственный честный ответ на вопрос «пора ли брать ещё человека» — и он приходит отсюда, а не из ощущения загруженности.</span></div></div></section>
+<section class="sec"><h2 id="a7"><span class="n">07</span>Что сделать</h2>
 
-<hr>
-
-<h2 id="a7"><span class="n">07</span>Что сделать</h2>
-
-<div class="step"><div class="no">1</div><div class="bd"><b>Исправить даты двух ручных записей</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Исправить даты двух ручных записей</b>
 <span>Проезд стоит на 13 августа — этой поездки ещё не было. Переговоры на 13 июля — за 18 дней до старта. Минута работы, и треть учёта проекта перестаёт врать.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Ввести правило: проверка не короче трёх минут</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Ввести правило: проверка не короче трёх минут</b>
 <span>Семнадцать секунд на круг — это причина тринадцати возвратов. Проверка должна заканчиваться не вердиктом «не то», а списком того, что именно поменять. Это единственное изменение, которое лечит и возвраты, и сроки одновременно.</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Завести закрытый справочник видов работ</b>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Завести закрытый справочник видов работ</b>
 <span>Шесть-семь категорий, не больше: производство, согласование, встречи и переговоры, проезд, планирование, отчётность, правки. Свободный ввод отключить — иначе через полгода будет тридцать вариантов написания одного и того же.</span></div></div>
 
-<div class="step"><div class="no">4</div><div class="bd"><b>Сделать комментарий обязательным</b>
+<div class="step rv"><div class="no">4</div><div class="bd"><b>Сделать комментарий обязательным</b>
 <span>Одна строка: куда, зачем, с кем. Без неё запись невозможно ни проверить, ни выставить в счёт.</span></div></div>
 
-<div class="step"><div class="no">5</div><div class="bd"><b>Посчитать стоимость своего часа</b>
+<div class="step rv"><div class="no">5</div><div class="bd"><b>Посчитать стоимость своего часа</b>
 <span>Полные затраты на человека в месяц — зарплата, налоги, рабочее место, подписки — поделить на реально доступные рабочие часы. Одно число, которое превращает все эти таймеры в деньги.</span></div></div>
 
-<div class="step"><div class="no">6</div><div class="bd"><b>Начать фиксировать переписку и созвоны</b>
-<span>Хотя бы грубо: полчаса в конце дня одной записью «переписка с клиентом». Сейчас эти часы просто исчезают, а они реальны и их много — особенно на проекте с тринадцатью кругами согласования.</span></div></div>
+<div class="step rv"><div class="no">6</div><div class="bd"><b>Начать фиксировать переписку и созвоны</b>
+<span>Хотя бы грубо: полчаса в конце дня одной записью «переписка с клиентом». Сейчас эти часы просто исчезают, а они реальны и их много — особенно на проекте с тринадцатью кругами согласования.</span></div></div></section>
+<section class="sec"><h2 id="a8"><span class="n">08</span>Ритуал</h2>
 
-<hr>
-
-<h2 id="a8"><span class="n">08</span>Ритуал</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Каждый день — 1 минута в конце дня</h4>
   <p>Внести то, что не прошло через таймер: дорога, созвоны, переписка. Одной строкой, с датой сегодня. Через день вы этого уже не вспомните, а через неделю — тем более.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Раз в неделю — 10 минут</h4>
   <p>Открыть экран и проверить три вещи: <b>нет ли записей с датами вне проекта</b>, <b>какова доля накладных</b> и <b>сколько часов набежало против ожидаемого</b>. Третье — ранний сигнал, что проект выходит за смету.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>В конце проекта — 20 минут</h4>
   <p>Итоговые часы, себестоимость, маржа. И один вопрос: <b>сколько часов такой проект должен стоить в следующий раз</b>. Записанный ответ — это ваш прайс, который растёт с каждым проектом.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a9"><span class="n">09</span>Ловушки</h2>
 
-<hr>
-
-<h2 id="a9"><span class="n">09</span>Ловушки</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Ручная запись задним числом</h4>
   <p>Память систематически занижает время: человек помнит работу и не помнит подготовку, дорогу, переключения. Чем позже вносится запись, тем сильнее занижение. Правило — в тот же день.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Дата по умолчанию</h4>
   <p>Ровно то, что случилось у вас дважды. Календарь предлагает какую-то дату, человек её не меняет, и запись уезжает на месяц. Проверять даты — часть ритуала, а не придирка.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Учтённое принимается за всё</h4>
   <p>11 ч 56 м — это то, что записали. Реальные затраты выше на всё незаписанное: переписку, обсуждения, возвраты в контекст. Считая маржу по учтённому, вы её завышаете.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Накладные как «не работа»</h4>
   <p>Три часа дороги — такие же три часа жизни человека, как три часа монтажа. Они не создают контент, но они оплачены. Невидимые накладные — самая частая причина, по которой прибыльный на бумаге проект оказывается убыточным.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Таймер как оценка людей</h4>
   <p>Самая разрушительная. Как только по часам начнут спрашивать, таймер станут накручивать или забывать выключать. Учёт времени — инструмент ценообразования, а не контроля. Об этом стоит сказать команде вслух и заранее.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Свободный ввод категорий</h4>
   <p>«Проезд», «проезд», «Дорога», «Поездка к клиенту» — четыре строки вместо одной, и никакой аналитики. Справочник должен быть закрытым с самого начала: потом чистить дороже.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a10"><span class="n">10</span>Как мыслить: метод</h2>
 
-<hr>
-
-<h2 id="a10"><span class="n">10</span>Как мыслить: метод</h2>
-
-<div class="card ac">
+<div class="card ac rv">
   <h4>Главный сдвиг: время — это не показатель усердия, а единица себестоимости</h4>
   <p>Естественное отношение к таймеру — «сколько мы поработали». Полезное — <b>«сколько это стоило и сколько за это заплатили»</b>.</p>
   <p>Разница видна на одном примере с вашего экрана. Три часа проезда — это не «мы старались». Это самая дорогая строка проекта, дороже любой задачи. Пока она читается как усердие, ею нельзя управлять. Как только она читается как затрата — появляется выбор: сократить, совместить или включить в цену.</p>
@@ -408,35 +502,104 @@
 
 <h3>Четыре вопроса к этому экрану</h3>
 
-<div class="step"><div class="no">1</div><div class="bd"><b>Все ли даты внутри проекта?</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Все ли даты внутри проекта?</b>
 <span>Первый вопрос, а не последний. Запись вне срока — это либо ошибка, либо чужие часы, и в обоих случаях она портит всё, что считается по периодам.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Какая доля не создаёт результат?</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Какая доля не создаёт результат?</b>
 <span>Дорога, встречи, ожидания, переключения. Не чтобы это убрать — часть неизбежна, — а чтобы это было в цене. У вас треть.</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Чего здесь не хватает?</b>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Чего здесь не хватает?</b>
 <span>Самая полезная привычка. Вспомните последнюю неделю и спросите: какие реальные часы не попали в систему. Ответ на этот вопрос обычно больше, чем всё записанное.</span></div></div>
 
-<div class="step"><div class="no">4</div><div class="bd"><b>Сколько это должно стоить в следующий раз?</b>
+<div class="step rv"><div class="no">4</div><div class="bd"><b>Сколько это должно стоить в следующий раз?</b>
 <span>Смысл учёта не в прошлом проекте, а в следующем. Каждый закрытый проект должен оставлять после себя число часов, на которое вы будете опираться при следующей продаже.</span></div></div>
 
 <h3>Три различения</h3>
 
-<table>
+<table class="rv">
 <tr><td>Срок против затрат</td><td>245 часов цикла и 12 часов труда — это один и тот же проект. Первое продают клиенту, второе платят команде. Проект может быть быстрым и убыточным одновременно.</td></tr>
 <tr><td>Таймер против ручной записи</td><td>Первое фиксируется в момент работы, второе восстанавливается по памяти. Смотреть на их долю — значит понимать, насколько можно доверять итогу. У вас треть восстановлена по памяти, и обе записи с неверными датами.</td></tr>
 <tr><td>Производство против накладных</td><td>Часы, создающие результат, и часы, обслуживающие процесс. Клиент платит за первые, а тратите вы и на те и на другие. Вся маржа живёт в этом зазоре.</td></tr>
 </table>
 
-<div class="quote">
+<div class="quote rv">
   <b>Правило последней минуты дня.</b> Всё, что не записано в тот же день, теряется навсегда — не в системе, а в вашей марже. Минута в конце дня стоит больше, чем час разбирательств в конце месяца.
-</div>
+</div></section>
 
 <div class="foot">
   DETROYD SMART SYSTEM · базовый тренинг по экрану «Потраченное время»<br>
   Разбор построен на проекте Qushbegi Milliy Taomlar, данные от 6 августа 2026 года.
 </div>
-
+  </main>
 </div>
+
+<script>
+/* Оболочка разбора: полоса прочитанного, подсветка текущего раздела в рельсе,
+   появление блоков по мере прокрутки и рост полос-диаграмм. Всё на IntersectionObserver
+   и одном обработчике прокрутки — без библиотек и без работы, пока страница вне экрана.
+
+   Если человек попросил систему уменьшить движение, ничего из этого не включается:
+   блоки просто стоят на местах, полосы сразу нужной длины. */
+(function(){
+  var тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* полоса прочитанного + тень у верхней панели */
+  var rp = document.querySelector('.rp i'), acad = document.querySelector('.acad'), тик = false;
+  function прокрутка(){
+    var h = document.documentElement.scrollHeight - innerHeight;
+    var y = scrollY || pageYOffset;
+    if(rp) rp.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
+    if(acad) acad.classList.toggle('stuck', y > 12);
+    тик = false;
+  }
+  addEventListener('scroll', function(){ if(!тик){ тик = true; requestAnimationFrame(прокрутка); } }, {passive:true});
+  прокрутка();
+
+  /* появление блоков. Наблюдатель отцепляется сразу после показа: элемент,
+     который уже видели, не должен исчезать при прокрутке назад. */
+  var показ = document.querySelectorAll('.rv');
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var i=0;i<показ.length;i++) показ[i].classList.add('in');
+  } else {
+    var ob = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); ob.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:0.05});
+    for(var j=0;j<показ.length;j++) ob.observe(показ[j]);
+  }
+
+  /* полосы-диаграммы: ширина хранится в data-w и ставится в момент показа,
+     иначе анимация проходит впустую где-то за пределами экрана */
+  var полосы = document.querySelectorAll('.bar .bf[data-w]');
+  function налить(el){ el.style.width = el.getAttribute('data-w'); }
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var k=0;k<полосы.length;k++) налить(полосы[k]);
+  } else {
+    var ob2 = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ налить(e.target); ob2.unobserve(e.target); } });
+    }, {threshold:0.3});
+    for(var m=0;m<полосы.length;m++) ob2.observe(полосы[m]);
+  }
+
+  /* подсветка текущего раздела. Считаем не пересечение, а расстояние до верха:
+     разделы разной длины, и при пороговом методе короткие проскакивали
+     неподсвеченными, а длинные держали подсветку на два экрана дольше нужного. */
+  var ссылки = [].slice.call(document.querySelectorAll('.rail a'));
+  var цели = ссылки.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); });
+  function текущий(){
+    var лучший = 0, минимум = Infinity, порог = innerHeight * 0.32;
+    for(var i=0;i<цели.length;i++){
+      if(!цели[i]) continue;
+      var t = цели[i].getBoundingClientRect().top - порог;
+      if(t <= 0 && Math.abs(t) < минимум){ минимум = Math.abs(t); лучший = i; }
+    }
+    for(var j=0;j<ссылки.length;j++) ссылки[j].classList.toggle('on', j === лучший);
+  }
+  if(ссылки.length){
+    var тик2 = false;
+    addEventListener('scroll', function(){ if(!тик2){ тик2 = true; requestAnimationFrame(function(){ текущий(); тик2 = false; }); } }, {passive:true});
+    текущий();
+  }
+})();
+</script>
 </body>
 </html>

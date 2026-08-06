@@ -3,136 +3,258 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0B0D">
 <title>Дедлайны: экспертный уровень</title>
 <style>
-  :root{
-    --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
-    --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
-    --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
-    --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
-    --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
-    --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);
-    font:16px/1.65 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:860px;margin:0 auto;padding:56px 24px 120px}
-  header{margin-bottom:52px}
-  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
-  h1{font-size:38px;line-height:1.12;letter-spacing:-.03em;margin:12px 0 0;font-weight:700}
-  .lead{margin-top:16px;font-size:18px;line-height:1.6;color:var(--txt2);max-width:62ch}
-  .lead b{color:var(--txt);font-weight:650}
-  h2{font-size:25px;letter-spacing:-.02em;margin:60px 0 6px;font-weight:700;scroll-margin-top:20px}
-  h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:8px;letter-spacing:.1em}
-  h3{font-size:18px;margin:34px 0 8px;font-weight:650;letter-spacing:-.01em}
-  p{margin:12px 0;color:var(--txt2);max-width:66ch}
-  p b,li b,td b{color:var(--txt);font-weight:600}
-  .sub{color:var(--txt3);font-size:15px}
-  ul,ol{color:var(--txt2);padding-left:22px;max-width:66ch}
-  li{margin:7px 0}
-  code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
+/* ═══════════════════════════════════════════════════════════════════
+   DETROYD ACADEMY — оболочка разбора
+   Полосу прогресса, обложку во весь экран и боковую навигацию держим
+   в одном месте: шестнадцать документов обязаны выглядеть одной серией,
+   а не шестнадцатью самостоятельными страницами.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
+  --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
+  --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
+  --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
+  --e:cubic-bezier(.4,0,.2,1); --e-out:cubic-bezier(.16,1,.3,1);
+  --rail:266px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:16px/1.68 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
 
-  .toc{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin-top:36px}
-  .toc ol{margin:8px 0 0;padding-left:20px}
-  .toc a{color:var(--txt2);text-decoration:none;border-bottom:1px solid transparent}
-  .toc a:hover{color:var(--ac);border-bottom-color:var(--ac-line)}
+/* ——— полоса прочитанного ——— */
+.rp{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:transparent}
+.rp i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--ac),var(--violet));
+  box-shadow:0 0 12px -2px var(--ac);transition:width .1s linear}
 
-  .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:22px 0}
-  .card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.05),transparent 60%),var(--bg1)}
-  .card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.05),transparent 60%),var(--bg1)}
-  .card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.05),transparent 60%),var(--bg1)}
-  .card h4{margin:0 0 4px;font-size:17px;font-weight:650}
-  .card p:last-child{margin-bottom:0}
+/* ——— верхняя полоса академии ——— */
+.acad{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:14px 30px;background:rgba(10,11,13,.72);backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;transition:border-color .25s var(--e),background .25s var(--e)}
+.acad.stuck{border-bottom-color:var(--line)}
+.acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--txt3);min-width:0}
+.acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px -1px var(--ac);flex:none}
+.acad-b b{color:var(--txt2);font-weight:700}
+.acad-lvl{margin-left:auto;display:flex;align-items:center;gap:7px}
+.acad-lvl span{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3);white-space:nowrap}
+.acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+.acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+  transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
+.acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
 
-  .frm{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:18px 22px;margin:20px 0;
-    font-family:var(--mono);font-size:16px;color:var(--txt);text-align:center;letter-spacing:.01em}
-  .frm .sm{display:block;font-size:12px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
-  .frm em{color:var(--ac);font-style:normal}
+/* ——— обложка во весь экран ——— */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:120px 30px 90px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(55,230,200,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(55,230,200,.045) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%);
+  mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%)}
+.hero-gl{position:absolute;width:min(64vw,900px);aspect-ratio:1;left:-10vw;top:-16vh;pointer-events:none;
+  background:radial-gradient(circle,rgba(55,230,200,.13),transparent 62%);filter:blur(26px)}
+.hero-in{position:relative;width:100%;max-width:1180px;margin:0 auto}
+.hero .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3)}
+.hero h1{font-size:clamp(38px,5.6vw,76px);line-height:1.03;letter-spacing:-.035em;margin:20px 0 0;font-weight:700;
+  max-width:20ch}
+.hero h1 em{font-style:normal;color:var(--ac)}
+.hero .lead{margin-top:22px;font-size:clamp(16.5px,1.35vw,20px);line-height:1.6;color:var(--txt2);max-width:70ch}
+.hero .lead b{color:var(--txt);font-weight:650}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:34px}
+.hero-meta span{font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line2);color:var(--txt3)}
+.hero-meta span.ac{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+.hero-cue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:9px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--txt3);text-decoration:none}
+.hero-cue i{display:block;width:1px;height:34px;background:linear-gradient(var(--ac),transparent);
+  animation:cue 2.1s var(--e) infinite}
+@keyframes cue{0%{transform:scaleY(.3);opacity:.3;transform-origin:top}50%{transform:scaleY(1);opacity:1;transform-origin:top}100%{transform:scaleY(.3);opacity:.3;transform-origin:top}}
 
-  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
-  .tag.ac{background:var(--ac-dim);color:var(--ac)}
-  .tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
-  .tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
+/* ——— каркас: рельс слева, текст справа ——— */
+.shell{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr);
+  gap:0;max-width:1560px;margin:0 auto;padding:0 30px 140px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:80px 26px 80px 0}
+.rail-t{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);
+  margin-bottom:16px}
+.rail a{display:flex;gap:11px;align-items:flex-start;text-decoration:none;padding:7px 0;
+  color:var(--txt3);font-size:13.5px;line-height:1.35;transition:color .18s var(--e)}
+.rail a n{font-family:var(--mono);font-size:10.5px;padding-top:2px;opacity:.6;flex:none;width:16px}
+.rail a s{text-decoration:none;border-left:1px solid transparent;padding-left:0;transition:.18s var(--e)}
+.rail a:hover{color:var(--txt2)}
+.rail a.on{color:var(--txt)}
+.rail a.on n{color:var(--ac);opacity:1}
+.rail-line{position:absolute;left:0;top:0;width:1px;background:var(--line)}
+.doc{min-width:0;padding:0 0 0 44px;border-left:1px solid var(--line);max-width:1000px}
 
-  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:20px 0}
-  .kpi>div{background:var(--bg1);padding:16px 18px}
-  .kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
-  .kpi .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:7px;line-height:1}
-  .kpi .s{font-size:12.5px;color:var(--txt3);margin-top:6px;font-family:var(--mono)}
+/* ——— типографика разбора ——— */
+h2{font-size:clamp(26px,2.4vw,36px);letter-spacing:-.025em;margin:0 0 6px;font-weight:700;scroll-margin-top:96px;
+  position:relative}
+h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:10px;letter-spacing:.12em}
+.sec{padding:88px 0 0;position:relative}
+.sec:first-of-type{padding-top:70px}
+h3{font-size:clamp(17px,1.5vw,20px);margin:40px 0 8px;font-weight:650;letter-spacing:-.012em}
+p{margin:13px 0;color:var(--txt2);max-width:74ch}
+p b,li b,td b{color:var(--txt);font-weight:600}
+.sub{color:var(--txt3);font-size:15px}
+ul,ol{color:var(--txt2);padding-left:22px;max-width:74ch}
+li{margin:7px 0}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
 
-  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
-  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--txt3);font-weight:600;padding:0 12px 10px 0;border-bottom:1px solid var(--line)}
-  th.num{text-align:right;padding-right:0}
-  td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
-  td:first-child{color:var(--txt);font-weight:600}
-  td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
-  td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
-  tr.hi td{background:rgba(240,120,92,.07)}
-  tr.ok td{background:rgba(67,216,140,.06)}
+/* Оглавление карточкой нужно только там, где боковая рельса не помещается.
+   Живёт оно не в обложке, а первым блоком текста: в обложке одиннадцать
+   пунктов растягивали её на два экрана и сталкивали заголовок за край. */
+.toc{display:none}
 
-  .quote{border-left:2px solid var(--ac-line);padding:4px 0 4px 18px;margin:22px 0;color:var(--txt2);font-size:16.5px}
-  .quote b{color:var(--txt)}
+.card{background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin:22px 0;
+  transition:border-color .25s var(--e),transform .25s var(--e)}
+.card:hover{border-color:var(--line2)}
+.card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.055),transparent 58%),var(--bg1)}
+.card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.055),transparent 58%),var(--bg1)}
+.card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.055),transparent 58%),var(--bg1)}
+.card h4{margin:0 0 6px;font-size:17.5px;font-weight:650;letter-spacing:-.012em}
+.card p:last-child{margin-bottom:0}
 
-  .step{display:flex;gap:16px;margin:18px 0;align-items:flex-start}
-  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--ac-dim);color:var(--ac);
-    display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:700}
-  .step .bd{flex:1;min-width:0}
-  .step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:2px}
-  .step .bd span{color:var(--txt2);font-size:15px}
+.frm{background:var(--bg2);border:1px solid var(--line2);border-radius:16px;padding:22px 26px;margin:24px 0;
+  font-family:var(--mono);font-size:clamp(14px,1.15vw,17px);color:var(--txt);text-align:center;letter-spacing:.01em}
+.frm .sm{display:block;font-size:11.5px;color:var(--txt3);letter-spacing:.13em;text-transform:uppercase;margin-bottom:12px}
+.frm em{color:var(--ac);font-style:normal}
 
-  .bars{margin:22px 0}
-  .bar{display:flex;align-items:center;gap:12px;margin:9px 0;font-family:var(--mono);font-size:13px}
-  .bar .bl{flex:none;width:52px;color:var(--txt2);text-align:right}
-  .bar .bt{flex:1;height:22px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative}
-  .bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
-    border-right:2px solid var(--ac)}
-  .bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
-  .bar .bv{flex:none;width:74px;color:var(--txt);font-weight:600}
+.tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
+.tag.ac{background:var(--ac-dim);color:var(--ac)}
+.tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
+.tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
 
-  hr{border:0;border-top:1px solid var(--line);margin:56px 0}
-  .foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:70px;padding-top:22px;border-top:1px solid var(--line)}
-  @media(max-width:640px){ .wrap{padding:34px 16px 80px} h1{font-size:29px} h2{font-size:21px} .lead{font-size:16.5px}
-    .frm{font-size:13.5px;padding:16px 14px} .bar .bl{width:44px} .bar .bv{width:62px}
-    table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
-    td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
-    table{display:block;max-width:100%;overflow-x:auto} }
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:24px 0}
+.kpi>div{background:var(--bg1);padding:20px 22px}
+.kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt3)}
+.kpi .v{font-family:var(--mono);font-size:clamp(26px,2.6vw,34px);font-weight:700;letter-spacing:-.025em;margin-top:9px;line-height:1}
+.kpi .s{font-size:12.5px;color:var(--txt3);margin-top:7px;font-family:var(--mono)}
 
-  /* Шапка академии: документ открывается из кабинета в новой вкладке, и без
-     обратной ссылки человек оказывается в тупике. Полоса не липкая намеренно —
-     на длинном тексте липкая шапка съедает высоту и мешает читать. */
-  .acad{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:13px 0 15px;margin:0 0 -14px;border-bottom:1px solid var(--line)}
-  .acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
-    letter-spacing:.14em;text-transform:uppercase;color:var(--txt3)}
-  .acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);
-    box-shadow:0 0 10px -1px var(--ac);flex:none}
-  .acad-lvl{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .acad-lvl span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-    padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3)}
-  .acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
-  .acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
-    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-    padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
-    transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
-  .acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
-  @media(max-width:600px){ .acad-lvl{margin-left:0;width:100%;order:3} }
+table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14.5px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--txt3);font-weight:600;padding:0 14px 11px 0;border-bottom:1px solid var(--line)}
+th.num{text-align:right;padding-right:0}
+td{padding:14px 14px 14px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+td:first-child{color:var(--txt);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
+td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
+tr.hi td{background:rgba(240,120,92,.07)}
+tr.ok td{background:rgba(67,216,140,.06)}
+
+.quote{border-left:2px solid var(--ac-line);padding:6px 0 6px 22px;margin:26px 0;color:var(--txt2);
+  font-size:clamp(16.5px,1.35vw,19px);line-height:1.55}
+.quote b{color:var(--txt)}
+
+.step{display:flex;gap:18px;margin:20px 0;align-items:flex-start}
+.step .no{flex:none;width:34px;height:34px;border-radius:11px;background:var(--ac-dim);color:var(--ac);
+  display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:700}
+.step .bd{flex:1;min-width:0}
+.step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:3px;font-size:16px}
+.step .bd span{color:var(--txt2);font-size:15px}
+
+.bars{margin:24px 0}
+.bar{display:flex;align-items:center;gap:14px;margin:10px 0;font-family:var(--mono);font-size:13px}
+.bar .bl{flex:none;min-width:56px;color:var(--txt2);text-align:right;white-space:nowrap}
+.bar .bt{flex:1;height:24px;background:var(--bg2);border-radius:7px;overflow:hidden;position:relative}
+.bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
+  border-right:2px solid var(--ac);width:0;transition:width 1s var(--e-out)}
+.bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
+.bar .bv{flex:none;width:78px;color:var(--txt);font-weight:600}
+
+hr{border:0;border-top:1px solid var(--line);margin:0}
+.sec>hr:first-child{display:none}
+.foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:90px;padding-top:26px;
+  border-top:1px solid var(--line);line-height:1.7}
+
+/* ——— появление по мере чтения ——— */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s var(--e-out),transform .6s var(--e-out)}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:1180px){
+  :root{--rail:0px}
+  .shell{grid-template-columns:minmax(0,1fr);max-width:900px;padding:0 22px 110px}
+  .rail{display:none}
+  .doc{padding-left:0;border-left:0;max-width:none}
+  .toc{display:block;background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:22px 24px;margin:34px 0 0}
+  .toc .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+  .toc ol{margin:10px 0 0;padding-left:20px}
+  .toc a{color:var(--txt2);text-decoration:none}
+  .toc a:hover{color:var(--ac)}
+}
+@media(max-width:680px){
+  .acad{padding:11px 16px;gap:10px;flex-wrap:wrap}
+  .acad-lvl{margin-left:auto}
+  /* На телефоне обложка должна укладываться в один экран: длинный заголовок
+     плюс два абзаца вступления выталкивали подсказку «читать» за край, и
+     страница открывалась серединой фразы. Ужимаем поля и межстрочные отступы. */
+  .hero{padding:92px 18px 72px}
+  .hero h1{font-size:clamp(29px,7.6vw,38px);margin-top:16px}
+  .hero .lead{margin-top:15px;font-size:15.5px;line-height:1.55}
+  .hero-meta{margin-top:22px;gap:7px}
+  .hero-meta span{padding:6px 11px;font-size:10px}
+  .hero-cue{bottom:24px}
+  .shell{padding:0 16px 90px}
+  .sec{padding-top:64px}
+  .card{padding:20px 18px}
+  .frm{padding:18px 15px}
+  .step{gap:13px}
+  table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
+  td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
+  table{display:block;max-width:100%;overflow-x:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1;transform:none;transition:none}
+  .hero-cue i{animation:none}
+  .bar .bf{transition:none}
+  .rp i{transition:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-<div class="acad"><div class="acad-b"><i></i>DETROYD Academy · Дедлайны</div><div class="acad-lvl"><span class="">Тренинг</span><span class="on">Экспертный</span></div><a class="acad-back" href="https://detroyd.com">← В кабинет</a></div>
+<div class="rp" aria-hidden="true"><i></i></div>
 
-<header>
-  <div class="eyebrow">DETROYD SMART SYSTEM · Дедлайны · экспертный уровень</div>
-  <h1>Журнал событий как источник истины</h1>
-  <p class="lead">Базовый тренинг разбирал экран. Этот — <b>про архитектуру данных, которая стоит за всей платформой, и про то, как из ленты событий восстанавливать факты, когда агрегаты вводят в заблуждение</b>.</p>
-  <p class="lead">Плюс разбор конкретного случая: как счётчик «13 возвратов» пережил три модуля, попал в мой прошлый вывод и был опровергнут одной колонкой с метками времени.</p>
+<div class="acad">
+  <div class="acad-b"><i></i>DETROYD Academy · <b>Дедлайны</b></div>
+  <div class="acad-lvl"><span class="">Тренинг</span><span class="on">Экспертный</span></div>
+  <a class="acad-back" href="https://detroyd.com">← В кабинет</a>
+</div>
 
-  <div class="toc">
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true"></div><div class="hero-gl" aria-hidden="true"></div>
+  <div class="hero-in">
+    <div class="eyebrow">DETROYD SMART SYSTEM · Дедлайны · экспертный уровень</div>
+    <h1>Журнал событий как источник истины</h1>
+    <p class="lead">Базовый тренинг разбирал экран. Этот — <b>про архитектуру данных, которая стоит за всей платформой, и про то, как из ленты событий восстанавливать факты, когда агрегаты вводят в заблуждение</b>.</p>
+    <p class="lead">Плюс разбор конкретного случая: как счётчик «13 возвратов» пережил три модуля, попал в мой прошлый вывод и был опровергнут одной колонкой с метками времени.</p>
+    <div class="hero-meta"><span class="ac">экспертный уровень</span><span>10 разделов</span><span>на данных от 6 августа 2026</span></div>
+  </div>
+  <a class="hero-cue" href="#a1"><span>читать</span><i></i></a>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Разделы разбора">
+    <div class="rail-t">Разделы</div>
+    <a href="#a1"><n>01</n><s>Событийная модель</s></a><a href="#a2"><n>02</n><s>Разбор ошибки</s></a><a href="#a3"><n>03</n><s>Шум в журнале</s></a><a href="#a4"><n>04</n><s>Анатомия просрочки</s></a><a href="#a5"><n>05</n><s>Как назначать сроки</s></a><a href="#a6"><n>06</n><s>Пакетное закрытие</s></a><a href="#a7"><n>07</n><s>Владение работой</s></a><a href="#a8"><n>08</n><s>Что ещё вычислимо из этого журнала</s></a><a href="#a9"><n>09</n><s>Гигиена событийных данных</s></a><a href="#a10"><n>10</n><s>Ловушки экспертного уровня</s></a>
+  </nav>
+  <main class="doc">
+<div class="toc">
     <div class="eyebrow">Что внутри</div>
     <ol>
       <li><a href="#a1">Событийная модель: почему журнал первичен</a></li>
@@ -147,18 +269,17 @@
       <li><a href="#a10">Ловушки экспертного уровня</a></li>
     </ol>
   </div>
-</header>
 
-<h2 id="a1"><span class="n">01</span>Событийная модель</h2>
+<section class="sec"><h2 id="a1"><span class="n">01</span>Событийная модель</h2>
 
 <p>Платформа устроена как <b>журнал событий с производными представлениями</b>. Это классическая архитектура, и у неё есть строгие свойства, которые стоит понимать, потому что из них следуют все ограничения аналитики.</p>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Устройство</span>
   <em>События</em> (что произошло) → <em>Проекции</em> (циклы, возвраты, velocity, on-time)
 </div>
 
-<table>
+<table class="rv">
 <tr><th>Свойство</th><th>Что означает</th></tr>
 <tr><td><b>События неизменны</b></td><td>Запись «взял в работу в 21:51» уже не отменить. Можно только добавить следующее событие</td></tr>
 <tr><td><b>Проекции выводимы</b></td><td>Любой счётчик пересчитывается из журнала заново. Поэтому исправлять надо правила, а не цифры</td></tr>
@@ -166,19 +287,16 @@
 <tr><td><b>Журнал полон, проекция избирательна</b></td><td>В журнале есть всё. В сводку попадает то, что заложили в правило</td></tr>
 </table>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Третье свойство — самое практичное</h4>
   <p>Агрегация всегда что-то теряет, и потеря <b>необратима на уровне числа</b>. Единственный способ вернуть потерянное — спуститься к событиям.</p>
   <p>Отсюда рабочее правило зрелого пользователя: <b>агрегат порождает гипотезу, событие её подтверждает или убивает</b>. Дашборд говорит «здесь что-то не так, посмотри сюда». Решение принимается после того, как вы посмотрели.</p>
-</div>
-
-<hr>
-
-<h2 id="a2"><span class="n">02</span>Разбор ошибки</h2>
+</div></section>
+<section class="sec"><h2 id="a2"><span class="n">02</span>Разбор ошибки</h2>
 
 <p>Разберу собственную ошибку целиком — она хороший учебный случай, потому что показывает, как убедительный агрегат ведёт не туда.</p>
 
-<div class="card">
+<div class="card rv">
   <h4>Как это развивалось</h4>
   <p><b>Шаг 1.</b> Статистика проекта показала: «Разработать бриф» — 13 возвратов, lead и cycle по 4 д 9 ч. Максимум по проекту, вчетверо выше медианы.</p>
   <p><b>Шаг 2.</b> Экран «Потраченное время» показал: таймер 1 ч 04 м, проверка 0:04.</p>
@@ -186,7 +304,7 @@
   <p><b>Шаг 4.</b> Лента активности: все видимые переключения по этой задаче — <b>4 августа, 21:51</b>. Одна минута. Автор один — Abdurauf Parpiyev.</p>
 </div>
 
-<table>
+<table class="rv">
 <tr><th>Утверждение</th><th>Статус</th><th>Комментарий</th></tr>
 <tr class="ok"><td>Цикл 4 д 9 ч</td><td>Верно</td><td>31 июл 14:20 → 4 авг 23:30. Факт из журнала</td></tr>
 <tr class="ok"><td>Таймер 1 ч 04 м</td><td>Верно</td><td>Эффективность около 1% — тоже факт</td></tr>
@@ -195,50 +313,44 @@
 <tr class="hi"><td>17 секунд на просмотр</td><td>Не подтверждается</td><td>Просмотров, скорее всего, было не 14</td></tr>
 </table>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>Где именно был сделан неверный шаг</h4>
   <p>В делении. Разделив 105 часов на 14 событий, я <b>неявно предположил, что события распределены равномерно</b>. Счётчик такого предположения не содержит — я добавил его сам, потому что оно казалось естественным.</p>
   <p>Это самая распространённая ошибка в работе с агрегатами: сумма или счётчик молчат о распределении, а деление на них навязывает распределение, которого может не быть. С медианой такого не случается — она поэтому и предпочтительнее.</p>
 </div>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Что теперь известно точно</h4>
   <p>Реальная картина по задаче: около <b>104 часов простоя</b> (31 июля 14:20 — 4 августа 21:51), затем минута переключений, затем через 1 ч 39 м закрытие другим человеком.</p>
   <p>Диагноз меняется полностью. Это <b>не</b> проблема качества проверки. Это <b>одна длинная остановка</b>: задачу завели, поставили срок на тот же день, и четверо суток к ней не возвращались. Лечится это не критериями приёмки, а тем, чтобы работа не выпадала из поля зрения, — то есть возрастом незавершённого и владельцами.</p>
-</div>
-
-<hr>
-
-<h2 id="a3"><span class="n">03</span>Шум в журнале</h2>
+</div></section>
+<section class="sec"><h2 id="a3"><span class="n">03</span>Шум в журнале</h2>
 
 <p>Журнал фиксирует всё, включая то, что не является работой. Восемь переключений за минуту — не процесс, а взаимодействие человека с интерфейсом: перетащил не туда, вернул, попробовал снова.</p>
 
-<div class="card">
+<div class="card rv">
   <h4>Три правила, отделяющие сигнал от шума</h4>
   <p><b>Дебаунс по времени.</b> Пара событий «туда-обратно» внутри одного окна — скажем, пяти минут — считается одним действием или не считается вовсе. Это стандартный приём, и он убирает почти весь интерфейсный шум.</p>
   <p><b>Возврат как отдельное событие.</b> Настоящий отказ должен отличаться от простого перемещения карточки: у него есть автор-проверяющий, отличный от исполнителя, и причина. Пока это одно и то же событие, счётчик будет смешивать разное.</p>
   <p><b>Минимальная длительность состояния.</b> Статус, продержавшийся секунды, — вероятно, ошибка ввода. Он не должен попадать в расчёт цикла. Кстати, в блоке «Как считаются метрики» уже есть родственное правило: задачи без единой отметки «в работе» не входят в выборку цикла. Это ровно та же идея, доведённая до конца.</p>
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>Практический вывод для вашего случая</h4>
   <p>Пока эти правила не введены, <b>счётчик возвратов непригоден для выводов</b> — ни о качестве работы, ни о качестве проверки. Он смешивает отказы и клики.</p>
   <p>Это касается не только этого экрана: тот же счётчик участвует в метрике «откаты 36% переходов назад» в Сводке по другому кабинету. Её тоже стоит перепроверить по журналу, прежде чем считать 36% диагнозом.</p>
-</div>
-
-<hr>
-
-<h2 id="a4"><span class="n">04</span>Анатомия просрочки</h2>
+</div></section>
+<section class="sec"><h2 id="a4"><span class="n">04</span>Анатомия просрочки</h2>
 
 <p>Опоздания бывают двух видов, и различить их можно арифметически: сравнить отведённое время с фактически затраченным.</p>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Признак</span>
   время до срока < время работы → <em>ошибка оценки</em><br>
   время до срока > время работы → <em>ошибка внимания</em>
 </div>
 
-<table>
+<table class="rv">
 <tr><th>Задача</th><th class="num">Дали</th><th class="num">Работы</th><th class="num">Запас</th><th>Тип</th></tr>
 <tr><td>Разработать бриф</td><td class="num">2 ч 10 м</td><td class="num">1 ч 04 м</td><td class="num">+66 м</td><td>Внимание</td></tr>
 <tr><td>Провести брифинг</td><td class="num">5 ч 38 м</td><td class="num">57 м</td><td class="num">+281 м</td><td>Внимание</td></tr>
@@ -246,40 +358,34 @@
 <tr><td>Настроить клиентский кабинет</td><td class="num">2 ч 21 м</td><td class="num">23 м</td><td class="num">+118 м</td><td>Внимание</td></tr>
 </table>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>Все четыре опоздания — одного типа</h4>
   <p>Ни в одном случае работы не было больше, чем времени. Запас везде положительный, в одном случае почти пять часов. Оценка была нормальной.</p>
   <p>Значит проблема не в том, что вы неправильно оцениваете объём. Проблема в том, что <b>заведённая задача выпадает из поля зрения</b>. Это принципиально другой класс лечения: не обучение оценке, а механика — владелец, очередь, возраст незавершённого.</p>
   <p>И это согласуется с находкой по «Разработать бриф»: 104 часа простоя — предельный случай той же болезни.</p>
-</div>
-
-<hr>
-
-<h2 id="a5"><span class="n">05</span>Как назначать сроки</h2>
+</div></section>
+<section class="sec"><h2 id="a5"><span class="n">05</span>Как назначать сроки</h2>
 
 <p>Все четыре опоздания родились от одного жеста: дедлайн поставлен на день создания задачи. Это не решение, а поведение по умолчанию — календарь открывается на сегодняшней дате.</p>
 
-<div class="card">
+<div class="card rv">
   <h4>Три уровня зрелости постановки сроков</h4>
   <p><b>Рефлекс.</b> «Пусть будет сегодня к вечеру». Срок не связан ни с объёмом, ни с загрузкой. Ваш текущий уровень.</p>
   <p><b>Оценка.</b> «Тут часа на два работы, ставлю на послезавтра». Уже лучше, но систематически оптимистично: человек оценивает работу и забывает про очередь, переключения и ожидание чужих ответов.</p>
   <p><b>Расчёт по факту.</b> Срок берётся не из оценки объёма, а из <b>исторического распределения времени выполнения</b>. У вас оно уже посчитано: 85% задач укладываются в 1 д 18 ч. Значит срок, поставленный на два дня вперёд, будет выдержан примерно в 85 случаях из ста — и это утверждение проверяемо.</p>
 </div>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Правило назначения срока</span>
   <em>Срок</em> = момент, когда работа будет <em>начата</em> + 85-й перцентиль времени выполнения
 </div>
 
-<p>Ключевое слово — <b>начата</b>. Именно его пропуск и создал ваши четыре опоздания: срок отсчитывали от момента создания, а работа начиналась через двое суток. Пока в очереди нет явного порядка и понимания, когда за задачу сядут, любой срок — это пожелание.</p>
-
-<hr>
-
-<h2 id="a6"><span class="n">06</span>Пакетное закрытие</h2>
+<p>Ключевое слово — <b>начата</b>. Именно его пропуск и создал ваши четыре опоздания: срок отсчитывали от момента создания, а работа начиналась через двое суток. Пока в очереди нет явного порядка и понимания, когда за задачу сядут, любой срок — это пожелание.</p></section>
+<section class="sec"><h2 id="a6"><span class="n">06</span>Пакетное закрытие</h2>
 
 <p>Три задачи с меткой завершения <b>2 августа 09:04</b> — одна и та же минута.</p>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>Что именно ломается</h4>
   <p><b>Время выполнения.</b> Все три получают одинаковую дату конца, хотя работа над ними завершалась в разное время. Разброс схлопывается искусственно.</p>
   <p><b>Выработка по дням.</b> Появляется всплеск в один день и провалы вокруг. Именно так на графике «Завершено по дням» возник пик из шести задач 2 августа — и он описывает не производство, а разбор доски.</p>
@@ -287,17 +393,14 @@
   <p><b>Возраст незавершённого.</b> Пока карточка не закрыта, она числится живой. Значит любой упреждающий сигнал приходит с задержкой в размере вашей привычки разбирать доску.</p>
 </div>
 
-<div class="quote">
+<div class="quote rv">
   Правило: <b>статус меняется в момент события, а не в момент, когда до доски дошли руки.</b> Это единственная дисциплина, без которой все временны́е метрики описывают ваш распорядок дня, а не работу.
-</div>
-
-<hr>
-
-<h2 id="a7"><span class="n">07</span>Владение работой</h2>
+</div></section>
+<section class="sec"><h2 id="a7"><span class="n">07</span>Владение работой</h2>
 
 <p>У задач исполнитель проставлен. У этапов — «Не назначен». Логика перевёрнута, и цена этого несимметрична.</p>
 
-<table>
+<table class="rv">
 <tr><th></th><th>Задача без владельца</th><th>Этап без владельца</th></tr>
 <tr><td>Размер</td><td>Часы</td><td>Дни или недели</td></tr>
 <tr><td>Кто подберёт</td><td>Часто кто-нибудь заметит</td><td>Никто: слишком крупно, чтобы взять походя</td></tr>
@@ -305,44 +408,38 @@
 <tr class="hi"><td>Цена</td><td>Смещение на часы</td><td>Смещение всего проекта</td></tr>
 </table>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>Живой пример прямо сейчас</h4>
   <p>ПРОДАКШН: срок завтра 18:00, владельца нет, потрачено ноль, последнее событие — пятиминутное включение позавчера вечером и возврат. Больше двадцати двух часов тишины.</p>
   <p>Ни одна плитка об этом не сигналит, потому что срок формально не наступил. Обнаружится это завтра в 18:01 — то есть тогда, когда сделать уже ничего нельзя.</p>
   <p>Это третье независимое появление одной и той же дыры: «проверяющий не указан» в Циклах по Artel, все дедлайны на одном человеке в Сводке, «не назначен» здесь. Владение работой — системная слабость, а не частный случай.</p>
-</div>
-
-<hr>
-
-<h2 id="a8"><span class="n">08</span>Что ещё вычислимо из этого журнала</h2>
+</div></section>
+<section class="sec"><h2 id="a8"><span class="n">08</span>Что ещё вычислимо из этого журнала</h2>
 
 <p>Раз журнал пишется на каждый переход, всё перечисленное уже доступно — нужен только расчёт.</p>
 
-<div class="card">
+<div class="card rv">
   <h4>Время в каждом статусе</h4>
   <p>Разница между соседними событиями по одной сущности даёт длительность каждого состояния. Отсюда — где именно работа стоит: в ожидании, в работе, на утверждении. Сейчас видно только суммарный цикл, а состав его неизвестен.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Кумулятивная диаграмма потока</h4>
   <p>Число сущностей в каждом статусе по дням накопленным итогом. Прямо выводится из журнала. Показывает расширение очереди перед узким местом за недели до того, как это станет видно по срокам.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Возраст незавершённого</h4>
   <p>Для каждой открытой сущности — время с последнего события. ПРОДАКШН имел бы сейчас возраст более 22 часов без движения при сроке через сутки. Это и есть тот упреждающий сигнал, которого не хватает во всех модулях.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Матрица передач</h4>
   <p>Кто кому передаёт работу и сколько времени она проводит между этими людьми. Из журнала выводится однозначно: автор события известен. Показывает, на каких стыках теряется время, — обычно там же, где нет владельца.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a9"><span class="n">09</span>Гигиена событийных данных</h2>
 
-<hr>
-
-<h2 id="a9"><span class="n">09</span>Гигиена событийных данных</h2>
-
-<table>
+<table class="rv">
 <tr><th>Правило</th><th>Зачем</th></tr>
 <tr><td>Событие пишется в момент действия</td><td>Иначе метки времени описывают распорядок дня, а не работу</td></tr>
 <tr><td>Автор события фиксируется всегда</td><td>Без этого невозможны матрица передач и разделение отказа от перемещения</td></tr>
@@ -352,52 +449,118 @@
 <tr><td>Журнал не редактируется</td><td>Исправление вносится новым событием. Иначе история перестаёт быть историей</td></tr>
 </table>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Почему это не бюрократия</h4>
   <p>Каждое правило здесь защищает конкретную метрику от конкретного искажения, и все шесть — дешёвые: пять из них реализуются проверками при вводе, а не дисциплиной.</p>
   <p>Общий принцип: <b>там, где можно поставить валидацию, не надо ставить регламент</b>. Регламент забывают, валидация работает всегда.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a10"><span class="n">10</span>Ловушки экспертного уровня</h2>
 
-<hr>
-
-<h2 id="a10"><span class="n">10</span>Ловушки экспертного уровня</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Деление на счётчик</h4>
   <p>Главная ловушка этого разбора и моя собственная. Разделить длительность на число событий — значит предположить равномерность. Счётчик о распределении молчит. Если распределение важно для вывода, его надо посмотреть, а не вывести делением.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Убедительность агрегата</h4>
   <p>«13 возвратов» звучит как готовый диагноз, потому что число большое и круглое. Именно убедительные агрегаты опаснее всего: их не хочется проверять. Правило простое — чем сильнее цифра подтверждает вашу гипотезу, тем обязательнее спуститься к событиям.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Журнал как доказательство вины</h4>
   <p>В ленте виден автор каждого перехода. Использовать это в разборе полётов — верный способ убить данные: люди начнут избегать переходов, дробить действия и просить коллег «нажать за них». Журнал восстанавливает факты о работе, а не о людях.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Метка времени как момент работы</h4>
   <p>Время события — это момент нажатия кнопки, а не момент работы. При пакетном закрытии разница составляет сутки. Без дисциплины «отмечаю сразу» весь событийный анализ описывает не то.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Полнота журнала как полнота картины</h4>
   <p>Журнал полон относительно того, что в нём фиксируется. Переписка, созвоны, обдумывание, ожидание ответа клиента событиями не являются и в нём отсутствуют. Восстановленная по журналу история всегда беднее реальной — и в этом зазоре живут самые долгие простои.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Исправление цифр вместо правил</h4>
   <p>Соблазн подправить неверный счётчик руками. В событийной модели это бессмысленно: проекция пересчитается из журнала и вернёт прежнее. Менять надо правило вывода — тогда исправятся все проекции разом и задним числом.</p>
-</div>
+</div></section>
 
 <div class="foot">
   DETROYD SMART SYSTEM · Дедлайны · экспертный уровень<br>
   Событийная модель данных (event sourcing), кумулятивная диаграмма потока (Anderson, 2010).<br>
   Разбор построен на кабинете DETROYD SYSTEM, проект Qushbegi Milliy Taomlar, данные от 6 августа 2026 года.
 </div>
-
+  </main>
 </div>
+
+<script>
+/* Оболочка разбора: полоса прочитанного, подсветка текущего раздела в рельсе,
+   появление блоков по мере прокрутки и рост полос-диаграмм. Всё на IntersectionObserver
+   и одном обработчике прокрутки — без библиотек и без работы, пока страница вне экрана.
+
+   Если человек попросил систему уменьшить движение, ничего из этого не включается:
+   блоки просто стоят на местах, полосы сразу нужной длины. */
+(function(){
+  var тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* полоса прочитанного + тень у верхней панели */
+  var rp = document.querySelector('.rp i'), acad = document.querySelector('.acad'), тик = false;
+  function прокрутка(){
+    var h = document.documentElement.scrollHeight - innerHeight;
+    var y = scrollY || pageYOffset;
+    if(rp) rp.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
+    if(acad) acad.classList.toggle('stuck', y > 12);
+    тик = false;
+  }
+  addEventListener('scroll', function(){ if(!тик){ тик = true; requestAnimationFrame(прокрутка); } }, {passive:true});
+  прокрутка();
+
+  /* появление блоков. Наблюдатель отцепляется сразу после показа: элемент,
+     который уже видели, не должен исчезать при прокрутке назад. */
+  var показ = document.querySelectorAll('.rv');
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var i=0;i<показ.length;i++) показ[i].classList.add('in');
+  } else {
+    var ob = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); ob.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:0.05});
+    for(var j=0;j<показ.length;j++) ob.observe(показ[j]);
+  }
+
+  /* полосы-диаграммы: ширина хранится в data-w и ставится в момент показа,
+     иначе анимация проходит впустую где-то за пределами экрана */
+  var полосы = document.querySelectorAll('.bar .bf[data-w]');
+  function налить(el){ el.style.width = el.getAttribute('data-w'); }
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var k=0;k<полосы.length;k++) налить(полосы[k]);
+  } else {
+    var ob2 = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ налить(e.target); ob2.unobserve(e.target); } });
+    }, {threshold:0.3});
+    for(var m=0;m<полосы.length;m++) ob2.observe(полосы[m]);
+  }
+
+  /* подсветка текущего раздела. Считаем не пересечение, а расстояние до верха:
+     разделы разной длины, и при пороговом методе короткие проскакивали
+     неподсвеченными, а длинные держали подсветку на два экрана дольше нужного. */
+  var ссылки = [].slice.call(document.querySelectorAll('.rail a'));
+  var цели = ссылки.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); });
+  function текущий(){
+    var лучший = 0, минимум = Infinity, порог = innerHeight * 0.32;
+    for(var i=0;i<цели.length;i++){
+      if(!цели[i]) continue;
+      var t = цели[i].getBoundingClientRect().top - порог;
+      if(t <= 0 && Math.abs(t) < минимум){ минимум = Math.abs(t); лучший = i; }
+    }
+    for(var j=0;j<ссылки.length;j++) ссылки[j].classList.toggle('on', j === лучший);
+  }
+  if(ссылки.length){
+    var тик2 = false;
+    addEventListener('scroll', function(){ if(!тик2){ тик2 = true; requestAnimationFrame(function(){ текущий(); тик2 = false; }); } }, {passive:true});
+    текущий();
+  }
+})();
+</script>
 </body>
 </html>

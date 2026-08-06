@@ -3,136 +3,258 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0B0D">
 <title>Сводка: экспертный уровень</title>
 <style>
-  :root{
-    --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
-    --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
-    --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
-    --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
-    --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
-    --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);
-    font:16px/1.65 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:860px;margin:0 auto;padding:56px 24px 120px}
-  header{margin-bottom:52px}
-  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
-  h1{font-size:38px;line-height:1.12;letter-spacing:-.03em;margin:12px 0 0;font-weight:700}
-  .lead{margin-top:16px;font-size:18px;line-height:1.6;color:var(--txt2);max-width:62ch}
-  .lead b{color:var(--txt);font-weight:650}
-  h2{font-size:25px;letter-spacing:-.02em;margin:60px 0 6px;font-weight:700;scroll-margin-top:20px}
-  h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:8px;letter-spacing:.1em}
-  h3{font-size:18px;margin:34px 0 8px;font-weight:650;letter-spacing:-.01em}
-  p{margin:12px 0;color:var(--txt2);max-width:66ch}
-  p b,li b,td b{color:var(--txt);font-weight:600}
-  .sub{color:var(--txt3);font-size:15px}
-  ul,ol{color:var(--txt2);padding-left:22px;max-width:66ch}
-  li{margin:7px 0}
-  code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
+/* ═══════════════════════════════════════════════════════════════════
+   DETROYD ACADEMY — оболочка разбора
+   Полосу прогресса, обложку во весь экран и боковую навигацию держим
+   в одном месте: шестнадцать документов обязаны выглядеть одной серией,
+   а не шестнадцатью самостоятельными страницами.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
+  --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
+  --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
+  --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
+  --e:cubic-bezier(.4,0,.2,1); --e-out:cubic-bezier(.16,1,.3,1);
+  --rail:266px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:16px/1.68 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
 
-  .toc{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin-top:36px}
-  .toc ol{margin:8px 0 0;padding-left:20px}
-  .toc a{color:var(--txt2);text-decoration:none;border-bottom:1px solid transparent}
-  .toc a:hover{color:var(--ac);border-bottom-color:var(--ac-line)}
+/* ——— полоса прочитанного ——— */
+.rp{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:transparent}
+.rp i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--ac),var(--violet));
+  box-shadow:0 0 12px -2px var(--ac);transition:width .1s linear}
 
-  .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:22px 0}
-  .card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.05),transparent 60%),var(--bg1)}
-  .card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.05),transparent 60%),var(--bg1)}
-  .card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.05),transparent 60%),var(--bg1)}
-  .card h4{margin:0 0 4px;font-size:17px;font-weight:650}
-  .card p:last-child{margin-bottom:0}
+/* ——— верхняя полоса академии ——— */
+.acad{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:14px 30px;background:rgba(10,11,13,.72);backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;transition:border-color .25s var(--e),background .25s var(--e)}
+.acad.stuck{border-bottom-color:var(--line)}
+.acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--txt3);min-width:0}
+.acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px -1px var(--ac);flex:none}
+.acad-b b{color:var(--txt2);font-weight:700}
+.acad-lvl{margin-left:auto;display:flex;align-items:center;gap:7px}
+.acad-lvl span{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3);white-space:nowrap}
+.acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+.acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+  transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
+.acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
 
-  .frm{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:18px 22px;margin:20px 0;
-    font-family:var(--mono);font-size:16px;color:var(--txt);text-align:center;letter-spacing:.01em}
-  .frm .sm{display:block;font-size:12px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
-  .frm em{color:var(--ac);font-style:normal}
+/* ——— обложка во весь экран ——— */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:120px 30px 90px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(55,230,200,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(55,230,200,.045) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%);
+  mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%)}
+.hero-gl{position:absolute;width:min(64vw,900px);aspect-ratio:1;left:-10vw;top:-16vh;pointer-events:none;
+  background:radial-gradient(circle,rgba(55,230,200,.13),transparent 62%);filter:blur(26px)}
+.hero-in{position:relative;width:100%;max-width:1180px;margin:0 auto}
+.hero .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3)}
+.hero h1{font-size:clamp(38px,5.6vw,76px);line-height:1.03;letter-spacing:-.035em;margin:20px 0 0;font-weight:700;
+  max-width:20ch}
+.hero h1 em{font-style:normal;color:var(--ac)}
+.hero .lead{margin-top:22px;font-size:clamp(16.5px,1.35vw,20px);line-height:1.6;color:var(--txt2);max-width:70ch}
+.hero .lead b{color:var(--txt);font-weight:650}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:34px}
+.hero-meta span{font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line2);color:var(--txt3)}
+.hero-meta span.ac{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+.hero-cue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:9px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--txt3);text-decoration:none}
+.hero-cue i{display:block;width:1px;height:34px;background:linear-gradient(var(--ac),transparent);
+  animation:cue 2.1s var(--e) infinite}
+@keyframes cue{0%{transform:scaleY(.3);opacity:.3;transform-origin:top}50%{transform:scaleY(1);opacity:1;transform-origin:top}100%{transform:scaleY(.3);opacity:.3;transform-origin:top}}
 
-  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
-  .tag.ac{background:var(--ac-dim);color:var(--ac)}
-  .tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
-  .tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
+/* ——— каркас: рельс слева, текст справа ——— */
+.shell{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr);
+  gap:0;max-width:1560px;margin:0 auto;padding:0 30px 140px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:80px 26px 80px 0}
+.rail-t{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);
+  margin-bottom:16px}
+.rail a{display:flex;gap:11px;align-items:flex-start;text-decoration:none;padding:7px 0;
+  color:var(--txt3);font-size:13.5px;line-height:1.35;transition:color .18s var(--e)}
+.rail a n{font-family:var(--mono);font-size:10.5px;padding-top:2px;opacity:.6;flex:none;width:16px}
+.rail a s{text-decoration:none;border-left:1px solid transparent;padding-left:0;transition:.18s var(--e)}
+.rail a:hover{color:var(--txt2)}
+.rail a.on{color:var(--txt)}
+.rail a.on n{color:var(--ac);opacity:1}
+.rail-line{position:absolute;left:0;top:0;width:1px;background:var(--line)}
+.doc{min-width:0;padding:0 0 0 44px;border-left:1px solid var(--line);max-width:1000px}
 
-  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:20px 0}
-  .kpi>div{background:var(--bg1);padding:16px 18px}
-  .kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
-  .kpi .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:7px;line-height:1}
-  .kpi .s{font-size:12.5px;color:var(--txt3);margin-top:6px;font-family:var(--mono)}
+/* ——— типографика разбора ——— */
+h2{font-size:clamp(26px,2.4vw,36px);letter-spacing:-.025em;margin:0 0 6px;font-weight:700;scroll-margin-top:96px;
+  position:relative}
+h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:10px;letter-spacing:.12em}
+.sec{padding:88px 0 0;position:relative}
+.sec:first-of-type{padding-top:70px}
+h3{font-size:clamp(17px,1.5vw,20px);margin:40px 0 8px;font-weight:650;letter-spacing:-.012em}
+p{margin:13px 0;color:var(--txt2);max-width:74ch}
+p b,li b,td b{color:var(--txt);font-weight:600}
+.sub{color:var(--txt3);font-size:15px}
+ul,ol{color:var(--txt2);padding-left:22px;max-width:74ch}
+li{margin:7px 0}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
 
-  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
-  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--txt3);font-weight:600;padding:0 12px 10px 0;border-bottom:1px solid var(--line)}
-  th.num{text-align:right;padding-right:0}
-  td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
-  td:first-child{color:var(--txt);font-weight:600}
-  td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
-  td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
-  tr.hi td{background:rgba(240,120,92,.07)}
-  tr.ok td{background:rgba(67,216,140,.06)}
+/* Оглавление карточкой нужно только там, где боковая рельса не помещается.
+   Живёт оно не в обложке, а первым блоком текста: в обложке одиннадцать
+   пунктов растягивали её на два экрана и сталкивали заголовок за край. */
+.toc{display:none}
 
-  .quote{border-left:2px solid var(--ac-line);padding:4px 0 4px 18px;margin:22px 0;color:var(--txt2);font-size:16.5px}
-  .quote b{color:var(--txt)}
+.card{background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin:22px 0;
+  transition:border-color .25s var(--e),transform .25s var(--e)}
+.card:hover{border-color:var(--line2)}
+.card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.055),transparent 58%),var(--bg1)}
+.card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.055),transparent 58%),var(--bg1)}
+.card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.055),transparent 58%),var(--bg1)}
+.card h4{margin:0 0 6px;font-size:17.5px;font-weight:650;letter-spacing:-.012em}
+.card p:last-child{margin-bottom:0}
 
-  .step{display:flex;gap:16px;margin:18px 0;align-items:flex-start}
-  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--ac-dim);color:var(--ac);
-    display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:700}
-  .step .bd{flex:1;min-width:0}
-  .step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:2px}
-  .step .bd span{color:var(--txt2);font-size:15px}
+.frm{background:var(--bg2);border:1px solid var(--line2);border-radius:16px;padding:22px 26px;margin:24px 0;
+  font-family:var(--mono);font-size:clamp(14px,1.15vw,17px);color:var(--txt);text-align:center;letter-spacing:.01em}
+.frm .sm{display:block;font-size:11.5px;color:var(--txt3);letter-spacing:.13em;text-transform:uppercase;margin-bottom:12px}
+.frm em{color:var(--ac);font-style:normal}
 
-  .bars{margin:22px 0}
-  .bar{display:flex;align-items:center;gap:12px;margin:9px 0;font-family:var(--mono);font-size:13px}
-  .bar .bl{flex:none;min-width:52px;color:var(--txt2);text-align:right;white-space:nowrap}
-  .bar .bt{flex:1;height:22px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative}
-  .bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
-    border-right:2px solid var(--ac)}
-  .bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
-  .bar .bv{flex:none;width:74px;color:var(--txt);font-weight:600}
+.tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
+.tag.ac{background:var(--ac-dim);color:var(--ac)}
+.tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
+.tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
 
-  hr{border:0;border-top:1px solid var(--line);margin:56px 0}
-  .foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:70px;padding-top:22px;border-top:1px solid var(--line)}
-  @media(max-width:640px){ .wrap{padding:34px 16px 80px} h1{font-size:29px} h2{font-size:21px} .lead{font-size:16.5px}
-    .frm{font-size:13.5px;padding:16px 14px} .bar .bl{min-width:44px} .bar .bv{width:62px}
-    table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
-    td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
-    .tblwrap,table{display:block;max-width:100%;overflow-x:auto} }
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:24px 0}
+.kpi>div{background:var(--bg1);padding:20px 22px}
+.kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt3)}
+.kpi .v{font-family:var(--mono);font-size:clamp(26px,2.6vw,34px);font-weight:700;letter-spacing:-.025em;margin-top:9px;line-height:1}
+.kpi .s{font-size:12.5px;color:var(--txt3);margin-top:7px;font-family:var(--mono)}
 
-  /* Шапка академии: документ открывается из кабинета в новой вкладке, и без
-     обратной ссылки человек оказывается в тупике. Полоса не липкая намеренно —
-     на длинном тексте липкая шапка съедает высоту и мешает читать. */
-  .acad{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:13px 0 15px;margin:0 0 -14px;border-bottom:1px solid var(--line)}
-  .acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
-    letter-spacing:.14em;text-transform:uppercase;color:var(--txt3)}
-  .acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);
-    box-shadow:0 0 10px -1px var(--ac);flex:none}
-  .acad-lvl{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .acad-lvl span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-    padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3)}
-  .acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
-  .acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
-    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-    padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
-    transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
-  .acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
-  @media(max-width:600px){ .acad-lvl{margin-left:0;width:100%;order:3} }
+table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14.5px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--txt3);font-weight:600;padding:0 14px 11px 0;border-bottom:1px solid var(--line)}
+th.num{text-align:right;padding-right:0}
+td{padding:14px 14px 14px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+td:first-child{color:var(--txt);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
+td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
+tr.hi td{background:rgba(240,120,92,.07)}
+tr.ok td{background:rgba(67,216,140,.06)}
+
+.quote{border-left:2px solid var(--ac-line);padding:6px 0 6px 22px;margin:26px 0;color:var(--txt2);
+  font-size:clamp(16.5px,1.35vw,19px);line-height:1.55}
+.quote b{color:var(--txt)}
+
+.step{display:flex;gap:18px;margin:20px 0;align-items:flex-start}
+.step .no{flex:none;width:34px;height:34px;border-radius:11px;background:var(--ac-dim);color:var(--ac);
+  display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:700}
+.step .bd{flex:1;min-width:0}
+.step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:3px;font-size:16px}
+.step .bd span{color:var(--txt2);font-size:15px}
+
+.bars{margin:24px 0}
+.bar{display:flex;align-items:center;gap:14px;margin:10px 0;font-family:var(--mono);font-size:13px}
+.bar .bl{flex:none;min-width:56px;color:var(--txt2);text-align:right;white-space:nowrap}
+.bar .bt{flex:1;height:24px;background:var(--bg2);border-radius:7px;overflow:hidden;position:relative}
+.bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
+  border-right:2px solid var(--ac);width:0;transition:width 1s var(--e-out)}
+.bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
+.bar .bv{flex:none;width:78px;color:var(--txt);font-weight:600}
+
+hr{border:0;border-top:1px solid var(--line);margin:0}
+.sec>hr:first-child{display:none}
+.foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:90px;padding-top:26px;
+  border-top:1px solid var(--line);line-height:1.7}
+
+/* ——— появление по мере чтения ——— */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s var(--e-out),transform .6s var(--e-out)}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:1180px){
+  :root{--rail:0px}
+  .shell{grid-template-columns:minmax(0,1fr);max-width:900px;padding:0 22px 110px}
+  .rail{display:none}
+  .doc{padding-left:0;border-left:0;max-width:none}
+  .toc{display:block;background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:22px 24px;margin:34px 0 0}
+  .toc .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+  .toc ol{margin:10px 0 0;padding-left:20px}
+  .toc a{color:var(--txt2);text-decoration:none}
+  .toc a:hover{color:var(--ac)}
+}
+@media(max-width:680px){
+  .acad{padding:11px 16px;gap:10px;flex-wrap:wrap}
+  .acad-lvl{margin-left:auto}
+  /* На телефоне обложка должна укладываться в один экран: длинный заголовок
+     плюс два абзаца вступления выталкивали подсказку «читать» за край, и
+     страница открывалась серединой фразы. Ужимаем поля и межстрочные отступы. */
+  .hero{padding:92px 18px 72px}
+  .hero h1{font-size:clamp(29px,7.6vw,38px);margin-top:16px}
+  .hero .lead{margin-top:15px;font-size:15.5px;line-height:1.55}
+  .hero-meta{margin-top:22px;gap:7px}
+  .hero-meta span{padding:6px 11px;font-size:10px}
+  .hero-cue{bottom:24px}
+  .shell{padding:0 16px 90px}
+  .sec{padding-top:64px}
+  .card{padding:20px 18px}
+  .frm{padding:18px 15px}
+  .step{gap:13px}
+  table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
+  td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
+  table{display:block;max-width:100%;overflow-x:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1;transform:none;transition:none}
+  .hero-cue i{animation:none}
+  .bar .bf{transition:none}
+  .rp i{transition:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-<div class="acad"><div class="acad-b"><i></i>DETROYD Academy · Сводка</div><div class="acad-lvl"><span class="">Тренинг</span><span class="on">Экспертный</span></div><a class="acad-back" href="https://detroyd.com">← В кабинет</a></div>
+<div class="rp" aria-hidden="true"><i></i></div>
 
-<header>
-  <div class="eyebrow">DETROYD SMART SYSTEM · Сводка · экспертный уровень</div>
-  <h1>Сводка: портфельное управление</h1>
-  <p class="lead">Базовый тренинг объяснял, что означает каждый блок. Этот — <b>как устроены метрики изнутри, где они врут по конструкции и как собрать из двенадцати плиток систему принятия решений</b>.</p>
-  <p class="lead">Всё считается на ваших числах от 6 августа: 1 активный из 7, 10 из 39 этапов, on-time 7 из 8, откаты 36%, velocity 9 при шести повторных.</p>
+<div class="acad">
+  <div class="acad-b"><i></i>DETROYD Academy · <b>Сводка</b></div>
+  <div class="acad-lvl"><span class="">Тренинг</span><span class="on">Экспертный</span></div>
+  <a class="acad-back" href="https://detroyd.com">← В кабинет</a>
+</div>
 
-  <div class="toc">
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true"></div><div class="hero-gl" aria-hidden="true"></div>
+  <div class="hero-in">
+    <div class="eyebrow">DETROYD SMART SYSTEM · Сводка · экспертный уровень</div>
+    <h1>Сводка: портфельное управление</h1>
+    <p class="lead">Базовый тренинг объяснял, что означает каждый блок. Этот — <b>как устроены метрики изнутри, где они врут по конструкции и как собрать из двенадцати плиток систему принятия решений</b>.</p>
+    <p class="lead">Всё считается на ваших числах от 6 августа: 1 активный из 7, 10 из 39 этапов, on-time 7 из 8, откаты 36%, velocity 9 при шести повторных.</p>
+    <div class="hero-meta"><span class="ac">экспертный уровень</span><span>11 разделов</span><span>на данных от 6 августа 2026</span></div>
+  </div>
+  <a class="hero-cue" href="#a1"><span>читать</span><i></i></a>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Разделы разбора">
+    <div class="rail-t">Разделы</div>
+    <a href="#a1"><n>01</n><s>Метрика как тройка</s></a><a href="#a2"><n>02</n><s>Эффект отбора</s></a><a href="#a3"><n>03</n><s>Ведущие и запаздывающие</s></a><a href="#a4"><n>04</n><s>Арифметика откатов</s></a><a href="#a5"><n>05</n><s>Валовая и чистая пропускная способность</s></a><a href="#a6"><n>06</n><s>On-time как биномиальное обязательство</s></a><a href="#a7"><n>07</n><s>Концентрация портфеля</s></a><a href="#a8"><n>08</n><s>Маршруты поставки</s></a><a href="#a9"><n>09</n><s>Горизонт портфеля</s></a><a href="#a10"><n>10</n><s>Эффективная размерность дашборда</s></a><a href="#a11"><n>11</n><s>Ловушки экспертного уровня</s></a>
+  </nav>
+  <main class="doc">
+<div class="toc">
     <div class="eyebrow">Что внутри</div>
     <ol>
       <li><a href="#a1">Метрика как тройка: множество, окно, правило</a></li>
@@ -148,13 +270,12 @@
       <li><a href="#a11">Ловушки экспертного уровня</a></li>
     </ol>
   </div>
-</header>
 
-<h2 id="a1"><span class="n">01</span>Метрика как тройка</h2>
+<section class="sec"><h2 id="a1"><span class="n">01</span>Метрика как тройка</h2>
 
 <p>Любой показатель на дашборде — это не число, а <b>три решения, принятых до вас</b>:</p>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Устройство метрики</span>
   <em>Метрика</em> = ( <em>множество</em> , <em>окно</em> , <em>правило агрегации</em> )
 </div>
@@ -163,7 +284,7 @@
 
 <p>Разложим ваш экран. Это упражнение стоит проделать один раз для любого дашборда, который вы собираетесь использовать всерьёз:</p>
 
-<table>
+<table class="rv">
 <tr><th>Показатель</th><th>Множество</th><th>Окно</th><th>Правило</th></tr>
 <tr><td>Здоровье 100%</td><td>активные проекты (1)</td><td>сейчас</td><td>доля «в норме»</td></tr>
 <tr><td>Средний прогресс 86%</td><td>активные проекты (1)</td><td>сейчас</td><td>среднее по этапам</td></tr>
@@ -175,26 +296,23 @@
 <tr><td>Риск оттока 0</td><td>активные проекты (1)</td><td>сейчас</td><td>счёт по порогу</td></tr>
 </table>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Что немедленно становится видно</h4>
   <p>Четыре показателя из восьми считаются по множеству из <b>одного элемента</b>. Это не поломка — это следствие того, что активный проект один. Но означает следующее: <b>половина вашего дашборда сейчас описывает проект Artel, а не агентство.</b></p>
   <p>И второе: <b>86% и 26%</b> различаются не правилом и не окном, а только множеством. Спор «какая цифра правильная» бессмыслен — правильны обе, вопрос лишь в том, на какой вопрос вы отвечаете.</p>
-</div>
-
-<hr>
-
-<h2 id="a2"><span class="n">02</span>Эффект отбора</h2>
+</div></section>
+<section class="sec"><h2 id="a2"><span class="n">02</span>Эффект отбора</h2>
 
 <p>Здесь начинается собственно экспертный уровень. Множество метрики задаётся статусом. Статус редактируется человеком. Значит <b>метрику можно двигать, не трогая реальность</b> — и это происходит само собой, без злого умысла.</p>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Правило</span>
   Метрика, чьё множество задано <em>редактируемым статусом</em>,<br>измеряет поведение редактора, а не бизнес
 </div>
 
 <p>Ваш случай в чистом виде. Шесть проектов из семи помечены «Завершён». При этом:</p>
 
-<table>
+<table class="rv">
 <tr><th>Проект</th><th class="num">Прогресс</th><th class="num">Этапы</th><th>Дедлайн</th></tr>
 <tr class="hi"><td>APOLO COFFEE</td><td class="num">25%</td><td class="num">2 / 8</td><td>просрочен 19 дн</td></tr>
 <tr class="hi"><td>TRIA SMART CORP</td><td class="num">11%</td><td class="num">1 / 9</td><td>просрочен 35 дн</td></tr>
@@ -206,7 +324,7 @@
 
 <p>Завершённый проект не может иметь <b>будущий</b> дедлайн — работать не над чем. И не может иметь <b>просроченный</b> — просрочка была бы закрыта вместе с проектом. Оба признака указывают на одно: статус проставлен вручную, а не выведен из состояния работы.</p>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>Цена этой неточности</h4>
   <p>Эти шесть проектов исключены из <b>здоровья портфеля</b>, из <b>просрочек</b> и из <b>риска оттока</b>. Три главных светофора экрана зелены ровно потому, что проблемные объекты вынесены из множества.</p>
   <p>Заметьте механику: никто не подделывал цифры. Просто у статуса «Завершён» не было определения, и он стал корзиной для всего, чем сейчас не занимаются. Дашборд честно посчитал то, что ему дали.</p>
@@ -214,48 +332,42 @@
 
 <h3>Как чинится</h3>
 
-<div class="step"><div class="no">1</div><div class="bd"><b>Развести три разных состояния</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Развести три разных состояния</b>
 <span><b>Завершён</b> — работа сделана, все этапы закрыты, дедлайнов нет. <b>Заморожен</b> — работа приостановлена, вернёмся. <b>Прекращён</b> — не вернёмся. Сейчас все три схлопнуты в один статус, и вместе с ними схлопнута вся диагностика.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Ввести правила целостности</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Ввести правила целостности</b>
 <span>«Завершён» недопустим при незакрытых этапах или непустом дедлайне. Такие правила проверяются автоматически и стоят один запрос к базе. Всё, что им противоречит, — очередь на разбор.</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Считать замороженные отдельной строкой</b>
-<span>Не включать в здоровье, но и не прятать. Замороженный портфель — это отложенная выручка, и он должен быть виден числом, а не отсутствием.</span></div></div>
-
-<hr>
-
-<h2 id="a3"><span class="n">03</span>Ведущие и запаздывающие</h2>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Считать замороженные отдельной строкой</b>
+<span>Не включать в здоровье, но и не прятать. Замороженный портфель — это отложенная выручка, и он должен быть виден числом, а не отсутствием.</span></div></div></section>
+<section class="sec"><h2 id="a3"><span class="n">03</span>Ведущие и запаздывающие</h2>
 
 <p>Показатели делятся на те, что описывают уже случившееся, и те, что предсказывают ещё не случившееся. Управлять можно только вторыми; первыми — отчитываться.</p>
 
-<table>
+<table class="rv">
 <tr><th>Тип</th><th>Ваши показатели</th><th>Что с ними делать</th></tr>
 <tr><td><b>Запаздывающие</b></td><td>On-time 88%, откаты 24, velocity за 30 дней</td><td>Отчётность и продажи. Реагировать поздно: событие уже произошло.</td></tr>
 <tr><td><b>Совпадающие</b></td><td>Просрочено, здоровье портфеля</td><td>Тушение. Действие сегодня, но профилактики уже не будет.</td></tr>
 <tr class="ok"><td><b>Ведущие</b></td><td>Активные, средний прогресс, риск оттока, радар дедлайнов, дни без активности</td><td>Собственно управление. Только здесь вмешательство меняет исход.</td></tr>
 </table>
 
-<div class="card">
+<div class="card rv">
   <h4>Практическое следствие</h4>
   <p>Ваш самый ценный ведущий индикатор сейчас — <b>средний прогресс активных 86% при одном активном проекте</b>. Он предсказывает провал загрузки через несколько недель. Никакая запаздывающая метрика об этом не скажет: выручка упадёт уже постфактум.</p>
   <p>Типичная ошибка владельца — строить управление вокруг запаздывающих метрик, потому что они выглядят солиднее и их удобно показывать. Итог: аккуратный отчёт о том, как всё сломалось.</p>
-</div>
-
-<hr>
-
-<h2 id="a4"><span class="n">04</span>Арифметика откатов</h2>
+</div></section>
+<section class="sec"><h2 id="a4"><span class="n">04</span>Арифметика откатов</h2>
 
 <p>Пусть <b>r</b> — доля переходов назад. Тогда вперёд идёт доля (1−r), назад r, и чистое продвижение на один переход:</p>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Чистое продвижение</span>
   <em>net</em> = (1 − r) − r = <em>1 − 2r</em> &nbsp;&nbsp;→&nbsp;&nbsp; переходов на шаг = <em>1 / (1 − 2r)</em>
 </div>
 
 <p>Функция гиперболическая — ровно как в формуле Кингмана, только механизм другой. И стена здесь не в 100%, а в <b>50%</b>: при равном числе движений вперёд и назад система не завершает работу вообще, сколько бы усилий в неё ни вкладывали.</p>
 
-<table>
+<table class="rv">
 <tr><th>Доля откатов</th><th class="num">Чистый шаг</th><th class="num">Переходов на шаг</th></tr>
 <tr class="ok"><td>5%</td><td class="num">0,90</td><td class="num">1,11</td></tr>
 <tr class="ok"><td>10%</td><td class="num">0,80</td><td class="num">1,25</td></tr>
@@ -269,40 +381,34 @@
 <tr class="hi"><td>50%</td><td class="num">0,00</td><td class="num">∞</td></tr>
 </table>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>Что это значит в вашем случае</h4>
   <p>На каждый реальный шаг вперёд приходится <b>3,6 перехода</b>. Иначе говоря, из каждых десяти движений работы по маршруту продуктивны примерно три.</p>
   <p>До точки, где процесс перестаёт завершать работу в принципе, вам <b>14 процентных пунктов</b>. Это не запас: гипербола ускоряется, и путь с 36% до 45% ощущается гораздо резче, чем с 20% до 30%.</p>
   <p>Обратная сторона обнадёживает. Снижение откатов с 36% до 15% увеличивает чистое продвижение с 0,28 до 0,70 — то есть <b>ускоряет всё агентство в 2,5 раза</b> без единого найма и без увеличения рабочих часов.</p>
-</div>
-
-<hr>
-
-<h2 id="a5"><span class="n">05</span>Валовая и чистая пропускная способность</h2>
+</div></section>
+<section class="sec"><h2 id="a5"><span class="n">05</span>Валовая и чистая пропускная способность</h2>
 
 <p>Velocity 9 — валовая величина: она считает все закрытия. Подпись рядом сообщает, что <b>6 из 9 повторные</b>.</p>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Чистая пропускная способность</span>
   <em>чистая</em> = <em>валовая</em> × ( 1 − доля повторных )<br>
   9 × ( 1 − 6/9 ) = <em>3</em> за 30 дней
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>Почему это не косметическая поправка</h4>
   <p>Вспомните закон Литтла из экспертного разбора Циклов: <b>цикл = незавершёнка ÷ пропускная способность</b>. Если подставить туда валовую величину вместо чистой, цикл окажется занижен ровно во столько раз, во сколько валовая больше чистой. У вас — <b>в три раза</b>.</p>
   <p>Это означает, что сроки, посчитанные по velocity 9, вы будете обещать втрое короче реальных. И промахиваться будете не иногда, а систематически — что затем испортит on-time delivery, который вы же и меряете.</p>
 </div>
 
-<p>Правило: <b>во все планировочные расчёты подставляется чистая пропускная способность.</b> Валовая годится ровно для одного — как индикатор активности рядом с чистой, чтобы видеть разрыв между ними. Сам разрыв и есть размер потерь.</p>
-
-<hr>
-
-<h2 id="a6"><span class="n">06</span>On-time как биномиальное обязательство</h2>
+<p>Правило: <b>во все планировочные расчёты подставляется чистая пропускная способность.</b> Валовая годится ровно для одного — как индикатор активности рядом с чистой, чтобы видеть разрыв между ними. Сам разрыв и есть размер потерь.</p></section>
+<section class="sec"><h2 id="a6"><span class="n">06</span>On-time как биномиальное обязательство</h2>
 
 <p>«88% в срок» — это оценка вероятности по восьми испытаниям. У любой такой оценки есть доверительный интервал, и при малом n он огромен. Интервал Уилсона для 7 из 8:</p>
 
-<div class="kpi">
+<div class="kpi rv">
   <div><div class="l">Точечная оценка</div><div class="v">88%</div><div class="s">7 из 8</div></div>
   <div><div class="l">Нижняя граница</div><div class="v" style="color:var(--neg)">53%</div><div class="s">95% доверия</div></div>
   <div><div class="l">Верхняя граница</div><div class="v" style="color:var(--pos)">98%</div><div class="s">95% доверия</div></div>
@@ -310,7 +416,7 @@
 
 <p>Ширина интервала — <b>45 процентных пунктов</b>. Честная формулировка того, что вы сейчас знаете о своей пунктуальности: <b>«где-то между половиной и почти всегда»</b>. Это не придирка к статистике, это единственное корректное прочтение восьми наблюдений.</p>
 
-<table>
+<table class="rv">
 <tr><th>Сдач накоплено</th><th class="num">Интервал при 88%</th><th class="num">Ширина</th></tr>
 <tr class="hi"><td>8 — вы здесь</td><td class="num">53 – 98%</td><td class="num">45 п.п.</td></tr>
 <tr><td>20</td><td class="num">70 – 97%</td><td class="num">27 п.п.</td></tr>
@@ -319,27 +425,24 @@
 <tr class="ok"><td>169</td><td class="num">82 – 92%</td><td class="num">10 п.п.</td></tr>
 </table>
 
-<div class="card">
+<div class="card rv">
   <h4>Как этим пользоваться, не дожидаясь 169 сдач</h4>
   <p>В коммерческом предложении заявляется не точечная оценка, а <b>нижняя граница интервала</b>. Сегодня это 53% — то есть заявлять нечего, и это правильный ответ, а не поражение.</p>
   <p>Что можно делать уже сейчас: обещать срок не средним, а <b>85-м процентилем</b> факта — так обещание перестаёт быть ставкой на удачу. И вести счёт публично внутри команды: «сдач подряд в срок: 3». Счётчик работает как метрика лучше, чем процент при малом n.</p>
   <p>Ориентир по вехам: <b>две</b> сдачи подряд в срок дадут вам честные 90%, <b>двенадцать</b> — честные 95%.</p>
-</div>
-
-<hr>
-
-<h2 id="a7"><span class="n">07</span>Концентрация портфеля</h2>
+</div></section>
+<section class="sec"><h2 id="a7"><span class="n">07</span>Концентрация портфеля</h2>
 
 <p>Блок «Структура портфеля» с бейджем «высокая концентрация» — это по сути индекс Херфиндаля, стандартная мера рыночной концентрации:</p>
 
-<div class="frm">
+<div class="frm rv">
   <span class="sm">Индекс Херфиндаля и эффективное число клиентов</span>
   <em>HHI</em> = Σ доля<sub>i</sub>² &nbsp;&nbsp;&nbsp; <em>N<sub>эфф</sub></em> = 1 / HHI
 </div>
 
 <p>Эффективное число клиентов — это ответ на вопрос «скольким равномерным клиентам эквивалентен мой портфель». Метрика гораздо честнее, чем «у нас семь клиентов», когда шесть из них дают по три процента.</p>
 
-<table>
+<table class="rv">
 <tr><th>Портфель</th><th class="num">HHI</th><th class="num">Эффективных клиентов</th></tr>
 <tr class="hi"><td>Один клиент — вы здесь</td><td class="num">1,00</td><td class="num">1,0</td></tr>
 <tr><td>Два поровну</td><td class="num">0,50</td><td class="num">2,0</td></tr>
@@ -349,58 +452,49 @@
 
 <p>Пороги: <b>HHI выше 0,25</b> — концентрированный портфель, <b>0,15–0,25</b> — умеренный, <b>ниже 0,15</b> — диверсифицированный. Практическое правило для агентства: ни один клиент выше 25–30% выручки, ни одна сфера выше 40%.</p>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>Важная поправка к вашему блоку</h4>
   <p>Модуль считает концентрацию <b>по количеству проектов</b>. Риск же измеряется <b>деньгами</b>: три мелких проекта и один крупный дают 25% концентрации по счёту и, возможно, 70% по выручке.</p>
   <p>Пока проект один, разницы нет. Как только их станет несколько, смотрите на структуру по деньгам, а не по счёту, — иначе метрика будет систематически вас успокаивать.</p>
-</div>
-
-<hr>
-
-<h2 id="a8"><span class="n">08</span>Маршруты поставки</h2>
+</div></section>
+<section class="sec"><h2 id="a8"><span class="n">08</span>Маршруты поставки</h2>
 
 <p>Радар дедлайнов: три ближайших срока, один исполнитель, один проект. Это состояние описывается двумя независимыми характеристиками, и обе плохие.</p>
 
-<div class="card">
+<div class="card rv">
   <h4>Число независимых маршрутов = 1</h4>
   <p>Не существует пути, которым работа может пройти в обход DTR HUNTER. Любая его недоступность — отпуск, болезнь, перегрузка — останавливает 100% ближайших обязательств одновременно, а не треть.</p>
   <p>Ожидаемая цена считается прямо: вероятность недоступности за период × стоимость срыва всех трёх сроков. Даже при скромных 5% в месяц это регулярная и вполне измеримая статья риска.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Загрузка единственного ресурса</h4>
   <p>Из формулы Кингмана: когда весь поток идёт через один ресурс, его загрузка ρ стремится к единице, а ожидание — к бесконечности. При одном активном проекте это не проявляется. При трёх параллельных проектах на том же человеке очередь вырастет не втрое, а в разы больше — так работает гипербола.</p>
   <p>Отсюда порядок расширения: <b>второй исполнитель нужен раньше, чем второй параллельный проект</b>, а не после. Иначе рост портфеля мгновенно съедается ростом сроков.</p>
 </div>
 
-<div class="quote">
+<div class="quote rv">
   Рабочий порог: <b>ни один человек не должен быть на критическом пути более чем половины ближайших обязательств.</b> У вас сейчас 100%.
-</div>
-
-<hr>
-
-<h2 id="a9"><span class="n">09</span>Горизонт портфеля</h2>
+</div></section>
+<section class="sec"><h2 id="a9"><span class="n">09</span>Горизонт портфеля</h2>
 
 <p>Осталось 29 незакрытых этапов из 39. Считаем два прогноза — по валовой и по чистой пропускной способности.</p>
 
 <div class="bars">
-  <div class="bar"><div class="bl">валовая</div><div class="bt"><div class="bf" style="width:33%"></div></div><div class="bv">4,8 мес</div></div>
-  <div class="bar d"><div class="bl">чистая</div><div class="bt"><div class="bf" style="width:100%"></div></div><div class="bv">14,5 мес</div></div>
+  <div class="bar"><div class="bl">валовая</div><div class="bt"><div class="bf" data-w="33%"></div></div><div class="bv">4,8 мес</div></div>
+  <div class="bar d"><div class="bl">чистая</div><div class="bt"><div class="bf" data-w="100%"></div></div><div class="bv">14,5 мес</div></div>
 </div>
 
 <p class="sub">Валовая: 6 этапов за 30 дней = 0,20 в день → 145 дней. Чистая: с поправкой на две трети повторных = 0,067 в день → 435 дней.</p>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Разница между прогнозами и есть главный результат расчёта</h4>
   <p>Разброс от пяти до четырнадцати месяцев — не признак плохой математики, а честное измерение того, насколько вы сейчас не знаете собственную мощность. Пока доля повторных закрытий не измерена точно, любой обещанный срок — ставка.</p>
   <p>Заметьте: <b>чтобы сузить этот разброс, не нужно работать быстрее.</b> Нужно перестать закрывать работу дважды. Тот же рычаг, что и в разделе про откаты, — и он же сокращает сам горизонт.</p>
 </div>
 
-<p>Взрослый способ выдавать такие прогнозы — не одно число, а распределение: метод Монте-Карло на истории пропускной способности из экспертного разбора Циклов. Ему нужно 11–12 недель аккуратных данных. Начнёте вести статусы честно с этой недели — к ноябрю сможете называть сроки с вероятностью вместо «месяца три-четыре».</p>
-
-<hr>
-
-<h2 id="a10"><span class="n">10</span>Эффективная размерность дашборда</h2>
+<p>Взрослый способ выдавать такие прогнозы — не одно число, а распределение: метод Монте-Карло на истории пропускной способности из экспертного разбора Циклов. Ему нужно 11–12 недель аккуратных данных. Начнёте вести статусы честно с этой недели — к ноябрю сможете называть сроки с вероятностью вместо «месяца три-четыре».</p></section>
+<section class="sec"><h2 id="a10"><span class="n">10</span>Эффективная размерность дашборда</h2>
 
 <p>На экране двенадцать блоков. Независимых сигналов среди них значительно меньше — и это самое полезное наблюдение для того, кто собирается по дашборду действовать.</p>
 
@@ -415,55 +509,121 @@
   <li>Июльские этапы, закрытые за 3–11 секунд</li>
 </ul>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Это не шесть проблем, а одна</h4>
   <p>Единственный скрытый фактор: <b>работа объявляется готовой раньше, чем она готова.</b> Все шесть наблюдений — его проекции на разные экраны.</p>
   <p>Практический вывод сильный. Не нужно шести программ улучшений. Нужны <b>критерии закрытия</b> — по пять строк на этап, — и все шесть показателей сдвинутся одновременно. Это и есть отличие работы по системе от работы по симптомам.</p>
   <p>И обратное предупреждение: если бы вы взялись чинить каждую метрику отдельно, вы бы получили шесть локальных оптимизаций, каждая из которых лечит проекцию, а не причину. Обычно так и появляются процессы, которые всем мешают и ничего не улучшают.</p>
 </div>
 
-<p>Полезная привычка при взгляде на любой дашборд: <b>сгруппируйте плитки по предполагаемой общей причине</b>, прежде чем планировать действия. Двенадцать блоков у вас сводятся примерно к четырём независимым темам: качество закрытия работы, загрузка портфеля, дисциплина статусов, зависимость от одного исполнителя.</p>
+<p>Полезная привычка при взгляде на любой дашборд: <b>сгруппируйте плитки по предполагаемой общей причине</b>, прежде чем планировать действия. Двенадцать блоков у вас сводятся примерно к четырём независимым темам: качество закрытия работы, загрузка портфеля, дисциплина статусов, зависимость от одного исполнителя.</p></section>
+<section class="sec"><h2 id="a11"><span class="n">11</span>Ловушки экспертного уровня</h2>
 
-<hr>
-
-<h2 id="a11"><span class="n">11</span>Ловушки экспертного уровня</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Дрейф знаменателя</h4>
   <p>Множество метрики меняется во времени — проекты переходят в «завершён», выпадают из расчёта, — и показатель растёт при неизменной реальности. Тренд по метрике с плавающим множеством нельзя интерпретировать вообще. Рядом с любым процентом ведите счёт элементов в знаменателе.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Ошибка выжившего в портфеле</h4>
   <p>Здоровье, просрочки и отток считаются по активным. Самые тяжёлые проекты имеют свойство переставать быть активными. Чем хуже дела, тем зеленее экран. Противоядие — отдельная строка «заморожено» с числом и суммой.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Гудхарт через статус</h4>
   <p>Когда по метрике начинают спрашивать, самый дешёвый способ её улучшить — не сделать работу, а поменять статус. Это не про нечестность: люди идут по пути наименьшего сопротивления, а путь оставили открытым. Закрывается правилами целостности, а не разговорами.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Метрики тщеславия</h4>
   <p>Показатель, который может только расти, ничего не измеряет. «Всего проектов 7», «всего задач закрыто» — из этой категории. Проверка простая: <b>может ли эта цифра ухудшиться от плохой работы?</b> Если нет — она украшение.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Ложная независимость плиток</h4>
   <p>Двенадцать блоков воспринимаются как двенадцать тем. Если несколько плиток — проекции одного фактора, вы посчитаете одну проблему за шесть и разложите силы на шесть направлений вместо одного. Раздел 10 про это целиком.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Дашборд как театр</h4>
   <p>Самая незаметная. Экран красивый, смотреть приятно, утренний ритуал соблюдается — и ни одного решения из него не следует. Проверка: <b>назовите три решения за последний месяц, принятые из-за конкретной цифры на этом экране.</b> Не называется ни одного — экран пока декорация, и это чинится дисциплиной, а не дизайном.</p>
-</div>
+</div></section>
 
 <div class="foot">
   DETROYD SMART SYSTEM · Сводка · экспертный уровень<br>
   Интервал Уилсона (1927), индекс Херфиндаля — Хиршмана, закон Гудхарта (1975).<br>
   Расчёты — на данных агентства DETROYD от 6 августа 2026 года.
 </div>
-
+  </main>
 </div>
+
+<script>
+/* Оболочка разбора: полоса прочитанного, подсветка текущего раздела в рельсе,
+   появление блоков по мере прокрутки и рост полос-диаграмм. Всё на IntersectionObserver
+   и одном обработчике прокрутки — без библиотек и без работы, пока страница вне экрана.
+
+   Если человек попросил систему уменьшить движение, ничего из этого не включается:
+   блоки просто стоят на местах, полосы сразу нужной длины. */
+(function(){
+  var тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* полоса прочитанного + тень у верхней панели */
+  var rp = document.querySelector('.rp i'), acad = document.querySelector('.acad'), тик = false;
+  function прокрутка(){
+    var h = document.documentElement.scrollHeight - innerHeight;
+    var y = scrollY || pageYOffset;
+    if(rp) rp.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
+    if(acad) acad.classList.toggle('stuck', y > 12);
+    тик = false;
+  }
+  addEventListener('scroll', function(){ if(!тик){ тик = true; requestAnimationFrame(прокрутка); } }, {passive:true});
+  прокрутка();
+
+  /* появление блоков. Наблюдатель отцепляется сразу после показа: элемент,
+     который уже видели, не должен исчезать при прокрутке назад. */
+  var показ = document.querySelectorAll('.rv');
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var i=0;i<показ.length;i++) показ[i].classList.add('in');
+  } else {
+    var ob = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); ob.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:0.05});
+    for(var j=0;j<показ.length;j++) ob.observe(показ[j]);
+  }
+
+  /* полосы-диаграммы: ширина хранится в data-w и ставится в момент показа,
+     иначе анимация проходит впустую где-то за пределами экрана */
+  var полосы = document.querySelectorAll('.bar .bf[data-w]');
+  function налить(el){ el.style.width = el.getAttribute('data-w'); }
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var k=0;k<полосы.length;k++) налить(полосы[k]);
+  } else {
+    var ob2 = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ налить(e.target); ob2.unobserve(e.target); } });
+    }, {threshold:0.3});
+    for(var m=0;m<полосы.length;m++) ob2.observe(полосы[m]);
+  }
+
+  /* подсветка текущего раздела. Считаем не пересечение, а расстояние до верха:
+     разделы разной длины, и при пороговом методе короткие проскакивали
+     неподсвеченными, а длинные держали подсветку на два экрана дольше нужного. */
+  var ссылки = [].slice.call(document.querySelectorAll('.rail a'));
+  var цели = ссылки.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); });
+  function текущий(){
+    var лучший = 0, минимум = Infinity, порог = innerHeight * 0.32;
+    for(var i=0;i<цели.length;i++){
+      if(!цели[i]) continue;
+      var t = цели[i].getBoundingClientRect().top - порог;
+      if(t <= 0 && Math.abs(t) < минимум){ минимум = Math.abs(t); лучший = i; }
+    }
+    for(var j=0;j<ссылки.length;j++) ссылки[j].classList.toggle('on', j === лучший);
+  }
+  if(ссылки.length){
+    var тик2 = false;
+    addEventListener('scroll', function(){ if(!тик2){ тик2 = true; requestAnimationFrame(function(){ текущий(); тик2 = false; }); } }, {passive:true});
+    текущий();
+  }
+})();
+</script>
 </body>
 </html>

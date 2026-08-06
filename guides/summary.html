@@ -3,136 +3,258 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0B0D">
 <title>Сводка: как это работает</title>
 <style>
-  :root{
-    --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
-    --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
-    --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
-    --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
-    --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
-    --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--txt);
-    font:16px/1.65 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:860px;margin:0 auto;padding:56px 24px 120px}
-  header{margin-bottom:52px}
-  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
-  h1{font-size:38px;line-height:1.12;letter-spacing:-.03em;margin:12px 0 0;font-weight:700}
-  .lead{margin-top:16px;font-size:18px;line-height:1.6;color:var(--txt2);max-width:62ch}
-  .lead b{color:var(--txt);font-weight:650}
-  h2{font-size:25px;letter-spacing:-.02em;margin:60px 0 6px;font-weight:700;scroll-margin-top:20px}
-  h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:8px;letter-spacing:.1em}
-  h3{font-size:18px;margin:34px 0 8px;font-weight:650;letter-spacing:-.01em}
-  p{margin:12px 0;color:var(--txt2);max-width:66ch}
-  p b,li b,td b{color:var(--txt);font-weight:600}
-  .sub{color:var(--txt3);font-size:15px}
-  ul,ol{color:var(--txt2);padding-left:22px;max-width:66ch}
-  li{margin:7px 0}
-  code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
+/* ═══════════════════════════════════════════════════════════════════
+   DETROYD ACADEMY — оболочка разбора
+   Полосу прогресса, обложку во весь экран и боковую навигацию держим
+   в одном месте: шестнадцать документов обязаны выглядеть одной серией,
+   а не шестнадцатью самостоятельными страницами.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
+  --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
+  --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
+  --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
+  --e:cubic-bezier(.4,0,.2,1); --e-out:cubic-bezier(.16,1,.3,1);
+  --rail:266px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:16px/1.68 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
 
-  .toc{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:20px 24px;margin-top:36px}
-  .toc ol{margin:8px 0 0;padding-left:20px}
-  .toc a{color:var(--txt2);text-decoration:none;border-bottom:1px solid transparent}
-  .toc a:hover{color:var(--ac);border-bottom-color:var(--ac-line)}
+/* ——— полоса прочитанного ——— */
+.rp{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:transparent}
+.rp i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--ac),var(--violet));
+  box-shadow:0 0 12px -2px var(--ac);transition:width .1s linear}
 
-  .card{background:var(--bg1);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:22px 0}
-  .card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.05),transparent 60%),var(--bg1)}
-  .card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.05),transparent 60%),var(--bg1)}
-  .card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.05),transparent 60%),var(--bg1)}
-  .card h4{margin:0 0 4px;font-size:17px;font-weight:650}
-  .card p:last-child{margin-bottom:0}
+/* ——— верхняя полоса академии ——— */
+.acad{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:14px 30px;background:rgba(10,11,13,.72);backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;transition:border-color .25s var(--e),background .25s var(--e)}
+.acad.stuck{border-bottom-color:var(--line)}
+.acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--txt3);min-width:0}
+.acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px -1px var(--ac);flex:none}
+.acad-b b{color:var(--txt2);font-weight:700}
+.acad-lvl{margin-left:auto;display:flex;align-items:center;gap:7px}
+.acad-lvl span{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3);white-space:nowrap}
+.acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+.acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+  transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
+.acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
 
-  .frm{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:18px 22px;margin:20px 0;
-    font-family:var(--mono);font-size:16px;color:var(--txt);text-align:center;letter-spacing:.01em}
-  .frm .sm{display:block;font-size:12px;color:var(--txt3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
-  .frm em{color:var(--ac);font-style:normal}
+/* ——— обложка во весь экран ——— */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:120px 30px 90px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(55,230,200,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(55,230,200,.045) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%);
+  mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%)}
+.hero-gl{position:absolute;width:min(64vw,900px);aspect-ratio:1;left:-10vw;top:-16vh;pointer-events:none;
+  background:radial-gradient(circle,rgba(55,230,200,.13),transparent 62%);filter:blur(26px)}
+.hero-in{position:relative;width:100%;max-width:1180px;margin:0 auto}
+.hero .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3)}
+.hero h1{font-size:clamp(38px,5.6vw,76px);line-height:1.03;letter-spacing:-.035em;margin:20px 0 0;font-weight:700;
+  max-width:20ch}
+.hero h1 em{font-style:normal;color:var(--ac)}
+.hero .lead{margin-top:22px;font-size:clamp(16.5px,1.35vw,20px);line-height:1.6;color:var(--txt2);max-width:70ch}
+.hero .lead b{color:var(--txt);font-weight:650}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:34px}
+.hero-meta span{font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  padding:8px 14px;border-radius:999px;border:1px solid var(--line2);color:var(--txt3)}
+.hero-meta span.ac{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+.hero-cue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:9px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--txt3);text-decoration:none}
+.hero-cue i{display:block;width:1px;height:34px;background:linear-gradient(var(--ac),transparent);
+  animation:cue 2.1s var(--e) infinite}
+@keyframes cue{0%{transform:scaleY(.3);opacity:.3;transform-origin:top}50%{transform:scaleY(1);opacity:1;transform-origin:top}100%{transform:scaleY(.3);opacity:.3;transform-origin:top}}
 
-  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
-  .tag.ac{background:var(--ac-dim);color:var(--ac)}
-  .tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
-  .tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
+/* ——— каркас: рельс слева, текст справа ——— */
+.shell{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr);
+  gap:0;max-width:1560px;margin:0 auto;padding:0 30px 140px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:80px 26px 80px 0}
+.rail-t{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);
+  margin-bottom:16px}
+.rail a{display:flex;gap:11px;align-items:flex-start;text-decoration:none;padding:7px 0;
+  color:var(--txt3);font-size:13.5px;line-height:1.35;transition:color .18s var(--e)}
+.rail a n{font-family:var(--mono);font-size:10.5px;padding-top:2px;opacity:.6;flex:none;width:16px}
+.rail a s{text-decoration:none;border-left:1px solid transparent;padding-left:0;transition:.18s var(--e)}
+.rail a:hover{color:var(--txt2)}
+.rail a.on{color:var(--txt)}
+.rail a.on n{color:var(--ac);opacity:1}
+.rail-line{position:absolute;left:0;top:0;width:1px;background:var(--line)}
+.doc{min-width:0;padding:0 0 0 44px;border-left:1px solid var(--line);max-width:1000px}
 
-  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:20px 0}
-  .kpi>div{background:var(--bg1);padding:16px 18px}
-  .kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--txt3)}
-  .kpi .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:7px;line-height:1}
-  .kpi .s{font-size:12.5px;color:var(--txt3);margin-top:6px;font-family:var(--mono)}
+/* ——— типографика разбора ——— */
+h2{font-size:clamp(26px,2.4vw,36px);letter-spacing:-.025em;margin:0 0 6px;font-weight:700;scroll-margin-top:96px;
+  position:relative}
+h2 .n{font-family:var(--mono);font-size:13px;color:var(--ac);display:block;margin-bottom:10px;letter-spacing:.12em}
+.sec{padding:88px 0 0;position:relative}
+.sec:first-of-type{padding-top:70px}
+h3{font-size:clamp(17px,1.5vw,20px);margin:40px 0 8px;font-weight:650;letter-spacing:-.012em}
+p{margin:13px 0;color:var(--txt2);max-width:74ch}
+p b,li b,td b{color:var(--txt);font-weight:600}
+.sub{color:var(--txt3);font-size:15px}
+ul,ol{color:var(--txt2);padding-left:22px;max-width:74ch}
+li{margin:7px 0}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
 
-  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
-  th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--txt3);font-weight:600;padding:0 12px 10px 0;border-bottom:1px solid var(--line)}
-  th.num{text-align:right;padding-right:0}
-  td{padding:12px 12px 12px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
-  td:first-child{color:var(--txt);font-weight:600}
-  td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
-  td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
-  tr.hi td{background:rgba(240,120,92,.07)}
-  tr.ok td{background:rgba(67,216,140,.06)}
+/* Оглавление карточкой нужно только там, где боковая рельса не помещается.
+   Живёт оно не в обложке, а первым блоком текста: в обложке одиннадцать
+   пунктов растягивали её на два экрана и сталкивали заголовок за край. */
+.toc{display:none}
 
-  .quote{border-left:2px solid var(--ac-line);padding:4px 0 4px 18px;margin:22px 0;color:var(--txt2);font-size:16.5px}
-  .quote b{color:var(--txt)}
+.card{background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin:22px 0;
+  transition:border-color .25s var(--e),transform .25s var(--e)}
+.card:hover{border-color:var(--line2)}
+.card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.055),transparent 58%),var(--bg1)}
+.card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.055),transparent 58%),var(--bg1)}
+.card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.055),transparent 58%),var(--bg1)}
+.card h4{margin:0 0 6px;font-size:17.5px;font-weight:650;letter-spacing:-.012em}
+.card p:last-child{margin-bottom:0}
 
-  .step{display:flex;gap:16px;margin:18px 0;align-items:flex-start}
-  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--ac-dim);color:var(--ac);
-    display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:700}
-  .step .bd{flex:1;min-width:0}
-  .step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:2px}
-  .step .bd span{color:var(--txt2);font-size:15px}
+.frm{background:var(--bg2);border:1px solid var(--line2);border-radius:16px;padding:22px 26px;margin:24px 0;
+  font-family:var(--mono);font-size:clamp(14px,1.15vw,17px);color:var(--txt);text-align:center;letter-spacing:.01em}
+.frm .sm{display:block;font-size:11.5px;color:var(--txt3);letter-spacing:.13em;text-transform:uppercase;margin-bottom:12px}
+.frm em{color:var(--ac);font-style:normal}
 
-  .bars{margin:22px 0}
-  .bar{display:flex;align-items:center;gap:12px;margin:9px 0;font-family:var(--mono);font-size:13px}
-  .bar .bl{flex:none;width:52px;color:var(--txt2);text-align:right}
-  .bar .bt{flex:1;height:22px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative}
-  .bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
-    border-right:2px solid var(--ac)}
-  .bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
-  .bar .bv{flex:none;width:74px;color:var(--txt);font-weight:600}
+.tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
+.tag.ac{background:var(--ac-dim);color:var(--ac)}
+.tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
+.tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
 
-  hr{border:0;border-top:1px solid var(--line);margin:56px 0}
-  .foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:70px;padding-top:22px;border-top:1px solid var(--line)}
-  @media(max-width:640px){ .wrap{padding:34px 16px 80px} h1{font-size:29px} h2{font-size:21px} .lead{font-size:16.5px}
-    .frm{font-size:13.5px;padding:16px 14px} .bar .bl{width:44px} .bar .bv{width:62px}
-    table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
-    td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
-    .tblwrap,table{display:block;max-width:100%;overflow-x:auto} }
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:24px 0}
+.kpi>div{background:var(--bg1);padding:20px 22px}
+.kpi .l{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--txt3)}
+.kpi .v{font-family:var(--mono);font-size:clamp(26px,2.6vw,34px);font-weight:700;letter-spacing:-.025em;margin-top:9px;line-height:1}
+.kpi .s{font-size:12.5px;color:var(--txt3);margin-top:7px;font-family:var(--mono)}
 
-  /* Шапка академии: документ открывается из кабинета в новой вкладке, и без
-     обратной ссылки человек оказывается в тупике. Полоса не липкая намеренно —
-     на длинном тексте липкая шапка съедает высоту и мешает читать. */
-  .acad{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    padding:13px 0 15px;margin:0 0 -14px;border-bottom:1px solid var(--line)}
-  .acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
-    letter-spacing:.14em;text-transform:uppercase;color:var(--txt3)}
-  .acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);
-    box-shadow:0 0 10px -1px var(--ac);flex:none}
-  .acad-lvl{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .acad-lvl span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
-    padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3)}
-  .acad-lvl span.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
-  .acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
-    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-    padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
-    transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
-  .acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
-  @media(max-width:600px){ .acad-lvl{margin-left:0;width:100%;order:3} }
+table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14.5px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--txt3);font-weight:600;padding:0 14px 11px 0;border-bottom:1px solid var(--line)}
+th.num{text-align:right;padding-right:0}
+td{padding:14px 14px 14px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+td:first-child{color:var(--txt);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
+td.num:not(:last-child),th.num:not(:last-child){padding-right:22px}
+tr.hi td{background:rgba(240,120,92,.07)}
+tr.ok td{background:rgba(67,216,140,.06)}
+
+.quote{border-left:2px solid var(--ac-line);padding:6px 0 6px 22px;margin:26px 0;color:var(--txt2);
+  font-size:clamp(16.5px,1.35vw,19px);line-height:1.55}
+.quote b{color:var(--txt)}
+
+.step{display:flex;gap:18px;margin:20px 0;align-items:flex-start}
+.step .no{flex:none;width:34px;height:34px;border-radius:11px;background:var(--ac-dim);color:var(--ac);
+  display:grid;place-items:center;font-family:var(--mono);font-size:14px;font-weight:700}
+.step .bd{flex:1;min-width:0}
+.step .bd b{display:block;color:var(--txt);font-weight:650;margin-bottom:3px;font-size:16px}
+.step .bd span{color:var(--txt2);font-size:15px}
+
+.bars{margin:24px 0}
+.bar{display:flex;align-items:center;gap:14px;margin:10px 0;font-family:var(--mono);font-size:13px}
+.bar .bl{flex:none;min-width:56px;color:var(--txt2);text-align:right;white-space:nowrap}
+.bar .bt{flex:1;height:24px;background:var(--bg2);border-radius:7px;overflow:hidden;position:relative}
+.bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
+  border-right:2px solid var(--ac);width:0;transition:width 1s var(--e-out)}
+.bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
+.bar .bv{flex:none;width:78px;color:var(--txt);font-weight:600}
+
+hr{border:0;border-top:1px solid var(--line);margin:0}
+.sec>hr:first-child{display:none}
+.foot{color:var(--txt3);font-size:13.5px;font-family:var(--mono);margin-top:90px;padding-top:26px;
+  border-top:1px solid var(--line);line-height:1.7}
+
+/* ——— появление по мере чтения ——— */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s var(--e-out),transform .6s var(--e-out)}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:1180px){
+  :root{--rail:0px}
+  .shell{grid-template-columns:minmax(0,1fr);max-width:900px;padding:0 22px 110px}
+  .rail{display:none}
+  .doc{padding-left:0;border-left:0;max-width:none}
+  .toc{display:block;background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:22px 24px;margin:34px 0 0}
+  .toc .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+  .toc ol{margin:10px 0 0;padding-left:20px}
+  .toc a{color:var(--txt2);text-decoration:none}
+  .toc a:hover{color:var(--ac)}
+}
+@media(max-width:680px){
+  .acad{padding:11px 16px;gap:10px;flex-wrap:wrap}
+  .acad-lvl{margin-left:auto}
+  /* На телефоне обложка должна укладываться в один экран: длинный заголовок
+     плюс два абзаца вступления выталкивали подсказку «читать» за край, и
+     страница открывалась серединой фразы. Ужимаем поля и межстрочные отступы. */
+  .hero{padding:92px 18px 72px}
+  .hero h1{font-size:clamp(29px,7.6vw,38px);margin-top:16px}
+  .hero .lead{margin-top:15px;font-size:15.5px;line-height:1.55}
+  .hero-meta{margin-top:22px;gap:7px}
+  .hero-meta span{padding:6px 11px;font-size:10px}
+  .hero-cue{bottom:24px}
+  .shell{padding:0 16px 90px}
+  .sec{padding-top:64px}
+  .card{padding:20px 18px}
+  .frm{padding:18px 15px}
+  .step{gap:13px}
+  table{font-size:12.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
+  td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
+  table{display:block;max-width:100%;overflow-x:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1;transform:none;transition:none}
+  .hero-cue i{animation:none}
+  .bar .bf{transition:none}
+  .rp i{transition:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-<div class="acad"><div class="acad-b"><i></i>DETROYD Academy · Сводка</div><div class="acad-lvl"><span class="on">Тренинг</span><span class="">Экспертный</span></div><a class="acad-back" href="https://detroyd.com">← В кабинет</a></div>
+<div class="rp" aria-hidden="true"><i></i></div>
 
-<header>
-  <div class="eyebrow">DETROYD SMART SYSTEM · Сводка · базовый тренинг</div>
-  <h1>Сводка: приборная панель агентства</h1>
-  <p class="lead">Циклы отвечают на вопрос «почему проект идёт столько, сколько идёт». Сводка отвечает на другой: <b>«что происходит со всем бизнесом прямо сейчас и куда смотреть первым делом»</b>. Это единственный экран, который вы открываете каждое утро.</p>
-  <p class="lead">Разбор написан на ваших числах от 6 августа. Все цифры в тексте — с ваших экранов.</p>
+<div class="acad">
+  <div class="acad-b"><i></i>DETROYD Academy · <b>Сводка</b></div>
+  <div class="acad-lvl"><span class="on">Тренинг</span><span class="">Экспертный</span></div>
+  <a class="acad-back" href="https://detroyd.com">← В кабинет</a>
+</div>
 
-  <div class="toc">
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true"></div><div class="hero-gl" aria-hidden="true"></div>
+  <div class="hero-in">
+    <div class="eyebrow">DETROYD SMART SYSTEM · Сводка · базовый тренинг</div>
+    <h1>Сводка: приборная панель агентства</h1>
+    <p class="lead">Циклы отвечают на вопрос «почему проект идёт столько, сколько идёт». Сводка отвечает на другой: <b>«что происходит со всем бизнесом прямо сейчас и куда смотреть первым делом»</b>. Это единственный экран, который вы открываете каждое утро.</p>
+    <p class="lead">Разбор написан на ваших числах от 6 августа. Все цифры в тексте — с ваших экранов.</p>
+    <div class="hero-meta"><span class="ac">тренинг уровень</span><span>8 разделов</span><span>на данных от 6 августа 2026</span></div>
+  </div>
+  <a class="hero-cue" href="#a1"><span>читать</span><i></i></a>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Разделы разбора">
+    <div class="rail-t">Разделы</div>
+    <a href="#a1"><n>01</n><s>Зачем модуль и главное правило чтения</s></a><a href="#a2"><n>02</n><s>Экран по блокам</s></a><a href="#a3"><n>03</n><s>Что говорят ваши данные сегодня</s></a><a href="#a4"><n>04</n><s>Что сделать на этой неделе</s></a><a href="#a5"><n>05</n><s>Как это превращается в деньги</s></a><a href="#a6"><n>06</n><s>Ритуал</s></a><a href="#a7"><n>07</n><s>Ловушки</s></a><a href="#a8"><n>08</n><s>Как мыслить: метод</s></a>
+  </nav>
+  <main class="doc">
+<div class="toc">
     <div class="eyebrow">Что внутри</div>
     <ol>
       <li><a href="#a1">Зачем модуль и главное правило чтения</a></li>
@@ -145,30 +267,26 @@
       <li><a href="#a8">Как мыслить: метод</a></li>
     </ol>
   </div>
-</header>
 
-<h2 id="a1"><span class="n">01</span>Зачем модуль и главное правило чтения</h2>
+<section class="sec"><h2 id="a1"><span class="n">01</span>Зачем модуль и главное правило чтения</h2>
 
 <p>У владельца агентства есть три вопроса, на которые нужно отвечать ежедневно: <b>что горит</b>, <b>двигаемся ли мы вообще</b> и <b>не рушится ли что-то, чего я пока не вижу</b>. Сводка собирает ответы на все три в один экран, чтобы не открывать семь проектов по очереди.</p>
 
 <p>Чем Сводка <b>не</b> является: это не отчёт для клиента, не финансовая картина и не оценка людей. Это диспетчерский пульт — он показывает, где загорелась лампочка, и ничего не говорит о том, почему. Почему — это Циклы и KPI.</p>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>Главное правило, без которого экран читается неверно</h4>
   <p>У каждой плитки своя <b>область видимости</b> — множество, по которому она считается. Одни считают только активные проекты, другие — весь портфель, третьи — всё время работы кабинета.</p>
   <p>Поэтому две соседние цифры могут выглядеть противоречиво и при этом обе быть правильными. Ваш экран прямо сейчас: <b>«Средний прогресс 86%»</b> и <b>«10 из 39 этапов»</b> — то есть 26%. Разница в 60 процентных пунктов не ошибка: первая цифра про один активный проект, вторая про весь портфель.</p>
   <p>Отсюда привычка: <b>увидел цифру — сначала прочитай подпись под ней и ярлык периода рядом.</b> Подпись и есть область видимости. Без неё цифра не значит ничего.</p>
-</div>
-
-<hr>
-
-<h2 id="a2"><span class="n">02</span>Экран по блокам</h2>
+</div></section>
+<section class="sec"><h2 id="a2"><span class="n">02</span>Экран по блокам</h2>
 
 <p>Дальше — каждый блок по одной схеме: что показывает, зачем он нужен, как читать и что у вас там сейчас.</p>
 
 <h3>Верхний ряд — состояние «прямо сейчас»</h3>
 
-<div class="card">
+<div class="card rv">
   <h4>Здоровье портфеля <span class="tag">сейчас</span></h4>
   <p><b>Что показывает.</b> Долю активных проектов, находящихся в норме. Это светофор: пока он зелёный, ничего не горит.</p>
   <p><b>Зачем нужен.</b> Одна цифра вместо просмотра всех карточек. Утренняя проверка «можно спокойно заниматься своими делами или нет».</p>
@@ -176,7 +294,7 @@
   <p><b>У вас сейчас.</b> 100% при трёх проектах, просроченных на 19, 22 и 35 дней. Противоречия нет: те три помечены завершёнными и в расчёт не входят. Но именно поэтому <b>зелёный цвет здесь означает «единственный активный проект в порядке», а не «в агентстве всё хорошо»</b>.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Активные <span class="tag">сейчас</span></h4>
   <p><b>Что показывает.</b> Сколько проектов реально в работе, и сколько всего было. У вас — 1 из 7, шесть завершено.</p>
   <p><b>Зачем нужен.</b> Это ваш WIP — количество одновременных работ. Самая недооценённая цифра на экране: именно она определяет сроки по всем проектам сразу.</p>
@@ -184,7 +302,7 @@
   <p><b>У вас сейчас.</b> Единица. С точки зрения скорости это идеально. С точки зрения выручки — вся выручка держится на одном клиенте.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Средний прогресс <span class="tag">сейчас</span></h4>
   <p><b>Что показывает.</b> Средний процент закрытых этапов по <b>активным</b> проектам.</p>
   <p><b>Зачем нужен.</b> Отвечает на вопрос «мы в начале или в конце». В конце — пора готовить следующую продажу, иначе будет провал в загрузке.</p>
@@ -192,7 +310,7 @@
   <p><b>У вас сейчас.</b> 86% — это Artel, 6 этапов из 7. Проект почти закончен. Практический вывод: <b>через несколько недель у вас ноль активных проектов, если сейчас не начать продавать.</b> Это самая срочная вещь на экране, и выглядит она безобидно.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>On-time delivery <span class="tag">всё время</span></h4>
   <p><b>Что показывает.</b> Долю сдач, попавших в срок, за всю историю кабинета. У вас 7 из 8.</p>
   <p><b>Зачем нужен.</b> Это ваше главное обещание клиенту, выраженное числом. Единственная метрика на экране, которую можно показывать в продаже.</p>
@@ -200,7 +318,7 @@
   <p><b>У вас сейчас.</b> 88% при восьми сдачах. Одна просрочка — и станет 78%, то есть минус 10 пунктов с одного случая. Чтобы честно заявлять 95%, нужно 12 сдач подряд в срок.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Просрочено <span class="tag">сейчас</span></h4>
   <p><b>Что показывает.</b> Количество просроченных этапов и задач в активной работе. У вас 0 этапов и 1 задача.</p>
   <p><b>Зачем нужен.</b> Список того, что уже горит. Это единственная плитка, требующая действия сегодня.</p>
@@ -210,7 +328,7 @@
 
 <h3>Второй ряд — движение и риски</h3>
 
-<div class="card">
+<div class="card rv">
   <h4>Velocity <span class="tag">30 дней</span></h4>
   <p><b>Что показывает.</b> Сколько единиц работы закрыто за 30 дней. У вас 9: шесть этапов и три задачи. Рядом — сколько за последние 7 дней (3) и сколько закрытий повторные (6).</p>
   <p><b>Зачем нужен.</b> Это ваша пропускная способность. Из неё считается, сколько проектов вы вообще способны вести и когда закончите то, что взяли.</p>
@@ -218,7 +336,7 @@
   <p><b>У вас сейчас.</b> И тут же главная оговорка: <b>6 закрытий из 9 — повторные</b>. Значит нового движения было три, а не девять. Про это подробно в находках.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Риск оттока <span class="tag">сейчас</span></h4>
   <p><b>Что показывает.</b> Клиентов, у которых упала активность — признак того, что человек отваливается ещё до того, как скажет об этом вслух.</p>
   <p><b>Зачем нужен.</b> Удержать клиента дешевле, чем найти нового, в разы. Эта плитка даёт неделю форы.</p>
@@ -226,7 +344,7 @@
   <p><b>У вас сейчас.</b> Ноль — при том что в таблице ниже три проекта без активности 5, 7 и 9 дней. Они не активны, поэтому в риск не попадают. Держите это в голове.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Откаты <span class="tag">всё время</span></h4>
   <p><b>Что показывает.</b> Сколько раз работа возвращалась на шаг назад — из «готово» в «в работе», из проверки в переделку. У вас 24 отката, это 36% всех переходов.</p>
   <p><b>Зачем нужен.</b> Это прямой измеритель качества входа. Откат означает, что вещь объявили сделанной раньше, чем она была сделана.</p>
@@ -236,7 +354,7 @@
 
 <h3>Портфель проектов</h3>
 
-<div class="card">
+<div class="card rv">
   <h4>Таблица <span class="tag">все / активные / просрочены / завершены</span></h4>
   <p><b>Что показывает.</b> Каждый проект строкой: прогресс, этапы, здоровье, ближайший дедлайн, дата последней активности.</p>
   <p><b>Зачем нужен.</b> Верхние плитки говорят «где-то горит», таблица говорит «вот где именно».</p>
@@ -246,7 +364,7 @@
 
 <h3>Структура портфеля</h3>
 
-<div class="card">
+<div class="card rv">
   <h4>Сфера · Услуга · Тариф <span class="tag warn">высокая концентрация</span></h4>
   <p><b>Что показывает.</b> Из чего состоит ваш поток денег: по отраслям клиентов, по типам услуг, по тарифам.</p>
   <p><b>Зачем нужен.</b> Это карта риска. Если одна сфера или одна услуга даёт больше трети портфеля, вы зависите от одного рынка: просядет он — просядете вы. Плюс это подсказка для продаж, где у вас уже есть экспертиза и кейсы.</p>
@@ -256,7 +374,7 @@
 
 <h3>Радар дедлайнов</h3>
 
-<div class="card">
+<div class="card rv">
   <h4>Просрочено · сегодня · неделя</h4>
   <p><b>Что показывает.</b> Ближайшие сроки с исполнителем и цветовой меткой срочности.</p>
   <p><b>Зачем нужен.</b> Это ваш список на утро. Всё остальное на экране — контекст, а это — действия.</p>
@@ -266,92 +384,83 @@
 
 <h3>Загрузка по этапам</h3>
 
-<div class="card">
+<div class="card rv">
   <h4>По всем проектам</h4>
   <p><b>Что показывает.</b> По каждому типу этапа: сколько закрыто из скольких заведённых.</p>
   <p><b>Зачем нужен.</b> Показывает, какой тип работы систематически застревает — не в одном проекте, а вообще. Это подсказка, где чинить процесс, а не конкретную задачу.</p>
   <p><b>Как читать.</b> Ищите единственную строку с незакрытой полосой. Один и тот же тип этапа, отстающий из месяца в месяц, — это дефект процесса.</p>
   <p><b>У вас сейчас.</b> Всё закрыто, кроме <b>«Отчётность» 0/1</b>. И в радаре дедлайнов отчётность стоит на 10 августа. Отчётность — классический этап, который делают последним и чаще всего срывают, а клиент замечает именно его: работу он не видит, отчёт видит.</p>
-</div>
-
-<hr>
-
-<h2 id="a3"><span class="n">03</span>Что говорят ваши данные сегодня</h2>
+</div></section>
+<section class="sec"><h2 id="a3"><span class="n">03</span>Что говорят ваши данные сегодня</h2>
 
 <p>Семь находок по убыванию денежной важности.</p>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>1. Через несколько недель у вас может не остаться работы</h4>
   <p>Активный проект один, и он готов на 86% — шесть этапов из семи. Ближайший дедлайн 10 августа. Дальше — пустой портфель.</p>
   <p>Это самая срочная вещь на экране, и она замаскирована зелёным цветом: «здоровье 100%», «прогресс 86%» читаются как хорошие новости. Хорошая новость по проекту здесь одновременно является плохой новостью по бизнесу.</p>
   <p><b>Правило на будущее:</b> продажи начинаются, когда средний прогресс переваливает за 60–70%, а не когда проект сдан. Цикл продажи длиннее, чем остаток проекта.</p>
 </div>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>2. Откаты 36% — две трети усилий уходят вхолостую</h4>
   <p>Каждый третий переход статуса — назад. Посчитаем, что это значит. Если из ста переходов 64 вперёд и 36 назад, чистое продвижение — 28 шагов. То есть <b>на один реальный шаг вперёд приходится 3,6 перехода</b>.</p>
   <p>Это та же болезнь, что вы уже видели в Циклах: 12 отправок на 3 материала, ноль утверждений с первого раза. Здесь она видна с другой стороны — как 24 возврата назад.</p>
   <p>Причина одна: <b>работа объявляется готовой раньше, чем она готова.</b> Лечится не скоростью, а критериями закрытия этапа.</p>
 </div>
 
-<div class="card neg">
+<div class="card neg rv">
   <h4>3. Velocity 9 — на самом деле 3</h4>
   <p>Под цифрой 9 стоит подпись «6 повторно». Значит из девяти закрытий шесть — это повторные закрытия того, что уже закрывали. Новых событий было три.</p>
   <p>Разница принципиальная. При velocity 9 остаток портфеля в 29 этапов проходится примерно за 5 месяцев. При честной velocity 3 — за <b>14 месяцев</b>. Планировать по валовой цифре — значит обещать клиентам сроки, в которые вы не попадёте.</p>
   <p>Смотрите на velocity всегда парой: валовая и доля повторных. Одна без другой врёт.</p>
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>4. Шесть проектов из семи помечены «Завершён» с незакрытыми этапами</h4>
   <p>APOLO COFFEE — «Завершён» при 2 этапах из 8 и просрочке 19 дней. TRIA SMART CORP — «Завершён» при 1 из 9 и просрочке 35 дней. DeTroyd System, DETROYD TEST, TRIADA SMART CORP — «Завершён» при нуле закрытых этапов.</p>
   <p>Завершённый проект не может иметь просроченный дедлайн — работать больше не над чем. Значит это не завершённые проекты, а <b>брошенные или замороженные</b>, помеченные как завершённые.</p>
   <p>Цена этой неточности высокая: эти шесть проектов исключены из здоровья портфеля, из просрочек и из риска оттока. Три главных светофора экрана зелены потому, что проблемные проекты вынесены за скобки.</p>
 </div>
 
-<div class="card warn">
+<div class="card warn rv">
   <h4>5. Все ближайшие сроки — на одном человеке</h4>
   <p>Три позиции в радаре, один исполнитель — DTR HUNTER, один проект — Artel. Заболел, устал, перегружен — встали все три срока сразу.</p>
   <p>Это не вопрос лояльности сотрудника, это вопрос структуры: у вас нет второго маршрута. Пока проект один, риск терпимый. При трёх проектах на том же человеке это гарантированный срыв.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>6. On-time 88% — цифра честная, но хрупкая</h4>
   <p>7 из 8. Одна просрочка обрушивает её до 78%. Две — до 70%. При такой выборке метрика скорее ободряет, чем измеряет.</p>
   <p>Практический смысл: <b>пока не набралось 20+ сдач, не выносите этот процент в коммерческое предложение.</b> Обещание, которое вы не сможете удержать статистически, дороже, чем отсутствие обещания.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>7. Отчётность — единственный тип этапа, который не закрывается</h4>
   <p>Загрузка по этапам: всё 1/1, кроме отчётности — 0/1. И она же в радаре на 10 августа.</p>
   <p>Один случай — ещё не закономерность. Но отчётность отстаёт в агентствах почти всегда, потому что она не приносит удовольствия и делается после «настоящей» работы. При этом для клиента отчёт — главный видимый признак, что вы работаете. Стоит проследить за этой строкой ещё месяц.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a4"><span class="n">04</span>Что сделать на этой неделе</h2>
 
-<hr>
-
-<h2 id="a4"><span class="n">04</span>Что сделать на этой неделе</h2>
-
-<div class="step"><div class="no">1</div><div class="bd"><b>Разобрать статус шести «завершённых»</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Разобрать статус шести «завершённых»</b>
 <span>По каждому решить честно: закрыт, заморожен или брошен. Завершённым оставить только те, где работа действительно сделана. Остальные вернуть в активные или архивировать отдельным статусом. После этого все светофоры на экране начнут показывать правду.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Начать продавать сегодня, а не после сдачи Artel</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Начать продавать сегодня, а не после сдачи Artel</b>
 <span>При 86% готовности единственного проекта окно между сдачей и следующим контрактом — это ваш кассовый разрыв. Цикл продажи в вашем сегменте длиннее, чем оставшийся этап.</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Написать критерии закрытия для трёх этапов</b>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Написать критерии закрытия для трёх этапов</b>
 <span>Брифинг, продакшн, отчётность. По пять строк: что должно быть готово, чтобы этап считался закрытым. Это прямая атака на 36% откатов — без критериев «готово» означает «нажал кнопку».</span></div></div>
 
-<div class="step"><div class="no">4</div><div class="bd"><b>Закрыть просроченную задачу и разобрать причину</b>
+<div class="step rv"><div class="no">4</div><div class="bd"><b>Закрыть просроченную задачу и разобрать причину</b>
 <span>«Разработать контент план» просрочена с 1 августа. Важна не сама задача, а ответ на вопрос, что помешало: ждали материалы, ждали решение, переключились на срочное. Ответ запишите — через двадцать таких записей у вас будет карта причин простоя.</span></div></div>
 
-<div class="step"><div class="no">5</div><div class="bd"><b>Раздать три ближайших срока хотя бы на двоих</b>
-<span>Не потому что DTR HUNTER не справится, а потому что второго маршрута нет. Одно распределение сегодня — и радар перестаёт быть очередью к одному человеку.</span></div></div>
-
-<hr>
-
-<h2 id="a5"><span class="n">05</span>Как это превращается в деньги</h2>
+<div class="step rv"><div class="no">5</div><div class="bd"><b>Раздать три ближайших срока хотя бы на двоих</b>
+<span>Не потому что DTR HUNTER не справится, а потому что второго маршрута нет. Одно распределение сегодня — и радар перестаёт быть очередью к одному человеку.</span></div></div></section>
+<section class="sec"><h2 id="a5"><span class="n">05</span>Как это превращается в деньги</h2>
 
 <p>Сводка влияет на выручку четырьмя способами, и все четыре считаются.</p>
 
-<table>
+<table class="rv">
 <tr><th>Что видит Сводка</th><th>Как это становится деньгами</th></tr>
 <tr><td>Прогресс активных подходит к концу</td><td>Продажи стартуют заранее — нет провала в загрузке между контрактами. Один пустой месяц в году стоит примерно 8% годовой выручки.</td></tr>
 <tr><td>Откаты и повторные закрытия</td><td>Каждый откат — оплаченная вами работа, за которую клиент не платит второй раз. Снижение с 36% до 15% возвращает примерно четверть мощности команды без найма.</td></tr>
@@ -359,72 +468,63 @@
 <tr><td>Концентрация портфеля</td><td>Клиент выше 30% портфеля — это ваш будущий кассовый разрыв. Метрика заранее говорит, какого клиента искать следующим.</td></tr>
 </table>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>И главное — предсказуемость</h4>
   <p>On-time delivery, подтверждённый статистикой, продаётся дороже, чем скорость. Клиент платит наценку не за «быстро», а за «в названный срок, без напоминаний». Это единственная характеристика агентства, за которую не торгуются, — но только тогда, когда за ней стоит выборка, а не восемь случаев.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a6"><span class="n">06</span>Ритуал</h2>
 
-<hr>
-
-<h2 id="a6"><span class="n">06</span>Ритуал</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Каждое утро — 5 минут</h4>
   <p>Три взгляда, в этом порядке: <b>Просрочено</b> — есть ли что тушить. <b>Радар дедлайнов</b> — что горит на этой неделе и на ком. <b>Столбец «Активность»</b> в таблице — что не двигалось больше трёх дней.</p>
   <p>Всё. На верхние проценты утром смотреть не нужно — они меняются слишком медленно, чтобы влиять на сегодняшний день.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Понедельник — 20 минут</h4>
   <p><b>Velocity</b> вместе с долей повторных: движемся или топчемся. <b>Средний прогресс</b> и число активных: пора ли продавать. <b>Откаты</b>: растут или падают после ваших изменений. <b>Загрузка по этапам</b>: какой тип работы застревает второй месяц подряд.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Раз в месяц — 30 минут</h4>
   <p><b>On-time delivery</b>: сколько накопилось сдач и можно ли уже говорить о проценте вслух. <b>Структура портфеля</b>: не подобрался ли один клиент или одна сфера к трети. <b>Полный портфель</b>: 10/39 — сколько реально закрыли за месяц и сходится ли это с velocity.</p>
-</div>
+</div></section>
+<section class="sec"><h2 id="a7"><span class="n">07</span>Ловушки</h2>
 
-<hr>
-
-<h2 id="a7"><span class="n">07</span>Ловушки</h2>
-
-<div class="card">
+<div class="card rv">
   <h4>Зелёный цвет — не то же самое, что «всё хорошо»</h4>
   <p>Здоровье 100% при трёх просроченных проектах в таблице ниже. Цвет отражает узкую область видимости. Прежде чем успокоиться, прочитайте подпись под процентом.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Смешивание масштабов</h4>
   <p>86% и 26% на одном экране про одно и то же слово «прогресс». Первое — про активный проект, второе — про портфель. Спрашивайте себя каждый раз: это про что — про проект, про активные или про всё?</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Проценты без знаменателя</h4>
   <p>88% on-time звучит одинаково при восьми сдачах и при восьмистах. Знаменатель написан прямо под цифрой — «7 в срок из 8». Читайте его всегда.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Velocity без доли повторных</h4>
   <p>Девять закрытий, из них шесть повторных, — это три. Валовая цифра льстит, и планировать по ней нельзя.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Статус как отговорка</h4>
   <p>Пометить брошенный проект «завершённым» — самый простой способ сделать экран зелёным. И самый быстрый способ ослепить себя: проблемные проекты исчезают из всех трёх светофоров сразу.</p>
 </div>
 
-<div class="card">
+<div class="card rv">
   <h4>Разглядывание вместо действия</h4>
   <p>Сводка — пульт, а не отчёт. Если после утреннего просмотра вы не сделали ни одного действия и не задали ни одного вопроса, просмотр можно было пропустить.</p>
-</div>
-
-<hr>
-
-<h2 id="a8"><span class="n">08</span>Как мыслить: метод</h2>
+</div></section>
+<section class="sec"><h2 id="a8"><span class="n">08</span>Как мыслить: метод</h2>
 
 <p>Числа устареют через неделю. Метод — нет.</p>
 
-<div class="card ac">
+<div class="card ac rv">
   <h4>Главный сдвиг: сначала область видимости, потом цифра</h4>
   <p>На этом экране нет неправильных чисел — есть числа, посчитанные по разным множествам. Ошибка возникает не в системе, а в голове читателя, который сравнивает несравнимое.</p>
   <p>Привычка: <b>прочитать подпись и ярлык периода раньше, чем сам показатель.</b> «100%» ничего не значит; «100%, в норме 1 из 1 активного» — значит всё.</p>
@@ -432,35 +532,104 @@
 
 <h3>Четыре вопроса к экрану, всегда в этом порядке</h3>
 
-<div class="step"><div class="no">1</div><div class="bd"><b>Что горит прямо сейчас?</b>
+<div class="step rv"><div class="no">1</div><div class="bd"><b>Что горит прямо сейчас?</b>
 <span>Просрочено, радар дедлайнов. Только это требует действия сегодня. На всё остальное можно смотреть спокойно.</span></div></div>
 
-<div class="step"><div class="no">2</div><div class="bd"><b>Что перестало двигаться?</b>
+<div class="step rv"><div class="no">2</div><div class="bd"><b>Что перестало двигаться?</b>
 <span>Столбец активности, риск оттока. Молчание опаснее просрочки: просрочку видно, остановку — нет. У вас три проекта молчат 5, 7 и 9 дней.</span></div></div>
 
-<div class="step"><div class="no">3</div><div class="bd"><b>Движемся ли мы вообще, а не только шевелимся?</b>
+<div class="step rv"><div class="no">3</div><div class="bd"><b>Движемся ли мы вообще, а не только шевелимся?</b>
 <span>Velocity минус повторные, откаты. Разница между активностью и продвижением — это и есть разница между занятым агентством и растущим.</span></div></div>
 
-<div class="step"><div class="no">4</div><div class="bd"><b>Что будет через месяц?</b>
+<div class="step rv"><div class="no">4</div><div class="bd"><b>Что будет через месяц?</b>
 <span>Средний прогресс активных, структура портфеля. Единственный блок вопросов, отвечающий за выручку, а не за операционку. И единственный, который забывают.</span></div></div>
 
 <h3>Три различения</h3>
 
-<table>
+<table class="rv">
 <tr><td>Активность против продвижения</td><td>Закрытая задача не всегда означает шаг вперёд: 6 из 9 ваших закрытий повторные, а 36% переходов — назад. Занятость измеряется velocity, продвижение — velocity за вычетом повторов.</td></tr>
 <tr><td>Отсутствие сигнала против отсутствия проблемы</td><td>Ноль в риске оттока означает «среди активных проблем нет», а не «проблем нет». Каждая плитка слепа за пределами своей области видимости, и знать эти границы — часть навыка.</td></tr>
 <tr><td>Операционка против бизнеса</td><td>Просрочки и дедлайны — про сегодня. Прогресс активных и концентрация — про через месяц. Первое кричит, второе молчит. Разоряются обычно на втором.</td></tr>
 </table>
 
-<div class="quote">
+<div class="quote rv">
   <b>Правило одного действия.</b> После каждого утреннего просмотра должно оставаться хотя бы одно: закрытая задача, заданный вопрос, изменённый статус, отправленное письмо. Экран без действия — это привычка, а не управление.
-</div>
+</div></section>
 
 <div class="foot">
   DETROYD SMART SYSTEM · базовый тренинг по модулю «Сводка»<br>
   Разбор построен на данных агентства DETROYD от 6 августа 2026 года.
 </div>
-
+  </main>
 </div>
+
+<script>
+/* Оболочка разбора: полоса прочитанного, подсветка текущего раздела в рельсе,
+   появление блоков по мере прокрутки и рост полос-диаграмм. Всё на IntersectionObserver
+   и одном обработчике прокрутки — без библиотек и без работы, пока страница вне экрана.
+
+   Если человек попросил систему уменьшить движение, ничего из этого не включается:
+   блоки просто стоят на местах, полосы сразу нужной длины. */
+(function(){
+  var тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* полоса прочитанного + тень у верхней панели */
+  var rp = document.querySelector('.rp i'), acad = document.querySelector('.acad'), тик = false;
+  function прокрутка(){
+    var h = document.documentElement.scrollHeight - innerHeight;
+    var y = scrollY || pageYOffset;
+    if(rp) rp.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
+    if(acad) acad.classList.toggle('stuck', y > 12);
+    тик = false;
+  }
+  addEventListener('scroll', function(){ if(!тик){ тик = true; requestAnimationFrame(прокрутка); } }, {passive:true});
+  прокрутка();
+
+  /* появление блоков. Наблюдатель отцепляется сразу после показа: элемент,
+     который уже видели, не должен исчезать при прокрутке назад. */
+  var показ = document.querySelectorAll('.rv');
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var i=0;i<показ.length;i++) показ[i].classList.add('in');
+  } else {
+    var ob = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); ob.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:0.05});
+    for(var j=0;j<показ.length;j++) ob.observe(показ[j]);
+  }
+
+  /* полосы-диаграммы: ширина хранится в data-w и ставится в момент показа,
+     иначе анимация проходит впустую где-то за пределами экрана */
+  var полосы = document.querySelectorAll('.bar .bf[data-w]');
+  function налить(el){ el.style.width = el.getAttribute('data-w'); }
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var k=0;k<полосы.length;k++) налить(полосы[k]);
+  } else {
+    var ob2 = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ налить(e.target); ob2.unobserve(e.target); } });
+    }, {threshold:0.3});
+    for(var m=0;m<полосы.length;m++) ob2.observe(полосы[m]);
+  }
+
+  /* подсветка текущего раздела. Считаем не пересечение, а расстояние до верха:
+     разделы разной длины, и при пороговом методе короткие проскакивали
+     неподсвеченными, а длинные держали подсветку на два экрана дольше нужного. */
+  var ссылки = [].slice.call(document.querySelectorAll('.rail a'));
+  var цели = ссылки.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); });
+  function текущий(){
+    var лучший = 0, минимум = Infinity, порог = innerHeight * 0.32;
+    for(var i=0;i<цели.length;i++){
+      if(!цели[i]) continue;
+      var t = цели[i].getBoundingClientRect().top - порог;
+      if(t <= 0 && Math.abs(t) < минимум){ минимум = Math.abs(t); лучший = i; }
+    }
+    for(var j=0;j<ссылки.length;j++) ссылки[j].classList.toggle('on', j === лучший);
+  }
+  if(ссылки.length){
+    var тик2 = false;
+    addEventListener('scroll', function(){ if(!тик2){ тик2 = true; requestAnimationFrame(function(){ текущий(); тик2 = false; }); } }, {passive:true});
+    текущий();
+  }
+})();
+</script>
 </body>
 </html>
