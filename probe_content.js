@@ -118,6 +118,61 @@ const отчёт = (o) => Object.assign({
   ok('публикация без рубрики попадает в непокрытые', A.безРубрики.есть && A.безРубрики.n === 1, A.безРубрики);
   ok('непокрытые не попадают в рейтинг рубрик', A.безРубрики.вРейтинге === 0, A.безРубрики);
 
+  /* Свёртка обязана убивать копии и не трогать разные отчёты. Ошибиться здесь
+     дороже всего: лишний отчёт виден (публикации задваиваются), а съеденный —
+     нет, экран выглядит нормально и просто врёт. */
+  const A2 = await page.evaluate(({ пуб }) => {
+    const п = (o) => Object.assign({}, пуб, o || {});
+    const отч = (id, назв, период, когда, названия) => ({ id: id, project_id: 'p1',
+      title: назв, published_at: когда,
+      payload: { period: период, posts: [], reels: названия.map(t => п({ title: t })) } });
+    const сборка = (rows) => ctBuild(rows, { projects: [{ id:'p1', name:'Тест' }] });
+
+    /* Instagram и TikTok за один месяц — два разных отчёта, а не копия. */
+    const разные = сборка([
+      отч('1','Instagram МАЙ','МАЙ','2026-05-31T10:00:00Z',['инста-1','инста-2']),
+      отч('2','TikTok МАЙ',   'МАЙ','2026-06-01T10:00:00Z',['тикток-1','тикток-2'])
+    ]);
+    /* Цепочка копий — один отчёт, побеждает свежая. */
+    const копии = сборка([
+      отч('1','Отчёт',                'МАЙ','2026-05-01T00:00:00Z',['x']),
+      отч('2','Отчёт · копия',        'МАЙ','2026-05-02T00:00:00Z',['x']),
+      отч('3','Отчёт · копия · копия','МАЙ','2026-05-03T00:00:00Z',['x'])
+    ]);
+    /* Копию переименовали — по названию уже не копия, но публикации те же. */
+    const переим = сборка([
+      отч('1','Отчёт май',     'МАЙ','2026-05-01T00:00:00Z',['раз','два']),
+      отч('2','Отчёт май v2',  'МАЙ','2026-05-09T00:00:00Z',['раз','два'])
+    ]);
+    /* Серия внутри одного отчёта: два «Рецепт дня» — две публикации. */
+    const серия = сборка([ отч('1','Отчёт','МАЙ','2026-05-01T00:00:00Z',
+      ['Рецепт дня','Рецепт дня','Другое']) ]);
+
+    return {
+      разные: { отчётов: разные.stats.reports, публикаций: разные.units.length,
+                названия: разные.units.map(u=>u.title).sort().join(',') },
+      копии:  { отчётов: копии.stats.reports, свёрнуто: копии.dedupe.dropped,
+                победитель: копии.units[0] && копии.units[0].reportId },
+      переим: { отчётов: переим.stats.reports, публикаций: переим.units.length,
+                дублей: переим.dedupe.crossDropped,
+                изОтчёта: переим.units.map(u=>u.reportId).join(',') },
+      серия:  { публикаций: серия.units.length, дублей: серия.dedupe.crossDropped }
+    };
+  }, { пуб: пуб() });
+
+  ok('два разных отчёта одного периода остаются оба',
+      A2.разные.отчётов === 2 && A2.разные.публикаций === 4, A2.разные);
+  ok('и ни одна публикация из них не пропадает',
+      A2.разные.названия === 'инста-1,инста-2,тикток-1,тикток-2', A2.разные.названия);
+  ok('цепочка копий по-прежнему сворачивается в самую свежую',
+      A2.копии.отчётов === 1 && A2.копии.свёрнуто === 2 && A2.копии.победитель === '3', A2.копии);
+  ok('переименованная копия не задваивает публикации',
+      A2.переим.публикаций === 2 && A2.переим.дублей === 2, A2.переим);
+  ok('и в расчёт идёт версия из свежего отчёта',
+      A2.переим.изОтчёта === '2,2', A2.переим.изОтчёта);
+  ok('одноимённые публикации внутри одного отчёта — разные публикации',
+      A2.серия.публикаций === 3 && A2.серия.дублей === 0, A2.серия);
+
   /* ─────────────────────────────────────────────────────────────────────── */
   console.log('[B] математика: ставки, масштаб, композит, сжатие');
 
@@ -289,6 +344,32 @@ const отчёт = (o) => Object.assign({
   ok('она уходит в блок «недостаточно данных»', C.одна.вМалых === 1, C.одна);
   ok('сырое значение при этом показано', C.одна.сырое, C.одна);
   ok('опечатка «25 765 комментариев» ловится', C.опечатка.ok === false, C.опечатка);
+  /* Обратная сторона той же проверки. Розыгрыш «напиши в комментариях» даёт
+     комментариев больше, чем лайков, и это не ошибка данных: доля
+     комментирующих остаётся нормальной. Такой рилс обязан остаться в
+     рейтинге — иначе правило вырезает как раз тот формат, ради оценки
+     которого модуль и строился. */
+  const C2 = await page.evaluate(({ пуб }) => {
+    const п = (o) => Object.assign({}, пуб, o || {});
+    const ед = (o) => ctUnits({ id:'r', project_id:'p1', title:'о',
+      published_at:'2026-07-01T00:00:00Z',
+      payload:{ period:'МАЙ', posts:[], reels:[п(o)] } }, null)[0];
+    const розыгрыш = ед({ title:'розыгрыш', reach:57502, views:79437,
+      likes:150, comments:384, saves:257, shares:13 });
+    const опечатка = ед({ title:'опечатка', reach:51507, views:57502,
+      likes:384, comments:25765, saves:13, shares:45 });
+    return {
+      розыгрыш: { ok: розыгрыш.ok, tr: розыгрыш.tr, правила: розыгрыш.issues.map(i=>i.id) },
+      опечатка: { ok: опечатка.ok, tr: опечатка.tr, правила: опечатка.issues.map(i=>i.id) }
+    };
+  }, { пуб: пуб() });
+  ok('розыгрыш с комментариями больше лайков остаётся в рейтинге',
+      C2.розыгрыш.ok === true, C2.розыгрыш);
+  ok('потому что доля комментирующих у него нормальная',
+      C2.розыгрыш.tr < 5, C2.розыгрыш.tr);
+  ok('а опечатка отсеивается именно по невозможной доле',
+      C2.опечатка.ok === false && C2.опечатка.правила.indexOf('comments_gt_likes') >= 0
+      && C2.опечатка.tr > 5, C2.опечатка);
   ok('и ловится обоими правилами', C.опечатка.нарушения.indexOf('comments_gt_likes') >= 0
       && C.опечатка.нарушения.indexOf('rate_over_30') >= 0, C.опечатка.нарушения);
   ok('такая публикация индекса не получает', C.опечатка.безИндекса, C.опечатка);
@@ -315,7 +396,7 @@ const отчёт = (o) => Object.assign({
     if (typeof PROJECTS !== 'undefined' && !PROJECTS.filter(p => String(p.id) === 'p1').length) PROJECTS.push({ id: 'p1', name: 'Тест' });
     CT_RAW = [{ id: 'r1', project_id: 'p1', title: 'Отчёт', published_at: '2026-07-01T00:00:00Z',
       payload: { period: 'МАЙ', posts: [], reels: реалы, metrics: { followers: 40 } } }];
-    CT_SIG = ctSig();   // кэш принадлежит этому набору проектов, иначе он будет стёрт как чужой
+    CT_SIG = ctSig(); CT_AT = Date.now();   // кэш принадлежит этому набору проектов, иначе он будет стёрт как чужой
 
     const цветаНаВкладке = () => {
       const м = {};
@@ -381,7 +462,7 @@ const отчёт = (o) => Object.assign({
 
     /* Пустое состояние: ни одного отчёта. */
     const было = CT_RAW;
-    CT_RAW = []; CT_SIG = ctSig();
+    CT_RAW = []; CT_SIG = ctSig(); CT_AT = Date.now();
     CT.tab = 'content'; renderContentFx();
     const пусто = { есть: !!document.querySelector('#content-ag .cfx-empty'),
                     текст: (document.querySelector('#content-ag .cfx-empty b') || {}).textContent };
@@ -393,7 +474,7 @@ const отчёт = (o) => Object.assign({
     const пустоВ = { пусто: !!document.querySelector('#content-ag .cfx-empty'),
       находок: document.querySelectorAll('#content-ag .card.cfx-find').length,
       проДанные: /Данных не хватает/.test(document.getElementById('content-ag').textContent) };
-    CT_RAW = было; CT_SIG = ctSig(); CT.tab = 'content'; renderContentFx();
+    CT_RAW = было; CT_SIG = ctSig(); CT_AT = Date.now(); CT.tab = 'content'; renderContentFx();
 
     return { контент, рубрики, выводы, модалка, пусто, пустоР, пустоВ,
              вРеестре: AG_MODULES.content || null };
@@ -456,7 +537,7 @@ const отчёт = (o) => Object.assign({
     PROJECTS.length = 0;
     PROJECTS.push({ id: 'A1', name: 'А-один' }, { id: 'A2', name: 'А-два' });
     CT_RAW = [отчёт('A1', 'Альфа'), отчёт('A2', 'Бета')];
-    CT_SIG = ctSig();
+    CT_SIG = ctSig(); CT_AT = Date.now();
     CT.project = ''; CT.tab = 'content'; renderContentFx();
     const всеПрофили = ctState().units.length;
     CT.project = 'A1'; renderContentFx();          // фильтр профиля должен сужать
@@ -482,7 +563,7 @@ const отчёт = (o) => Object.assign({
     /* Второй рубеж: даже если отпечаток промахнётся и в кэше окажется чужая
        строка, до сборки она дойти не должна. */
     CT_RAW = [отчёт('A1', 'Альфа'), отчёт('B1', 'Гамма')];
-    CT_SIG = ctSig();
+    CT_SIG = ctSig(); CT_AT = Date.now();
     const рубеж = {
       публикаций: ctState().units.length,
       названия: ctState().units.map(u => u.title).join(' ')
@@ -513,12 +594,21 @@ const отчёт = (o) => Object.assign({
     const п = (o) => Object.assign({}, пуб, o || {});
     const запросы = [];
     const было = window.SB;
+    let наПроект = 3, сбой = null;
+    const строка = (id, i) => ({ id: 'r' + id + '_' + i, project_id: id, title: 'о' + i,
+      published_at: '2026-07-01T00:00:00Z',
+      payload: { period: 'П' + i, posts: [], reels: [п(), п(), п()] } });
+    /* Заглушка повторяет настоящую цепочку вызовов вместе с range: без него
+       проба проверяла бы запрос, которого модуль больше не делает. */
     window.SB = { from: (таблица) => ({
       select: () => ({ eq: (поле, знач) => ({ in: (поле2, ids) => ({
-        order: async () => { запросы.push({ таблица, знач, ids: ids.slice() });
-          return { data: ids.map((id,i)=>({ id:'r'+i, project_id:id, title:'о',
-            published_at:'2026-07-01T00:00:00Z',
-            payload:{ period:'МАЙ', posts:[], reels:[п(),п(),п()] } })), error: null }; }
+        order: () => ({ range: async (от, до) => {
+          запросы.push({ таблица, знач, ids: ids.slice(), от: от, до: до });
+          if(сбой) return { data: null, error: { message: сбой } };
+          const все = [];
+          ids.forEach(id => { for(let i = 0; i < наПроект; i++) все.push(строка(id, i)); });
+          return { data: все.slice(от, до + 1), error: null };
+        } })
       }) }) })
     }) };
 
@@ -526,18 +616,34 @@ const отчёт = (o) => Object.assign({
     ctReset();
     await ctLoad();
     const первая = { отпечаток: CT_SIG, устарел: ctStale(), строк: (CT_RAW||[]).length,
-                     спросили: запросы[0] ? запросы[0].ids : null };
+                     спросили: запросы[0] ? запросы[0].ids : null,
+                     страниц: запросы.length, времяЕсть: CT_AT > 0 };
 
     PROJECTS.length = 0; PROJECTS.push({ id: 'Y1', name: 'игрек' }, { id: 'Y2', name: 'игрек-два' });
     const послеСмены = { устарел: ctStale(), отпечатокСтарый: CT_SIG };
+    запросы.length = 0;
     await ctLoad();
     const вторая = { отпечаток: CT_SIG, устарел: ctStale(),
-                     спросили: запросы[1] ? запросы[1].ids : null };
+                     спросили: запросы[0] ? запросы[0].ids : null };
+
+    /* Тысяча строк — потолок одного ответа PostgREST. Архив крупнее обязан
+       дочитываться постранично, а не обрезаться молча. */
+    наПроект = 1500; запросы.length = 0;
+    PROJECTS.length = 0; PROJECTS.push({ id: 'Z1', name: 'зет' });
+    ctReset(); await ctLoad();
+    const архив = { строк: (CT_RAW||[]).length, страниц: запросы.length,
+                    диапазоны: запросы.map(з => з.от + '-' + з.до) };
+
+    /* Сбой чтения не имеет права выглядеть как «отчётов нет». */
+    наПроект = 3; сбой = 'нет доступа'; запросы.length = 0;
+    ctReset(); await ctLoad();
+    const ошибка = { текст: CT_ERR, строк: (CT_RAW||[]).length };
+    сбой = null;
 
     window.SB = было;
     PROJECTS.length = 0; PROJECTS.push({ id: 'p1', name: 'Тест' });
     ctReset();
-    return { первая, послеСмены, вторая, запросов: запросы.length };
+    return { первая, послеСмены, вторая, архив, ошибка };
   }, { пуб: пуб() });
 
   ok('загрузка спрашивает только проекты своего агентства',
@@ -548,6 +654,14 @@ const отчёт = (o) => Object.assign({
   ok('повторная загрузка спрашивает уже новый набор',
       JSON.stringify(F2.вторая.спросили) === JSON.stringify(['Y1', 'Y2']), F2.вторая);
   ok('и отпечаток обновляется', F2.вторая.отпечаток === 'Y1,Y2' && F2.вторая.устарел === false, F2.вторая);
+  ok('маленький архив читается одним запросом', F2.первая.страниц === 1 && F2.первая.строк === 3, F2.первая);
+  ok('время снимка запоминается', F2.первая.времяЕсть, F2.первая);
+  ok('архив больше тысячи строк дочитывается постранично',
+      F2.архив.строк === 1500 && F2.архив.страниц === 2, F2.архив);
+  ok('и страницы идут подряд, без пропусков',
+      F2.архив.диапазоны.join(' ') === '0-999 1000-1999', F2.архив.диапазоны);
+  ok('сбой чтения не выглядит как «отчётов нет»',
+      F2.ошибка.текст === 'нет доступа', F2.ошибка);
 
 
   /* ─────────────────────────────────────────────────────────────────────── */
@@ -561,7 +675,7 @@ const отчёт = (o) => Object.assign({
     PROJECTS.length = 0;
     PROJECTS.push({ id: 'P1', name: 'Первый' }, { id: 'P2', name: 'Второй' });
     CT_RAW = [отчёт('P1', 'МАЙ', 'а'), отчёт('P2', 'ИЮНЬ', 'б')];
-    CT_SIG = ctSig(); CT.project = ''; CT.period = ''; CT.kind = 'all';
+    CT_SIG = ctSig(); CT_AT = Date.now(); CT.project = ''; CT.period = ''; CT.kind = 'all';
     CT.tab = 'content'; renderContentFx();
 
     /* Меряем только на показанном кабинете: на скрытом все прямоугольники
@@ -687,7 +801,7 @@ const отчёт = (o) => Object.assign({
     PROJECTS.length = 0; PROJECTS.push({ id: 'p1', name: 'Тест' });
     CT_RAW = [{ id: 'r1', project_id: 'p1', title: 'о', published_at: '2026-07-01T00:00:00Z',
       payload: { period: 'МАЙ', posts: [], reels: рилсы } }];
-    CT_SIG = ctSig(); CT.project = ''; CT.period = ''; CT.kind = 'all'; CT.tab = 'content';
+    CT_SIG = ctSig(); CT_AT = Date.now(); CT.project = ''; CT.period = ''; CT.kind = 'all'; CT.tab = 'content';
 
     /* Замеры колонок имеют смысл только на показанном кабинете: на скрытом
        все прямоугольники нулевые и любое сравнение краёв сходится само. */
@@ -819,7 +933,7 @@ const отчёт = (o) => Object.assign({
     PROJECTS.length = 0; PROJECTS.push({ id: 'p1', name: 'Тест' });
     CT_RAW = [{ id:'r1', project_id:'p1', title:'о', published_at:'2026-07-01T00:00:00Z',
       payload: { period:'МАЙ', posts: [], reels: рилсы } }];
-    CT_SIG = ctSig(); CT.project=''; CT.period=''; CT.kind='all'; CT.sort='score';
+    CT_SIG = ctSig(); CT_AT = Date.now(); CT.project=''; CT.period=''; CT.kind='all'; CT.sort='score';
     CT.view='tiles'; CT.tab='content'; renderContentFx();
 
     const st = ctState();
@@ -854,7 +968,7 @@ const отчёт = (o) => Object.assign({
           payload:{ period:'X', posts:[], reels:[
             п({ title:'опечатка', reach:51507, views:57502, likes:384, comments:25765, saves:13, shares:45 }),
             п({ rubric:'B' }), п({ rubric:'B' }), п({ rubric:'B' })] } }];
-        CT_SIG = ctSig(); renderContentFx();
+        CT_SIG = ctSig(); CT_AT = Date.now(); renderContentFx();
         const плохая = ctState().units.filter(u => u.title === 'опечатка')[0];
         return { вердикт: плохая ? плохая.verdict : 'нет публикации',
                  наЭкране: !!document.querySelector('#content-ag .cfx-verd.off') };
@@ -912,7 +1026,7 @@ const отчёт = (o) => Object.assign({
     PROJECTS.length = 0; PROJECTS.push({ id: 'p1', name: 'Тест' });
     CT_RAW = [{ id:'r1', project_id:'p1', title:'о', published_at:'2026-07-01T00:00:00Z',
       payload: { period:'МАЙ', posts: [], reels: рилсы } }];
-    CT_SIG = ctSig(); CT.project=''; CT.period=''; CT.kind='all'; CT.sort='score';
+    CT_SIG = ctSig(); CT_AT = Date.now(); CT.project=''; CT.period=''; CT.kind='all'; CT.sort='score';
     CT.view='tiles'; CT.tab='content'; renderContentFx();
     document.querySelectorAll('#content-ag .rv').forEach(e => e.classList.add('in'));
 
@@ -1057,6 +1171,161 @@ const отчёт = (o) => Object.assign({
       Math.abs(Kh.высота - доНаведения.высота) < 0.5, [доНаведения.высота, Kh.высота]);
 
   /* ─────────────────────────────────────────────────────────────────────── */
+  console.log('[L] актуальность: публикация, правка и удаление отчёта');
+
+  /* Модуль показывает не «данные», а снимок момента загрузки. Если снимок не
+     обновляется, человек принимает решения по вчерашним цифрам и не знает об
+     этом — экран выглядит одинаково в обоих случаях. Поэтому проверяется весь
+     путь: событие из базы, собственная запись кабинета и просроченный снимок. */
+  await page.evaluate(() => {
+    const l = document.getElementById('page-login'), a = document.getElementById('app-ag');
+    if(l) l.classList.add('hidden'); if(a) a.classList.add('on');
+    /* Модуль обязан считать себя открытым — иначе перечитывать нечего. */
+    document.querySelectorAll('#app-ag .nav-i').forEach(n => n.classList.remove('on'));
+    const пункт = document.querySelector('#app-ag .nav-i[data-m="content"]');
+    if(пункт) пункт.classList.add('on');
+
+    window.__L = { запросов: 0, подписок: 0, обработчик: null, таблица: [] };
+    window.__SBбыл = window.SB;
+    const п = (o) => Object.assign({ title:'п', rubric:'A', cover:'', link:'',
+      views:2000, reach:1000, likes:50, comments:10, saves:5, shares:5, gain:2 }, o||{});
+    window.__L.отчёт = (id, названия) => ({ id: id, project_id: 'p1', title: 'отчёт ' + id,
+      published_at: '2026-07-0' + (id.length) + 'T00:00:00Z',
+      payload: { period: 'П' + id, posts: [],
+                 reels: названия.map(t => п({ title: t })) } });
+    window.__L.таблица = [ window.__L.отчёт('a', ['раз', 'два', 'три']) ];
+
+    window.SB = {
+      channel: () => ({
+        on: function(тип, фильтр, h){ window.__L.обработчик = h; return this; },
+        subscribe: function(){ window.__L.подписок++; return this; }
+      }),
+      from: () => ({ select: () => ({ eq: () => ({ in: () => ({
+        order: () => ({ range: async (от, до) => {
+          window.__L.запросов++;
+          return { data: window.__L.таблица.slice(от, до + 1), error: null };
+        } }) }) }) }) })
+    };
+    PROJECTS.length = 0; PROJECTS.push({ id: 'p1', name: 'Тест' });
+    /* Подписку могла открыть предыдущая секция на настоящем клиенте —
+       проверяем именно то, что модуль подписывается при загрузке. */
+    CT_RT = null;
+    ctReset();
+  });
+
+  await page.evaluate(async () => { await ctLoad(); CT.tab='content'; renderContentFx(); });
+  const L1 = await page.evaluate(() => ({
+    запросов: window.__L.запросов, подписок: window.__L.подписок,
+    публикаций: ctState().units.length,
+    обёрнуты: ['tReportAdd','tReportDel','tReportUpdate'].filter(n => window[n] && window[n].__ct).length,
+    времяНаЭкране: /данные на \d\d:\d\d:\d\d/.test(document.getElementById('content-ag').textContent)
+  }));
+  ok('модуль подписался на изменения отчётов', L1.подписок === 1, L1);
+  ok('первая загрузка прочитала отчёт', L1.запросов === 1 && L1.публикаций === 3, L1);
+  ok('все три записи отчётов перехвачены', L1.обёрнуты === 3, L1);
+  ok('время снимка показано человеку', L1.времяНаЭкране, L1);
+
+  /* 1. Опубликовали новый отчёт — событие из базы. */
+  await page.evaluate(() => {
+    window.__L.таблица.push(window.__L.отчёт('bb', ['четыре', 'пять']));
+    if(window.__L.обработчик) window.__L.обработчик({ eventType: 'INSERT' });
+  });
+  await page.waitForTimeout(1400);
+  const L2 = await page.evaluate(() => ({
+    запросов: window.__L.запросов, публикаций: ctState().units.length,
+    наЭкране: (document.getElementById('content-ag').textContent.match(/четыре/g)||[]).length
+  }));
+  ok('новый отчёт подхватывается без перезагрузки страницы',
+      L2.запросов === 2 && L2.публикаций === 5, L2);
+  ok('и его публикации сразу видны на экране', L2.наЭкране > 0, L2);
+
+  /* 2. Поток правок из редактора не превращается в поток запросов.
+     Редактор SMM сохраняет по ходу набора — события приходят вразбивку, а не
+     пачкой. Поэтому и в пробе они идут с паузами: залп в одном такте схлопнул
+     бы любой таймер, и проверка ничего бы не проверяла. */
+  await page.evaluate(async () => {
+    for(let i = 0; i < 6; i++){
+      if(window.__L.обработчик) window.__L.обработчик({ eventType:'UPDATE' });
+      await new Promise(r => setTimeout(r, 200));
+    }
+  });
+  await page.waitForTimeout(1400);
+  const L3 = await page.evaluate(() => ({ запросов: window.__L.запросов }));
+  ok('поток правок из редактора даёт один запрос, а не шесть', L3.запросов === 3, L3);
+
+  /* 3. Удалили отчёт. */
+  await page.evaluate(() => {
+    window.__L.таблица = window.__L.таблица.filter(r => r.id !== 'bb');
+    if(window.__L.обработчик) window.__L.обработчик({ eventType: 'DELETE' });
+  });
+  await page.waitForTimeout(1400);
+  const L4 = await page.evaluate(() => ({
+    публикаций: ctState().units.length,
+    наЭкране: (document.getElementById('content-ag').textContent.match(/четыре/g)||[]).length
+  }));
+  ok('удалённый отчёт исчезает с экрана', L4.публикаций === 3 && L4.наЭкране === 0, L4);
+
+  /* 4. Просроченный снимок обновляется сам, даже если событий не было. */
+  await page.evaluate(() => { CT_AT = Date.now() - 10*60*1000;
+    window.__L.таблица.push(window.__L.отчёт('ccc', ['шесть']));
+    renderContentFx(); });
+  await page.waitForTimeout(1200);
+  const L5 = await page.evaluate(() => ({ публикаций: ctState().units.length,
+    возраст: Date.now() - CT_AT }));
+  ok('снимок старше полутора минут перечитывается сам',
+      L5.публикаций === 4 && L5.возраст < 5000, L5);
+
+  /* 5. Перечитывание не гасит экран: старые цифры стоят, пока идут новые. */
+  const L6 = await page.evaluate(() => {
+    const было = document.getElementById('content-ag').textContent.length;
+    ctInvalidate();
+    const во_время = { кэш: CT_RAW !== null,
+                       длина: document.getElementById('content-ag').textContent.length };
+    return { было, во_время };
+  });
+  ok('во время обновления экран не пустеет',
+      L6.во_время.кэш && L6.во_время.длина === L6.было, L6);
+
+  /* 6. Модуль закрыт — обновлять нечего, кэш просто выбрасывается. */
+  await page.waitForTimeout(1200);
+  const L7 = await page.evaluate(async () => {
+    document.querySelectorAll('#app-ag .nav-i').forEach(n => n.classList.remove('on'));
+    const до = window.__L.запросов;
+    ctInvalidate();
+    await new Promise(r => setTimeout(r, 1100));
+    return { запросовДобавилось: window.__L.запросов - до, кэш: CT_RAW };
+  });
+  ok('у закрытого модуля обновление не жжёт сеть',
+      L7.запросовДобавилось === 0 && L7.кэш === null, L7);
+
+  /* Перерисовка умеет запускать дозагрузку, а дозагрузка — перерисовку. Если
+     отпечаток вдруг перестанет сходиться, эта пара уйдёт в бесконечный цикл и
+     положит базу запросами. Предохранитель обязан быть. */
+  const L8 = await page.evaluate(async () => {
+    document.querySelectorAll('#app-ag .nav-i').forEach(n => n.classList.remove('on'));
+    const п = document.querySelector('#app-ag .nav-i[data-m="content"]');
+    if(п) п.classList.add('on');
+    const настоящий = ctSig;
+    ctSig = () => 'каждый-раз-другой-' + (window.__L.запросов);   // отпечаток никогда не сходится
+    const до = window.__L.запросов;
+    ctReset(); renderContentFx();
+    await new Promise(r => setTimeout(r, 900));
+    const стало = window.__L.запросов - до;
+    ctSig = настоящий;
+    clearTimeout(CT_T); CT_T = null; ctReset();
+    return { запросов: стало };
+  });
+  ok('расхождение отпечатка не уводит модуль в бесконечную дозагрузку',
+      L8.запросов > 0 && L8.запросов <= 10, L8);
+
+  await page.evaluate(() => {
+    window.SB = window.__SBбыл; delete window.__SBбыл;
+    clearTimeout(CT_T); CT_T = null; CT_RT = null;
+    document.querySelectorAll('#app-ag .nav-i').forEach(n => n.classList.remove('on'));
+    ctReset();
+  });
+
+  /* ─────────────────────────────────────────────────────────────────────── */
   console.log('[E] вёрстка: три ширины, отсутствие горизонтальной прокрутки');
 
   for (const [ш, в] of [[390, 844], [1600, 1000], [2400, 1200]]) {
@@ -1098,7 +1367,7 @@ const отчёт = (o) => Object.assign({
     if (typeof PROJECTS !== 'undefined' && !PROJECTS.filter(x => String(x.id) === 'p1').length) PROJECTS.push({ id: 'p1', name: 'Тест' });
     CT_RAW = [{ id: 'r1', project_id: 'p1', title: 'о', published_at: '2026-07-01',
       payload: { period: 'X', posts: [], reels: [п({ rubric: 'A' }), п({ rubric: 'A' }), п({ rubric: 'B' }), п({ rubric: 'B' })] } }];
-    CT_SIG = ctSig();
+    CT_SIG = ctSig(); CT_AT = Date.now();
     CT.tab = 'content'; renderContentFx();
     const c = document.querySelector('#content-ag .cfx-kpi');
     const cs = c ? getComputedStyle(c) : null;
