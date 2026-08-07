@@ -320,7 +320,7 @@ const отчёт = (o) => Object.assign({
     const цветаНаВкладке = () => {
       const м = {};
       document.querySelectorAll('#content-ag [style*="--c:"]').forEach(e => {
-        const n = (e.querySelector('.ct-rubn b') || e.querySelector('.ct-rub') || {}).textContent;
+        const n = (e.querySelector('.cfx-rubn b') || e.querySelector('.cfx-rub') || {}).textContent;
         const c = (e.getAttribute('style').match(/--c:\s*([^;]+)/) || [])[1];
         if (n && c) м[n.trim()] = c.trim();
       });
@@ -331,47 +331,47 @@ const отчёт = (o) => Object.assign({
     const контент = {
       вкладок: document.querySelectorAll('#content-ag .team-tab').length,
       активна: (document.querySelector('#content-ag .team-tab.on') || {}).textContent,
-      честность: !!document.querySelector('#content-ag .ct-honest'),
-      плиток: document.querySelectorAll('#content-ag .ct-kpi').length,
-      диаграмма: document.querySelectorAll('#content-ag .ct-pt').length,
-      карточек: document.querySelectorAll('#content-ag .ct-grid .ct-cardu').length,
-      бейджей: document.querySelectorAll('#content-ag .ct-grid .ct-rank').length,
-      метрикНаКарточке: document.querySelectorAll('#content-ag .ct-grid .ct-cardu:first-child .ct-mets span').length,
-      заглушек: document.querySelectorAll('#content-ag .ct-noimg').length,
-      топАнтитоп: document.querySelectorAll('#content-ag .ct-tb .card').length,
+      честность: !!document.querySelector('#content-ag .cfx-honest'),
+      плиток: document.querySelectorAll('#content-ag .cfx-kpi').length,
+      диаграмма: document.querySelectorAll('#content-ag .cfx-pt').length,
+      карточек: document.querySelectorAll('#content-ag .cfx-grid .cfx-cardu').length,
+      бейджей: document.querySelectorAll('#content-ag .cfx-grid .cfx-rank').length,
+      метрикНаКарточке: document.querySelectorAll('#content-ag .cfx-grid .cfx-cardu:first-child .cfx-mets span').length,
+      заглушек: document.querySelectorAll('#content-ag .cfx-noimg').length,
+      топАнтитоп: document.querySelectorAll('#content-ag .cfx-tb .card').length,
       цвета: цветаНаВкладке()
     };
 
     CT.tab = 'rubrics'; renderContentFx();
     const рубрики = {
-      карточек: document.querySelectorAll('#content-ag .card.ct-rub').length,
-      сN: Array.from(document.querySelectorAll('#content-ag .ct-rubn span')).map(e => e.textContent),
-      бейджиДоверия: document.querySelectorAll('#content-ag .ct-rubh .ct-badge').length,
-      сырое: document.querySelectorAll('#content-ag .ct-rubv .raw').length,
-      малые: document.querySelectorAll('#content-ag .ct-lowc').length,
-      матрица: !!document.querySelector('#content-ag .ct-mx'),
+      карточек: document.querySelectorAll('#content-ag .card.cfx-rub').length,
+      сN: Array.from(document.querySelectorAll('#content-ag .cfx-rubn span')).map(e => e.textContent),
+      бейджиДоверия: document.querySelectorAll('#content-ag .cfx-rubh .cfx-badge').length,
+      сырое: document.querySelectorAll('#content-ag .cfx-rubv .raw').length,
+      малые: document.querySelectorAll('#content-ag .cfx-lowc').length,
+      матрица: !!document.querySelector('#content-ag .cfx-mx'),
       цвета: цветаНаВкладке()
     };
 
     CT.tab = 'findings'; renderContentFx();
     const выводы = {
-      находок: document.querySelectorAll('#content-ag .card.ct-find').length,
-      сДоказательством: document.querySelectorAll('#content-ag .card.ct-find .ct-block .ct-lbl').length,
-      сРекомендацией: document.querySelectorAll('#content-ag .card.ct-find .ct-block.ac').length,
-      уверенность: Array.from(document.querySelectorAll('#content-ag .ct-fh .ct-badge')).map(e => e.textContent),
-      миниатюр: document.querySelectorAll('#content-ag .ct-ev').length
+      находок: document.querySelectorAll('#content-ag .card.cfx-find').length,
+      сДоказательством: document.querySelectorAll('#content-ag .card.cfx-find .cfx-block .cfx-lbl').length,
+      сРекомендацией: document.querySelectorAll('#content-ag .card.cfx-find .cfx-block.ac').length,
+      уверенность: Array.from(document.querySelectorAll('#content-ag .cfx-fh .cfx-badge')).map(e => e.textContent),
+      миниатюр: document.querySelectorAll('#content-ag .cfx-ev').length
     };
 
     /* Карточка публикации: пять разделов и веса на виду. */
     CT.tab = 'content'; renderContentFx();
-    const первая = document.querySelector('#content-ag .ct-grid .ct-cardu');
+    const первая = document.querySelector('#content-ag .cfx-grid .cfx-cardu');
     let модалка = null;
     if (первая) {
       первая.click();
-      const м = document.querySelector('.ct-modal');
+      const м = document.querySelector('.cfx-modal');
       if (м) модалка = {
-        разделов: м.querySelectorAll('.ct-msec').length,
-        подписи: Array.from(м.querySelectorAll('.ct-msec .ct-lbl')).map(e => e.textContent),
+        разделов: м.querySelectorAll('.cfx-msec').length,
+        подписи: Array.from(м.querySelectorAll('.cfx-msec .cfx-lbl')).map(e => e.textContent),
         весаВидны: /веса:/.test(м.textContent),
         перцентиль: /выше \d+ % публикаций/.test(м.textContent),
         проСсылку: /Ссылка не заполнена/.test(м.textContent)
@@ -383,15 +383,15 @@ const отчёт = (o) => Object.assign({
     const было = CT_RAW;
     CT_RAW = []; CT_SIG = ctSig();
     CT.tab = 'content'; renderContentFx();
-    const пусто = { есть: !!document.querySelector('#content-ag .ct-empty'),
-                    текст: (document.querySelector('#content-ag .ct-empty b') || {}).textContent };
+    const пусто = { есть: !!document.querySelector('#content-ag .cfx-empty'),
+                    текст: (document.querySelector('#content-ag .cfx-empty b') || {}).textContent };
     CT.tab = 'rubrics'; renderContentFx();
-    const пустоР = !!document.querySelector('#content-ag .ct-empty');
+    const пустоР = !!document.querySelector('#content-ag .cfx-empty');
     CT.tab = 'findings'; renderContentFx();
     /* На выводах пустоты быть не должно: отсутствие данных — само по себе
        вывод, и он полезнее пустого экрана. */
-    const пустоВ = { пусто: !!document.querySelector('#content-ag .ct-empty'),
-      находок: document.querySelectorAll('#content-ag .card.ct-find').length,
+    const пустоВ = { пусто: !!document.querySelector('#content-ag .cfx-empty'),
+      находок: document.querySelectorAll('#content-ag .card.cfx-find').length,
       проДанные: /Данных не хватает/.test(document.getElementById('content-ag').textContent) };
     CT_RAW = было; CT_SIG = ctSig(); CT.tab = 'content'; renderContentFx();
 
@@ -549,6 +549,230 @@ const отчёт = (o) => Object.assign({
       JSON.stringify(F2.вторая.спросили) === JSON.stringify(['Y1', 'Y2']), F2.вторая);
   ok('и отпечаток обновляется', F2.вторая.отпечаток === 'Y1,Y2' && F2.вторая.устарел === false, F2.вторая);
 
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  console.log('[G] ряд управления: списки, а не три ряда кнопок');
+
+  const G = await page.evaluate(({ пуб }) => {
+    const п = (o) => Object.assign({}, пуб, o || {});
+    const отчёт = (pid, per, t) => ({ id: 'r-' + pid + per, project_id: pid, title: 'о',
+      published_at: '2026-07-01T00:00:00Z',
+      payload: { period: per, posts: [], reels: [п({ title: t }), п({ title: t + '2' }), п({ title: t + '3' })] } });
+    PROJECTS.length = 0;
+    PROJECTS.push({ id: 'P1', name: 'Первый' }, { id: 'P2', name: 'Второй' });
+    CT_RAW = [отчёт('P1', 'МАЙ', 'а'), отчёт('P2', 'ИЮНЬ', 'б')];
+    CT_SIG = ctSig(); CT.project = ''; CT.period = ''; CT.kind = 'all';
+    CT.tab = 'content'; renderContentFx();
+
+    /* Меряем только на показанном кабинете: на скрытом все прямоугольники
+       нулевые, и проверка «стоят в одну строку» проходила бы на пустом месте. */
+    const _login = document.getElementById('page-login');
+    const _app = document.getElementById('app-ag');
+    const _былСкрыт = _login ? _login.classList.contains('hidden') : true;
+    const _былВключён = _app ? _app.classList.contains('on') : true;
+    if(_login) _login.classList.add('hidden');
+    if(_app) _app.classList.add('on');
+
+    const бар = document.querySelector('#content-ag .cfx-bar');
+    const списки = бар ? [].slice.call(бар.querySelectorAll('.cfx-dd')) : [];
+    /* Одного «одинакового верха» мало: если списки схлопнутся в нулевую
+       ширину, верх у них тоже совпадёт, и проверка пройдёт на пустом месте.
+       Смотрим ещё ширину и то, что они идут слева направо. */
+    const короб = списки.map(d => d.getBoundingClientRect());
+    const верх = короб.map(r => Math.round(r.top));
+    const ширины = короб.map(r => Math.round(r.width));
+    const слеваНаправо = короб.every((r, i) => i === 0 || r.left > короб[i-1].left);
+
+    /* Выбор в списке обязан менять состояние, а не только подпись. */
+    const кнопка = списки[0].querySelector('.dd-menu .dd-opt:nth-child(2)');
+    кнопка.click();
+    const послеВыбора = { проект: CT.project, публикаций: ctState().units.length,
+      подпись: (document.querySelector('#content-ag .cfx-dd .dd-v') || {}).textContent,
+      подсвечен: !!document.querySelector('#content-ag .cfx-dd.picked') };
+
+    ctPick('project', '');
+    const сброшено = !document.querySelector('#content-ag .cfx-dd.picked');
+
+    /* Открытое меню уносится порталом в body; перерисовка не должна оставить
+       его сиротой поверх экрана. */
+    selToggle('cfx-period');
+    const открыто = !!document.querySelector('body > .dd-menu.dd-portal');
+    renderContentFx();
+    const осиротело = !!document.querySelector('body > .dd-menu.dd-portal');
+
+    if(_login && !_былСкрыт) _login.classList.remove('hidden');
+    if(_app && !_былВключён) _app.classList.remove('on');
+
+    return {
+      рядов: бар ? 1 : 0,
+      списков: списки.length,
+      вОдномРяду: верх.length > 1 && верх.every(v => v === верх[0]),
+      ширины: ширины, слеваНаправо: слеваНаправо,
+      подписейРядов: document.querySelectorAll('#content-ag .cfx-flbl').length,
+      лид: document.querySelectorAll('#content-ag .cfx-lead').length,
+      порог: !!бар.querySelector('.cfx-tog'),
+      послеВыбора, сброшено, открыто, осиротело,
+      высота: бар ? Math.round(бар.getBoundingClientRect().height) : null
+    };
+  }, { пуб: пуб() });
+
+  ok('ряд управления один', G.рядов === 1, G);
+  ok('три выпадающих списка', G.списков === 3, G.списков);
+  ok('и все стоят в одну строку', G.вОдномРяду, G);
+  ok('каждый список видим и имеет ширину', G.ширины.every(w => w >= 90), G.ширины);
+  ok('и они идут слева направо, а не друг под другом', G.слеваНаправо, G);
+  ok('ряд не выше одной строки контролов', G.высота != null && G.высота <= 46, G.высота);
+  ok('подписей рядов не осталось', G.подписейРядов === 0, G.подписейРядов);
+  ok('вводной строки не осталось', G.лид === 0, G.лид);
+  ok('порог зрелости остался переключателем', G.порог, G.порог);
+  ok('выбор в списке меняет состояние модуля', G.послеВыбора.проект === 'P1', G.послеВыбора);
+  ok('и сужает выборку', G.послеВыбора.публикаций === 3, G.послеВыбора);
+  ok('подпись кнопки показывает выбранное', G.послеВыбора.подпись === 'Первый', G.послеВыбора);
+  ok('включённый фильтр виден, не открывая список', G.послеВыбора.подсвечен, G.послеВыбора);
+  ok('сброс снимает подсветку', G.сброшено, G.сброшено);
+  ok('меню действительно уходит в портал', G.открыто, G);
+  ok('перерисовка не оставляет меню сиротой', !G.осиротело, G);
+
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  console.log('[H] имена классов модуля никому не мешают');
+
+  /* Префикс ct- в кабинете уже занят: кнопка контактов носит класс ct-chip,
+     и правило модуля .ct-chip{height:38px} ломало ей высоту в панели вкладок
+     проекта — вкладки переставали быть одной строкой. Проверка следит, чтобы
+     ни один класс модуля не встречался в остальном файле. */
+  const H = await page.evaluate(async () => {
+    const текст = await (await fetch('/index.html')).text();
+    const iC = текст.indexOf('##CT-CSS-START##'), jC = текст.indexOf('##CT-CSS-END##');
+    const iJ = текст.indexOf('##CT-JS-START##'), jJ = текст.indexOf('##CT-JS-END##');
+    if (iC < 0 || iJ < 0) return { ошибка: 'блоки модуля не найдены' };
+    const свой = текст.slice(iC, jC);
+    const чужое = текст.slice(0, iC) + текст.slice(jC, iJ) + текст.slice(jJ);
+
+    /* Компоненты кабинета, которые модуль оформляет намеренно. Всё остальное
+       с дефисом в имени обязано носить его собственный префикс. */
+    const общие = ['card', 'card-h', 'card-body', 'dd-btn', 'dd-menu', 'dd-opt', 'dd-v',
+      'modal-h', 'modal-b', 'modal-f', 'btn-add', 'btn-ghost', 'team-tab', 'team-tabs',
+      'tabs-row', 'dd-portal'];
+
+    /* Только составные имена: односложные (on, in, v, l) в правилах модуля
+       всегда стоят вложенными и владельцем ничего не считают. */
+    const все = Array.from(new Set((свой.match(/\.[a-z][a-z0-9]*(?:-[a-z0-9]+)+/g) || [])
+      .map(s => s.slice(1))));
+    const мои = все.filter(c => общие.indexOf(c) < 0);
+    const столкновения = мои.filter(c => {
+      const re = new RegExp('class="[^"]*\\b' + c + '\\b|\\.' + c + '\\b');
+      return re.test(чужое);
+    });
+    return { классов: мои.length, столкновения: столкновения,
+             безПрефикса: мои.filter(c => c.indexOf('cfx-') !== 0) };
+  });
+
+  ok('классы модуля вообще нашлись', H.классов > 40, H);
+  ok('ни один класс модуля не встречается в остальном кабинете',
+      H.столкновения && H.столкновения.length === 0, H.столкновения);
+  ok('все собственные классы носят префикс модуля', H.безПрефикса && H.безПрефикса.length === 0, H.безПрефикса);
+
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  console.log('[I] сортировка: просмотры, акцент и колонки таблицы');
+
+  const I = await page.evaluate(({ пуб }) => {
+    const п = (o) => Object.assign({}, пуб, o || {});
+    const рилсы = [];
+    for (let i = 0; i < 6; i++) рилсы.push(п({
+      title: 'ролик ' + (i + 1), rubric: i % 2 ? 'A' : 'B',
+      reach: 1000 * (i + 1), views: 9000 - i * 700,      // просмотры намеренно против охвата
+      likes: 40 + i * 9, comments: 6 + i * 2, saves: 3 + i, shares: 2 + i, gain: 1 + i }));
+    PROJECTS.length = 0; PROJECTS.push({ id: 'p1', name: 'Тест' });
+    CT_RAW = [{ id: 'r1', project_id: 'p1', title: 'о', published_at: '2026-07-01T00:00:00Z',
+      payload: { period: 'МАЙ', posts: [], reels: рилсы } }];
+    CT_SIG = ctSig(); CT.project = ''; CT.period = ''; CT.kind = 'all'; CT.tab = 'content';
+
+    /* Замеры колонок имеют смысл только на показанном кабинете: на скрытом
+       все прямоугольники нулевые и любое сравнение краёв сходится само. */
+    const _login = document.getElementById('page-login');
+    const _app = document.getElementById('app-ag');
+    const _былСкрыт = _login ? _login.classList.contains('hidden') : true;
+    const _былВключён = _app ? _app.classList.contains('on') : true;
+    if(_login) _login.classList.add('hidden');
+    if(_app) _app.classList.add('on');
+
+    const чипы = () => [].slice.call(document.querySelectorAll('#content-ag .cfx-ctrls .cfx-chip'))
+      .map(b => b.textContent);
+
+    CT.sort = 'score'; CT.view = 'tiles'; renderContentFx();
+    const поИндексу = {
+      чипы: чипы(),
+      перваяМетрика: (document.querySelector('#content-ag .cfx-grid .cfx-mets span i') || {}).textContent,
+      акцентов: document.querySelectorAll('#content-ag .cfx-grid .cfx-cardu:first-child .cfx-mets span.on').length,
+      метрик: document.querySelectorAll('#content-ag .cfx-grid .cfx-cardu:first-child .cfx-mets span').length
+    };
+
+    CT.sort = 'views'; renderContentFx();
+    const карт = [].slice.call(document.querySelectorAll('#content-ag .cfx-grid .cfx-cardu'));
+    const поПросмотрам = {
+      перваяМетрика: (карт[0].querySelector('.cfx-mets span i') || {}).textContent,
+      акцентНаПервой: карт[0].querySelector('.cfx-mets span').classList.contains('on'),
+      значение: карт[0].querySelector('.cfx-mets span').textContent,
+      порядок: карт.map(c => (c.querySelector('.cfx-title') || {}).textContent)
+    };
+
+    CT.view = 'table'; renderContentFx();
+    const таб = document.querySelector('#content-ag .cfx-list');
+    const шапка = [].slice.call(таб.querySelectorAll('thead th'));
+    const перваяСтрока = [].slice.call(таб.querySelectorAll('tbody tr:first-child td'));
+    /* Заголовок и данные обязаны стоять в одной колонке: сравниваем правый
+       край у числовых и левый у текстовых. */
+    const совпали = шапка.every((th, i) => {
+      const td = перваяСтрока[i]; if (!td) return false;
+      const a = th.getBoundingClientRect(), b = td.getBoundingClientRect();
+      const коробка = th.classList.contains('n')
+        ? Math.abs(a.right - b.right) < 2
+        : Math.abs(a.left - b.left) < 2;
+      /* Совпадения коробок мало: у ячейки и заголовка может быть разное
+         выравнивание текста внутри одной и той же колонки, и тогда шапка
+         стоит слева, а данные уезжают вправо. */
+      const текст = getComputedStyle(th).textAlign === getComputedStyle(td).textAlign;
+      return коробка && текст;
+    });
+    const таблица = {
+      колонок: шапка.length,
+      ячеек: перваяСтрока.length,
+      заголовки: шапка.map(th => th.textContent),
+      совпали: совпали,
+      номерУзкий: Math.round(шапка[0].getBoundingClientRect().width),
+      выделеннаяШапка: (таб.querySelector('thead th.sel') || {}).textContent,
+      выделенныхЯчеек: таб.querySelectorAll('tbody tr:first-child td.sel').length
+    };
+
+    CT.sort = 'score'; CT.view = 'tiles'; renderContentFx();
+    if(_login && !_былСкрыт) _login.classList.remove('hidden');
+    if(_app && !_былВключён) _app.classList.remove('on');
+    return { поИндексу, поПросмотрам, таблица };
+  }, { пуб: пуб() });
+
+  ok('в сортировке есть просмотры', I.поИндексу.чипы.indexOf('Просмотры') >= 0, I.поИндексу.чипы);
+  ok('и стоят сразу за охватом',
+      I.поИндексу.чипы.indexOf('Просмотры') === I.поИндексу.чипы.indexOf('Охват') + 1, I.поИндексу.чипы);
+  ok('на карточке по-прежнему четыре метрики', I.поИндексу.метрик === 4, I.поИндексу);
+  ok('и ровно одна из них подсвечена', I.поИндексу.акцентов === 1, I.поИндексу);
+  ok('при сортировке по просмотрам они выходят на карточку первыми',
+      I.поПросмотрам.перваяМетрика === 'Просм.', I.поПросмотрам);
+  ok('и подсвечены', I.поПросмотрам.акцентНаПервой, I.поПросмотрам);
+  ok('порядок карточек — по просмотрам, а не по охвату',
+      I.поПросмотрам.порядок[0] === 'ролик 1' && I.поПросмотрам.порядок[5] === 'ролик 6',
+      I.поПросмотрам.порядок);
+  ok('в таблице столько же ячеек, сколько заголовков',
+      I.таблица.колонок === I.таблица.ячеек && I.таблица.колонок === 10, I.таблица);
+  ok('колонка просмотров в таблице есть', I.таблица.заголовки.indexOf('Просмотры') >= 0, I.таблица.заголовки);
+  ok('заголовки стоят ровно над своими данными', I.таблица.совпали, I.таблица);
+  ok('колонка номера узкая, а не в треть экрана',
+      I.таблица.номерУзкий > 20 && I.таблица.номерУзкий < 90, I.таблица.номерУзкий);
+  ok('колонка, по которой ранжируем, подсвечена в шапке',
+      I.таблица.выделеннаяШапка === 'Просмотры', I.таблица);
+  ok('и в данных', I.таблица.выделенныхЯчеек === 1, I.таблица);
+
   /* ─────────────────────────────────────────────────────────────────────── */
   console.log('[E] вёрстка: три ширины, отсутствие горизонтальной прокрутки');
 
@@ -574,7 +798,7 @@ const отчёт = (o) => Object.assign({
     const i = весь.indexOf('##CT-CSS-START##');
     const блок = i < 0 ? '' : весь.slice(i, весь.indexOf('##CT-CSS-END##'));
     const m = блок.match(/@media\s*\(prefers-reduced-motion:reduce\)\{[\s\S]*?\n\}/);
-    return !!m && /ct-cardu/.test(m[0]) && /ct-kpi/.test(m[0]);
+    return !!m && /cfx-cardu/.test(m[0]) && /cfx-kpi/.test(m[0]);
   });
   ok('анимации выключаются при prefers-reduced-motion', M, M);
 
@@ -593,7 +817,7 @@ const отчёт = (o) => Object.assign({
       payload: { period: 'X', posts: [], reels: [п({ rubric: 'A' }), п({ rubric: 'A' }), п({ rubric: 'B' }), п({ rubric: 'B' })] } }];
     CT_SIG = ctSig();
     CT.tab = 'content'; renderContentFx();
-    const c = document.querySelector('#content-ag .ct-kpi');
+    const c = document.querySelector('#content-ag .cfx-kpi');
     const cs = c ? getComputedStyle(c) : null;
     return { видна: cs ? (cs.opacity === '1') : null, безСдвига: cs ? (cs.transform === 'none') : null };
   }, { пуб: пуб() });
