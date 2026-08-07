@@ -338,7 +338,7 @@ const отчёт = (o) => Object.assign({
       бейджей: document.querySelectorAll('#content-ag .cfx-grid .cfx-rank').length,
       метрикНаКарточке: document.querySelectorAll('#content-ag .cfx-grid .cfx-cardu:first-child .cfx-mets span').length,
       заглушек: document.querySelectorAll('#content-ag .cfx-noimg').length,
-      топАнтитоп: document.querySelectorAll('#content-ag .cfx-tb .card').length,
+      полюсов: document.querySelectorAll('#content-ag .cfx-pol .cfx-plg').length,
       цвета: цветаНаВкладке()
     };
 
@@ -408,7 +408,7 @@ const отчёт = (o) => Object.assign({
   ok('у каждой карточки ранговый бейдж', D.контент.бейджей === 8, D.контент.бейджей);
   ok('на карточке ровно четыре метрики', D.контент.метрикНаКарточке === 4, D.контент.метрикНаКарточке);
   ok('без обложки рисуется заглушка, а не битая картинка', D.контент.заглушек > 0, D.контент.заглушек);
-  ok('топ и антитоп стоят рядом', D.контент.топАнтитоп === 2, D.контент.топАнтитоп);
+  ok('полюса показаны двумя группами', D.контент.полюсов === 2, D.контент.полюсов);
   ok('рубрики нарисованы карточками', D.рубрики.карточек >= 2, D.рубрики.карточек);
   ok('у каждой рубрики видно n', D.рубрики.сN.length === D.рубрики.карточек
       && D.рубрики.сN.every(t => /публикац/.test(t)), D.рубрики.сN);
@@ -714,7 +714,14 @@ const отчёт = (o) => Object.assign({
     const поПросмотрам = {
       перваяМетрика: (карт[0].querySelector('.cfx-mets span i') || {}).textContent,
       перваяЗначение: (карт[0].querySelector('.cfx-mets span b') || {}).textContent,
-      акцентНаПервой: карт[0].querySelector('.cfx-mets span').classList.contains('on'),
+      /* Класс на элементе — ещё не подсветка: без правила в таблице стилей
+         акцент существует только в разметке, а человек его не видит. */
+      акцентНаПервой: (function(){
+        const с = карт[0].querySelectorAll('.cfx-mets span');
+        if(!с[0] || !с[1] || !с[0].classList.contains('on')) return false;
+        return getComputedStyle(с[0].querySelector('b')).color
+             !== getComputedStyle(с[1].querySelector('b')).color;
+      })(),
       значение: карт[0].querySelector('.cfx-mets span').textContent,
       порядок: карт.map(c => (c.querySelector('.cfx-title') || {}).textContent)
     };
@@ -875,6 +882,179 @@ const отчёт = (o) => Object.assign({
   ok('индекс вынесен отдельно', /^\d+$/.test(J.наЭкране.индекс || ''), J.наЭкране.индекс);
   ok('публикация с испорченными данными вердикта не получает',
       J.безОценки.вердикт === null && J.безОценки.наЭкране, J.безОценки);
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  console.log('[K] полюса месяца: где лучшее и где худшее — без чтения');
+
+  /* Блок сообщает контраст. Если по картинке нельзя за секунду сказать, какая
+     половина хорошая, блок не работает — сколько бы правильных чисел в нём ни
+     стояло. Поэтому здесь проверяется именно различимость: подпись, цвет
+     кромки, цвет номера. Одного сигнала мало: цвет не читают дальтоники,
+     подпись пропускают взглядом, — поэтому их три и все обязаны быть. */
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const K = await page.evaluate(({ пуб }) => {
+    const п = (o) => Object.assign({}, пуб, o || {});
+    const _login = document.getElementById('page-login');
+    const _app = document.getElementById('app-ag');
+    const _былСкрыт = _login ? _login.classList.contains('hidden') : true;
+    const _былВкл = _app ? _app.classList.contains('on') : false;
+    if(_login) _login.classList.add('hidden');
+    if(_app) _app.classList.add('on');
+
+    /* Восемь публикаций со строго убывающим качеством: порядок известен
+       заранее, значит известны и номера мест в обеих группах. */
+    const рилсы = Array.from({ length: 8 }, (_, i) => п({
+      title: 'кадр ' + (i + 1),
+      reach: 10000 - i * 900, views: 20000 - i * 1500,
+      likes: 900 - i * 95, comments: 40 - i * 4, saves: 60 - i * 6,
+      shares: 50 - i * 5, gain: 30 - i * 3
+    }));
+    PROJECTS.length = 0; PROJECTS.push({ id: 'p1', name: 'Тест' });
+    CT_RAW = [{ id:'r1', project_id:'p1', title:'о', published_at:'2026-07-01T00:00:00Z',
+      payload: { period:'МАЙ', posts: [], reels: рилсы } }];
+    CT_SIG = ctSig(); CT.project=''; CT.period=''; CT.kind='all'; CT.sort='score';
+    CT.view='tiles'; CT.tab='content'; renderContentFx();
+    document.querySelectorAll('#content-ag .rv').forEach(e => e.classList.add('in'));
+
+    /* Эталонные цвета берём у самого кабинета, а не вписываем числами: тема
+       может смениться, и жёстко зашитый rgb превратит проверку в ложь. */
+    const эталон = (v) => {
+      const s = document.createElement('span');
+      s.style.color = 'var(' + v + ')'; s.style.position = 'absolute'; s.style.opacity = '0';
+      document.body.appendChild(s);
+      const c = getComputedStyle(s).color; s.remove(); return c;
+    };
+    const цвПоз = эталон('--pos'), цвНег = эталон('--neg');
+
+    const пол = document.querySelector('#content-ag .cfx-pol');
+    const гр = (к) => пол && пол.querySelector('.cfx-plg.' + к);
+    const кадры = (к) => гр(к) ? [].slice.call(гр(к).querySelectorAll('.cfx-plf')) : [];
+    const верхК = кадры('up'), низК = кадры('dn');
+    const пер = (e) => e ? getComputedStyle(e, '::before').backgroundColor : null;
+    /* Пробы обязаны краснеть, а не падать: если элемента нет, это результат
+       проверки, а не авария — иначе один переименованный класс уносит весь
+       прогон, и остальные проверки не выполняются вовсе. */
+    const стиль = (e, s, св) => { const x = e && e.querySelector(s);
+      return x ? getComputedStyle(x)[св] : null; };
+    const ном = (e) => стиль(e, '.cfx-pln', 'color');
+    const текст = (e, s) => (e && e.querySelector(s) || {}).textContent;
+    const пр = (e) => e ? e.getBoundingClientRect() : null;
+
+    const r = {
+      групп: пол ? пол.querySelectorAll('.cfx-plg').length : 0,
+      подписи: пол ? [].slice.call(пол.querySelectorAll('.cfx-plgh b')).map(x => x.textContent) : [],
+      пояснения: пол ? [].slice.call(пол.querySelectorAll('.cfx-plgh em')).map(x => x.textContent) : [],
+      кадровВерх: верхК.length, кадровНиз: низК.length,
+      места: пол ? [].slice.call(пол.querySelectorAll('.cfx-pln')).map(x => +x.textContent) : [],
+      названия: пол ? [].slice.call(пол.querySelectorAll('.cfx-plt')).map(x => x.textContent) : [],
+      шов: текст(пол, '.cfx-plsep span'),
+      /* Три сигнала различия. */
+      кромкаВерх: пер(верхК[0]), кромкаНиз: пер(низК[0]),
+      номерВерх: ном(верхК[0]),  номерНиз: ном(низК[0]),
+      подписьВерхЦвет: стиль(гр('up'), '.cfx-plgh b', 'color'),
+      подписьНизЦвет:  стиль(гр('dn'), '.cfx-plgh b', 'color'),
+      цвПоз: цвПоз, цвНег: цвНег,
+      /* Композиция: лучшее слева, худшее справа, шов между ними. */
+      слеваСправа: (function(){
+        const a = пр(гр('up')), b = пр(гр('dn')), s = пр(пол && пол.querySelector('.cfx-plsep'));
+        if(!a || !b || !s) return null;
+        return { поРяду: a.right <= s.left + 1 && s.right <= b.left + 1,
+                 наОднойВысоте: Math.abs(a.top - b.top) < 1,
+                 равныПоШирине: Math.abs(a.width - b.width) < 2 };
+      })(),
+      /* Кадры стоят встык: между соседними ни отступа, ни рамки шире волоса. */
+      встык: (function(){
+        if(верхК.length < 2) return null;
+        const a = пр(верхК[0]), b = пр(верхК[1]);
+        return b.left - a.right <= 1.5;
+      })(),
+      метрикНаКадре: верхК[0] ? верхК[0].querySelectorAll('.cfx-plm span').length : 0,
+      вердиктНаКадре: !!(верхК[0] && верхК[0].querySelector('.cfx-plv')),
+      панельСкрыта: стиль(верхК[0], '.cfx-plh', 'opacity'),
+      индексПодписан: текст(верхК[0], '.cfx-plx i'),
+      /* Классы витрины не должны существовать нигде, кроме своего блока. */
+      снаружи: document.querySelectorAll('#content-ag .cfx-plf').length - (верхК.length + низК.length),
+      шапкаНаходкиНаКонтенте: document.querySelectorAll('#content-ag .cfx-fh').length
+    };
+
+    CT.tab = 'findings'; renderContentFx();
+    r.витринаНаВыводах = document.querySelectorAll('#content-ag .cfx-plh').length;
+    r.шапкаНаходкиНаВыводах = document.querySelectorAll('#content-ag .cfx-fh').length;
+    CT.tab = 'content'; renderContentFx();
+    document.querySelectorAll('#content-ag .rv').forEach(e => e.classList.add('in'));
+
+    if(_login && !_былСкрыт) _login.classList.remove('hidden');
+    if(_app && !_былВкл) _app.classList.remove('on');
+    return r;
+  }, { пуб: пуб() });
+
+  ok('полюса собраны в две группы', K.групп === 2, K.групп);
+  ok('группы названы словами', K.подписи.join('|') === 'Лучшее|Худшее', K.подписи);
+  ok('и каждая говорит, какие это места', K.пояснения.length === 2
+      && /места 1–3/.test(K.пояснения[0] || '') && /места 6–8/.test(K.пояснения[1] || ''), K.пояснения);
+  ok('в каждой группе по три кадра', K.кадровВерх === 3 && K.кадровНиз === 3, [K.кадровВерх, K.кадровНиз]);
+  ok('номера мест сквозные по всему рейтингу',
+      K.места.join(',') === '1,2,3,6,7,8', K.места);
+  ok('слева действительно лучшие публикации',
+      K.названия.slice(0, 3).join('|') === 'кадр 1|кадр 2|кадр 3', K.названия);
+  ok('справа — худшие', K.названия.slice(3).join('|') === 'кадр 6|кадр 7|кадр 8', K.названия);
+  ok('шов называет, сколько осталось в середине',
+      K.шов === '2 публикации в середине', K.шов);
+
+  ok('сигнал 1: подпись группы окрашена — зелёная слева, красная справа',
+      K.подписьВерхЦвет === K.цвПоз && K.подписьНизЦвет === K.цвНег,
+      [K.подписьВерхЦвет, K.подписьНизЦвет, K.цвПоз, K.цвНег]);
+  ok('сигнал 2: кромка кадра сплошная и того же цвета',
+      K.кромкаВерх === K.цвПоз && K.кромкаНиз === K.цвНег, [K.кромкаВерх, K.кромкаНиз]);
+  ok('сигнал 3: номер места окрашен так же',
+      K.номерВерх === K.цвПоз && K.номерНиз === K.цвНег, [K.номерВерх, K.номерНиз]);
+  ok('и верх с низом не совпадают ни по одному сигналу',
+      K.кромкаВерх !== K.кромкаНиз && K.номерВерх !== K.номерНиз
+      && K.подписьВерхЦвет !== K.подписьНизЦвет, K);
+
+  ok('лучшее слева, худшее справа, шов между ними',
+      K.слеваСправа && K.слеваСправа.поРяду, K.слеваСправа);
+  ok('группы симметричны: одна высота, одна ширина',
+      K.слеваСправа && K.слеваСправа.наОднойВысоте && K.слеваСправа.равныПоШирине, K.слеваСправа);
+  ok('кадры стоят встык, без рамок', K.встык === true, K.встык);
+  ok('на кадре четыре метрики и вердикт',
+      K.метрикНаКадре === 4 && K.вердиктНаКадре, [K.метрикНаКадре, K.вердиктНаКадре]);
+  ok('индекс на кадре подписан, а не голое число', K.индексПодписан === 'инд', K.индексПодписан);
+  ok('метрики не закрывают обложку, пока на неё не смотрят',
+      K.панельСкрыта === '0', K.панельСкрыта);
+  ok('классы витрины не встречаются вне блока полюсов', K.снаружи === 0, K.снаружи);
+  ok('шапка находки и панель кадра не делят один класс',
+      K.шапкаНаходкиНаКонтенте === 0 && K.витринаНаВыводах === 0 && K.шапкаНаходкиНаВыводах > 0,
+      [K.шапкаНаходкиНаКонтенте, K.витринаНаВыводах, K.шапкаНаходкиНаВыводах]);
+
+  /* Наведение — единственный способ увидеть числа, значит оно обязано
+     работать, а не просто быть описано в стилях. */
+  const доНаведения = await page.evaluate(() => {
+    const l = document.getElementById('page-login'), a = document.getElementById('app-ag');
+    if(l) l.classList.add('hidden'); if(a) a.classList.add('on');
+    const п = document.querySelector('#content-ag .cfx-pol');
+    const к = document.querySelector('#content-ag .cfx-pol .cfx-plg.up .cfx-plf');
+    return { высота: п.getBoundingClientRect().height, ширина: к.getBoundingClientRect().width };
+  });
+  await page.hover('#content-ag .cfx-pol .cfx-plg.up .cfx-plf');
+  await page.waitForTimeout(450);
+  const Kh = await page.evaluate(() => {
+    const п = document.querySelector('#content-ag .cfx-pol');
+    const к = document.querySelectorAll('#content-ag .cfx-pol .cfx-plg.up .cfx-plf');
+    const оп = (e) => { const x = e && e.querySelector('.cfx-plh');
+      return x ? getComputedStyle(x).opacity : null; };
+    return { подНаведением: оп(к[0]), соседняя: оп(к[1]),
+             высота: п.getBoundingClientRect().height,
+             ширина: к[0].getBoundingClientRect().width };
+  });
+  ok('под курсором метрики появляются', parseFloat(Kh.подНаведением) > 0.9, Kh);
+  ok('а на соседнем кадре остаются скрытыми', parseFloat(Kh.соседняя) === 0, Kh);
+  /* Кадр держит пропорцию 4/5: расширь его — вырастет высота всей полосы, и
+     страница под блоком дёрнется. Наведение не имеет права двигать вёрстку. */
+  ok('наведение не меняет размер кадра',
+      Math.abs(Kh.ширина - доНаведения.ширина) < 0.5, [доНаведения.ширина, Kh.ширина]);
+  ok('и не меняет высоту блока — страница под ним не прыгает',
+      Math.abs(Kh.высота - доНаведения.высота) < 0.5, [доНаведения.высота, Kh.высота]);
 
   /* ─────────────────────────────────────────────────────────────────────── */
   console.log('[E] вёрстка: три ширины, отсутствие горизонтальной прокрутки');
