@@ -451,11 +451,20 @@ const отчёт = (o) => Object.assign({
       первая.click();
       const м = document.querySelector('.cfx-modal');
       if (м) модалка = {
-        разделов: м.querySelectorAll('.cfx-msec').length,
-        подписи: Array.from(м.querySelectorAll('.cfx-msec .cfx-lbl')).map(e => e.textContent),
+        герой: !!м.querySelector('.cfx-pshero'),
+        вердикт: (м.querySelector('.cfx-psverd') || {}).textContent,
+        чисел: м.querySelectorAll('.cfx-psnums > div').length,
+        фраз: м.querySelectorAll('.cfx-pssay p').length,
+        первыеСлова: Array.from(м.querySelectorAll('.cfx-pssay p b')).map(e => e.textContent),
+        плиток: м.querySelectorAll('.cfx-pstile').length,
+        шкал: м.querySelectorAll('.cfx-pstile .cfx-psm').length,
+        подписиПлиток: Array.from(м.querySelectorAll('.cfx-pstn')).map(e => e.textContent),
         весаВидны: /веса:/.test(м.textContent),
-        перцентиль: /выше \d+ % публикаций/.test(м.textContent),
-        проСсылку: /Ссылка не заполнена/.test(м.textContent)
+        перцентиль: /выше (только )?\d+ %/.test(м.textContent),
+        проСсылку: /Ссылка не заполнена/.test(м.textContent),
+        /* Разбор обязан говорить о числах, а не «вообще»: в тексте должны
+           стоять те же величины, что и в плитках. */
+        числаВТексте: /\d/.test((м.querySelector('.cfx-pssay') || {}).textContent || '')
       };
       if (typeof pd2Close === 'function') pd2Close();
     }
@@ -510,10 +519,20 @@ const отчёт = (o) => Object.assign({
       && D.выводы.уверенность.every(t => /подтверждено|вероятно|предварительно/.test(t)), D.выводы.уверенность);
   ok('есть находки с кликабельными миниатюрами', D.выводы.миниатюр > 0, D.выводы.миниатюр);
   ok('карточка публикации открывается', !!D.модалка, D.модалка);
-  ok('в карточке четыре смысловых раздела', D.модалка && D.модалка.разделов === 4, D.модалка && D.модалка.подписи);
-  ok('разделы названы по целям, а не по типам метрик',
-      D.модалка && JSON.stringify(D.модалка.подписи) === JSON.stringify(['Охват', 'Вовлечение', 'Рост', 'Оценка']),
-      D.модалка && D.модалка.подписи);
+  ok('в досье есть шапка с вердиктом и двумя главными цифрами',
+      D.модалка && D.модалка.герой && D.модалка.чисел === 3, D.модалка);
+  ok('вердикт назван словом', D.модалка && /\S/.test(D.модалка.вердикт || ''), D.модалка);
+  ok('разбор объясняет тремя фразами', D.модалка && D.модалка.фраз === 3, D.модалка);
+  ok('и каждая фраза начинается с вывода, а не с числа',
+      D.модалка && D.модалка.первыеСлова.length === 3
+      && D.модалка.первыеСлова.every(s => /^[А-ЯЁ]/.test(s)), D.модалка && D.модалка.первыеСлова);
+  ok('разбор ссылается на конкретные числа', D.модалка && D.модалка.числаВТексте, D.модалка);
+  ok('восемь плиток метрик', D.модалка && D.модалка.плиток === 8, D.модалка);
+  ok('и у каждой сравнимой метрики своя шкала к медиане',
+      D.модалка && D.модалка.шкал >= 6, D.модалка);
+  ok('плитки названы понятными словами', D.модалка
+      && D.модалка.подписиПлиток.join(',') === 'Охват,Просмотры,ER,Лайки,Комментарии,Сохранения,Репосты,Подписки',
+      D.модалка && D.модалка.подписиПлиток);
   ok('веса индекса показаны человеку', D.модалка && D.модалка.весаВидны, D.модалка);
   ok('метрика показана вместе со своим местом в распределении', D.модалка && D.модалка.перцентиль, D.модалка);
   ok('отсутствие ссылки названо словами', D.модалка && D.модалка.проСсылку, D.модалка);
@@ -1151,7 +1170,9 @@ const отчёт = (o) => Object.assign({
     return { высота: п.getBoundingClientRect().height, ширина: к.getBoundingClientRect().width };
   });
   await page.hover('#content-ag .cfx-pol .cfx-plg.up .cfx-plf');
-  await page.waitForTimeout(450);
+  /* Панель проявляется за 260 мс. Ждём с запасом: на загруженной машине
+     переход не успевает, и проба краснеет на ровном месте. */
+  await page.waitForTimeout(900);
   const Kh = await page.evaluate(() => {
     const п = document.querySelector('#content-ag .cfx-pol');
     const к = document.querySelectorAll('#content-ag .cfx-pol .cfx-plg.up .cfx-plf');
