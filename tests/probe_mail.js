@@ -40,7 +40,10 @@ const seed = () => {
       if (el.id !== 'app-ag' && !/^(SCRIPT|STYLE|LINK|TEMPLATE)$/.test(el.tagName)) el.style.display = 'none';
     });
     window.LIVE = false; window.toast = t => { window.__toast = String(t); };
-    window.tMe = () => ({ id: 'u1', full_name: 'DTR', role: 'agency_owner', agency_id: 'AG' });
+    /* Почта — опциональный раздел: без включённого флага агентства она не
+       откроется вовсе, и проба смотрела бы на пустой экран. */
+    window.tMe = () => ({ id: 'u1', full_name: 'DTR', role: 'agency_owner', agency_id: 'AG',
+                          agencyModules: { mail: true } });
     window.ME = window.tMe();
     /* mlLoad ходит в сеть и сам перерисовывает экран — подменяем только
        поход, отрисовку оставляем настоящую. */

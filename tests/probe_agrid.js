@@ -19,7 +19,11 @@ const MODS = ['projects', 'deadlines', 'calendar', 'overview', 'cycles', 'financ
 const FULL = ['calc', 'mail'];
 
 const setup = () => {
-  window.__me = { id: 'u1', full_name: 'detroyd', role: 'agency_owner', agency_id: 'AG', agencySlug: 'probe' };
+  /* Опциональные разделы включаем все: проба меряет вёрстку, а не право
+     доступа, и выключенный раздел подсунул бы ей чужой экран. */
+  window.__me = { id: 'u1', full_name: 'detroyd', role: 'agency_owner', agency_id: 'AG', agencySlug: 'probe',
+    agencyModules: (typeof AG_MODULES_OPT !== 'undefined'
+      ? AG_MODULES_OPT.reduce((o, k) => (o[k] = true, o), {}) : {}) };
   window.tMe = () => window.__me; window.ME = window.__me;
   window.toast = () => {}; window.LIVE = false;
   window.agIsOwner = () => true; window.agIsPM = () => true; window.agIsDirector = () => true;

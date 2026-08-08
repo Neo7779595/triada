@@ -26,40 +26,88 @@ const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { f
   await page.waitForTimeout(1400);
 
   console.log('[A] раздела нет, пока его не включили');
+  /* Проверяем ВСЕ опциональные разделы, а не один названный: список растёт,
+     и раздел, добавленный в него завтра, обязан проходить тот же путь
+     «выключено → включено → выключено» без отдельной проверки под себя. */
   const M = await page.evaluate(() => {
     window.__me = { id: 'u1', role: 'agency_owner', agency_id: 'a1' }; window.tMe = () => window.__me;
-    const nav = () => document.querySelector('#app-ag .nav-i[data-m="finance"]');
-    const снимок = () => { applyAgencyPerms(); return {
-      выключен: agModuleOff('finance'),
-      пункт: nav() ? getComputedStyle(nav()).display : 'нет узла',
-      право: agCanView('finance'),
-      вПравах: _permKeys().indexOf('finance') >= 0 }; };
-    const ново = снимок();
-    window.__me.agencyModules = { finance: true };
-    const включено = снимок();
-    window.__me.agencyModules = {};
-    const обратно = снимок();
-    /* пустое поле и отсутствие поля — одно и то же: неизвестно значит нет */
-    window.__me.agencyModules = { finance: false };
-    const явноВыключено = снимок();
+    const снимок = (m) => { applyAgencyPerms();
+      const nav = document.querySelector('#app-ag .nav-i[data-m="' + m + '"]');
+      return {
+        выключен: agModuleOff(m),
+        пункт: nav ? getComputedStyle(nav).display : 'нет узла',
+        право: agCanView(m),
+        вПравах: _permKeys().indexOf(m) >= 0 }; };
+    const по = {};
+    AG_MODULES_OPT.forEach(m => {
+      delete window.__me.agencyModules;
+      const ново = снимок(m);
+      window.__me.agencyModules = {}; const пусто = снимок(m);
+      window.__me.agencyModules = {}; window.__me.agencyModules[m] = true;
+      const включено = снимок(m);
+      window.__me.agencyModules = {}; window.__me.agencyModules[m] = false;
+      const явноВыключено = снимок(m);
+      по[m] = { ново, пусто, включено, явноВыключено };
+    });
     delete window.__me.agencyModules;
-    return { ново, включено, обратно, явноВыключено,
+    return { по: по,
       опциональные: (typeof AG_MODULES_OPT !== 'undefined') ? AG_MODULES_OPT.slice() : null,
       обычныйНеОпционален: agModuleOff('projects') };
   });
+  const все = (ф) => Object.keys(M.по).every(m => ф(M.по[m]));
+  const кто = (ф) => Object.keys(M.по).filter(m => !ф(M.по[m]));
   ok('у нового агентства раздела нет: ни пункта, ни права, ни строки в правах',
-    M.ново.выключен === true && M.ново.пункт === 'none'
-    && M.ново.право === false && M.ново.вПравах === false, M.ново);
+    все(s => s.ново.выключен === true && s.ново.пункт === 'none'
+          && s.ново.право === false && s.ново.вПравах === false), кто(s => s.ново.выключен === true
+          && s.ново.пункт === 'none' && s.ново.право === false && s.ново.вПравах === false));
   ok('включили из генерального — раздел появился целиком',
-    M.включено.выключен === false && M.включено.пункт !== 'none'
-    && M.включено.право === true && M.включено.вПравах === true, M.включено);
+    все(s => s.включено.выключен === false && s.включено.пункт !== 'none'
+          && s.включено.право === true && s.включено.вПравах === true),
+    кто(s => s.включено.выключен === false && s.включено.пункт !== 'none'
+          && s.включено.право === true && s.включено.вПравах === true));
   ok('выключили — пропал так же целиком',
-    M.обратно.выключен === true && M.обратно.пункт === 'none' && M.обратно.вПравах === false, M.обратно);
+    все(s => s.пусто.выключен === true && s.пусто.пункт === 'none' && s.пусто.вПравах === false),
+    кто(s => s.пусто.выключен === true && s.пусто.пункт === 'none' && s.пусто.вПравах === false));
   ok('явно выключенный и никогда не включённый — одно и то же',
-    M.явноВыключено.выключен === true && M.явноВыключено.пункт === 'none', M.явноВыключено);
-  ok('опциональным помечен только тот раздел, который правда опционален',
-    Array.isArray(M.опциональные) && M.опциональные.join(',') === 'finance'
+    все(s => s.явноВыключено.выключен === true && s.явноВыключено.пункт === 'none'
+          && s.явноВыключено.пункт === s.ново.пункт),
+    кто(s => s.явноВыключено.выключен === true && s.явноВыключено.пункт === 'none'));
+  ok('опциональны ровно «Финансы» и «Почта», обычный раздел — нет',
+    Array.isArray(M.опциональные) && M.опциональные.join(',') === 'finance,mail'
     && M.обычныйНеОпционален === false, M.опциональные);
+
+  /* Раздел прячут не для красоты: выключенный он не должен открываться ни
+     одним путём. Пункт меню — только один из них; модуль умеют вызывать и
+     напрямую, из восстановленного состояния или перехода по уведомлению. */
+  const R = await page.evaluate(() => {
+    const host = document.getElementById('content-ag');
+    const проба = (флаг) => {
+      window.__me.agencyModules = флаг;
+      host.innerHTML = '<i id="метка"></i>';
+      try{ renderMail(); }catch(e){ return 'упало: ' + e.message; }
+      return document.getElementById('метка') ? 'не тронул' : 'нарисовал';
+    };
+    const выкл = проба({});
+    const вкл  = проба({ mail: true });
+    /* И навигация мимо меню. Выключенный раздел — не отказ в доступе:
+       сказать владельцу «нет доступа» к тому, что он сам и выключил, значит
+       соврать. Поэтому проверяем не только куда увело, но и что тоста нет. */
+    window.__me.agencyModules = {};
+    const прежнийToast = window.toast; let сказано = '';
+    window.toast = (s)=>{ сказано = String(s); };
+    agNav('team');                                   // уходим с проектов, чтобы переход было видно
+    agNav('mail');
+    window.toast = прежнийToast;
+    const кудаУвело = (document.querySelector('#app-ag .nav-i.on') || {}).dataset;
+    delete window.__me.agencyModules;
+    return { выкл, вкл, увело: кудаУвело ? кудаУвело.m : null, сказано: сказано };
+  });
+  ok('выключенная почта не рисуется даже прямым вызовом', R.выкл === 'не тронул', R);
+  ok('включённая — рисуется', R.вкл === 'нарисовал', R);
+  ok('переход на выключенный раздел уводит на проекты, а не в пустоту',
+    R.увело === 'projects', R);
+  ok('и не врёт про «нет доступа» к тому, что выключено самим владельцем',
+    R.сказано === '', R);
 
   console.log('[B] генеральный кабинет рисует те же разделы, что читает агентский');
   const G = await page.evaluate(() => {
