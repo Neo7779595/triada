@@ -374,6 +374,44 @@ const ПУБ = { title:'п', rubric:'Р', views:1000, reach:1000, likes:50, comm
   ok('модуль читает форматы ровно так же, как их видит редактор', I.сходится, I);
   ok('поле format реально записано в payload', I.естьПоле, I.естьПоле);
 
+  /* ── [K] презентация показывает весь контент ────────────────────────────── */
+  console.log('[K] презентация: лента больше не пропадает');
+  const K = await page.evaluate(() => {
+    const п = o => Object.assign({ rubric:'Р', views:1000, reach:1000, likes:50, comments:5, saves:10, shares:4, er:6.5 }, o);
+    openSMM({ id:'r3', project_id:'p1', title:'SMM', published_at:'2026-08-08',
+      payload:{ period:'МАЙ', metrics:{}, prev:{}, goals:{}, rubrics:[],
+        reels:[п({ title:'рилс', er:7.5 })],
+        posts:[п({ title:'кару', format:'carousel', er:9 }), п({ title:'пост', er:6 })] } });
+    _smmTab = 'preview'; smmRender();
+    const sec = document.getElementById('smm-reels-sec');
+    const текст = sec ? sec.textContent.replace(/\s+/g, ' ') : '';
+    const подписи = sec ? [].slice.call(sec.querySelectorAll('div'))
+      .map(e => e.textContent.trim())
+      .filter(t => /^(Топ · )?(Reels|Карусель|Публикация)$/.test(t)) : [];
+
+    /* Отчёт, где есть только лента, — заполненный: раньше smmHasData смотрел
+       на одни reels, и такой отчёт открывался на «Данных» как пустой. */
+    const толькоЛента = smmHasData({ payload:{ reels:[], posts:[п({ title:'п' })], rubrics:[], metrics:{} } });
+    const совсемПустой = smmHasData({ payload:{ reels:[], posts:[], rubrics:[], metrics:{} } });
+
+    /* Пустая презентация зовёт добавить публикации, а не Reels. */
+    openSMM({ id:'r4', project_id:'p1', title:'SMM', published_at:'2026-08-08',
+      payload:{ period:'МАЙ', metrics:{}, prev:{}, goals:{}, rubrics:[], reels:[], posts:[] } });
+    _smmTab = 'preview'; smmRender();
+    const пусто = (document.getElementById('smm-reels-sec') || {}).textContent || '';
+    return { есть: ['рилс','кару','пост'].map(t => текст.indexOf(t) >= 0),
+             подписи: подписи, толькоЛента: толькоЛента, совсемПустой: совсемПустой, пусто: пусто };
+  });
+  ok('в презентацию попали все три формата', K.есть.every(Boolean), K.есть);
+  ok('и у каждой карточки назван формат',
+      K.подписи.length === 3 && /Карусель/.test(K.подписи.join(',')) && /Публикация/.test(K.подписи.join(',')),
+      K.подписи);
+  ok('первая карточка помечена как топ', /^Топ · /.test(K.подписи[0] || ''), K.подписи[0]);
+  ok('отчёт из одной ленты считается заполненным', K.толькоЛента === true, K.толькоЛента);
+  ok('и пустой по-прежнему пустой', K.совсемПустой === false, K.совсемПустой);
+  ok('пустая презентация зовёт добавить публикации, а не Reels',
+      /Добавьте публикации/.test(K.пусто) && !/Reels/.test(K.пусто), K.пусто.slice(0, 90));
+
   ok('без ошибок на странице', errs.length === 0, errs.slice(0, 3));
   console.log('\n' + pass + ' ok · ' + fail + ' fail');
   await b.close();

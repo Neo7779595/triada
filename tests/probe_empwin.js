@@ -112,6 +112,17 @@ const setup = () => {
     await page.evaluate(() => document.getElementById('empw-c-perm').textContent) === '0/' + N, N);
   const groups = await page.evaluate(() => [...document.querySelectorAll('#e-perms .perm-gh')].map(e => e.textContent));
   ok('модули разбиты на группы', groups.join('|') === 'Работа|Аналитика|Агентство', groups);
+  /* Модуль без строки в этой сетке выдать нельзя вообще: пункт меню скрывается
+     по отсутствию права, а поставить право негде. Так «Эффективность контента»
+     и была невидима для всех, кроме владельца и директора. */
+  const ПОЛНЫЙ = ['projects','deadlines','calendar','overview','cycles','finance',
+                  'team','kpi','leaderboard','content','calc','kb','tools','mail','integrations'];
+  /* Сетка строится из _permKeys(), а незаписанные в группы ключи падают в
+     «Ещё» — значит строка гарантирована каждому ключу списка. Проверяем список. */
+  const К = await page.evaluate(() => ({ все: _permKeysAll() }));
+  ok('в правах есть строка на каждый модуль кабинета',
+      ПОЛНЫЙ.every(k => К.все.indexOf(k) >= 0) && К.все.length === ПОЛНЫЙ.length, К.все);
+  ok('и «Эффективность контента» среди них', К.все.indexOf('content') >= 0, К.все);
   ok('строк ровно по числу ключей', await page.evaluate(() => document.querySelectorAll('#e-perms .perm-row:not(.perm-sub)').length === _permKeys().length));
 
   /* У финансов есть ступень, которой нет больше ни у кого: финансист ведёт
