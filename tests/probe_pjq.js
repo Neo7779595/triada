@@ -144,12 +144,12 @@ const setup = () => {
     const c = window.__card('Artel');
     const byLbl = t => [...c.querySelectorAll('.pjh-card')].find(x => (x.querySelector('.pjh-lbl') || {}).textContent === t);
     const dl = byLbl('Дедлайн'), pace = byLbl('Темп'), life = byLbl('Срок жизни'), cx = byLbl('Сложность');
-    const smm = c.querySelector('.pjh-smm');
+    const smm = c.querySelector('.pjh-smm'), smmGo = c.querySelector('.pjh-smm-go');
     const pills = [...c.querySelectorAll('.pjh-pill')].map(x => x.getAttribute('onclick') || '');
     return { dl: { tag: dl.tagName, click: dl.getAttribute('onclick') || '', go: !!dl.querySelector('.pjh-go-c') },
       pace: { tag: pace.tagName, click: pace.getAttribute('onclick') || '' },
-      life: life.tagName, cx: cx.tagName,
-      smm: { tag: smm.tagName, click: smm.getAttribute('onclick') || '', go: !!smm.querySelector('.pjh-go-c') },
+      life: life.tagName, cx: cx.tagName, cxClick: cx.getAttribute('onclick') || '',
+      smm: { tag: (smmGo || {}).tagName, click: (smmGo ? smmGo.getAttribute('onclick') : '') || '', go: !!smm.querySelector('.pjh-smm-cfg'), wrap: smm.tagName },
       pills };
   });
   ok('«Дедлайн» — кнопка', zones.dl.tag === 'BUTTON', zones.dl.tag);
@@ -158,10 +158,10 @@ const setup = () => {
   ok('«Темп» — кнопка', zones.pace.tag === 'BUTTON', zones.pace.tag);
   ok('«Темп» открывает те же сроки', /pjqOpen\('p1','due','overdue'\)/.test(zones.pace.click), zones.pace.click);
   ok('«Срок жизни» кнопкой не стал', zones.life === 'DIV', zones.life);
-  ok('«Сложность» кнопкой не стала', zones.cx === 'DIV', zones.cx);
-  ok('SMM-сводка — кнопка', zones.smm.tag === 'BUTTON', zones.smm.tag);
+  ok('«Сложность» открывает справочник', zones.cx === 'BUTTON' && /pjcxOpen\('p1'\)/.test(zones.cxClick), zones);
+  ok('SMM-сводка — кнопка внутри обёртки', zones.smm.tag === 'BUTTON' && zones.smm.wrap === 'DIV', zones.smm);
   ok('SMM ведёт в последний отчёт', /pjhSmmGo\('p1'\)/.test(zones.smm.click), zones.smm.click);
-  ok('у SMM шеврон', zones.smm.go);
+  ok('у SMM шестерёнка настройки', zones.smm.go);
   ok('плитка этапов открывает этапы', /pjqOpen\('p1','stages'\)/.test(zones.pills[0]), zones.pills[0]);
   ok('плитка задач открывает задачи', /pjqOpen\('p1','tasks'\)/.test(zones.pills[1]), zones.pills[1]);
 
