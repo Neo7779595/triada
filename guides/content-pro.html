@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0B0D">
+<title>Эффективность контента: экспертный уровень</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   DETROYD ACADEMY — оболочка разбора
+   Полосу прогресса, обложку во весь экран и боковую навигацию держим
+   в одном месте: шестнадцать документов обязаны выглядеть одной серией,
+   а не шестнадцатью самостоятельными страницами.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0A0B0D; --bg1:#0F1116; --bg2:#151920; --bg3:#1C212A;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --txt:#EAECEF; --txt2:#9AA1AC; --txt3:#7A828D;
+  --ac:#37E6C8; --ac-dim:rgba(55,230,200,.13); --ac-line:rgba(55,230,200,.34);
+  --pos:#43D88C; --neg:#F0785C; --warn:#E3B567; --violet:#8A8FFF;
+  --mono:'Geist Mono','JetBrains Mono',ui-monospace,monospace;
+  --e:cubic-bezier(.4,0,.2,1); --e-out:cubic-bezier(.16,1,.3,1);
+  --rail:304px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+/* Базовый кегль 18px, а не 16. Разбор читают подряд по двадцать минут, и
+   справочные 16px на большом экране заставляют придвигаться к монитору.
+   Всё остальное считается от этой величины, поэтому меняется одним числом. */
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:18px/1.7 'Geist','DM Sans',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* ——— полоса прочитанного ——— */
+.rp{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:transparent}
+.rp i{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--ac),var(--violet));
+  box-shadow:0 0 12px -2px var(--ac);transition:width .1s linear}
+
+/* ——— верхняя полоса академии ——— */
+.acad{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:14px 30px;background:rgba(10,11,13,.72);backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;transition:border-color .25s var(--e),background .25s var(--e)}
+.acad.stuck{border-bottom-color:var(--line)}
+.acad-b{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--txt3);min-width:0}
+.acad-b i{width:7px;height:7px;border-radius:50%;background:var(--ac);box-shadow:0 0 10px -1px var(--ac);flex:none}
+.acad-b b{color:var(--txt2);font-weight:700}
+.acad-lvl{margin-left:auto;display:flex;align-items:center;gap:7px}
+/* Уровни стали ссылками — базовый вид описываем и для span, и для a, иначе
+   браузер рисует их своим синим и полоса разъезжается по цвету. */
+.acad-lvl span,.acad-lvl a{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  padding:4px 10px;border-radius:999px;background:var(--bg3);color:var(--txt3);white-space:nowrap;
+  text-decoration:none}
+.acad-lvl span.on,.acad-lvl a.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+.acad-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 13px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+  background:transparent;cursor:pointer;
+  transition:border-color .16s var(--e),color .16s var(--e),background .16s var(--e)}
+.acad-back:hover{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+/* Кнопка «назад» стоит первой и крупнее прочего: из статьи в кабинет
+   возвращаются чаще, чем делают что-либо ещё в этой полосе. */
+.acad-prev{margin-right:2px;padding:7px 14px 7px 11px;border-color:var(--line2);color:var(--txt)}
+.acad-prev svg{width:13px;height:13px;flex:none}
+/* Уровни — это переключатель между двумя разборами одного модуля, а не подпись.
+   Раньше они выглядели одинаково с кликабельными элементами и никуда не вели. */
+a.acad-sw{text-decoration:none;transition:background .16s var(--e),color .16s var(--e),box-shadow .16s var(--e)}
+a.acad-sw:hover{background:var(--bg2);color:var(--txt2)}
+a.acad-sw.on{background:var(--ac-dim);color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac-line)}
+a.acad-sw.on:hover{background:rgba(55,230,200,.2);color:var(--ac)}
+
+/* ——— кнопка «наверх» ——— */
+.up{position:fixed;right:26px;bottom:26px;z-index:45;width:46px;height:46px;border-radius:14px;
+  display:grid;place-items:center;cursor:pointer;border:1px solid var(--line2);
+  background:rgba(15,17,22,.82);backdrop-filter:blur(12px);color:var(--txt2);
+  opacity:0;transform:translateY(10px) scale(.94);pointer-events:none;
+  transition:opacity .24s var(--e),transform .24s var(--e-out),color .16s var(--e),border-color .16s var(--e)}
+.up.on{opacity:1;transform:none;pointer-events:auto}
+.up:hover{color:var(--ac);border-color:var(--ac-line)}
+.up svg{width:17px;height:17px}
+
+/* ——— переход к следующему разбору ——— */
+.navend{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:70px 0 0}
+.navend a{display:flex;flex-direction:column;gap:8px;text-decoration:none;padding:26px 28px;
+  border:1px solid var(--line);border-radius:18px;background:var(--bg1);
+  transition:border-color .2s var(--e),transform .2s var(--e),background .2s var(--e)}
+.navend a:hover{border-color:var(--ac-line);transform:translateY(-2px);background:var(--bg2)}
+.navend a.nx{align-items:flex-end;text-align:right}
+.navend k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+.navend s{text-decoration:none;font-size:19px;font-weight:650;color:var(--txt);letter-spacing:-.018em;line-height:1.3}
+.navend .none{opacity:.35;pointer-events:none}
+@media(max-width:680px){ .navend{grid-template-columns:1fr} .navend a.nx{align-items:flex-start;text-align:left}
+  .up{right:16px;bottom:16px;width:42px;height:42px} }
+
+/* ——— обложка во весь экран ——— */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:120px 30px 90px;overflow:hidden}
+.hero-bg{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(55,230,200,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(55,230,200,.045) 1px,transparent 1px);
+  background-size:60px 60px;
+  -webkit-mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%);
+  mask-image:radial-gradient(80% 70% at 22% 22%,#000,transparent 72%)}
+.hero-gl{position:absolute;width:min(64vw,900px);aspect-ratio:1;left:-10vw;top:-16vh;pointer-events:none;
+  background:radial-gradient(circle,rgba(55,230,200,.13),transparent 62%);filter:blur(26px)}
+.hero-in{position:relative;width:100%;max-width:1460px;margin:0 auto}
+.hero .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--txt3)}
+.hero h1{font-size:clamp(40px,5.8vw,92px);line-height:1.02;letter-spacing:-.035em;margin:22px 0 0;font-weight:700;
+  max-width:19ch}
+.hero h1 em{font-style:normal;color:var(--ac)}
+.hero .lead{margin-top:24px;font-size:clamp(18px,1.45vw,24px);line-height:1.58;color:var(--txt2);max-width:66ch}
+.hero .lead b{color:var(--txt);font-weight:650}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:34px}
+.hero-meta span{font-family:var(--mono);font-size:12px;letter-spacing:.11em;text-transform:uppercase;
+  padding:9px 16px;border-radius:999px;border:1px solid var(--line2);color:var(--txt3)}
+.hero-meta span.ac{border-color:var(--ac-line);color:var(--ac);background:var(--ac-dim)}
+.hero-cue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:9px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--txt3);text-decoration:none}
+.hero-cue i{display:block;width:1px;height:34px;background:linear-gradient(var(--ac),transparent);
+  animation:cue 2.1s var(--e) infinite}
+@keyframes cue{0%{transform:scaleY(.3);opacity:.3;transform-origin:top}50%{transform:scaleY(1);opacity:1;transform-origin:top}100%{transform:scaleY(.3);opacity:.3;transform-origin:top}}
+
+/* ——— каркас: рельс слева, текст справа ———
+   Ширину отдаём экрану: на мониторе 2400px прежние 1560px оставляли треть
+   пустой. Строка при этом не растягивается бесконечно — её держит мера в
+   символах у самих абзацев, а лишнюю ширину забирают таблицы и плитки. */
+.shell{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr);
+  gap:0;max-width:2160px;margin:0 auto;padding:0 clamp(24px,3.4vw,80px) 150px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;height:100svh;display:flex;flex-direction:column;
+  justify-content:center;padding:80px 26px 80px 0}
+.rail-t{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--txt3);
+  margin-bottom:16px}
+.rail a{display:flex;gap:12px;align-items:flex-start;text-decoration:none;padding:8px 0;
+  color:var(--txt3);font-size:15px;line-height:1.35;transition:color .18s var(--e)}
+.rail a n{font-family:var(--mono);font-size:11.5px;padding-top:3px;opacity:.6;flex:none;width:18px}
+.rail a s{text-decoration:none;border-left:1px solid transparent;padding-left:0;transition:.18s var(--e)}
+.rail a:hover{color:var(--txt2)}
+.rail a.on{color:var(--txt)}
+.rail a.on n{color:var(--ac);opacity:1}
+.rail-line{position:absolute;left:0;top:0;width:1px;background:var(--line)}
+/* Текст занимает всю оставшуюся ширину каркаса. Своего потолка у колонки нет
+   намеренно: он делал правое поле вдвое шире левого, и разворот выглядел
+   сдвинутым. Длину строки держит мера в символах у абзацев, а таблицы, плитки
+   и формулы забирают всю ширину — им она и нужна. */
+.doc{min-width:0;padding:0 0 0 clamp(32px,3.2vw,64px);border-left:1px solid var(--line);max-width:none}
+
+/* ——— типографика разбора ——— */
+h2{font-size:clamp(30px,2.9vw,50px);letter-spacing:-.03em;margin:0 0 8px;font-weight:700;scroll-margin-top:100px;
+  position:relative;line-height:1.08}
+h2 .n{font-family:var(--mono);font-size:14px;color:var(--ac);display:block;margin-bottom:12px;letter-spacing:.14em}
+.sec{padding:104px 0 0;position:relative}
+.sec:first-of-type{padding-top:70px}
+h3{font-size:clamp(20px,1.8vw,27px);margin:52px 0 10px;font-weight:650;letter-spacing:-.018em;line-height:1.25}
+p{margin:16px 0;color:var(--txt2);max-width:78ch}
+p b,li b,td b{color:var(--txt);font-weight:600}
+.sub{color:var(--txt3);font-size:16px}
+ul,ol{color:var(--txt2);padding-left:24px;max-width:78ch}
+li{margin:9px 0}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 6px;border-radius:5px;color:var(--txt)}
+
+/* Оглавление карточкой нужно только там, где боковая рельса не помещается.
+   Живёт оно не в обложке, а первым блоком текста: в обложке одиннадцать
+   пунктов растягивали её на два экрана и сталкивали заголовок за край. */
+.toc{display:none}
+
+/* Карточка — прозаический блок, и текст должен заполнять её целиком: с общей
+   мерой в 70 символов внутри широкой карточки правая половина оставалась
+   пустой и блок выглядел недоделанным. Ширину карточки при этом ограничиваем:
+   строка на всю ширину монитора не читается. Таблицы, плитки и формулы этого
+   потолка не знают — им ширина нужна, и они идут во всю колонку. */
+.card{background:var(--bg1);border:1px solid var(--line);border-radius:20px;padding:30px 36px;margin:28px 0;
+  max-width:min(100%,1240px);
+  transition:border-color .25s var(--e),transform .25s var(--e)}
+.card p,.card ul,.card ol{max-width:none}
+.card table{margin:20px 0 6px}
+/* Шаги и цитаты — тоже проза: тот же потолок, чтобы левый край всего текста
+   на странице стоял в одну линию, а правый не прыгал от блока к блоку. */
+.step{max-width:min(100%,1240px)}
+.quote{max-width:min(100%,1080px)}
+.card:hover{border-color:var(--line2)}
+.card.ac{border-color:var(--ac-line);background:linear-gradient(180deg,rgba(55,230,200,.055),transparent 58%),var(--bg1)}
+.card.warn{border-color:rgba(227,181,103,.32);background:linear-gradient(180deg,rgba(227,181,103,.055),transparent 58%),var(--bg1)}
+.card.neg{border-color:rgba(240,120,92,.32);background:linear-gradient(180deg,rgba(240,120,92,.055),transparent 58%),var(--bg1)}
+.card h4{margin:0 0 8px;font-size:21px;font-weight:650;letter-spacing:-.018em;line-height:1.28}
+.card p:last-child{margin-bottom:0}
+
+.frm{background:var(--bg2);border:1px solid var(--line2);border-radius:18px;padding:30px 30px;margin:30px 0;
+  font-family:var(--mono);font-size:clamp(15px,1.3vw,21px);color:var(--txt);text-align:center;letter-spacing:.01em;line-height:1.55}
+.frm .sm{display:block;font-size:12.5px;color:var(--txt3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:15px}
+.frm em{color:var(--ac);font-style:normal}
+
+.tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 9px;border-radius:999px;background:var(--bg3);color:var(--txt3);vertical-align:2px;margin-left:8px}
+.tag.ac{background:var(--ac-dim);color:var(--ac)}
+.tag.neg{background:rgba(240,120,92,.14);color:var(--neg)}
+.tag.warn{background:rgba(227,181,103,.14);color:var(--warn)}
+
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:18px;overflow:hidden;margin:30px 0}
+.kpi>div{background:var(--bg1);padding:26px 28px}
+.kpi .l{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--txt3)}
+.kpi .v{font-family:var(--mono);font-size:clamp(30px,3vw,46px);font-weight:700;letter-spacing:-.03em;margin-top:11px;line-height:1}
+.kpi .s{font-size:13.5px;color:var(--txt3);margin-top:9px;font-family:var(--mono)}
+
+table{width:100%;border-collapse:collapse;margin:28px 0;font-size:16.5px}
+th{text-align:left;font-family:var(--mono);font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--txt3);font-weight:600;padding:0 18px 13px 0;border-bottom:1px solid var(--line)}
+th.num{text-align:right;padding-right:0}
+td{padding:18px 18px 18px 0;border-bottom:1px solid var(--line);color:var(--txt2);vertical-align:top}
+td:first-child{color:var(--txt);font-weight:600}
+td.num{font-family:var(--mono);text-align:right;padding-right:0;color:var(--txt);font-weight:600}
+td.num:not(:last-child),th.num:not(:last-child){padding-right:28px}
+tr.hi td{background:rgba(240,120,92,.07)}
+tr.ok td{background:rgba(67,216,140,.06)}
+
+.quote{border-left:3px solid var(--ac-line);padding:8px 0 8px 28px;margin:34px 0;color:var(--txt2);
+  font-size:clamp(19px,1.6vw,26px);line-height:1.5;letter-spacing:-.012em}
+.quote b{color:var(--txt)}
+
+.step{display:flex;gap:22px;margin:26px 0;align-items:flex-start}
+.step .no{flex:none;width:40px;height:40px;border-radius:13px;background:var(--ac-dim);color:var(--ac);
+  display:grid;place-items:center;font-family:var(--mono);font-size:16px;font-weight:700}
+.step .bd{flex:1;min-width:0}
+/* Заголовок шага — только прямой потомок. Полужирное слово внутри фразы
+   («рекомендую 2», адрес консоли посреди предложения) раньше попадало под то же
+   правило и вставало отдельной строкой крупным кеглем, разрывая предложение. */
+.step .bd>b{display:block;color:var(--txt);font-weight:650;margin-bottom:5px;font-size:19px;letter-spacing:-.012em}
+.step .bd span{color:var(--txt2);font-size:17px;line-height:1.6}
+.step .bd span b{color:var(--txt);font-weight:650;font-size:inherit;letter-spacing:inherit}
+
+.bars{margin:24px 0}
+.bar{display:flex;align-items:center;gap:16px;margin:12px 0;font-family:var(--mono);font-size:14.5px}
+.bar .bl{flex:none;min-width:64px;color:var(--txt2);text-align:right;white-space:nowrap}
+.bar .bt{flex:1;height:28px;background:var(--bg2);border-radius:8px;overflow:hidden;position:relative}
+.bar .bf{height:100%;background:linear-gradient(90deg,var(--ac-dim),rgba(55,230,200,.42));
+  border-right:2px solid var(--ac);width:0;transition:width 1s var(--e-out)}
+.bar.d .bf{background:linear-gradient(90deg,rgba(240,120,92,.14),rgba(240,120,92,.5));border-right-color:var(--neg)}
+.bar .bv{flex:none;width:88px;color:var(--txt);font-weight:600}
+
+hr{border:0;border-top:1px solid var(--line);margin:0}
+.sec>hr:first-child{display:none}
+.foot{color:var(--txt3);font-size:14.5px;font-family:var(--mono);margin-top:110px;padding-top:30px;
+  border-top:1px solid var(--line);line-height:1.75}
+
+/* ——— появление по мере чтения ——— */
+.rv{opacity:0;transform:translateY(14px);transition:opacity .6s var(--e-out),transform .6s var(--e-out)}
+.rv.in{opacity:1;transform:none}
+
+@media(max-width:1180px){
+  :root{--rail:0px}
+  .shell{grid-template-columns:minmax(0,1fr);max-width:1040px;padding:0 clamp(20px,4vw,40px) 110px}
+  .rail{display:none}
+  .doc{padding-left:0;border-left:0;max-width:none}
+  .toc{display:block;background:var(--bg1);border:1px solid var(--line);border-radius:18px;padding:22px 24px;margin:34px 0 0}
+  .toc .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt3)}
+  .toc ol{margin:10px 0 0;padding-left:20px}
+  .toc a{color:var(--txt2);text-decoration:none}
+  .toc a:hover{color:var(--ac)}
+}
+@media(max-width:680px){
+  .acad{padding:11px 14px;gap:8px;flex-wrap:wrap}
+  .acad-lvl{margin-left:auto}
+  .acad-b{font-size:10px;letter-spacing:.1em}
+  .acad-prev span,.acad-back span{display:none}
+  .acad-prev,.acad-back{padding:7px 11px}
+  /* На телефоне обложка должна укладываться в один экран: длинный заголовок
+     плюс два абзаца вступления выталкивали подсказку «читать» за край, и
+     страница открывалась серединой фразы. Ужимаем поля и межстрочные отступы. */
+  .hero{padding:92px 18px 72px}
+  .hero h1{font-size:clamp(29px,7.6vw,38px);margin-top:16px}
+  .hero .lead{margin-top:15px;font-size:15.5px;line-height:1.55}
+  .hero-meta{margin-top:22px;gap:7px}
+  .hero-meta span{padding:6px 11px;font-size:10px}
+  .hero-cue{bottom:24px}
+  .shell{padding:0 16px 90px}
+  body{font-size:17px}
+  .sec{padding-top:70px}
+  .card{padding:22px 19px}
+  .card h4{font-size:19px}
+  .frm{padding:20px 15px}
+  .step{gap:14px}
+  .step .no{width:34px;height:34px;font-size:14px}
+  .step .bd>b{font-size:17.5px}
+  .step .bd span{font-size:16px}
+  .quote{padding-left:20px;margin:26px 0}
+  table{font-size:13.5px} th,td{padding-right:6px} td,th{overflow-wrap:anywhere}
+  td{padding:13px 6px 13px 0}
+  td.num:not(:last-child),th.num:not(:last-child){padding-right:8px}
+  table{display:block;max-width:100%;overflow-x:auto}
+  /* Адрес вроде console.cloud.google.com/auth/verification переносить негде:
+     пробелов в нём нет, и на 390px он оказывается шире колонки — страница
+     начинает ездить вбок целиком, вместе с заголовками и текстом. Разрешаем
+     разрыв ровно там, где слово иначе не помещается; обычные слова, которые
+     в строку влезают, это правило не трогает. */
+  .doc h2,.doc h3,.doc h4,.doc p,.doc li,.doc b,.doc a,.doc code,.step .bd b{overflow-wrap:break-word}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1;transform:none;transition:none}
+  .hero-cue i{animation:none}
+  .bar .bf{transition:none}
+  .rp i{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="rp" aria-hidden="true"><i></i></div>
+
+<div class="acad">
+  <button class="acad-back acad-prev" type="button" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span>Назад</span></button>
+  <div class="acad-b"><i></i>DETROYD Academy · <b>Эффективность контента</b></div>
+  <div class="acad-lvl">
+    <a class="acad-sw " href="content.html">Тренинг</a>
+    <a class="acad-sw on" href="content-pro.html">Экспертный</a>
+  </div>
+  <a class="acad-back" href="https://detroyd.com/#tools" aria-label="В кабинет"><span>В кабинет</span></a>
+</div>
+
+<header class="hero">
+  <div class="hero-bg" aria-hidden="true"></div><div class="hero-gl" aria-hidden="true"></div>
+  <div class="hero-in">
+    <div class="eyebrow">DETROYD SMART SYSTEM · методика модуля</div>
+    <h1>Эффективность контента</h1>
+    <p class="lead">Почему в модуле именно эти формулы, где они ломаются и какие ошибки он уже содержал.</p>
+    <p class="lead">Половина разбора — <b>собственные ошибки</b>: каждая выглядела убедительно ровно до проверки, и каждая нашлась не тестом, а взглядом на конкретный экран с конкретными числами.</p>
+    <div class="hero-meta"><span class="ac">экспертный уровень</span><span>10 разделов</span><span>на данных от 6 августа 2026</span></div>
+  </div>
+  <a class="hero-cue" href="#a1"><span>читать</span><i></i></a>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Разделы разбора">
+    <div class="rail-t">Разделы</div>
+    <a href="#a1"><n>01</n><s>Ставки считаются из счётчиков, а не берутся из отчёта</s></a><a href="#a2"><n>02</n><s>Проверка на вменяемость и цена ложного срабатывания</s></a><a href="#a3"><n>03</n><s>Индекс: как шесть метрик сводятся в одно число</s></a><a href="#a4"><n>04</n><s>Поле «масштаб × качество»</s></a><a href="#a5"><n>05</n><s>Рубрики: эмпирический байес</s></a><a href="#a6"><n>06</n><s>Разбор ошибки: разброс наблюдений против точности оценки</s></a><a href="#a7"><n>07</n><s>Разбор ошибки: места, противоречащие друг другу</s></a><a href="#a8"><n>08</n><s>Разбор ошибки: сверка числа с самим собой</s></a><a href="#a9"><n>09</n><s>Актуальность: три источника свежести</s></a><a href="#a10"><n>10</n><s>Чего модуль не знает</s></a>
+  </nav>
+  <main class="doc">
+<div class="toc"><b>Разделы</b><ol><li><a href="#a1">Ставки из счётчиков</a></li><li><a href="#a2">Проверка на вменяемость</a></li><li><a href="#a3">Индекс: шесть метрик в одно число</a></li><li><a href="#a4">Поле «масштаб × качество»</a></li><li><a href="#a5">Рубрики: эмпирический байес</a></li><li><a href="#a6">Ошибка: разброс против точности</a></li><li><a href="#a7">Ошибка: противоречивые места</a></li><li><a href="#a8">Ошибка: сверка числа с собой</a></li><li><a href="#a9">Актуальность</a></li><li><a href="#a10">Чего модуль не знает</a></li></ol></div>
+<p>Базовый разбор объясняет, что показано на экране. Этот — почему именно так, и чего это стоило. Половина документа — разбор ошибок, которые модуль уже содержал и которые были найдены не тестами, а взглядом на конкретный экран с конкретными числами.</p>
+
+<div class="card ac">
+  <h4>Главный вопрос модуля</h4>
+  <p><b>Что считать единицей наблюдения.</b> Публикацию или показ? От ответа зависят все интервалы, все пороги и половина выводов — и именно на этом вопросе модуль один раз ошибся так, что заявлял точность в треть процентного пункта там, где не знал почти ничего.</p>
+</div>
+<section class="sec"><h2 id="a1"><span class="n">01</span>Ставки считаются из счётчиков, а не берутся из отчёта</h2>
+
+<p>В payload SMM-отчёта уже лежат <code>er</code>, <code>lr</code>, <code>tr</code>, <code>sr</code>, <code>shr</code>. Модуль их игнорирует и пересчитывает из счётчиков заново.</p>
+
+<div class="card neg rv">
+  <h4>Случай, который это решил</h4>
+  <p>Один и тот же рилс лежит в базе с <b>25 765 комментариями</b> на охват 51 507 в пяти старых копиях отчёта и с <b>257</b> в пяти новых. Опечатку исправили, отчёты с ней остались.</p>
+  <p>При наивной агрегации рубрика «ИГРОВОЙ МЕХАНИЗМ» получает ER 26 % и первое место. При честной обработке она уходит в блок «недостаточно данных» с ER 1,36 % — и оказывается худшей.</p>
+</div>
+
+<p>Мораль общая: <b>счётчики видно и можно проверить, ставку — нет</b>. Ставка в базе — результат чьего-то расчёта в неизвестный момент по неизвестной формуле. Из двух чисел, которые должны совпадать, доверять надо тому, которое можно перепроверить.</p>
+
+<h3>Знаменатель</h3>
+
+<p>У всех ставок один знаменатель — <b>охват</b>. Не подписчики: они раздувают знаменатель теми, кто публикацию не видел, и создают видимость падения вовлечённости с ростом аккаунта. Не просмотры: они не дедуплицированы, один человек может дать десять.</p>
+
+<p>ER здесь — сумма четырёх ставок, а не отдельная метрика. Поэтому в композитный индекс он не входит: добавить его к четырём компонентам значит посчитать сохранения и репосты дважды.</p></section>
+<section class="sec"><h2 id="a2"><span class="n">02</span>Проверка на вменяемость и цена ложного срабатывания</h2>
+
+<p>Шесть правил отсеивают публикации, чьим числам верить нельзя. Публикация остаётся видимой, но индекса не получает и в агрегаты рубрики не входит.</p>
+
+<table class="rv">
+<tr><th>Правило</th><th>Что ловит</th></tr>
+<tr><td><code>rate_over_30</code></td><td>ER выше 30 % — почти всегда ошибка в охвате</td></tr>
+<tr><td><code>reach_gt_views</code></td><td>Охват больше просмотров — перепутанные колонки</td></tr>
+<tr><td><code>eng_gt_reach</code></td><td>Взаимодействий больше, чем охват</td></tr>
+<tr><td><code>gain_over_10pct</code></td><td>Подписок больше 10 % от охвата</td></tr>
+<tr><td><code>no_reach</code></td><td>Нет охвата — ставки считать не на чем</td></tr>
+<tr class="hi"><td><code>comments_gt_likes</code></td><td>Комментариев больше лайков <b>и</b> доля комментирующих выше 5 % от охвата</td></tr>
+</table>
+
+<div class="card warn rv">
+  <h4>Разбор ошибки: последнее правило было слишком широким</h4>
+  <p>Изначально оно звучало просто: комментариев больше лайков и больше пятидесяти. Логика казалась безупречной — на нормальной публикации лайков всегда больше.</p>
+  <p>И оно выбросило из рейтинга ваш реальный рилс <b>«3 ta urunishda tikka tushirganga bitta Uzbek do'ner»</b>: 150 лайков, 384 комментария, ER 1,4 %. Это розыгрыш с условием «напиши в комментариях» — нормальная комментарийная механика, а не опечатка.</p>
+  <p>Правило вырезало ровно тот формат, ради оценки которого модуль и строился.</p>
+</div>
+
+<p>Исправление: к перевесу добавлено условие на саму ставку — <b>доля комментирующих выше 5 % от охвата</b>. Опечатка на 25 765 даёт 50,88 % и отсеивается по-прежнему; розыгрыш с 0,67 % проходит.</p>
+
+<div class="card rv">
+  <h4>Общий принцип</h4>
+  <p>У любой проверки есть две цены: пропустить мусор и выбросить хорошее. Вторая обычно невидима — выброшенное просто не появляется на экране, и никто не замечает, что его нет. Поэтому у каждого правила должно быть условие на <b>неправдоподобие</b>, а не на необычность.</p>
+</div></section>
+<section class="sec"><h2 id="a3"><span class="n">03</span>Индекс: как шесть метрик сводятся в одно число</h2>
+
+<p>Композит строится в четыре шага, и каждый решает свою проблему.</p>
+
+<div class="step rv">
+  <div class="bd"><b>Логарифм.</b> Охват и ставки распределены с тяжёлым правым хвостом. В линейном масштабе один виральный ролик определяет всю шкалу.</div>
+</div>
+<div class="step rv">
+  <div class="bd"><b>Робастный масштаб.</b> Отклонение от медианы делится на MAD × 1,4826. Если MAD нулевой — на IQR / 1,349, если и он нулевой — на SD. Каскад нужен потому, что у половины публикаций репостов ноль, и MAD обнуляется на реальных данных регулярно.</div>
+</div>
+<div class="step rv">
+  <div class="bd"><b>Логистическое сжатие.</b> <code>s = 1 / (1 + e^(−z/1.5))</code>. Отклонение в полторы сигмы даёт 0,73, в четыре — 0,93, в девять — 0,998: выброс упирается в потолок, а середина распределения остаётся различимой.</div>
+</div>
+<div class="step rv">
+  <div class="bd"><b>Взвешенное геометрическое среднее.</b> Не арифметическое: провал по одной компоненте не должен компенсироваться избытком по другой. Публикация с нулевыми сохранениями и огромным охватом — не «средняя», она проблемная.</div>
+</div>
+
+<div class="card rv">
+  <h4>Веса и почему они на виду</h4>
+  <p>Охват 0,25 · лайки 0,10 · комментарии 0,15 · сохранения 0,20 · репосты 0,20 · подписки 0,10. Сохранения и репосты весят больше лайков потому, что двигают алгоритм и стоят аудитории дороже.</p>
+  <p>Веса написаны в досье каждой публикации. Скрытые веса превращают оценку в гадание, а доверять гаданию нельзя даже когда оно верное.</p>
+</div>
+
+<h3>Разбор ошибки: индекс на машинном нуле</h3>
+
+<div class="card neg rv">
+  <h4>51 из 100 там, где сравнивать было не с чем</h4>
+  <p>Когда публикаций мало или они похожи, разброса между ними нет, и стандартное отклонение обязано выйти нулём. У чисел с плавающей точкой оно выходит <b>1e-16</b> — накопленной ошибкой суммирования.</p>
+  <p>Формально «разброс есть»: компонента проходила проверку <code>s &gt; 0</code>, и модуль строил индекс на шуме десятого знака. Публикация получала 51 из 100 при полном отсутствии базы для сравнения.</p>
+  <p>Исправление — относительный порог машинного нуля: <code>s &gt; 1e-9 × (|med| + 1)</code>. Шум растёт вместе с величиной, поэтому и порог относительный.</p>
+</div>
+
+<p>Отдельный урок: <b>сравнение с нулём в оценке разброса почти всегда ошибка</b>. Ноль в плавающей арифметике достижим редко, и проверка на него пропускает шум как сигнал.</p></section>
+<section class="sec"><h2 id="a4"><span class="n">04</span>Поле «масштаб × качество»</h2>
+
+<p>Охват — одновременно вход и выход алгоритма: он определяет, сколько людей увидят, и сам зависит от того, как отреагировали первые зрители. Сведение его с качеством реакций в один скаляр прячет главный диагностический сигнал.</p>
+
+<div class="card ac rv">
+  <h4>Почему квадрантов четыре, а не два</h4>
+  <p>Низкий индекс получается двумя разными способами. «Провал показа» (реакция сильная, увидели немногие) и «охват пустой» (показали широко, не зацепило) дают близкие числа и требуют <b>противоположных действий</b>. В первом случае чинить надо обложку и первые секунды, во втором — само содержание.</p>
+  <p>Одна колонка чисел этой разницы не содержит. Четыре квадранта дают четыре решения.</p>
+</div>
+
+<p>Качество реакций считается тем же композитом, но <b>без охвата и без подписок</b>: только четыре ставки. Иначе ось Y содержала бы ось X, и поле выродилось бы в диагональ.</p></section>
+<section class="sec"><h2 id="a5"><span class="n">05</span>Рубрики: эмпирический байес</h2>
+
+<p>Рубрика с двумя публикациями, одна из которых выстрелила, по сырому среднему возглавит рейтинг. Сглаживание к норме профиля решает это без произвольных порогов.</p>
+
+<div class="frm rv">
+  θ = exp( (n · ln y + m · ln μ) / (n + m) )
+</div>
+
+<p>где <code>y</code> — сырое значение рубрики, <code>μ</code> — норма профиля, <code>n</code> — число публикаций, <code>m</code> — псевдонаблюдения. Всё в логарифмах, потому что ставки логнормальны.</p>
+
+<h3>Откуда берётся m</h3>
+
+<p><code>m = σ² / τ²</code>: отношение дисперсии внутри рубрик к дисперсии между ними, оценённое разложением ANOVA по вашим же данным. Смысл прямой: <b>чем меньше рубрики отличаются друг от друга, тем сильнее каждую тянет к общей норме</b>. Параметр не выдуман и не подобран, он вычислен.</p>
+
+<div class="card rv">
+  <h4>Что это значит на ваших числах</h4>
+  <p>Сейчас <code>m ≈ 10</code> — потолок диапазона. То есть межгрупповая дисперсия мала относительно внутригрупповой: рубрики почти не отличаются друг от друга, и сглаживание работает на максимуме. Отсюда и коридор лифтов ×0,99 – ×1,13.</p>
+  <p>Это не дефект расчёта, а его правильный ответ: на пяти рубриках по две-пять публикаций различий между темами не видно.</p>
+</div>
+
+<p>Рубрика с одной публикацией не ранжируется вовсе. Ни один из тринадцати изученных при проектировании сервисов аналитики так не делает — все показывают её в общем списке, и это их методическая ошибка: одна публикация не позволяет отличить свойство рубрики от свойства ролика.</p></section>
+<section class="sec"><h2 id="a6"><span class="n">06</span>Разбор ошибки: разброс наблюдений против точности оценки</h2>
+
+<p>Самая дорогая ошибка модуля. Она прожила дольше остальных, потому что выглядела как аккуратная статистика.</p>
+
+<div class="card neg rv">
+  <h4>Что было</h4>
+  <p>Под значением рубрики стояла подпись «типичный диапазон» и полоса. За ней скрывались <b>две несравнимые величины</b>:</p>
+  <ul>
+    <li>при n ≥ 3 — межквартильный размах самих публикаций, то есть <b>разброс наблюдений</b>;</li>
+    <li>при n &lt; 3 — квазипуассоновский доверительный интервал ставки, то есть <b>точность оценки</b>.</li>
+  </ul>
+  <p>На карточке они выглядели одинаково и назывались одинаково.</p>
+</div>
+
+<div class="card neg rv">
+  <h4>И вторая, хуже первой</h4>
+  <p>Интервал при n &lt; 3 считался по <b>охвату</b>:</p>
+  <div class="frm rv">se = √( φ · p(1−p) / R ) , φ = 3 , R = 99 000</div>
+  <p>То есть 99 000 показов принимались за 99 000 независимых наблюдений. Две публикации давали интервал <b>9,4 – 10,0 %</b> — точность в треть процентного пункта там, где о рубрике известно почти ничего.</p>
+  <p>Показы одного ролика не независимы: их приносит один и тот же ролик одному и тому же алгоритму одной и той же аудитории. Единица наблюдения здесь — <b>публикация</b>.</p>
+  <p>Честный разброс тех же двух публикаций: <b>8,4 % и 13,5 %</b>. В восемь раз шире.</p>
+</div>
+
+<div class="card warn rv">
+  <h4>Симптом, по которому это и нашлось</h4>
+  <p>На экране стояло «6,21 %» с диапазоном «9,4 – 10,0 %», не содержащим этого числа. Заголовок был сглаженным значением, полоса — про сырое. Внутренняя несогласованность вылезла наружу картинкой, хотя ни один тест её не ловил.</p>
+</div>
+
+<p>Исправление: величина одна и измеримая — где лежат публикации рубрики. При n ≥ 3 межквартильный размах, при n = 2 расстояние между двумя значениями, при n = 1 разброса нет. Метка на полосе — сырое значение, из которого разброс и посчитан.</p>
+
+<div class="card ac rv">
+  <h4>Урок</h4>
+  <p><b>Псевдорепликация</b> — принятие зависимых наблюдений за независимые — самая частая ошибка в продуктовой аналитике соцсетей. Она всегда даёт слишком узкие интервалы и слишком уверенные выводы, и всегда выглядит как более строгая статистика, чем есть.</p>
+  <p>Проверочный вопрос один: <b>что здесь единица наблюдения</b>. Если ответ «показ» или «просмотр» — почти наверняка ошибка.</p>
+</div></section>
+<section class="sec"><h2 id="a7"><span class="n">07</span>Разбор ошибки: места, противоречащие друг другу</h2>
+
+<div class="card neg rv">
+  <h4>Что было на экране</h4>
+  <p>«ПАРТНЁРЫ — место 2–4» и тут же «ИММИДЖЕВЫЙ — место 3».</p>
+  <p>Либо второй правда третий — тогда первый третьим быть не может, — либо неизвестно ни то, ни другое. Утверждать оба сразу нельзя.</p>
+</div>
+
+<p>Причина: диапазон давался по числу публикаций (<code>n === 2</code>), а ширина бралась с потолка — плюс два места. Ни то ни другое не следовало из данных.</p>
+
+<div class="card ac rv">
+  <h4>Как стало</h4>
+  <p>Соседние по рейтингу рубрики попадают в одну группу, если их разбросы перекрываются — то есть данные не позволяют сказать, какая выше. Все члены группы показывают один диапазон, одиночка показывает точное место.</p>
+  <p><b>Симметрично по построению.</b> «Первый неотличим от второго» и «второй неотличим от первого» — одно утверждение, и теперь оно так и выглядит.</p>
+  <p>Когда в одну группу попадают все, это говорится один раз словами, а не штампуется «1–5» на каждой карточке: одно утверждение не становится пятью оттого, что напечатано пять раз.</p>
+</div></section>
+<section class="sec"><h2 id="a8"><span class="n">08</span>Разбор ошибки: сверка числа с самим собой</h2>
+
+<div class="card neg rv">
+  <h4>«Расхождение 0», которое ничего не значило</h4>
+  <p>Находка о подписках сверяла сумму приписанного публикациям с «чистым приростом аккаунта». Второе бралось как <code>followers_manual ?? followers</code>.</p>
+  <p>Но <code>metrics.followers</code> редактор SMM-отчёта <b>считает сам</b> — той же суммой приписанных подписок. Без введённого руками числа сверка сравнивала величину с собой и всегда печатала «расхождение 0».</p>
+  <p>Ноль, который ничего не значит, хуже отсутствия сверки: он читается как «сходится» и строит ложную уверенность ровно там, где её быть не должно.</p>
+</div>
+
+<p>Исправление: независимым источником считается только введённое руками число. Нет его — так и написано, и сверка не показывается.</p>
+
+<div class="card rv">
+  <h4>Заголовок, поставленный заранее</h4>
+  <p>Там же находка всегда называлась «Прирост подписчиков атрибутирован не полностью» — даже когда атрибуция была у всех публикаций. Заголовок был написан до того, как посмотрели на данные. Теперь он собирается из фактов.</p>
+</div></section>
+<section class="sec"><h2 id="a9"><span class="n">09</span>Актуальность: три источника свежести</h2>
+
+<p>Модуль читал отчёты один раз за вход и держал снимок до смены агентства. Опубликовали отчёт — не появится, удалили — останется. Выглядело это нормально: экран одинаковый в обоих случаях.</p>
+
+<div class="step rv">
+  <div class="bd"><b>Realtime по таблице reports.</b> Ловит изменения от других людей агентства.</div>
+</div>
+<div class="step rv">
+  <div class="bd"><b>Перехват собственных записей кабинета.</b> Работает, даже если сокет упал или вкладка была усыплена.</div>
+</div>
+<div class="step rv">
+  <div class="bd"><b>Проверка возраста снимка.</b> Старше полутора минут — перечитывается фоном. Последний рубеж на случай, когда молчат оба источника.</div>
+</div>
+
+<div class="card rv">
+  <h4>Детали, без которых это не работает</h4>
+  <p>Редактор SMM-отчёта сохраняет по ходу набора — событий приходит поток. Перечитывание отложено на 800 мс, иначе каждое нажатие клавиши уходило бы запросом.</p>
+  <p>Экран во время обновления не гаснет: моргать пустотой хуже, чем секунду показать предыдущие цифры с честной отметкой времени.</p>
+  <p>У закрытого модуля обновление не жжёт сеть — снимок просто выбрасывается, и следующее открытие возьмёт свежие данные.</p>
+</div></section>
+<section class="sec"><h2 id="a10"><span class="n">10</span>Чего модуль не знает</h2>
+
+<div class="card warn rv">
+  <h4>Даты публикации</h4>
+  <p>Её нет в отчёте, поэтому поправка на зрелость выключена. У ленты период полураспада охвата около 18 часов, у Reels окно шире — сравнивать вчерашний ролик с месячным на равных методически неверно. Модуль это знает и говорит об этом в строке честности, но исправить сам не может.</p>
+</div>
+
+<div class="card warn rv">
+  <h4>Отписок</h4>
+  <p>Приписанные подписки — это только приход. Чистое изменение аудитории из них не выводится.</p>
+</div>
+
+<div class="card warn rv">
+  <h4>Причинности</h4>
+  <p>Всё, что показывает модуль, — ассоциации в наблюдательных данных. «Рубрика Х работает лучше» значит «публикации с меткой Х имели более высокие ставки», а не «метка Х вызывает высокие ставки». Экспериментов здесь нет и быть не может.</p>
+</div>
+
+<div class="card neg rv">
+  <h4>И честный предел на текущих данных</h4>
+  <p>Пять отчётов, 21 публикация, две-пять на рубрику, один период. На таком объёме модуль способен надёжно сказать, <b>что случилось с конкретной публикацией</b>, и не способен надёжно сказать, <b>какая рубрика лучше</b>. Он это и говорит — вместо того чтобы выдать рейтинг, который развалится на следующем месяце.</p>
+</div></section>
+
+<div class="foot">
+  DETROYD SMART SYSTEM · Эффективность контента · экспертный уровень<br>
+Эмпирический байес (Efron &amp; Morris, 1975), робастные оценки масштаба (Rousseeuw &amp; Croux, 1993),<br>
+псевдорепликация (Hurlbert, 1984), разложение дисперсии ANOVA.<br>
+Разбор построен на кабинете DETROYD SYSTEM, данные от 8 августа 2026 года.
+</div>
+<nav class="navend" aria-label="Соседние разборы"><a class="pv" href="content.html"><k>← предыдущий разбор</k><s>Эффективность контента — тренинг</s></a><a class="nx" href="time.html"><k>следующий разбор →</k><s>Потраченное время — тренинг</s></a></nav>
+  </main>
+</div>
+
+<button class="up" type="button" aria-label="Наверх"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></button>
+
+<script>
+/* Оболочка разбора: полоса прочитанного, подсветка текущего раздела в рельсе,
+   появление блоков по мере прокрутки и рост полос-диаграмм. Всё на IntersectionObserver
+   и одном обработчике прокрутки — без библиотек и без работы, пока страница вне экрана.
+
+   Если человек попросил систему уменьшить движение, ничего из этого не включается:
+   блоки просто стоят на местах, полосы сразу нужной длины. */
+(function(){
+  var тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* полоса прочитанного + тень у верхней панели */
+  var rp = document.querySelector('.rp i'), acad = document.querySelector('.acad'), тик = false;
+  function прокрутка(){
+    var h = document.documentElement.scrollHeight - innerHeight;
+    var y = scrollY || pageYOffset;
+    if(rp) rp.style.width = (h > 0 ? Math.min(100, y / h * 100) : 0) + '%';
+    if(acad) acad.classList.toggle('stuck', y > 12);
+    тик = false;
+  }
+  addEventListener('scroll', function(){ if(!тик){ тик = true; requestAnimationFrame(прокрутка); } }, {passive:true});
+  прокрутка();
+
+  /* появление блоков. Наблюдатель отцепляется сразу после показа: элемент,
+     который уже видели, не должен исчезать при прокрутке назад. */
+  var показ = document.querySelectorAll('.rv');
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var i=0;i<показ.length;i++) показ[i].classList.add('in');
+  } else {
+    var ob = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); ob.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -8% 0px', threshold:0.05});
+    for(var j=0;j<показ.length;j++) ob.observe(показ[j]);
+  }
+
+  /* полосы-диаграммы: ширина хранится в data-w и ставится в момент показа,
+     иначе анимация проходит впустую где-то за пределами экрана */
+  var полосы = document.querySelectorAll('.bar .bf[data-w]');
+  function налить(el){ el.style.width = el.getAttribute('data-w'); }
+  if(тихо || !('IntersectionObserver' in window)){
+    for(var k=0;k<полосы.length;k++) налить(полосы[k]);
+  } else {
+    var ob2 = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ налить(e.target); ob2.unobserve(e.target); } });
+    }, {threshold:0.3});
+    for(var m=0;m<полосы.length;m++) ob2.observe(полосы[m]);
+  }
+
+  /* «Наверх» — показываем после первого экрана. Кнопка нужна именно в длинном
+     разборе: докрутив до одиннадцатого раздела, человек иначе тянет полосу
+     прокрутки через весь документ. */
+  var up = document.querySelector('.up');
+  if(up){
+    up.addEventListener('click', function(){
+      try{ scrollTo({top:0, behavior: тихо ? 'auto' : 'smooth'}); }catch(e){ scrollTo(0,0); }
+    });
+    addEventListener('scroll', function(){ up.classList.toggle('on', (scrollY||pageYOffset) > innerHeight * 0.9); }, {passive:true});
+  }
+
+  /* «Назад» ведёт в «Инструменты» — туда, откуда материал и открывали. Раньше
+     кнопка отдавала history.back(), и в новой вкладке истории не оказывалось:
+     человек попадал на стартовые «Проекты» и искал академию заново. Адрес с
+     хэшем работает одинаково в обоих случаях, поэтому историю не трогаем. */
+  var КАБИНЕТ_ИНСТРУМЕНТЫ = 'https://detroyd.com/#tools';
+  var prev = document.querySelector('.acad-prev');
+  if(prev) prev.addEventListener('click', function(e){ e.preventDefault(); location.href = КАБИНЕТ_ИНСТРУМЕНТЫ; });
+
+  /* подсветка текущего раздела. Считаем не пересечение, а расстояние до верха:
+     разделы разной длины, и при пороговом методе короткие проскакивали
+     неподсвеченными, а длинные держали подсветку на два экрана дольше нужного. */
+  var ссылки = [].slice.call(document.querySelectorAll('.rail a'));
+  var цели = ссылки.map(function(a){ return document.getElementById(a.getAttribute('href').slice(1)); });
+  function текущий(){
+    var лучший = 0, минимум = Infinity, порог = innerHeight * 0.32;
+    for(var i=0;i<цели.length;i++){
+      if(!цели[i]) continue;
+      var t = цели[i].getBoundingClientRect().top - порог;
+      if(t <= 0 && Math.abs(t) < минимум){ минимум = Math.abs(t); лучший = i; }
+    }
+    for(var j=0;j<ссылки.length;j++) ссылки[j].classList.toggle('on', j === лучший);
+  }
+  if(ссылки.length){
+    var тик2 = false;
+    addEventListener('scroll', function(){ if(!тик2){ тик2 = true; requestAnimationFrame(function(){ текущий(); тик2 = false; }); } }, {passive:true});
+    текущий();
+  }
+})();
+</script>
+</body>
+</html>
